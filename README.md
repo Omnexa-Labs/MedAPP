@@ -67,6 +67,11 @@ Agentic services live under `agents/services/` (ports 9001–9006). Each is a th
 
 ## Documentation
 
+**Start here:**
+- [**Project handbook**](docs/PROJECT.md) — mission, architecture, roadmap, how to work in this repo
+- [**Frontend handbook**](docs/FRONTEND.md) — for the frontend engineer: get started, conventions, what to build
+
+**Reference:**
 - [Architecture overview](docs/architecture/overview.md)
 - [API conventions](docs/api/conventions.md)
 - [ADRs](docs/adr/)
