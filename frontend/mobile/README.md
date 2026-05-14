@@ -15,6 +15,9 @@ That's it. The app boots into the login screen. Use the pre-filled credentials
 (`demo@medapp.test` / `demo1234`) — anything with a valid email and 4+ char
 password is accepted in mock mode.
 
+> Verified on Flutter 3.24.5 stable (Windows). `flutter analyze` is clean,
+> `flutter test` passes (2/2).
+
 ### Run against a live backend
 
 ```bash
