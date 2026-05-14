@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hospital_service
+  labels: { app: hospital_service }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: hospital_service }
+  template:
+    metadata:
+      labels: { app: hospital_service }
+    spec:
+      serviceAccountName: hospital_service
+      containers:
+        - name: app
+          image: REPLACE_IMAGE_REF
+          ports: [{ containerPort: 8004 }]
+          envFrom:
+            - configMapRef: { name: medapp-config }
+            - secretRef: { name: medapp-secrets }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8004 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8004 }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 1, memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hospital_service
+spec:
+  selector: { app: hospital_service }
+  ports:
+    - port: 8004
+      targetPort: 8004

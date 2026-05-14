@@ -1,0 +1,10 @@
+{
+  "python.analysis.extraPaths": ["backend/shared", "backend/services"],
+  "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" },
+  "[dart]": { "editor.formatOnSave": true },
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true
+  }
+}

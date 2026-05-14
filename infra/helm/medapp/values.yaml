@@ -1,0 +1,29 @@
+image:
+  registry: europe-west1-docker.pkg.dev/medapp-dev/images
+  tag: latest
+  pullPolicy: IfNotPresent
+
+services:
+  api_gateway: { port: 8000, replicas: 2 }
+  user_service: { port: 8001, replicas: 2 }
+  doctor_service: { port: 8002, replicas: 2 }
+  nurse_service: { port: 8003, replicas: 2 }
+  hospital_service: { port: 8004, replicas: 2 }
+  booking_service: { port: 8005, replicas: 2 }
+  payment_service: { port: 8006, replicas: 2 }
+  telemedicine_service: { port: 8007, replicas: 2 }
+  notification_service: { port: 8008, replicas: 2 }
+  lab_service: { port: 8009, replicas: 2 }
+  ehr_service: { port: 8010, replicas: 2 }
+  social_service: { port: 8011, replicas: 2 }
+  analytics_service: { port: 8012, replicas: 2 }
+  concierge_agent: { port: 9001, replicas: 2 }
+  smart_recommend_agent: { port: 9002, replicas: 1 }
+  medical_chat_agent: { port: 9003, replicas: 2 }
+  lab_reader_agent: { port: 9004, replicas: 1 }
+  vitals_watcher_agent: { port: 9005, replicas: 1 }
+  booking_agent: { port: 9006, replicas: 1 }
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits:   { cpu: 1,   memory: 1Gi }

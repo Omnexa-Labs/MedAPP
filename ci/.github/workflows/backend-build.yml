@@ -1,0 +1,51 @@
+name: backend-build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write }
+    strategy:
+      matrix:
+        service:
+          - api_gateway
+          - user_service
+          - doctor_service
+          - nurse_service
+          - hospital_service
+          - booking_service
+          - payment_service
+          - telemedicine_service
+          - notification_service
+          - lab_service
+          - ehr_service
+          - social_service
+          - analytics_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+      - uses: docker/login-action@v3
+        with:
+          registry: europe-west1-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/services/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: |
+            europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/images/${{ matrix.service }}:${{ github.sha }}
+            europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/images/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

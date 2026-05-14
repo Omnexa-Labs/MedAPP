@@ -1,0 +1,171 @@
+name: medapp
+
+x-py-build: &py-build
+  context: ../..
+  args:
+    BUILDKIT_INLINE_CACHE: 1
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medapp
+      POSTGRES_PASSWORD: medapp
+      POSTGRES_DB: medapp
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medapp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: medapp
+      RABBITMQ_DEFAULT_PASS: medapp
+    ports: ["5672:5672", "15672:15672"]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes: ["./otel-config.yaml:/etc/otel/config.yaml:ro"]
+    ports: ["4317:4317", "4318:4318"]
+
+  api_gateway:
+    build:
+      <<: *py-build
+      dockerfile: backend/services/api_gateway/Dockerfile
+    depends_on: [user_service]
+    environment: &svc-env
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["8000:8000"]
+
+  user_service:
+    build: { <<: *py-build, dockerfile: backend/services/user_service/Dockerfile }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_started } }
+    environment: *svc-env
+    ports: ["8001:8001"]
+
+  doctor_service:
+    build: { <<: *py-build, dockerfile: backend/services/doctor_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8002:8002"]
+
+  nurse_service:
+    build: { <<: *py-build, dockerfile: backend/services/nurse_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8003:8003"]
+
+  hospital_service:
+    build: { <<: *py-build, dockerfile: backend/services/hospital_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8004:8004"]
+
+  booking_service:
+    build: { <<: *py-build, dockerfile: backend/services/booking_service/Dockerfile }
+    depends_on: [postgres, rabbitmq]
+    environment: *svc-env
+    ports: ["8005:8005"]
+
+  payment_service:
+    build: { <<: *py-build, dockerfile: backend/services/payment_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8006:8006"]
+
+  telemedicine_service:
+    build: { <<: *py-build, dockerfile: backend/services/telemedicine_service/Dockerfile }
+    depends_on: [redis]
+    environment: *svc-env
+    ports: ["8007:8007"]
+
+  notification_service:
+    build: { <<: *py-build, dockerfile: backend/services/notification_service/Dockerfile }
+    depends_on: [rabbitmq]
+    environment: *svc-env
+    ports: ["8008:8008"]
+
+  lab_service:
+    build: { <<: *py-build, dockerfile: backend/services/lab_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8009:8009"]
+
+  ehr_service:
+    build: { <<: *py-build, dockerfile: backend/services/ehr_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8010:8010"]
+
+  social_service:
+    build: { <<: *py-build, dockerfile: backend/services/social_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8011:8011"]
+
+  analytics_service:
+    build: { <<: *py-build, dockerfile: backend/services/analytics_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8012:8012"]
+
+  # ── Agents (Claude-powered) ────────────────────────────────────────────────
+  concierge_agent:
+    build: { <<: *py-build, dockerfile: agents/services/concierge_agent/Dockerfile }
+    depends_on: [api_gateway]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9001:9001"]
+
+  smart_recommend_agent:
+    build: { <<: *py-build, dockerfile: agents/services/smart_recommend_agent/Dockerfile }
+    depends_on: [ehr_service]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9002:9002"]
+
+  medical_chat_agent:
+    build: { <<: *py-build, dockerfile: agents/services/medical_chat_agent/Dockerfile }
+    depends_on: [ehr_service]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9003:9003"]
+
+  lab_reader_agent:
+    build: { <<: *py-build, dockerfile: agents/services/lab_reader_agent/Dockerfile }
+    depends_on: [ehr_service, lab_service]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9004:9004"]
+
+  vitals_watcher_agent:
+    build: { <<: *py-build, dockerfile: agents/services/vitals_watcher_agent/Dockerfile }
+    depends_on: [ehr_service, notification_service]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9005:9005"]
+
+  booking_agent:
+    build: { <<: *py-build, dockerfile: agents/services/booking_agent/Dockerfile }
+    depends_on: [booking_service, payment_service]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports: ["9006:9006"]
+
+volumes:
+  pgdata:

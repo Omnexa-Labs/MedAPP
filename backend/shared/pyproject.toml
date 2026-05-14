@@ -1,0 +1,25 @@
+[project]
+name = "medapp-shared"
+version = "0.1.0"
+description = "Shared libraries used by all MedApp backend services"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg>=0.29",
+  "alembic>=1.13",
+  "aio-pika>=9.4",
+  "httpx>=0.27",
+  "pyjwt[crypto]>=2.9",
+  "structlog>=24.1",
+  "opentelemetry-api>=1.27",
+  "opentelemetry-sdk>=1.27",
+  "opentelemetry-instrumentation-fastapi>=0.48b0",
+  "opentelemetry-exporter-otlp>=1.27",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

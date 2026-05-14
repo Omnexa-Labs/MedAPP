@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "ms-azuretools.vscode-docker",
+    "hashicorp.terraform",
+    "dart-code.flutter",
+    "dart-code.dart-code"
+  ]
+}
