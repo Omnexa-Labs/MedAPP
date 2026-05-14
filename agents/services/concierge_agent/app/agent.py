@@ -1,23 +1,24 @@
-"""Concierge agent — the patient's main entry point.
+"""Concierge agent.
 
-Implementation notes:
-- Model: claude-opus-4-7 (per `claude-api` skill default).
-- Adaptive thinking on (the only on-mode for Opus 4.7).
-- Effort `high` (recommended for intelligence-sensitive work).
-- System prompt is frozen and marked `cache_control: ephemeral` — the prefix is
-  tools (deterministic order) → system → messages. The patient's per-request
-  message goes after the breakpoint so the cache hits across turns.
-- We use the SDK's beta tool runner so we don't hand-roll the agentic loop.
+Wires together: system prompt + tool specs + executor + the chosen LLM provider.
+The provider is loaded by name from settings — change `CONCIERGE_LLM_PROVIDER`
+to switch (currently `mock` until we pick one).
 """
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
 
-from agents.shared import AgentRequest, AgentResponse, BaseAgent, get_claude_client
+from agents.shared import (
+    AgentRequest,
+    AgentResponse,
+    BaseAgent,
+    LLMChatTurn,
+    make_provider,
+)
 
 from .config import settings
-from .tools import ALL_TOOLS
+from .tools import TOOLS, make_executor
 
 _SYSTEM_PROMPT = (Path(__file__).resolve().parents[3] / "prompts" / "concierge.md").read_text()
 
@@ -25,49 +26,23 @@ _SYSTEM_PROMPT = (Path(__file__).resolve().parents[3] / "prompts" / "concierge.m
 class ConciergeAgent(BaseAgent):
     name = "concierge"
 
-    async def handle(self, req: AgentRequest) -> AgentResponse:
-        client = get_claude_client()
+    def __init__(self) -> None:
+        self._provider = make_provider(settings.llm_provider)
 
-        history_messages = [{"role": t.role, "content": t.content} for t in req.history]
-        user_turn = {
-            "role": "user",
-            "content": (
-                f"[patient_id={req.patient_id}]\n{req.message}"
-            ),
-        }
+    async def handle(self, req: AgentRequest) -> AgentResponse:
+        messages = [LLMChatTurn(role=t.role, content=t.content) for t in req.history]
+        messages.append(LLMChatTurn(role="user", content=req.message))
+
+        executor = make_executor(req.patient_id)
 
         def _run():
-            runner = client.beta.messages.tool_runner(
-                model=settings.model,
+            return self._provider.run(
+                system_prompt=_SYSTEM_PROMPT,
+                messages=messages,
+                tools=TOOLS,
+                executor=executor,
                 max_tokens=settings.max_tokens,
-                thinking={"type": "adaptive"},
-                output_config={"effort": settings.effort},
-                system=[
-                    {
-                        "type": "text",
-                        "text": _SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                tools=ALL_TOOLS,
-                messages=[*history_messages, user_turn],
             )
-            final = None
-            tool_calls: list[dict] = []
-            for message in runner:
-                final = message
-                for block in message.content:
-                    if block.type == "tool_use":
-                        tool_calls.append({"name": block.name, "input": block.input})
-            return final, tool_calls
 
-        final, tool_calls = await asyncio.to_thread(_run)
-
-        reply = next((b.text for b in final.content if b.type == "text"), "")
-        usage = {
-            "input_tokens": final.usage.input_tokens,
-            "output_tokens": final.usage.output_tokens,
-            "cache_read_input_tokens": getattr(final.usage, "cache_read_input_tokens", 0) or 0,
-            "cache_creation_input_tokens": getattr(final.usage, "cache_creation_input_tokens", 0) or 0,
-        }
-        return AgentResponse(reply=reply, tool_calls=tool_calls, usage=usage)
+        result = await asyncio.to_thread(_run)
+        return AgentResponse(reply=result.reply, tool_calls=result.tool_calls, usage=result.usage)

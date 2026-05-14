@@ -5,11 +5,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="BOOKING_", extra="ignore")
 
     service_name: str = "booking_agent"
-    model: str = "claude-opus-4-7"
-    max_tokens: int = 16000
-    effort: str = "high"
+    llm_provider: str = "mock"
+    max_tokens: int = 4096
 
-    anthropic_api_key: str = ""
     service_token: str = "change-me"
 
     user_service_url: str = "http://user_service:8001"

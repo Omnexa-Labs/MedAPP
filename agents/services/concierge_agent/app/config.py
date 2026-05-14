@@ -5,11 +5,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CONCIERGE_", extra="ignore")
 
     service_name: str = "concierge_agent"
-    model: str = "claude-opus-4-7"
-    max_tokens: int = 16000
-    effort: str = "high"
 
-    anthropic_api_key: str = ""  # picked up by SDK from ANTHROPIC_API_KEY too
+    # LLM provider — "mock" until we pick one. See agents/shared/llm.py.
+    llm_provider: str = "mock"
+    max_tokens: int = 4096
+
     service_token: str = "change-me"
 
     booking_service_url: str = "http://booking_service:8005"

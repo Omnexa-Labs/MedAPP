@@ -1,21 +1,25 @@
 # MedApp Agents
 
-Agentic AI layer. Each agent is a FastAPI service that uses **Claude Opus 4.7** as its brain and calls MedApp backend microservices as tools.
+Agentic AI layer. Each agent is a FastAPI service that drives an LLM (provider TBD)
+to orchestrate MedApp backend microservices as tools.
 
-**Not ML training, not model serving** — we don't fine-tune. We orchestrate Claude with tool use.
+**No training, no model serving.** We don't fine-tune. We orchestrate an LLM with tool use.
 
-## Surface choice: Claude API + tool use (not Managed Agents)
+## LLM provider — not yet chosen
 
-We use **Claude API with the SDK's beta tool runner** because:
-- Our tools are HTTP calls to our own internal services (booking, EHR, payments) — no sandbox/bash/code-exec workspace needed
-- PHI stays inside our VPC; calling internal services from inside our FastAPI is cleaner for HIPAA boundaries
-- Each agent is a stateless FastAPI service; scaling and observability live alongside the other backend services
+The LLM provider is **abstracted behind an `LLMProvider` interface** in
+`agents/shared/llm.py`. We have not yet committed to OpenAI, Anthropic Claude,
+Google Gemini, or a self-hosted model.
+
+- Default in dev/CI: `MockLLM` — deterministic canned responses, no network, no key.
+- To pick a real provider: implement a single class in `agents/shared/llm.py`
+  (≈ 30 lines) and flip `LLM_PROVIDER=<name>` in env. See `ADR 0002` in `docs/adr/`.
 
 ## Agents
 
 | Service | Port | Persona | Primary tools |
 |---|---|---|---|
-| concierge_agent | 9001 | The user's personal medical assistant — orchestrates everything else | search_providers, book_appointment, get_ehr, send_message |
+| concierge_agent | 9001 | Personal medical assistant — orchestrates everything else | search_providers, book_appointment, get_ehr, send_message |
 | smart_recommend_agent | 9002 | Lifestyle, diet, and medication recommendations from EHR + wearables | get_ehr, get_vitals_history, get_medications |
 | medical_chat_agent | 9003 | Long-form symptom triage and health Q&A | get_ehr, get_medications, lookup_drug_interactions |
 | lab_reader_agent | 9004 | Reads uploaded lab results / prescriptions (vision) and explains them | upload_to_ehr, lookup_drug_interactions, find_specialist |
@@ -24,26 +28,28 @@ We use **Claude API with the SDK's beta tool runner** because:
 
 ## Conventions
 
-- **Model**: `claude-opus-4-7` everywhere. Adaptive thinking on by default (`thinking: {type: "adaptive"}`).
-- **Tool runner**: SDK beta `@beta_tool` decorators. No manual loops unless a tool needs human-in-the-loop approval.
-- **Prompt caching**: every agent has a frozen system prompt + tool list, marked with `cache_control` so cache hit rate stays high.
-- **Memory**: per-user conversational state lives in `user_service` / `ehr_service` — agents are stateless, the patient ID arrives in each request and is propagated to all tool calls.
-- **PHI**: agents never log raw EHR content. Use `structlog.bind(patient_id=…)` and reference by ID only.
+- **Provider-agnostic.** Tool definitions are plain JSON schemas. Prompts are plain Markdown. Nothing in the agent code imports a vendor SDK.
+- **Tools are HTTP wrappers** around internal MedApp services. The agent passes `patient_id`; we forward it as `X-Patient-Id` for row-level access control.
+- **PHI never goes to logs/traces.** Use `agents/shared/phi.py::redact()` before `structlog.bind()` or attaching anything to a span.
+- **Agents are stateless.** Conversation state lives in `ehr_service` / `user_service`; the patient ID arrives in each `/chat` request.
 
 ## Layout
 
 ```
 agents/
-  shared/                    # Claude client factory, tool helpers, base FastAPI, PHI redaction
+  shared/
+    llm.py                # LLMProvider interface + MockLLM
+    base_agent.py         # FastAPI factory + AgentRequest/Response
+    medapp_client.py      # httpx client that forwards X-Patient-Id
+    phi.py                # redaction
+  prompts/                # one .md per agent — frozen system prompts
   services/<agent>/
     app/
-      main.py                # FastAPI + /chat endpoint
-      config.py              # env-driven settings (model, max_tokens, downstream URLs)
-      agent.py               # tool runner setup
-      tools.py               # @beta_tool functions wrapping MedApp services
+      main.py             # FastAPI + /chat
+      config.py           # env-driven settings
+      agent.py            # wires LLMProvider + tools + prompt
+      tools.py            # tool definitions + executors
     Dockerfile
     pyproject.toml
     tests/
-  prompts/                   # canonical system prompts per agent (cached prefix)
-  tools/                     # shared tool implementations imported by multiple agents
 ```

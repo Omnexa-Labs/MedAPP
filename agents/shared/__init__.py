@@ -1,11 +1,22 @@
-from .claude_client import get_claude_client
+from .base_agent import AgentRequest, AgentResponse, BaseAgent, ChatTurn, make_app
+from .llm import ChatTurn as LLMChatTurn
+from .llm import LLMProvider, LLMResult, MockLLM, ToolExecutor, ToolSpec, make_provider
 from .medapp_client import MedAppClient
-from .base_agent import BaseAgent, AgentRequest, AgentResponse
+from .phi import redact
 
 __all__ = [
-    "get_claude_client",
-    "MedAppClient",
-    "BaseAgent",
     "AgentRequest",
     "AgentResponse",
+    "BaseAgent",
+    "ChatTurn",
+    "LLMChatTurn",
+    "LLMProvider",
+    "LLMResult",
+    "MedAppClient",
+    "MockLLM",
+    "ToolExecutor",
+    "ToolSpec",
+    "make_app",
+    "make_provider",
+    "redact",
 ]

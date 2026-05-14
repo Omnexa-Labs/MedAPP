@@ -1,4 +1,4 @@
-from agents.shared.base_agent import make_app
+from agents.shared import make_app
 
 from .agent import VitalsWatcherAgent
 

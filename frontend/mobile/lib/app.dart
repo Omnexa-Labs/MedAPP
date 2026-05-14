@@ -14,6 +14,7 @@ class MedApp extends ConsumerWidget {
       title: 'MedApp',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );

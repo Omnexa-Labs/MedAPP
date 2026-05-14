@@ -1,14 +1,16 @@
 """Tools for the Vitals Watcher agent.
 
-Each tool wraps an internal MedApp service. Implement the bodies as you grow
-this agent’s scope; the concierge_agent has a fully fleshed-out example.
+Stub: only `get_ehr_summary` is wired. Add more tools by mirroring the pattern
+in concierge_agent/app/tools.py.
 """
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import httpx
-from anthropic import beta_tool
+
+from agents.shared import ToolSpec
 
 from .config import settings
 
@@ -22,15 +24,24 @@ def _hdr(patient_id: str) -> dict[str, str]:
     return {"X-Patient-Id": patient_id}
 
 
-@beta_tool
-def get_ehr_summary(patient_id: str) -> str:
-    """Return a structured summary of the patient’s medical record."""
-    r = _client.get(
-        f"{settings.ehr_service_url}/records/{patient_id}/summary",
-        headers=_hdr(patient_id),
-    )
-    r.raise_for_status()
-    return json.dumps(r.json())
+TOOLS: list[ToolSpec] = [
+    ToolSpec(
+        name="get_ehr_summary",
+        description="Return a structured summary of the patient's medical record.",
+        input_schema={"type": "object", "properties": {}, "required": []},
+    ),
+]
 
 
-ALL_TOOLS = [get_ehr_summary]
+def make_executor(patient_id: str):
+    def execute(name: str, args: dict[str, Any]) -> str:
+        if name == "get_ehr_summary":
+            r = _client.get(
+                f"{settings.ehr_service_url}/records/{patient_id}/summary",
+                headers=_hdr(patient_id),
+            )
+            if r.status_code >= 400:
+                return json.dumps({"error": r.text, "status": r.status_code})
+            return json.dumps(r.json())
+        return json.dumps({"error": f"unknown tool {name}"})
+    return execute
