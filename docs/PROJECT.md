@@ -154,11 +154,20 @@ scripts/                Codegen, migrations, seeds
 
 ### 4.3 Backend principles
 
-- **Microservices from day one** (ADR 0001). One database per service. No cross-service joins.
+- **Microservices from day one** (ADR 0001). One Postgres DB per service. No cross-service joins.
+- **Polyglot persistence:** Postgres for relational, MongoDB for documents, Qdrant for vectors. A given service uses whichever combination it needs.
 - **Sync calls**: HTTP via `httpx` clients in `backend/shared/clients/`.
 - **Async calls**: RabbitMQ topic exchange, CloudEvents envelope (`backend/shared/events/`).
 - **Auth**: JWT issued by `user_service`, verified at the gateway, re-verified per service for defense in depth.
-- **Per-service Alembic migrations**, orchestrated by `scripts/migrate-all.sh`.
+- **Per-service Alembic migrations** for Postgres (orchestrated by `scripts/migrate-all.sh`). Mongo collections are schema-on-read.
+
+#### Data architecture (which store for what)
+
+| Datastore | Driver | Used for |
+|---|---|---|
+| **PostgreSQL 16** | `asyncpg` (runtime) + `psycopg2` (Alembic / scripts) via SQLAlchemy 2.x | All transactional/relational data: users, doctors, bookings, payments, audit logs |
+| **MongoDB 7** | `motor` (async) | Chat transcripts, EHR document metadata + extracted text, social feed posts, agent traces |
+| **Qdrant 1.11** | `qdrant-client` (async via REST/gRPC) | Embeddings: EHR retrieval, lab text search, medical knowledge base, long-term agent memory |
 
 ### 4.4 Agentic layer principles
 
@@ -194,7 +203,10 @@ scripts/                Codegen, migrations, seeds
 | Agents | FastAPI + provider-agnostic LLM | Same stack as backend; provider deferred |
 | State (mobile) | Riverpod 2.x | Composable, testable, type-safe |
 | HTTP (mobile) | Dio | Interceptors, error handling, retry |
-| DB | PostgreSQL 16 | Boring, proven, plays well with all clouds |
+| Relational DB | PostgreSQL 16 (SQLAlchemy 2.x async + asyncpg, sync via psycopg2) | Per-service relational store |
+| Document DB | MongoDB 7 (motor async driver) | Unstructured / semi-structured data (chat transcripts, EHR document metadata, social feed) |
+| Vector DB | Qdrant 1.11 | Embeddings for RAG (EHR, labs, knowledge base, agent memory) |
+| Migrations | Alembic | Postgres schema migrations (per service); Mongo is schema-on-read |
 | Cache | Redis 7 | Sessions, rate limits, WebRTC presence |
 | Queue | RabbitMQ | Topic exchange for event bus |
 | Object storage | GCS | We're on GCP |
