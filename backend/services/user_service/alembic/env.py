@@ -1,11 +1,27 @@
+"""Alembic env. Runs synchronously via psycopg2; the runtime app uses asyncpg.
+
+The service-level DATABASE_URL uses `+asyncpg`; for migrations we swap it to
+the sync `+psycopg2` driver so Alembic can execute DDL through a normal
+synchronous engine.
+"""
+
 from logging.config import fileConfig
+from pathlib import Path
+import sys
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from app.config import settings
 from app.models import Base  # noqa: F401  (imported to register metadata)
 
 config = context.config
+
+sync_url = settings.database_url.replace("+asyncpg", "+psycopg2")
+config.set_main_option("sqlalchemy.url", sync_url)
+
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

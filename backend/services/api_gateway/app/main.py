@@ -32,7 +32,11 @@ def create_app() -> FastAPI:
         if upstream is None:
             return Response(status_code=404, content=b'{"error":"unknown route"}')
 
-        url = f"{upstream}/{full_path}"
+        # The user-service exposes its own clean "/me" resources, while the gateway
+        # still accepts the older external "/profile" prefix. Rewrite that prefix
+        # on the way through so the edge API stays stable for clients.
+        path = _rewrite_path(full_path, upstream)
+        url = f"{upstream}/{path}"
         headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
         body = await request.body()
         client: httpx.AsyncClient = request.app.state.http
@@ -51,6 +55,14 @@ def create_app() -> FastAPI:
 def _resolve_upstream(path: str) -> str | None:
     leading = "/" + path.split("/", 1)[0]
     return ROUTES.get(leading)
+
+
+def _rewrite_path(path: str, upstream: str) -> str:
+    if upstream == settings.user_service_url and path.startswith("profile/"):
+        return "me/" + path.removeprefix("profile/")
+    if upstream == settings.user_service_url and path == "profile":
+        return "me"
+    return path
 
 
 app = create_app()

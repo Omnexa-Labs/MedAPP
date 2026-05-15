@@ -12,12 +12,12 @@ only have 30 seconds: clone the repo, `cd frontend/mobile`, `flutter pub get`,
 ## 1. What you're building
 
 **MedApp** is a mobile-first healthcare platform — patients booking doctors,
-joining telemedicine sessions, uploading lab results, talking to an AI
+joining telemedicine sessions, uploading lab results; and talking to an AI
 concierge. Your surface is the Flutter mobile app (iOS + Android, with web as
 a stretch target).
 
 The product is described in detail in [`docs/PROJECT.md`](PROJECT.md). The
-short version: you are building the entire patient-facing experience, plus the
+short version: you are building the entire role-based user experience, plus the
 in-app surfaces for doctors, nurses, and hospital admins (same binary, role-
 adaptive UI).
 
@@ -98,8 +98,8 @@ flutter run \
 ```
 
 To use mode 2 or 3 you need the backend running. From the repo root:
-`make dev` boots Postgres, Redis, RabbitMQ, and all backend services + agents
-in Docker.
+`make dev` boots Postgres, Redis, RabbitMQ, and the backend services in Docker.
+Use `make dev-all` later if you also need the Claude agents.
 
 **Start in mock mode.** Use live mode only when you specifically need to
 integrate with a real endpoint.

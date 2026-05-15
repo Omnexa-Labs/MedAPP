@@ -786,7 +786,7 @@ A service ships when **all** of these are true:
 - [ ] All emitted events documented in this guide + schema in `backend/shared/events/`
 - [ ] All consumed events have an idempotent handler with a dedup test
 - [ ] Dockerfile builds; image runs `/healthz` returning 200
-- [ ] `make dev` boots it without manual steps
+- [ ] `make dev` boots the backend stack without manual steps
 - [ ] structlog + OTel: a single request shows up in Jaeger with one root span
 - [ ] No PHI in logs (grep test in CI)
 - [ ] README at the service root explains: what it owns, endpoints, events,

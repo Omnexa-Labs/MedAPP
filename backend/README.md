@@ -38,9 +38,8 @@ services/<name>/
 ## Running a single service
 
 ```bash
-cd services/user_service
-uv sync
-uv run uvicorn app.main:app --reload --port 8001
+make up SERVICE=user_service
+make logs SERVICE=user_service
 ```
 
 ## Migrations
@@ -48,7 +47,7 @@ uv run uvicorn app.main:app --reload --port 8001
 Each service owns its own database schema. Run migrations per-service:
 
 ```bash
-cd services/user_service && uv run alembic upgrade head
+make migrate SERVICE=user_service
 ```
 
 Or all at once: `make migrate` from repo root.

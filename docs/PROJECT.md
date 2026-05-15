@@ -10,20 +10,20 @@
 
 **Make high-quality healthcare reachable from a phone, anywhere.**
 
-MedApp is a mobile-first healthcare platform connecting patients with doctors,
-nurses, and hospitals — with an AI assistant in the loop for triage, scheduling,
-record-keeping, and lifestyle guidance. The product targets emerging markets
-first (Ghana, Nigeria, Kenya) where the gap between "I'm not feeling well" and
-"I'm in front of a clinician" is widest, then expands.
+MedApp is a mobile-first healthcare platform connecting users with doctors,
+nurses, hospitals, and support workflows — with an AI assistant in the loop for
+triage, scheduling, record-keeping, and guidance. The product targets emerging
+markets first (Ghana, Nigeria, Kenya) where the gap between "I need care" and
+"I'm in front of the right clinician" is widest, then expands.
 
 We are not trying to replace clinicians. We're trying to:
 
-- Help patients **find the right clinician** faster (search by specialty, location, rating, price, insurance).
+- Help users **find the right clinician or service** faster (search by specialty, location, rating, price, insurance).
 - Help them **show up prepared** (AI-summarised symptoms, uploaded labs, medication list).
 - Help them **follow through** after the visit (reminders, prescription tracking, follow-up booking).
-- Give clinicians a **lightweight EHR** that travels with the patient across providers.
+- Give clinicians a **lightweight EHR** that travels with the user across providers.
 
-Success looks like: a patient in Kumasi books a cardiologist, completes a video consult, gets a prescription, has it interpreted by the AI assistant, and uploads their next lab result — all from one app, in their language.
+Success looks like: a user in Kumasi books a cardiologist, completes a video consult, gets a prescription, has it interpreted by the AI assistant, and uploads their next lab result — all from one app, in their language.
 
 ---
 
@@ -31,13 +31,13 @@ Success looks like: a patient in Kumasi books a cardiologist, completes a video 
 
 | Role | Primary surface | Examples |
 |---|---|---|
-| **Patient** | Mobile app | Books appointments, talks to AI concierge, uploads records |
+| **User** | Mobile app | Uses the role-based app for booking, concierge chat, records, and follow-up |
 | **Doctor** | Mobile app + web (later) | Manages availability, runs telemedicine sessions, writes prescriptions |
 | **Nurse** | Mobile app | Accepts home-visit bookings, records vitals |
 | **Hospital admin** | Admin web console | Manages doctors, facilities, pricing, KYC |
 | **Platform admin (us)** | Admin web console | KYC review, disputes, content moderation, analytics |
 
-The mobile app is the same binary for all four user types — the role is on the user record and the UI adapts.
+The mobile app is the same binary for all role types — the role is on the user record and the UI adapts.
 
 ---
 
@@ -57,14 +57,14 @@ The mobile app is the same binary for all four user types — the role is on the
 - Pre-visit checklist, post-visit summary, prescription PDF
 
 ### 3.4 EHR-lite
-- Patient-owned medical records: documents, vitals timeline, medications, allergies
+- User-owned medical records: documents, vitals timeline, medications, allergies
 - Consent-driven sharing with providers
 - Encrypted at rest, audit logged on every access
 
 ### 3.5 AI agents (provider-not-yet-chosen)
 | Agent | What it does |
 |---|---|
-| **Concierge** | The patient's personal assistant — orchestrates everything else |
+| **Concierge** | The user's personal assistant — orchestrates everything else |
 | **Smart Recommend** | Diet, lifestyle, medication adherence from EHR + wearables |
 | **Medical Chat** | Conversational symptom triage; never diagnoses, always refers |
 | **Lab Reader** | Reads uploaded lab results & prescriptions (vision); explains in plain language |
@@ -81,25 +81,23 @@ Standard marketplace mechanics: ratings + textual reviews; multi-channel payment
 - Insurance claims processing
 - Clinical decision support (this requires regulatory clearance we're not pursuing yet)
 - Wearable hardware
-
 ---
 
 ## 4. Architecture
 
 ### 4.1 The picture
-
 ```
 ┌──────────────────────────────┐         ┌──────────────────────────────┐
-│   Mobile (Flutter)            │         │   Admin Web (Next.js, later) │
+│   Mobile (Flutter)           │         │   Admin Web (Next.js, later) │
 └──────────────┬───────────────┘         └─────────────┬────────────────┘
-               │                                       │
-               └────────────┬──────────────────────────┘
-                            │ HTTPS
-                  ┌─────────▼─────────┐
-                  │   API Gateway     │  JWT verify · rate-limit · routing
-                  └─────────┬─────────┘
-       ┌────────────────────┼────────────────────┐
-       │                    │                    │
+         │                                       │
+         └────────────┬──────────────────────────┘
+              │ HTTPS
+          ┌─────────▼─────────┐
+          │   API Gateway     │  JWT verify · rate-limit · routing
+          └─────────┬─────────┘
+     ┌────────────────────┼────────────────────┐
+     │                    │                    │
    13 backend           6 AI agents        Cross-cutting
    microservices      (FastAPI + LLM)
    (FastAPI)
@@ -173,7 +171,7 @@ scripts/                Codegen, migrations, seeds
 
 - **Provider-agnostic.** No vendor SDK imports anywhere by default. The `LLMProvider` interface in `agents/shared/llm.py` defines `ToolSpec`, `ChatTurn`, `LLMResult`. Switching providers later = ~30 lines in one file.
 - **Default provider is `MockLLM`** (deterministic, no key, no network). Dev and CI run with this.
-- **Tools are HTTP wrappers** around internal MedApp services. Each tool gets `patient_id`, forwarded as `X-Patient-Id` for row-level access control.
+- **Tools are HTTP wrappers** around internal MedApp services. Each tool gets `user_id`, forwarded as `X-User-Id` for row-level access control.
 - **Agents are stateless.** Conversation state lives in `ehr_service` / `user_service`.
 - **PHI never goes to logs/traces.** Use `agents/shared/phi.py::redact()` before binding anything.
 
@@ -235,8 +233,9 @@ git clone https://github.com/Omnexa-Labs/MedAPP.git
 cd MedAPP
 
 cp .env.example .env       # leave ANTHROPIC_API_KEY blank — we use MockLLM
-make dev                   # boots Postgres, Redis, RabbitMQ, 13 services, 6 agents
-make migrate               # apply Alembic migrations per service
+make dev                   # boots Postgres, Redis, RabbitMQ, and backend services
+make migrate               # apply Alembic migrations per backend service
+make dev-all               # optional: include the Claude agents later
 make seed                  # load fixtures
 ```
 
@@ -364,7 +363,7 @@ Goal: book a doctor → join telemedicine → leave with a record.
 ### Phase 4 — Scale & polish
 - [ ] Performance tuning at 100k DAU
 - [ ] HIPAA SOC 2 readiness
-- [ ] Doctor mobile workflows (separate from patient UX)
+- [ ] Doctor mobile workflows (separate from user UX)
 
 ---
 

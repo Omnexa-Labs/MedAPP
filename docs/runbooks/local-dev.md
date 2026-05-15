@@ -12,10 +12,15 @@
 
 ```bash
 cp .env.example .env
-make dev          # boots Postgres, Redis, RabbitMQ, all 13 services
-make migrate      # apply Alembic migrations across all services
+make dev          # boots Postgres, Redis, RabbitMQ, and the backend services
+make migrate      # apply Alembic migrations across backend services that own Alembic
+make migrate SERVICE=user_service  # apply a single service migration
+make up SERVICE=user_service       # start one service and its compose deps
+make logs SERVICE=user_service     # tail one service's logs
 make seed         # load fixtures
 ```
+
+Use `make dev-all` later if you want the Claude agents too.
 
 Open:
 - API gateway: http://localhost:8000
@@ -35,5 +40,5 @@ flutter run --dart-define=ENV=dev --dart-define=API_BASE_URL=http://10.0.2.2:800
 ## Troubleshooting
 
 - **Postgres won't accept connections** — `make down && docker volume rm medapp_pgdata && make dev`.
-- **Alembic "Target database is not up to date"** — run `make migrate` again; check for unmerged migration heads with `alembic heads`.
+- **Alembic "Target database is not up to date"** — run `make migrate` again; check for unmerged migration heads with `uv run alembic heads` inside the service directory.
 - **Flutter can't reach API** — confirm the right `API_BASE_URL` for your platform.

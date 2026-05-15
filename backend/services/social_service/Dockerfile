@@ -1,8 +1,9 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir uv
-WORKDIR /app
-COPY backend/shared /shared
+ENV PYTHONPATH=/app/backend/services/social_service:/app/backend/shared
+WORKDIR /app/backend/services/social_service
+COPY backend/shared /app/backend/shared
 COPY backend/services/social_service/pyproject.toml ./
 RUN uv pip install --system --no-cache .
 COPY backend/services/social_service/app ./app

@@ -27,7 +27,7 @@ scripts/          Dev tooling, codegen, db scripts
 
 ```bash
 # 1. Install: Docker Desktop, Python 3.12, uv, Node 20, Flutter 3.22+, gcloud SDK
-# 2. Boot the stack (Postgres, Redis, RabbitMQ, all services)
+# 2. Boot the backend stack (Postgres, Redis, RabbitMQ, backend services)
 make dev
 
 # 3. Run mobile app
@@ -41,7 +41,7 @@ See `docs/runbooks/local-dev.md` for the full setup walkthrough.
 | Service | Port | Purpose |
 |---|---|---|
 | api_gateway | 8000 | Edge auth, routing, rate limit |
-| user_service | 8001 | Patients, auth, KYC |
+| user_service | 8001 | Users, auth, KYC |
 | doctor_service | 8002 | Doctor profiles + availability |
 | nurse_service | 8003 | Nurse profiles + booking |
 | hospital_service | 8004 | Hospitals, facilities, ratings |

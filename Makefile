@@ -1,37 +1,142 @@
 
-.PHONY: help dev down logs fmt lint test migrate seed gen-clients
+.PHONY: help dev dev-all up down stop restart rebuild logs ps shell migrate migrate-all revision seed fmt lint test check gen-clients
 
 SHELL := bash
-COMPOSE := docker compose -f infra/docker/docker-compose.yml
+COMPOSE_FILE := infra/docker/docker-compose.yml
+COMPOSE := docker compose -f $(COMPOSE_FILE)
 
-help:
+BACKEND_INFRA := postgres redis mongodb qdrant rabbitmq otel-collector
+BACKEND_SERVICES := api_gateway user_service doctor_service nurse_service hospital_service booking_service payment_service telemedicine_service notification_service lab_service ehr_service social_service analytics_service
+AGENT_SERVICES := concierge_agent smart_recommend_agent medical_chat_agent lab_reader_agent vitals_watcher_agent booking_agent
+DEFAULT_STACK := $(BACKEND_INFRA) $(BACKEND_SERVICES)
+FULL_STACK := $(DEFAULT_STACK) $(AGENT_SERVICES)
+KNOWN_SERVICES := $(BACKEND_SERVICES) $(AGENT_SERVICES)
+
+SERVICE ?=
+SERVICES ?=
+MESSAGE ?=
+TARGET_SERVICES := $(strip $(if $(SERVICES),$(SERVICES),$(SERVICE)))
+
+define validate_services
+for svc in $(1); do \
+	case " $(KNOWN_SERVICES) " in \
+		*" $$svc "*) ;; \
+		*) echo "Unknown service: $$svc"; echo "Known services: $(KNOWN_SERVICES)"; exit 1 ;; \
+	esac; \
+done
+endef
+
+help: ## Show available make targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-15s %s\n", $$1, $$2}'
 
-dev: ## Boot full local stack (db + all services)
-	$(COMPOSE) up -d --build
+dev: ## Boot the backend local stack (infra + backend services)
+	$(COMPOSE) up -d --build $(DEFAULT_STACK)
 
-down: ## Stop local stack
+dev-all: ## Boot backend services plus the Claude agents
+	$(COMPOSE) up -d --build $(FULL_STACK)
+
+up: ## Start one or more services; use SERVICE=user_service or SERVICES="user_service api_gateway"
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		$(COMPOSE) up -d --build $(DEFAULT_STACK); \
+	else \
+		$(call validate_services,$(TARGET_SERVICES)); \
+		$(COMPOSE) up -d --build $(TARGET_SERVICES); \
+	fi
+
+down: ## Stop and remove the backend stack
 	$(COMPOSE) down
 
-logs: ## Tail logs from all services
-	$(COMPOSE) logs -f --tail=100
+stop: ## Stop one or more running services without removing the stack
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		echo "Usage: make stop SERVICE=user_service"; \
+		exit 1; \
+	fi
+	$(call validate_services,$(TARGET_SERVICES))
+	$(COMPOSE) stop $(TARGET_SERVICES)
 
-fmt: ## Format Python + Dart
-	ruff format backend ml
-	cd frontend/mobile && dart format lib test
+restart: ## Restart one or more services; defaults to the backend stack
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		$(COMPOSE) restart $(DEFAULT_STACK); \
+	else \
+		$(call validate_services,$(TARGET_SERVICES)); \
+		$(COMPOSE) restart $(TARGET_SERVICES); \
+	fi
 
-lint: ## Lint Python + Dart
-	ruff check backend ml
-	cd frontend/mobile && flutter analyze
+rebuild: ## Rebuild and restart one or more services; defaults to the backend stack
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		$(COMPOSE) up -d --build $(DEFAULT_STACK); \
+	else \
+		$(call validate_services,$(TARGET_SERVICES)); \
+		$(COMPOSE) up -d --build $(TARGET_SERVICES); \
+	fi
 
-test: ## Run Python tests across all services
-	cd backend && pytest -q
+logs: ## Tail logs for the selected services or the backend stack
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		$(COMPOSE) logs -f --tail=100 $(DEFAULT_STACK); \
+	else \
+		$(call validate_services,$(TARGET_SERVICES)); \
+		$(COMPOSE) logs -f --tail=100 $(TARGET_SERVICES); \
+	fi
 
-migrate: ## Run Alembic migrations for all services
-	bash scripts/migrate-all.sh
+ps: ## Show compose service status
+	$(COMPOSE) ps
+
+shell: ## Open a shell in one running service; use SERVICE=user_service
+	@if [ -z "$(TARGET_SERVICES)" ]; then \
+		echo "Usage: make shell SERVICE=user_service"; \
+		exit 1; \
+	fi
+	$(call validate_services,$(TARGET_SERVICES))
+	$(COMPOSE) exec $(firstword $(TARGET_SERVICES)) sh
+
+migrate: ## Apply migrations for one service or all migratable backend services
+	@for svc in $(if $(TARGET_SERVICES),$(TARGET_SERVICES),$(BACKEND_SERVICES)); do \
+		dir="backend/services/$$svc"; \
+		if [ ! -d "$$dir" ]; then \
+			echo "Skipping $$svc (not a backend service)"; \
+			continue; \
+		fi; \
+		if [ ! -f "$$dir/alembic.ini" ]; then \
+			echo "Skipping $$svc (no alembic.ini)"; \
+			continue; \
+		fi; \
+		echo "==> migrating $$svc"; \
+		(cd "$$dir" && uv run alembic upgrade head); \
+	done
+
+migrate-all: migrate ## Apply migrations across every backend service that owns Alembic
+
+revision: ## Create a new Alembic revision; use SERVICE=user_service MESSAGE="add users table"
+	@if [ -z "$(TARGET_SERVICES)" ] || [ -z "$(MESSAGE)" ]; then \
+		echo "Usage: make revision SERVICE=user_service MESSAGE=\"add users table\""; \
+		exit 1; \
+	fi
+	$(call validate_services,$(TARGET_SERVICES))
+	@for svc in $(TARGET_SERVICES); do \
+		dir="backend/services/$$svc"; \
+		if [ ! -f "$$dir/alembic.ini" ]; then \
+			echo "Skipping $$svc (no alembic.ini)"; \
+			continue; \
+		fi; \
+		echo "==> revision $$svc"; \
+		(cd "$$dir" && uv run alembic revision --autogenerate -m "$(MESSAGE)"); \
+	done
 
 seed: ## Seed local databases with fixtures
 	bash scripts/seed.sh
+
+fmt: ## Format Python and Flutter code
+	ruff format backend agents
+	cd frontend/mobile && dart format lib test
+
+lint: ## Lint Python and Flutter code
+	ruff check backend agents
+	cd frontend/mobile && flutter analyze
+
+test: ## Run the backend Python test suite
+	cd backend && pytest -q
+
+check: lint test ## Run lint and tests
 
 gen-clients: ## Regenerate Dart + TS clients from OpenAPI specs
 	bash scripts/gen-clients.sh
