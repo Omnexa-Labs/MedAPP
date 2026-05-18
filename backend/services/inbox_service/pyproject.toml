@@ -1,0 +1,26 @@
+[project]
+name = "inbox-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "pydantic-settings>=2.3",
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg>=0.29",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.13",
+  "pyjwt[crypto]>=2.9",
+  "structlog>=24.1",
+  "uvicorn[standard]>=0.30",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

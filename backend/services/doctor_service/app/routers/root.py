@@ -1,8 +1,11 @@
 from fastapi import APIRouter
 
+from ..schemas.status import ServiceStatus
+from ..services.root_service import get_service_status
+
 router = APIRouter(tags=["Doctor"])
 
 
-@router.get("/")
-async def index() -> dict[str, str]:
-    return {"service": "doctor_service", "status": "scaffold"}
+@router.get("/", response_model=ServiceStatus)
+async def index() -> ServiceStatus:
+    return get_service_status()

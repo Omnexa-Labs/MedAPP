@@ -26,7 +26,7 @@ def upgrade() -> None:
         sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column("first_name", sa.String(255), nullable=False),
         sa.Column("last_name", sa.String(255), nullable=False),
-        sa.Column("role", sa.String(32), nullable=False, server_default="patient"),
+        sa.Column("role", sa.String(32), nullable=False, server_default="user"),
         sa.Column("dob", sa.Date, nullable=True),
         sa.Column("gender", sa.String(16), nullable=True),
         sa.Column(

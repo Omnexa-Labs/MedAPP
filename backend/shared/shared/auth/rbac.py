@@ -6,7 +6,7 @@ from .principal import Principal, get_current_principal
 
 
 class Role(StrEnum):
-    PATIENT = "patient"
+    USER = "user"
     DOCTOR = "doctor"
     NURSE = "nurse"
     HOSPITAL_ADMIN = "hospital_admin"

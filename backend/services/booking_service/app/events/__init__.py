@@ -1,0 +1,1 @@
+"""Event publishers and consumers for booking_service."""

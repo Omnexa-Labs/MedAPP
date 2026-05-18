@@ -4,16 +4,23 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
+  "pydantic-settings>=2.3",
+  "sqlalchemy[asyncio]>=2.0",
+  "asyncpg>=0.29",
+  "psycopg[binary]>=3.2",
+  "alembic>=1.13",
+  "pyjwt[crypto]>=2.9",
+  "structlog>=24.1",
   "uvicorn[standard]>=0.30",
-  "medapp-shared",
 ]
 
-[tool.uv.sources]
-medapp-shared = { path = "../../shared", editable = true }
+[tool.setuptools]
+include-package-data = true
 
-[tool.hatch.build.targets.wheel]
-packages = ["app"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

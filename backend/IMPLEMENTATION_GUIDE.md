@@ -1,6 +1,6 @@
 # Backend Implementation Guide
 
-The order to build the 13 services in, and what each one entails. This is a
+The order to build the 14 services in, and what each one entails. This is a
 working document — keep it open while you're implementing, update it as
 decisions firm up.
 
@@ -20,14 +20,15 @@ decisions firm up.
   - [2.3 booking_service — the product's core verb](#23-booking_service--port-8005)
   - [2.4 payment_service — Stripe + M-Pesa](#24-payment_service--port-8006)
   - [2.5 notification_service — push, SMS, email](#25-notification_service--port-8008)
-  - [2.6 telemedicine_service — WebRTC rooms](#26-telemedicine_service--port-8007)
-  - [2.7 ehr_service — records, documents, vitals](#27-ehr_service--port-8010)
-  - [2.8 lab_service — uploads + partner labs](#28-lab_service--port-8009)
-  - [2.9 hospital_service — facilities, accreditation](#29-hospital_service--port-8004)
-  - [2.10 nurse_service — home visits, vitals capture](#210-nurse_service--port-8003)
-  - [2.11 social_service — feed, posts, Q&A](#211-social_service--port-8011)
-  - [2.12 analytics_service — metrics, reporting](#212-analytics_service--port-8012)
-  - [2.13 api_gateway — harden last](#213-api_gateway--port-8000)
+  - [2.6 inbox_service — support chat + handoff](#26-inbox_service--port-8013)
+  - [2.7 telemedicine_service — WebRTC rooms](#27-telemedicine_service--port-8007)
+  - [2.8 ehr_service — records, documents, vitals](#28-ehr_service--port-8010)
+  - [2.9 lab_service — uploads + partner labs](#29-lab_service--port-8009)
+  - [2.10 hospital_service — facilities, accreditation](#210-hospital_service--port-8004)
+  - [2.11 nurse_service — home visits, vitals capture](#211-nurse_service--port-8003)
+  - [2.12 social_service — feed, posts, Q&A](#212-social_service--port-8011)
+  - [2.13 analytics_service — metrics, reporting](#213-analytics_service--port-8012)
+  - [2.14 api_gateway — harden last](#214-api_gateway--port-8000)
 - [§3 Cross-service patterns](#3-cross-service-patterns)
 - [§4 Definition of Done (per service)](#4-definition-of-done-per-service)
 
@@ -62,6 +63,19 @@ backend/services/<name>/
   Dockerfile
   pyproject.toml
 ```
+
+**Layering rule**
+- `routers/` are transport adapters only: validate inputs, call the service
+  layer, and map domain errors to HTTP responses.
+- `services/` hold the use-case logic and coordinate persistence, events, and
+  external calls.
+- `models/` and `db.py` own ORM and session concerns.
+- `schemas/` define API contracts only; they should not reach into the ORM.
+- `deps.py` provides reusable request-scoped dependencies.
+
+If a service is still small, keep the same folders anyway. That avoids future
+renames when the service grows and makes every backend service look familiar to
+the next engineer.
 
 **Database rules**
 - One Postgres DB per service. **No cross-service joins.** Need data from
@@ -108,14 +122,15 @@ backend/services/<name>/
 | 3 | **booking_service** | The product's core verb. | 1–2 wk |
 | 4 | **payment_service** | Booking is meaningless without payment capture. | 1–2 wk |
 | 5 | **notification_service** | Closes the loop: user knows the booking succeeded. | 3–5 d |
-| 6 | **telemedicine_service** | First actual visit happens here. | 1 wk |
-| 7 | **ehr_service** | Records persist across visits; pre-req for agents. | 1 wk |
-| 8 | **lab_service** | Uploads + partner labs. Feeds ehr + agents. | 1 wk |
-| 9 | **hospital_service** | Marketplace breadth (facilities, accreditation). | 1 wk |
-| 10 | **nurse_service** | Home visits. Mirrors doctor flow. | 3–5 d |
-| 11 | **social_service** | Doctor blog, Q&A. Non-critical. | 1 wk |
-| 12 | **analytics_service** | Read-side projections. Don't start until others emit events. | 1 wk |
-| 13 | **api_gateway** | Hardens what you've already built. Last on purpose. | 3–5 d |
+| 6 | **inbox_service** | Persistent patient/support chat and human handoff. | 1 wk |
+| 7 | **telemedicine_service** | First actual visit happens here. | 1 wk |
+| 8 | **ehr_service** | Records persist across visits; pre-req for agents. | 1 wk |
+| 9 | **lab_service** | Uploads + partner labs. Feeds ehr + agents. | 1 wk |
+| 10 | **hospital_service** | Marketplace breadth (facilities, accreditation). | 1 wk |
+| 11 | **nurse_service** | Home visits. Mirrors doctor flow. | 3–5 d |
+| 12 | **social_service** | Doctor blog, Q&A. Non-critical. | 1 wk |
+| 13 | **analytics_service** | Read-side projections. Don't start until others emit events. | 1 wk |
+| 14 | **api_gateway** | Hardens what you've already built. Last on purpose. | 3–5 d |
 
 **One controversial call:** the gateway is last. Run services directly during
 dev; harden routing/rate-limit/edge JWT verification only when you stage. The
@@ -367,6 +382,7 @@ notifications, the rest is invisible.
 - Templates per locale (EN, FR, TWI, SW)
 - Delivery log + retry
 - User preferences (which channels for which event types)
+- Delivery only; persistent conversation state lives in `inbox_service`
 
 **Data**
 - Postgres: `delivery_log`, `notification_preferences`
@@ -377,7 +393,6 @@ notifications, the rest is invisible.
 POST   /v1/notifications/send           internal (signed via JWT, role=service)
 GET    /v1/me/preferences
 PUT    /v1/me/preferences
-GET    /v1/me/inbox                     in-app feed
 ```
 
 **Emits**
@@ -391,7 +406,7 @@ GET    /v1/me/inbox                     in-app feed
 - `appointment.starting_soon` (scheduled job 15min before) → push + SMS
 - `lab.result_ready`
 - `vitals.anomaly.detected` → push + SMS
-- `chat.new_message`
+- `inbox.message.sent`
 
 **Providers**
 - Push: Firebase Cloud Messaging (FCM).
@@ -409,7 +424,42 @@ GET    /v1/me/inbox                     in-app feed
 
 ---
 
-### 2.6 `telemedicine_service` — port 8007
+### 2.6 `inbox_service` — port 8013
+
+**Why sixth:** support handoff needs a durable conversation service that is not the same thing as delivery notifications or room chat.
+
+**Owns**
+- Persistent threads and participants
+- Message history and read state
+- Direct user-to-human chat
+- Agent handoff threads with summary messages
+- Assignment metadata for support queues
+
+**Data**
+- Postgres: `threads`, `thread_participants`, `thread_messages`
+
+**Endpoints**
+```
+POST   /v1/threads                      create a direct support thread
+GET    /v1/threads                      list my threads
+GET    /v1/threads/{id}                 thread metadata
+GET    /v1/threads/{id}/messages        message history
+POST   /v1/threads/{id}/messages        append a message
+POST   /v1/threads/{id}/read            mark thread read
+POST   /v1/threads/handoff              internal agent/service handoff
+```
+
+**Consumes**
+- `inbox.handoff_requested` or a direct service call from a chat agent when human escalation is needed
+
+**Tests**
+- Direct thread creation keeps creator + participants visible.
+- Handoff threads are visible to both the patient and the service actor.
+- Read state advances when a participant marks the thread read.
+
+---
+
+### 2.7 `telemedicine_service` — port 8007
 
 **Why sixth:** booking + payment are done; now the visit actually happens.
 
@@ -460,7 +510,7 @@ POST   /v1/rooms/{id}/messages
 
 ---
 
-### 2.7 `ehr_service` — port 8010
+### 2.8 `ehr_service` — port 8010
 
 **Why seventh:** records need to persist across visits. Also the substrate
 the AI agents read from.
@@ -518,7 +568,7 @@ DELETE /v1/patients/{id}/consents/{id}  revoke
 
 ---
 
-### 2.8 `lab_service` — port 8009
+### 2.9 `lab_service` — port 8009
 
 **Owns**
 - Lab orders (when a doctor requests a test)
@@ -554,7 +604,7 @@ GET    /v1/me/lab/results
 
 ---
 
-### 2.9 `hospital_service` — port 8004
+### 2.10 `hospital_service` — port 8004
 
 **Owns**
 - Hospitals + facilities (wards, ORs, ICU beds)
@@ -583,7 +633,7 @@ GET    /v1/hospitals/{id}/reviews
 
 ---
 
-### 2.10 `nurse_service` — port 8003
+### 2.11 `nurse_service` — port 8003
 
 **Mirrors doctor_service.** The difference: nurses do home visits, so
 availability has a geo radius and travel time.
@@ -599,7 +649,7 @@ POST   /v1/nurses/{id}/home_visit_fee
 
 ---
 
-### 2.11 `social_service` — port 8011
+### 2.12 `social_service` — port 8011
 
 **Owns**
 - Doctor posts / blog
@@ -629,7 +679,7 @@ POST   /v1/social/qa/{id}/answer        doctor answers
 
 ---
 
-### 2.12 `analytics_service` — port 8012
+### 2.13 `analytics_service` — port 8012
 
 **Why second-to-last:** you can't analyze what hasn't been emitted yet. Build
 once other services are producing events.
@@ -660,7 +710,7 @@ GET    /v1/admin/doctors/{id}/scorecard
 
 ---
 
-### 2.13 `api_gateway` — port 8000
+### 2.14 `api_gateway` — port 8000
 
 **Why last:** it's a thin layer. Building it early means re-doing route
 config every time a downstream endpoint changes.

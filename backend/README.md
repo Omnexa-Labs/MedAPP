@@ -26,6 +26,23 @@ services/<name>/
   pyproject.toml
 ```
 
+## Layering standard
+
+All services should keep a consistent internal split, even when the service is
+small:
+
+- `routers/` handles HTTP only and stays thin.
+- `services/` holds business rules and orchestration.
+- `models/` and `db.py` own persistence concerns.
+- `schemas/` defines request and response contracts.
+- `deps.py` provides dependency injection helpers.
+- `events/` and client wrappers isolate external integrations.
+
+The preferred dependency direction is: `routers -> services -> models/db`, with
+schemas flowing into and out of the edges. This keeps module names like
+`auth_service` clearly inside `user_service` instead of reading like a separate
+microservice.
+
 ## Shared library (`backend/shared/`)
 
 - `auth/` — JWT verification, RBAC dependencies (used by every service)

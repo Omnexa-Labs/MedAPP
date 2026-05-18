@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SERVICES=(user_service doctor_service nurse_service hospital_service booking_service \
-          payment_service telemedicine_service notification_service lab_service \
+          payment_service telemedicine_service notification_service inbox_service lab_service \
           ehr_service social_service analytics_service)
 
 for svc in "${SERVICES[@]}"; do

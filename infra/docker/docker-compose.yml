@@ -117,6 +117,12 @@ services:
     environment: *svc-env
     ports: ["8008:8008"]
 
+  inbox_service:
+    build: { <<: *py-build, dockerfile: backend/services/inbox_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8013:8013"]
+
   lab_service:
     build: { <<: *py-build, dockerfile: backend/services/lab_service/Dockerfile }
     depends_on: [postgres]

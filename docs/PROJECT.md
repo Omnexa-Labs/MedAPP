@@ -108,7 +108,7 @@ Standard marketplace mechanics: ratings + textual reviews; multi-channel payment
 ```
 backend/                FastAPI microservices + shared libs (Python)
   shared/               JWT, DB, events, observability, schemas
-  services/             13 services, one DB per service
+  services/             14 services, one DB per service
     api_gateway/        Edge: auth, routing, rate-limit
     user_service/       Auth, profiles, KYC (FULLY WIRED)
     doctor_service/     Doctor profiles + availability (scaffolded)
@@ -118,6 +118,7 @@ backend/                FastAPI microservices + shared libs (Python)
     payment_service/    Stripe, PayPal, M-Pesa (scaffolded)
     telemedicine_service/  WebRTC rooms + tokens (scaffolded)
     notification_service/  Push, SMS, email (scaffolded)
+    inbox_service/      Persistent chat, support handoff, read state (scaffolded)
     lab_service/        Lab uploads + partner labs (scaffolded)
     ehr_service/        Documents, vitals, records (scaffolded)
     social_service/     Feed, posts, Q&A (scaffolded)
@@ -312,6 +313,7 @@ make lint   # ruff check + flutter analyze
 | payment_service | 8006 | scaffold | Stripe, M-Pesa, PayPal |
 | telemedicine_service | 8007 | scaffold | WebRTC rooms |
 | notification_service | 8008 | scaffold | push, SMS, email |
+| inbox_service | 8013 | scaffold | persistent chat, support handoff |
 | lab_service | 8009 | scaffold | lab uploads, partner labs |
 | ehr_service | 8010 | scaffold | records, documents, vitals |
 | social_service | 8011 | scaffold | feed, posts, Q&A |
@@ -340,6 +342,7 @@ Goal: book a doctor → join telemedicine → leave with a record.
 - [ ] Flesh out user_service registration flows (phone OTP, social login)
 - [ ] Implement doctor_service availability + search filters
 - [ ] Implement booking_service end-to-end (create / cancel / reschedule)
+- [ ] Implement inbox_service for support handoff and patient chat
 - [ ] Implement payment_service (Stripe + M-Pesa MVP)
 - [ ] Implement ehr_service document upload + retrieval (GCS-backed)
 - [ ] Wire telemedicine_service to Twilio / Daily

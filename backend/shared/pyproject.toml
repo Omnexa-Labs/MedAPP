@@ -8,6 +8,7 @@ dependencies = [
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
   "sqlalchemy[asyncio]>=2.0",
+  "aiosqlite>=0.21",
   "asyncpg>=0.29",
   "psycopg2-binary>=2.9",
   "alembic>=1.13",
@@ -23,9 +24,13 @@ dependencies = [
   "opentelemetry-exporter-otlp>=1.27",
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["shared"]
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["shared*"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"

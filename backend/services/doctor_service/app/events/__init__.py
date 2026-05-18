@@ -1,0 +1,1 @@
+"""Event publishers and consumers for doctor_service.""""""Event publishers and consumers for doctor_service."""

@@ -6,7 +6,7 @@ COMPOSE_FILE := infra/docker/docker-compose.yml
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 
 BACKEND_INFRA := postgres redis mongodb qdrant rabbitmq otel-collector
-BACKEND_SERVICES := api_gateway user_service doctor_service nurse_service hospital_service booking_service payment_service telemedicine_service notification_service lab_service ehr_service social_service analytics_service
+BACKEND_SERVICES := api_gateway user_service doctor_service nurse_service hospital_service booking_service payment_service telemedicine_service notification_service inbox_service lab_service ehr_service social_service analytics_service
 AGENT_SERVICES := concierge_agent smart_recommend_agent medical_chat_agent lab_reader_agent vitals_watcher_agent booking_agent
 DEFAULT_STACK := $(BACKEND_INFRA) $(BACKEND_SERVICES)
 FULL_STACK := $(DEFAULT_STACK) $(AGENT_SERVICES)
@@ -90,19 +90,7 @@ shell: ## Open a shell in one running service; use SERVICE=user_service
 	$(COMPOSE) exec $(firstword $(TARGET_SERVICES)) sh
 
 migrate: ## Apply migrations for one service or all migratable backend services
-	@for svc in $(if $(TARGET_SERVICES),$(TARGET_SERVICES),$(BACKEND_SERVICES)); do \
-		dir="backend/services/$$svc"; \
-		if [ ! -d "$$dir" ]; then \
-			echo "Skipping $$svc (not a backend service)"; \
-			continue; \
-		fi; \
-		if [ ! -f "$$dir/alembic.ini" ]; then \
-			echo "Skipping $$svc (no alembic.ini)"; \
-			continue; \
-		fi; \
-		echo "==> migrating $$svc"; \
-		(cd "$$dir" && uv run alembic upgrade head); \
-	done
+	@uv run python scripts/service_migrations.py migrate $(if $(TARGET_SERVICES),$(TARGET_SERVICES),)
 
 migrate-all: migrate ## Apply migrations across every backend service that owns Alembic
 
@@ -112,15 +100,7 @@ revision: ## Create a new Alembic revision; use SERVICE=user_service MESSAGE="ad
 		exit 1; \
 	fi
 	$(call validate_services,$(TARGET_SERVICES))
-	@for svc in $(TARGET_SERVICES); do \
-		dir="backend/services/$$svc"; \
-		if [ ! -f "$$dir/alembic.ini" ]; then \
-			echo "Skipping $$svc (no alembic.ini)"; \
-			continue; \
-		fi; \
-		echo "==> revision $$svc"; \
-		(cd "$$dir" && uv run alembic revision --autogenerate -m "$(MESSAGE)"); \
-	done
+	@uv run python scripts/service_migrations.py revision --message "$(MESSAGE)" $(TARGET_SERVICES)
 
 seed: ## Seed local databases with fixtures
 	bash scripts/seed.sh
@@ -134,7 +114,7 @@ lint: ## Lint Python and Flutter code
 	cd frontend/mobile && flutter analyze
 
 test: ## Run the backend Python test suite
-	cd backend && pytest -q
+	@python scripts/service_tests.py
 
 check: lint test ## Run lint and tests
 
