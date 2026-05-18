@@ -5,6 +5,8 @@ ENV PYTHONPATH=/app/backend/services/lab_service:/app/backend/shared
 WORKDIR /app/backend/services/lab_service
 COPY backend/shared /app/backend/shared
 COPY backend/services/lab_service/pyproject.toml ./
+COPY backend/services/lab_service/alembic.ini ./
+COPY backend/services/lab_service/alembic ./alembic
 COPY backend/services/lab_service/app ./app
 RUN uv pip install --system --no-build-isolation --no-cache .
 EXPOSE 8009

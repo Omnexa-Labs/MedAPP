@@ -5,4 +5,4 @@ router = APIRouter(tags=["Social"])
 
 @router.get("/")
 async def index() -> dict[str, str]:
-    return {"service": "social_service", "status": "scaffold"}
+    return {"service": "social_service", "status": "ready"}

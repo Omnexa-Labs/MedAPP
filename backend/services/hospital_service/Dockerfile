@@ -5,6 +5,8 @@ ENV PYTHONPATH=/app/backend/services/hospital_service:/app/backend/shared
 WORKDIR /app/backend/services/hospital_service
 COPY backend/shared /app/backend/shared
 COPY backend/services/hospital_service/pyproject.toml ./
+COPY backend/services/hospital_service/alembic.ini ./
+COPY backend/services/hospital_service/alembic ./alembic
 COPY backend/services/hospital_service/app ./app
 RUN uv pip install --system --no-build-isolation --no-cache .
 EXPOSE 8004

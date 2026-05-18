@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GW_", extra="ignore")
 
     service_name: str = "api-gateway"
-    jwt_secret: str = "change-me"
+    jwt_secret: str = "change-me-change-me-change-me-change-me"
     jwt_algorithm: str = "HS256"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ehr_service_url: str = "http://ehr_service:8010"
     social_service_url: str = "http://social_service:8011"
     analytics_service_url: str = "http://analytics_service:8012"
+    onboarding_service_url: str = "http://onboarding_service:8013"
 
     # Agents
     concierge_agent_url: str = "http://concierge_agent:9001"
@@ -36,19 +37,24 @@ settings = Settings()
 
 
 ROUTES: dict[str, str] = {
-    "/auth": settings.user_service_url,
+    "/v1/auth": settings.user_service_url,
+    "/v1/me": settings.user_service_url,
     "/profile": settings.user_service_url,
-    "/doctors": settings.doctor_service_url,
-    "/nurses": settings.nurse_service_url,
-    "/hospitals": settings.hospital_service_url,
-    "/bookings": settings.booking_service_url,
-    "/payments": settings.payment_service_url,
-    "/telemedicine": settings.telemedicine_service_url,
-    "/notifications": settings.notification_service_url,
-    "/labs": settings.lab_service_url,
-    "/records": settings.ehr_service_url,
-    "/social": settings.social_service_url,
-    "/analytics": settings.analytics_service_url,
+    "/v1/doctors": settings.doctor_service_url,
+    "/v1/nurses": settings.nurse_service_url,
+    "/v1/hospitals": settings.hospital_service_url,
+    "/v1/bookings": settings.booking_service_url,
+    "/v1/payments": settings.payment_service_url,
+    "/v1/webhooks": settings.payment_service_url,
+    "/v1/rooms": settings.telemedicine_service_url,
+    "/v1/notifications": settings.notification_service_url,
+    "/v1/me/preferences": settings.notification_service_url,
+    "/v1/me/inbox": settings.notification_service_url,
+    "/v1/lab": settings.lab_service_url,
+    "/v1/patients": settings.ehr_service_url,
+    "/v1/social": settings.social_service_url,
+    "/v1/admin": settings.analytics_service_url,
+    "/v1/onboarding": settings.onboarding_service_url,
     "/agents/concierge": settings.concierge_agent_url,
     "/agents/recommend": settings.smart_recommend_agent_url,
     "/agents/chat": settings.medical_chat_agent_url,

@@ -6,24 +6,24 @@
 
 ---
 
-## 1. Mission
+## 1. Vision & Mission
 
-**Make high-quality healthcare reachable from a phone, anywhere.**
+**Vision:** MedApp is a mobile-first, AI-assisted healthcare infrastructure that gives every user in emerging markets a lifelong, portable health identity and connects that identity to the providers, data, and workflows that make care continuous.
 
-MedApp is a mobile-first healthcare platform connecting users with doctors,
-nurses, hospitals, and support workflows — with an AI assistant in the loop for
-triage, scheduling, record-keeping, and guidance. The product targets emerging
-markets first (Ghana, Nigeria, Kenya) where the gap between "I need care" and
-"I'm in front of the right clinician" is widest, then expands.
+**Mission:** Build the user-owned health layer that stays present before, during, and after care by connecting records, providers, labs, pharmacies, telemedicine, reminders, and AI guidance into one continuous system.
 
-We are not trying to replace clinicians. We're trying to:
+MedApp is a user-first healthcare platform. We use the word user intentionally: a user is anyone with a body and a phone, whether they are healthy, worried, recovering, or actively receiving care. A patient is a state a user passes through, not their identity.
 
-- Help users **find the right clinician or service** faster (search by specialty, location, rating, price, insurance).
-- Help them **show up prepared** (AI-summarised symptoms, uploaded labs, medication list).
-- Help them **follow through** after the visit (reminders, prescription tracking, follow-up booking).
-- Give clinicians a **lightweight EHR** that travels with the user across providers.
+The product targets emerging markets first — Ghana, Nigeria, Kenya, and similar contexts — where healthcare is episodic when it should be continuous, and fragmented when it should be portable. Our job is not to replace clinicians. Our job is to make the infrastructure around clinicians continuous, user-owned, and mobile-first.
 
-Success looks like: a user in Kumasi books a cardiologist, completes a video consult, gets a prescription, has it interpreted by the AI assistant, and uploads their next lab result — all from one app, in their language.
+We are trying to:
+
+- Give every user a **lifelong portable record** they can carry across providers and countries.
+- Help users **prepare for care** with summaries, trends, reminders, and plain-language explanations.
+- Help users **follow through** after care with prescriptions, lab results, follow-ups, and nudges.
+- Give providers a **shared context layer** so each encounter starts from the user's actual history, not from zero.
+
+Success looks like a user in Kumasi who can open MedApp, share their complete health story in under 30 seconds, consult a clinician who already sees the right context, receive a prescription or lab order that flows back into the record, and get only the nudges that matter.
 
 ---
 
@@ -43,44 +43,45 @@ The mobile app is the same binary for all role types — the role is on the user
 
 ## 3. Product surface (what we build)
 
-### 3.1 Marketplace
-- Search & discovery for doctors, nurses, hospitals (specialty, geo, rating, price, insurance)
-- Profile pages with reviews, availability, accreditation, mortality rate (hospitals)
+### 3.1 User-owned health identity
+- A lifelong, portable record for every user: conditions, medications, allergies, immunizations, lab history, vitals trends, consultations, and prescriptions.
+- Exportable, shareable, and consent-driven across providers and borders.
+- The foundation for every other workflow in the platform.
 
-### 3.2 Booking
-- Unified booking engine for doctor / nurse / hospital appointments
-- Timezone-aware availability, waitlists, calendar integration
-- Payment capture (Stripe + M-Pesa + MTN Mobile Money + PayPal)
+### 3.2 Care coordination
+- Booking for doctors, nurses, hospitals, and future partner workflows.
+- Telemedicine that is tied to the user's record before and after the call.
+- Lab orders, results, and follow-up actions that flow back into the same record.
 
-### 3.3 Telemedicine
-- WebRTC video/audio with chat and file share
-- Pre-visit checklist, post-visit summary, prescription PDF
+### 3.3 Provider network
+- Search and discovery for doctors, nurses, hospitals, and future partner types.
+- Profiles with availability, specialty, accreditation, pricing, and other decision-making context.
+- Hospital teams and practitioner affiliations supported through partner onboarding.
 
-### 3.4 EHR-lite
-- User-owned medical records: documents, vitals timeline, medications, allergies
-- Consent-driven sharing with providers
-- Encrypted at rest, audit logged on every access
-
-### 3.5 AI agents (provider-not-yet-chosen)
-| Agent | What it does |
+### 3.4 AI health companion
+| Capability | What it does |
 |---|---|
-| **Concierge** | The user's personal assistant — orchestrates everything else |
-| **Smart Recommend** | Diet, lifestyle, medication adherence from EHR + wearables |
-| **Medical Chat** | Conversational symptom triage; never diagnoses, always refers |
-| **Lab Reader** | Reads uploaded lab results & prescriptions (vision); explains in plain language |
-| **Vitals Watcher** | Streams wearable data; alerts on anomalies |
-| **Booking** | Multi-step booking sub-agent the Concierge delegates to |
+| **Concierge** | The user-facing entry point that routes intent and coordinates the other capabilities. |
+| **Medical Chat** | Conversational intake and triage; it prepares the user, but does not diagnose. |
+| **Lab Reader** | Explains uploaded labs and prescriptions in plain language. |
+| **Vitals Watcher** | Monitors wearable and biometric trends, not isolated readings. |
+| **Care Timeline** | Maintains the longitudinal story of what has happened to the user. |
+| **Medication Agent** | Tracks adherence, reminders, and refill nudges. |
+| **Booking Agent** | Finds the right provider and coordinates the appointment. |
+| **Smart Recommend** | Low-frequency preventive guidance based on the user's actual data. |
 
-The agents call MedApp backend services as tools (search providers, get EHR, create booking). They're not a separate model layer — they're an orchestration layer over an LLM that we will choose during evaluation. See ADR 0002.
+The agents call MedApp backend services as tools. They are not a separate product surface; they are an orchestration layer that helps the user understand, prepare, track, and follow through.
 
-### 3.6 Reviews, payments, notifications, social
-Standard marketplace mechanics: ratings + textual reviews; multi-channel payments; push/SMS/email notifications; doctor blog posts and Q&A.
+### 3.5 Platform workflows
+- Notifications, reminders, and nudges with a high bar for usefulness.
+- Reviews, comments, Q&A, and other trust-building social surfaces.
+- Analytics and reporting for platform admins and operations teams.
 
-### 3.7 Out of scope (for now)
-- Prescription delivery / pharmacy fulfilment
-- Insurance claims processing
-- Clinical decision support (this requires regulatory clearance we're not pursuing yet)
-- Wearable hardware
+### 3.6 Out of scope for now
+- Pharmacy fulfilment as a business.
+- Insurance claims processing.
+- Clinical decision support.
+- Wearable hardware manufacturing.
 ---
 
 ## 4. Architecture
@@ -98,8 +99,8 @@ Standard marketplace mechanics: ratings + textual reviews; multi-channel payment
           └─────────┬─────────┘
      ┌────────────────────┼────────────────────┐
      │                    │                    │
-   13 backend           6 AI agents        Cross-cutting
-   microservices      (FastAPI + LLM)
+  15 backend           6 AI agents        Cross-cutting
+  services           (FastAPI + LLM)
    (FastAPI)
 ```
 
@@ -108,7 +109,7 @@ Standard marketplace mechanics: ratings + textual reviews; multi-channel payment
 ```
 backend/                FastAPI microservices + shared libs (Python)
   shared/               JWT, DB, events, observability, schemas
-  services/             14 services, one DB per service
+  services/             15 services, one DB per service
     api_gateway/        Edge: auth, routing, rate-limit
     user_service/       Auth, profiles, KYC (FULLY WIRED)
     doctor_service/     Doctor profiles + availability (scaffolded)
@@ -123,6 +124,7 @@ backend/                FastAPI microservices + shared libs (Python)
     ehr_service/        Documents, vitals, records (scaffolded)
     social_service/     Feed, posts, Q&A (scaffolded)
     analytics_service/  Metrics, reporting (scaffolded)
+    onboarding_service/ Partner onboarding for hospitals, practitioners, pharmacies
 
 agents/                 LLM-driven agents (Python, provider TBD)
   shared/llm.py         LLMProvider abstraction + MockLLM

@@ -7,3 +7,7 @@
 - **Idempotency**: POSTs that mutate require `Idempotency-Key` header; service stores `(key, response)` for 24h.
 - **Tracing**: clients pass `traceparent` (W3C). The gateway generates one if missing.
 - **OpenAPI**: each service publishes `/openapi.json`. The canonical specs live in `packages/openapi/` and are used to generate Dart + TS clients.
+
+## API contract
+
+See [backend API contract](backend-contract.md) for the frontend-facing service-by-service endpoint map and short descriptions.
