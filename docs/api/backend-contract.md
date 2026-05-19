@@ -148,6 +148,15 @@ Base route: `/v1/patients`
 - `POST /v1/patients/{patient_id}/consents` — grant a consent record.
 - `DELETE /v1/patients/{patient_id}/consents/{consent_id}` — revoke a consent record.
 
+## Wearable Sync Service
+
+Base route: `/v1/wearables`
+
+- `POST /v1/wearables/devices` — register or update a wearable device for the current user.
+- `GET /v1/wearables/devices` — list the current user's connected wearables.
+- `GET /v1/wearables/devices/{device_id}/samples` — read synced wearable samples for one device.
+- `POST /v1/wearables/sync` — ingest wearable vitals and forward them into the EHR timeline.
+
 ## Social Service
 
 Base route: `/v1/social`

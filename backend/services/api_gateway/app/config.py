@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     notification_service_url: str = "http://notification_service:8008"
     lab_service_url: str = "http://lab_service:8009"
     ehr_service_url: str = "http://ehr_service:8010"
+    wearable_sync_service_url: str = "http://wearable_sync_service:8014"
     social_service_url: str = "http://social_service:8011"
     analytics_service_url: str = "http://analytics_service:8012"
     onboarding_service_url: str = "http://onboarding_service:8013"
@@ -52,6 +53,7 @@ ROUTES: dict[str, str] = {
     "/v1/me/inbox": settings.notification_service_url,
     "/v1/lab": settings.lab_service_url,
     "/v1/patients": settings.ehr_service_url,
+    "/v1/wearables": settings.wearable_sync_service_url,
     "/v1/social": settings.social_service_url,
     "/v1/admin": settings.analytics_service_url,
     "/v1/onboarding": settings.onboarding_service_url,

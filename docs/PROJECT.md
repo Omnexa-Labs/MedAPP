@@ -318,6 +318,7 @@ make lint   # ruff check + flutter analyze
 | inbox_service | 8013 | scaffold | persistent chat, support handoff |
 | lab_service | 8009 | scaffold | lab uploads, partner labs |
 | ehr_service | 8010 | scaffold | records, documents, vitals |
+| wearable_sync_service | 8014 | scaffold | wearable ingestion, EHR sync |
 | social_service | 8011 | scaffold | feed, posts, Q&A |
 | analytics_service | 8012 | scaffold | metrics, reporting |
 
@@ -361,7 +362,7 @@ Goal: book a doctor → join telemedicine → leave with a record.
 
 ### Phase 3 — Clinical depth (12 weeks)
 - [ ] Lab Reader agent + OCR pipeline
-- [ ] Vitals Watcher + wearable sync (Apple Health, Google Fit, Fitbit)
+- [x] Vitals Watcher + wearable sync (Apple Health, Google Fit, Fitbit)
 - [ ] Insurance integration (one partner)
 - [ ] Multi-region GCP deployment (EU + ZA)
 

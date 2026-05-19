@@ -135,6 +135,12 @@ services:
     environment: *svc-env
     ports: ["8010:8010"]
 
+  wearable_sync_service:
+    build: { <<: *py-build, dockerfile: backend/services/wearable_sync_service/Dockerfile }
+    depends_on: [postgres]
+    environment: *svc-env
+    ports: ["8014:8014"]
+
   social_service:
     build: { <<: *py-build, dockerfile: backend/services/social_service/Dockerfile }
     depends_on: [postgres]

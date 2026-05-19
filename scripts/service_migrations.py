@@ -22,6 +22,7 @@ BACKEND_SERVICES = [
     "inbox_service",
     "lab_service",
     "ehr_service",
+    "wearable_sync_service",
     "social_service",
     "analytics_service",
 ]

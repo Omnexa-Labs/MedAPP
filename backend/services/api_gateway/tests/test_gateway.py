@@ -19,6 +19,7 @@ def test_gateway_routes_v1_prefixes_to_longest_match() -> None:
     assert _resolve_upstream("v1/admin/metrics/funnel") == settings.analytics_service_url
     assert _resolve_upstream("v1/me/inbox") == settings.notification_service_url
     assert _resolve_upstream("v1/onboarding/applications") == settings.onboarding_service_url
+    assert _resolve_upstream("v1/wearables/sync") == settings.wearable_sync_service_url
 
 
 def test_healthz() -> None:
