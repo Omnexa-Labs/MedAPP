@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal
 
 from ..models import Booking
-from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus
+from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus, BookingSummaryOut
 
 
 class BookingError(ValueError):
@@ -34,6 +34,12 @@ def _normalize_text(value: str | None) -> str | None:
         return None
     trimmed = value.strip()
     return trimmed or None
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _can_manage_booking(principal: Principal, booking: Booking | None = None) -> None:
@@ -99,6 +105,26 @@ async def list_bookings(
     result = await db.scalars(stmt)
     items = [BookingOut.model_validate(booking) for booking in result.all()]
     return BookingList(items=items)
+
+
+async def get_booking_summary(
+    db: AsyncSession,
+    principal: Principal,
+    *,
+    all_bookings: bool = False,
+    doctor_id: UUID | None = None,
+) -> BookingSummaryOut:
+    bookings = await list_bookings(db, principal, all_bookings=all_bookings, doctor_id=doctor_id)
+    now = datetime.now(tz=timezone.utc)
+    booked = [booking for booking in bookings.items if booking.status == BookingStatus.BOOKED]
+    cancelled = [booking for booking in bookings.items if booking.status == BookingStatus.CANCELLED]
+    upcoming = [booking for booking in booked if _as_utc(booking.starts_at) >= now][:3]
+    return BookingSummaryOut(
+        total_count=len(bookings.items),
+        booked_count=len(booked),
+        cancelled_count=len(cancelled),
+        upcoming_bookings=upcoming,
+    )
 
 
 async def get_booking(db: AsyncSession, principal: Principal, booking_id: UUID) -> Booking:

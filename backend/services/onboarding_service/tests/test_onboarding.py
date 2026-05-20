@@ -65,6 +65,13 @@ async def test_pharmacy_application_is_owned_by_submitter(pharmacist_client, adm
     assert list_resp.status_code == 200, list_resp.text
     assert len(list_resp.json()["items"]) == 1
 
+    summary_resp = await pharmacist_client.get("/v1/onboarding/summary")
+    assert summary_resp.status_code == 200, summary_resp.text
+    summary = summary_resp.json()
+    assert summary["total_count"] == 1
+    assert summary["draft_count"] == 1
+    assert summary["recent_applications"][0]["partner_type"] == "pharmacy"
+
 
 @pytest.mark.asyncio
 async def test_non_owner_cannot_read_application(pharmacist_client, doctor_client, pharmacy_payload):

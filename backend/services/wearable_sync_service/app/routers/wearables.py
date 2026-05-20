@@ -13,10 +13,12 @@ from ..schemas.wearable import (
     WearableDeviceList,
     WearableDeviceOut,
     WearableSampleList,
+    WearableSampleOut,
     WearableSyncRequest,
     WearableSyncResult,
+    WearableSummaryOut,
 )
-from ..services import create_or_update_device, list_device_samples, list_devices, sync_wearable_samples
+from ..services import create_or_update_device, get_wearable_summary, list_device_samples, list_devices, sync_wearable_samples
 
 router = APIRouter(prefix="/v1/wearables", tags=["Wearables"])
 
@@ -45,6 +47,11 @@ async def read_samples(
 ):
     samples = await list_device_samples(db, principal, device_id)
     return WearableSampleList(items=[WearableSampleOut.model_validate(sample) for sample in samples])
+
+
+@router.get("/summary", response_model=WearableSummaryOut)
+async def read_summary(db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
+    return await get_wearable_summary(db, principal)
 
 
 @router.post("/sync", response_model=WearableSyncResult, status_code=status.HTTP_201_CREATED)

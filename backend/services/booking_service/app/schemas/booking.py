@@ -40,3 +40,10 @@ class BookingOut(BookingBase):
 
 class BookingList(BaseModel):
     items: list[BookingOut] = Field(default_factory=list)
+
+
+class BookingSummaryOut(BaseModel):
+    total_count: int = 0
+    booked_count: int = 0
+    cancelled_count: int = 0
+    upcoming_bookings: list[BookingOut] = Field(default_factory=list)

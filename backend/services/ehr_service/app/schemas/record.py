@@ -39,6 +39,12 @@ class VitalTimelineOut(BaseModel):
     items: list[VitalOut] = Field(default_factory=list)
 
 
+class PatientSummaryOut(BaseModel):
+    patient: PatientOut
+    latest_vitals: list[VitalOut] = Field(default_factory=list)
+    active_consents: list[ConsentOut] = Field(default_factory=list)
+
+
 class ConsentCreate(BaseModel):
     doctor_user_id: UUID
     scope: str = Field(default="records", max_length=64)

@@ -45,6 +45,22 @@ async def test_doctor_can_create_order_and_patient_can_upload_result(doctor_clie
     assert len(items) == 1
     assert items[0]["result_id"] == result_id
 
+    summary_resp = await patient_client.get("/v1/me/lab/summary")
+    assert summary_resp.status_code == 200, summary_resp.text
+    summary = summary_resp.json()
+    assert summary["total_orders"] == 1
+    assert summary["open_orders"] == 1
+    assert summary["total_results"] == 1
+    assert len(summary["recent_results"]) == 1
+    assert summary["recent_results"][0]["result_id"] == result_id
+
+    search_resp = await patient_client.get("/v1/me/lab/search", params={"q": "hemoglobin 13.5"})
+    assert search_resp.status_code == 200, search_resp.text
+    search = search_resp.json()
+    assert search["query"] == "hemoglobin 13.5"
+    assert len(search["items"]) == 1
+    assert search["items"][0]["result"]["result_id"] == result_id
+
 
 @pytest.mark.asyncio
 async def test_other_patient_cannot_access_result(doctor_client, patient_client, other_patient_client, principal_patient, sessionmaker, result_time):

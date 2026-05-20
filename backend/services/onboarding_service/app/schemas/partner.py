@@ -133,3 +133,13 @@ class PartnerApplicationOut(BaseModel):
 
 class PartnerApplicationList(BaseModel):
     items: list[PartnerApplicationOut] = Field(default_factory=list)
+
+
+class PartnerApplicationSummaryOut(BaseModel):
+    total_count: int = 0
+    draft_count: int = 0
+    submitted_count: int = 0
+    under_review_count: int = 0
+    approved_count: int = 0
+    rejected_count: int = 0
+    recent_applications: list[PartnerApplicationOut] = Field(default_factory=list)

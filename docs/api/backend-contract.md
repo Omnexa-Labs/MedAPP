@@ -4,6 +4,12 @@ This document is the frontend-facing contract for the backend services. It group
 
 All services follow the `/v1/...` convention. The API gateway is the public entry point; the services below are the routed backend surfaces behind it.
 
+Backend service map:
+
+- Gateway routes `/v1/wearables` to the wearable sync service.
+- Wearable samples are normalized by the wearable sync service and written into the EHR vitals timeline.
+- The vitals watcher agent consumes the resulting vitals stream; it is not a direct frontend API.
+
 ## API Gateway
 
 Base route: `/`

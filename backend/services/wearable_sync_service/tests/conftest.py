@@ -63,7 +63,12 @@ async def principal():
 async def client(sessionmaker, principal):
     async def _db_override():
         async with sessionmaker() as session:
-            yield session
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     async def _principal_override():
         return principal

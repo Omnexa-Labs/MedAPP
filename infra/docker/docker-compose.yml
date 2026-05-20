@@ -153,6 +153,18 @@ services:
     environment: *svc-env
     ports: ["8012:8012"]
 
+  hms_service:
+    build: { <<: *py-build, dockerfile: backend/services/hms_service/Dockerfile }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_started } }
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      HMS_MGMT_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_hms_mgmt
+      HMS_TENANT_DATABASE_URL_TEMPLATE: postgresql+asyncpg://medapp:medapp@postgres/hms_{tenant_slug}
+      HMS_ADMIN_DATABASE_URL_SYNC: postgresql://medapp:medapp@postgres/medapp
+      HMS_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      HMS_AMQP_URL: amqp://medapp:medapp@rabbitmq/
+    ports: ["8020:8020"]
+
   # ── Agents (Claude-powered) ────────────────────────────────────────────────
   concierge_agent:
     build: { <<: *py-build, dockerfile: agents/services/concierge_agent/Dockerfile }

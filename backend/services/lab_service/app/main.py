@@ -5,12 +5,14 @@ from fastapi import FastAPI
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
+from .services.lab_service import build_qdrant_client
 from .routers import lab, root
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging(settings.log_level)
+    app.state.qdrant = build_qdrant_client()
     yield
 
 
@@ -21,6 +23,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
+    app.state.qdrant = build_qdrant_client()
     app.include_router(root.router)
     app.include_router(lab.router)
     app.include_router(lab.me_router)

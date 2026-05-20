@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal
 
 from ..models.record import AccessAudit, Consent, PatientRecord, VitalReading
-from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, PatientOut, VitalCreate, VitalOut
+from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, PatientOut, PatientSummaryOut, VitalCreate, VitalOut
 
 
 class EHRAccessError(RuntimeError):
@@ -30,6 +30,16 @@ def _principal_uuid(principal: Principal) -> UUID:
 
 def _is_clinician(principal: Principal) -> bool:
     return principal.role in {"doctor", "nurse", "admin"}
+
+
+async def _authorize_patient_access(session: AsyncSession, principal: Principal, patient: PatientRecord) -> UUID:
+    requester_id = _principal_uuid(principal)
+    if requester_id != patient.user_id:
+        if principal.role != "admin" and not _is_clinician(principal):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+        if principal.role != "admin" and not await _has_active_consent(session, patient.id, requester_id):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+    return requester_id
 
 
 async def create_patient_if_missing(session: AsyncSession, patient_user_id: UUID, *, display_name: str | None = None) -> PatientRecord:
@@ -67,14 +77,9 @@ async def record_access(session: AsyncSession, accessor_user_id: UUID, patient_i
 
 
 async def get_patient_bundle(session: AsyncSession, principal: Principal, patient_user_id: UUID, *, reason: str = "patient record access") -> PatientBundleOut:
-    requester_id = _principal_uuid(principal)
     patient = await _load_patient(session, patient_user_id)
 
-    if requester_id != patient.user_id:
-        if principal.role != "admin" and not _is_clinician(principal):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
-        if principal.role != "admin" and not await _has_active_consent(session, patient.id, requester_id):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+    requester_id = await _authorize_patient_access(session, principal, patient)
 
     await record_access(session, requester_id, patient.id, "patient_bundle", reason)
     vitals = await list_vitals(session, principal, patient_user_id, reason=reason, enforce_access=False)
@@ -89,6 +94,41 @@ async def get_patient_bundle(session: AsyncSession, principal: Principal, patien
         patient=PatientOut.model_validate(patient),
         vitals=[VitalOut.model_validate(vital) for vital in vitals],
         consents=[ConsentOut.model_validate(consent) for consent in consents],
+    )
+
+
+async def get_patient_summary(
+    session: AsyncSession,
+    principal: Principal,
+    patient_user_id: UUID,
+    *,
+    reason: str = "patient summary access",
+) -> PatientSummaryOut:
+    patient = await _load_patient(session, patient_user_id)
+    requester_id = await _authorize_patient_access(session, principal, patient)
+
+    latest_vitals_result = await session.scalars(
+        select(VitalReading)
+        .where(VitalReading.patient_id == patient.id)
+        .order_by(VitalReading.recorded_at.desc())
+        .limit(5)
+    )
+    latest_vitals = list(latest_vitals_result.all())
+    active_consents = list(
+        (
+            await session.scalars(
+                select(Consent)
+                .where(Consent.patient_id == patient.id, Consent.revoked_at.is_(None))
+                .order_by(Consent.granted_at.desc())
+            )
+        ).all()
+    )
+
+    await record_access(session, requester_id, patient.id, "patient_summary", reason)
+    return PatientSummaryOut(
+        patient=PatientOut.model_validate(patient),
+        latest_vitals=[VitalOut.model_validate(vital) for vital in reversed(latest_vitals)],
+        active_consents=[ConsentOut.model_validate(consent) for consent in active_consents],
     )
 
 

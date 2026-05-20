@@ -15,6 +15,7 @@ from ..schemas.partner import (
     PartnerApplicationCreate,
     PartnerApplicationList,
     PartnerApplicationOut,
+    PartnerApplicationSummaryOut,
     TeamMemberCreate,
 )
 from ..services import (
@@ -22,6 +23,7 @@ from ..services import (
     add_document,
     add_team_member,
     create_application,
+    get_application_summary,
     get_application,
     list_applications,
     review_application,
@@ -52,6 +54,14 @@ async def index(
 ):
     applications = await list_applications(db, principal, status_filter=status_filter)
     return PartnerApplicationList(items=[PartnerApplicationOut.model_validate(application) for application in applications])
+
+
+@router.get("/summary", response_model=PartnerApplicationSummaryOut)
+async def summary(
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    return await get_application_summary(db, principal)
 
 
 @router.get("/applications/{application_id}", response_model=PartnerApplicationOut)

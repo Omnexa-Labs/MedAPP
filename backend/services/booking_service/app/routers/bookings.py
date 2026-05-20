@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal, get_current_principal
 
 from ..deps import DbSession
-from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus
-from ..services import BookingError, cancel_booking, create_booking, get_booking, list_bookings
+from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus, BookingSummaryOut
+from ..services import BookingError, cancel_booking, create_booking, get_booking, get_booking_summary, list_bookings
 
 router = APIRouter(prefix="/v1/bookings", tags=["Booking"])
 
@@ -42,6 +42,16 @@ async def index(
         doctor_id=doctor_id,
         status_filter=status_filter,
     )
+
+
+@router.get("/summary", response_model=BookingSummaryOut)
+async def summary(
+    all_bookings: bool = Query(default=False),
+    doctor_id: UUID | None = None,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = DbSession,
+) -> BookingSummaryOut:
+    return await get_booking_summary(db, principal, all_bookings=all_bookings, doctor_id=doctor_id)
 
 
 @router.get("/{booking_id}", response_model=BookingOut)

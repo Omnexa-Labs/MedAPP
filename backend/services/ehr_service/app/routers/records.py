@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal
 
 from ..deps import DbSession, get_current_principal
-from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, VitalCreate, VitalOut, VitalTimelineOut
-from ..services import create_consent, delete_consent, get_patient_bundle, list_vitals, record_vital
+from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, PatientSummaryOut, VitalCreate, VitalOut, VitalTimelineOut
+from ..services import create_consent, delete_consent, get_patient_bundle, get_patient_summary, list_vitals, record_vital
 
 router = APIRouter(prefix="/v1/patients", tags=["Records"])
 
@@ -18,6 +18,11 @@ router = APIRouter(prefix="/v1/patients", tags=["Records"])
 @router.get("/{patient_id}/records", response_model=PatientBundleOut)
 async def read_bundle(patient_id: UUID, db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
     return await get_patient_bundle(db, principal, patient_id)
+
+
+@router.get("/{patient_id}/summary", response_model=PatientSummaryOut)
+async def read_summary(patient_id: UUID, db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
+    return await get_patient_summary(db, principal, patient_id)
 
 
 @router.post("/{patient_id}/vitals", response_model=VitalOut, status_code=status.HTTP_201_CREATED)

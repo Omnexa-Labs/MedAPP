@@ -156,9 +156,9 @@ scripts/                Codegen, migrations, seeds
 ### 4.3 Backend principles
 
 - **Microservices from day one** (ADR 0001). One Postgres DB per service. No cross-service joins.
-- **Polyglot persistence:** Postgres for relational, MongoDB for documents, Qdrant for vectors. A given service uses whichever combination it needs.
+- **Polyglot persistence:** Postgres for transactional state, GCS for binaries, MongoDB for narrative text, Qdrant for vectors, Redis for ephemeral state. A given service uses whichever combination it needs.
 - **Sync calls**: HTTP via `httpx` clients in `backend/shared/clients/`.
-- **Async calls**: RabbitMQ topic exchange, CloudEvents envelope (`backend/shared/events/`).
+- **Async calls**: RabbitMQ topic exchange, CloudEvents envelope (`backend/shared/events/`), with outbox-driven publication for cross-service sync.
 - **Auth**: JWT issued by `user_service`, verified at the gateway, re-verified per service for defense in depth.
 - **Per-service Alembic migrations** for Postgres (orchestrated by `scripts/migrate-all.sh`). Mongo collections are schema-on-read.
 
@@ -166,9 +166,47 @@ scripts/                Codegen, migrations, seeds
 
 | Datastore | Driver | Used for |
 |---|---|---|
-| **PostgreSQL 16** | `asyncpg` (runtime) + `psycopg2` (Alembic / scripts) via SQLAlchemy 2.x | All transactional/relational data: users, doctors, bookings, payments, audit logs |
-| **MongoDB 7** | `motor` (async) | Chat transcripts, EHR document metadata + extracted text, social feed posts, agent traces |
-| **Qdrant 1.11** | `qdrant-client` (async via REST/gRPC) | Embeddings: EHR retrieval, lab text search, medical knowledge base, long-term agent memory |
+| **PostgreSQL 16** | `asyncpg` (runtime) + `psycopg2` (Alembic / scripts) via SQLAlchemy 2.x | Canonical transactional records: users, profiles, bookings, payments, onboarding, consents, vitals metadata |
+| **GCS** | signed URLs + service-side upload/download clients | Lab PDFs, scans, images, exports, attachments, other binaries |
+| **MongoDB 7** | `motor` (async) | Chat transcripts, agent traces, flexible narrative/document metadata |
+| **Qdrant 1.11** | `qdrant-client` (async via REST/gRPC) | Embeddings for EHR chunks, lab OCR text, policy docs, agent memory |
+| **Redis 7** | cache/session client | Sessions, rate limits, locks, ephemeral job state, short-lived cache |
+| **RabbitMQ** | `aio-pika` / shared event bus | Cross-service domain events, async sync, outbox publication |
+
+See [docs/architecture/storage.md](docs/architecture/storage.md) for the service ownership map and agent read-model guidance.
+
+#### Service-owned storage map
+
+In a microservices architecture, the important boundary is not just the datastore type, but which service owns the source of truth.
+
+| Service | Owns | Secondary/read surfaces | Agent read path |
+|---|---|---|---|
+| `user_service` | Accounts, auth tokens, profiles, KYC submissions, consented identity claims | Redis for OTP/session state | Use `/v1/me`, auth claims, or user summary endpoints only |
+| `doctor_service` | Doctor profile, specialties, consultation fee, availability rules, slots | Qdrant search embeddings later if needed | Use doctor profile/search APIs, not tables |
+| `nurse_service` | Nurse profile, service area, availability flags | None initially | Use nurse profile APIs only |
+| `hospital_service` | Hospital profile, facilities, staff links, public reviews | None initially | Use hospital lookup/review APIs only |
+| `booking_service` | Booking lifecycle, cancellations, reschedules, booking windows | RabbitMQ booking events | Use booking summary APIs or booking events |
+| `payment_service` | Payment intents, payment status, refunds, receipts | GCS for exported receipts if needed | Use payment status APIs only |
+| `telemedicine_service` | Rooms, join/end state, room messages, access tokens | Redis for presence/session state | Use room state APIs only |
+| `notification_service` | Notification preferences, inbox delivery state, queued sends | RabbitMQ delivery events | Use notification preference/inbox APIs only |
+| `inbox_service` | Threads, messages, read receipts, handoff threads | None initially | Use inbox/thread APIs only |
+| `lab_service` | Lab orders, result metadata, upload state | GCS for PDFs/images; Qdrant for OCR text | Use lab result/order APIs and OCR-derived text, not binaries |
+| `ehr_service` | Patient bundles, vitals timeline, consents, documents metadata, access audit | GCS for binaries; Qdrant for retrieval chunks; Mongo later if notes become flexible | Use bundle/timeline/signed URL APIs or retrieval summaries |
+| `onboarding_service` | Partner applications, review state, documents, team members | GCS for submitted application files if needed | Use onboarding summary/review APIs only |
+| `wearable_sync_service` | Device registrations, sample sync state, sync failures, write-through mapping to EHR | Optional queue for retry/replay later | Use wearable sync/device APIs; agents should read the resulting EHR vitals, not raw device rows |
+| `social_service` | Posts, comments, reactions, Q&A, moderation state | MongoDB if post narrative becomes highly flexible; Qdrant for search later | Use social feed/public APIs only when explicitly needed |
+| `analytics_service` | Domain event ingestion, aggregates, funnels, retention, scorecards | Event stream projections | Use aggregate/scorecard APIs only |
+
+#### Agent efficiency rule
+
+Agents should not query operational stores directly unless a service explicitly exposes that read path. The preferred pattern is:
+
+1. Service writes to its own store.
+2. Service emits a domain event through the outbox.
+3. Read models, search indexes, or summaries are updated asynchronously.
+4. Agents read the smallest useful representation: summary endpoint, timeline endpoint, retrieval index, or pre-aggregated metric.
+
+That keeps agent latency low, avoids cross-service joins, and protects canonical data ownership.
 
 ### 4.4 Agentic layer principles
 
@@ -205,12 +243,12 @@ scripts/                Codegen, migrations, seeds
 | State (mobile) | Riverpod 2.x | Composable, testable, type-safe |
 | HTTP (mobile) | Dio | Interceptors, error handling, retry |
 | Relational DB | PostgreSQL 16 (SQLAlchemy 2.x async + asyncpg, sync via psycopg2) | Per-service relational store |
+| Object storage | GCS | Large binaries and signed downloads |
 | Document DB | MongoDB 7 (motor async driver) | Unstructured / semi-structured data (chat transcripts, EHR document metadata, social feed) |
 | Vector DB | Qdrant 1.11 | Embeddings for RAG (EHR, labs, knowledge base, agent memory) |
 | Migrations | Alembic | Postgres schema migrations (per service); Mongo is schema-on-read |
-| Cache | Redis 7 | Sessions, rate limits, WebRTC presence |
-| Queue | RabbitMQ | Topic exchange for event bus |
-| Object storage | GCS | We're on GCP |
+| Cache | Redis 7 | Sessions, rate limits, ephemeral jobs, short-lived cache |
+| Queue | RabbitMQ | Topic exchange for event bus and cross-service sync |
 | Cloud | GCP (GKE + Cloud SQL) | Decision in ADR 0001; team familiarity |
 | IaC | Terraform | Standard |
 | Container orchestration | Kubernetes (GKE) | We need autoscaling per service |

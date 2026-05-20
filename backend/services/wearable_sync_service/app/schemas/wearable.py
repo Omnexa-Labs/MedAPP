@@ -67,3 +67,12 @@ class WearableSyncResult(BaseModel):
     synced_count: int
     failed_count: int
     samples: list[WearableSampleOut] = Field(default_factory=list)
+
+
+class WearableSummaryOut(BaseModel):
+    total_devices: int = 0
+    active_devices: int = 0
+    total_samples: int = 0
+    synced_samples: int = 0
+    failed_samples: int = 0
+    recent_samples: list[WearableSampleOut] = Field(default_factory=list)

@@ -1,107 +1,97 @@
-# MedApp Mobile (Flutter)
+# MedApp Mobile (React Native + Expo)
 
-Cross-platform mobile app for patients, nurses, doctors, and hospital admins.
+The MedApp mobile client. Built with Expo (managed workflow), React Navigation, TanStack Query, Zustand, and NativeWind. Builds are distributed via EAS.
 
-## Clone & run (frontend engineer's quick start)
+## Stack
+
+- **Runtime:** Expo SDK 51, React Native 0.74, TypeScript
+- **Navigation:** `@react-navigation/native` (native stack + bottom tabs)
+- **Server state:** `@tanstack/react-query` + `axios`
+- **Client state:** `zustand`
+- **Storage:** `expo-secure-store` (tokens) + `@react-native-async-storage/async-storage` (prefs)
+- **Styling:** NativeWind (Tailwind for RN)
+- **Build/distribution:** EAS Build + EAS Submit
+
+## Project layout
+
+```
+mobile/
+├── App.tsx                # providers (query, navigation, gesture handler, safe area)
+├── index.ts               # entrypoint (registerRootComponent)
+├── app.config.ts          # Expo config (reads APP_ENV, USE_MOCK_API, API_BASE_URL)
+├── eas.json               # EAS build profiles
+├── babel.config.js        # nativewind + reanimated + module-resolver
+├── metro.config.js        # nativewind metro integration
+├── tailwind.config.js
+├── global.css             # tailwind directives
+├── tsconfig.json          # path alias @ -> src
+└── src/
+    ├── core/
+    │   ├── config/env.ts          # reads expoConfig.extra
+    │   ├── network/apiClient.ts   # axios instance + auth interceptor
+    │   ├── network/queryClient.ts # TanStack Query client
+    │   ├── storage/secureStorage.ts # token storage (expo-secure-store)
+    │   ├── storage/prefs.ts         # non-sensitive prefs (AsyncStorage)
+    │   └── theme/colors.ts
+    ├── store/
+    │   └── authStore.ts           # zustand auth slice + hydration
+    ├── navigation/
+    │   ├── RootNavigator.tsx      # switches Auth vs App based on auth state
+    │   ├── AuthNavigator.tsx
+    │   ├── AppTabs.tsx
+    │   └── types.ts
+    └── features/
+        ├── auth/{SignInScreen,SignUpScreen}.tsx
+        ├── home/HomeScreen.tsx
+        ├── chat/ChatScreen.tsx
+        └── profile/ProfileScreen.tsx
+```
+
+## Getting started
 
 ```bash
-git clone https://github.com/Omnexa-Labs/MedAPP.git
-cd MedAPP/frontend/mobile
-flutter pub get
-flutter run                                # uses mock API, no backend needed
+cd frontend/mobile
+npm install
+npx expo start
 ```
 
-That's it. The app boots into the login screen. Use the pre-filled credentials
-(`demo@medapp.test` / `demo1234`) — anything with a valid email and 4+ char
-password is accepted in mock mode.
+Press `a` for Android emulator, `i` for iOS simulator, or scan the QR with Expo Go.
 
-> Verified on Flutter 3.24.5 stable (Windows). `flutter analyze` is clean,
-> `flutter test` passes (2/2).
+> First-time only: install the Expo and EAS CLIs globally if you don't have them.
+> `npm i -g expo eas-cli`
 
-### Run against a live backend
+## Configuration
 
-```bash
-# Android emulator → host machine
-flutter run \
-  --dart-define=USE_MOCK_API=false \
-  --dart-define=API_BASE_URL=http://10.0.2.2:8000
+App config lives in `app.config.ts` and reads three env vars:
 
-# iOS simulator
-flutter run \
-  --dart-define=USE_MOCK_API=false \
-  --dart-define=API_BASE_URL=http://localhost:8000
+| Env var         | Values                          | Default in dev                       |
+| --------------- | ------------------------------- | ------------------------------------ |
+| `APP_ENV`       | `dev` \| `preview` \| `prod`    | `dev`                                |
+| `USE_MOCK_API`  | `true` \| `false`               | `true` when `APP_ENV=dev`            |
+| `API_BASE_URL`  | URL                             | `localhost:8000` (iOS/web), `10.0.2.2:8000` (Android emu) |
 
-# Physical device on the same LAN
-flutter run \
-  --dart-define=USE_MOCK_API=false \
-  --dart-define=API_BASE_URL=http://<your-laptop-ip>:8000
-```
+Each EAS build profile in `eas.json` sets these. For a physical device on your LAN,
+start with `API_BASE_URL=http://192.168.x.x:8000 npx expo start` (Windows PowerShell:
+`$env:API_BASE_URL = "http://192.168.x.x:8000"; npx expo start`).
 
-Boot the backend stack from the repo root: `make dev`.
+Bundle IDs and app name are also env-suffixed (`com.amalitech.medapp.dev`,
+`com.amalitech.medapp.preview`, `com.amalitech.medapp`) so all three builds can
+sit on one device.
 
-## Architecture
+## EAS
 
-Feature-first. Each feature owns its own `data/`, `domain/`, `presentation/`.
+1. Authenticate: `eas login`
+2. Link the project: `eas init` (or set `EAS_PROJECT_ID` env var).
+3. Build:
+   - Development client: `npm run build:dev`
+   - Internal preview: `npm run build:preview`
+   - Production: `npm run build:prod`
+4. Submit: `npm run submit:android` / `npm run submit:ios`
 
-```
-lib/
-  main.dart                       entry point
-  app.dart                        MaterialApp.router root
-  core/
-    config/env.dart               build-time config (--dart-define)
-    network/api_client.dart       Dio + auth interceptor
-    router/app_router.dart        go_router + auth-aware redirects
-    storage/token_storage.dart    secure (mobile) / prefs (web) token store
-    theme/app_theme.dart          Material 3 theme
-  features/
-    auth/                         signup, login, splash, auth state
-    home/                         dashboard
-    providers/                    doctor/nurse/hospital listings
-    chat/                         concierge agent UI
-    profile/                      view/edit, logout
-```
+## Conventions
 
-**State management**: Riverpod 2.x (`flutter_riverpod`). Auth state is an
-`AsyncNotifier<AuthState>` (`Authenticated | Unauthenticated | AuthLoading`).
-The router watches it and redirects accordingly — there's no manual nav from
-auth callbacks.
-
-**Networking**: Dio with a single interceptor that attaches `Bearer <token>`
-from `TokenStorage`. Repositories pick between `_HttpAuthRepository` and
-`_MockAuthRepository` based on `Env.useMockApi`.
-
-**Mock mode**: `USE_MOCK_API=true` (the default) replaces repositories with
-in-memory canned-data versions. This lets the frontend team build UI without
-ever booting the backend or signing up for any third-party service.
-
-## Tests
-
-```bash
-flutter test
-```
-
-Two tests ship:
-- `widget_test.dart` — app boots without throwing
-- `features/login_test.dart` — login form validation
-
-## Adding a screen
-
-1. Create `lib/features/<feature>/presentation/<screen>.dart`
-2. Register a route in `lib/core/router/app_router.dart`
-3. If it needs data: add `data/<feature>_repository.dart` (provide HTTP + mock impls behind a `Provider`)
-
-## Flavors
-
-Set with `--dart-define=ENV=<name>`:
-
-- `dev` — local docker-compose backend (mock by default)
-- `staging` — staging cluster
-- `prod` — production
-
-## Known gaps
-
-- No code generation (`build_runner`) is wired up yet. When we add typed
-  network models, add `freezed` + `json_serializable` and a `dart run build_runner watch` step.
-- Push notifications, deep linking, and biometric auth are not wired.
-- Real telemedicine call screen is a placeholder — `flutter_webrtc` integration
-  is intentionally deferred until backend signaling is ready.
+- All screens use `SafeAreaView` from `react-native-safe-area-context`.
+- Auth tokens live in `expo-secure-store` only; never in AsyncStorage.
+- HTTP goes through `apiClient` so the auth interceptor and base URL are consistent.
+- Server state belongs in TanStack Query; only ephemeral UI / auth state goes in Zustand.
+- Use `@/` for src-relative imports.

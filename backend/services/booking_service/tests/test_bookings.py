@@ -69,6 +69,48 @@ async def test_cancel_booking(client, booking_window) -> None:
     assert cancel_resp.json()["cancellation_reason"] == "No longer needed"
 
 
+async def test_booking_summary_is_bounded(client, booking_window) -> None:
+    start, end = booking_window
+    first = await client.post(
+        "/v1/bookings",
+        json={
+            "doctor_id": "77777777-7777-7777-7777-777777777777",
+            "starts_at": start.isoformat(),
+            "ends_at": end.isoformat(),
+            "reason": "First slot",
+        },
+    )
+    assert first.status_code == status.HTTP_201_CREATED
+
+    second_start = start + timedelta(hours=2)
+    second_end = end + timedelta(hours=2)
+    second = await client.post(
+        "/v1/bookings",
+        json={
+            "doctor_id": "88888888-8888-8888-8888-888888888888",
+            "starts_at": second_start.isoformat(),
+            "ends_at": second_end.isoformat(),
+            "reason": "Second slot",
+        },
+    )
+    assert second.status_code == status.HTTP_201_CREATED
+
+    cancelled = await client.post(
+        f"/v1/bookings/{first.json()['booking_id']}/cancel",
+        json={"cancellation_reason": "No longer needed"},
+    )
+    assert cancelled.status_code == status.HTTP_200_OK
+
+    summary_resp = await client.get("/v1/bookings/summary")
+    assert summary_resp.status_code == status.HTTP_200_OK, summary_resp.text
+    body = summary_resp.json()
+    assert body["total_count"] == 2
+    assert body["booked_count"] == 1
+    assert body["cancelled_count"] == 1
+    assert len(body["upcoming_bookings"]) == 1
+    assert body["upcoming_bookings"][0]["reason"] == "Second slot"
+
+
 async def test_admin_can_list_all_bookings(admin_client, booking_window) -> None:
     start, end = booking_window
     await admin_client.post(

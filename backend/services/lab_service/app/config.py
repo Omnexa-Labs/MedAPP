@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
+    qdrant_collection: str = "lab_results"
+    qdrant_vector_size: int = 8
 
 
 settings = Settings()

@@ -10,6 +10,7 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pydantic-settings>=2.3",
   "pyjwt[crypto]>=2.9",
+  "qdrant-client>=1.11",
   "sqlalchemy[asyncio]>=2.0",
   "structlog>=24.1",
 ]

@@ -74,3 +74,20 @@ class LabResultOut(BaseModel):
 
 class LabResultList(BaseModel):
     items: list[LabResultOut] = Field(default_factory=list)
+
+
+class LabSummaryOut(BaseModel):
+    total_orders: int = 0
+    open_orders: int = 0
+    total_results: int = 0
+    recent_results: list[LabResultOut] = Field(default_factory=list)
+
+
+class LabSearchHitOut(BaseModel):
+    score: float
+    result: LabResultOut
+
+
+class LabSearchResultsOut(BaseModel):
+    query: str
+    items: list[LabSearchHitOut] = Field(default_factory=list)

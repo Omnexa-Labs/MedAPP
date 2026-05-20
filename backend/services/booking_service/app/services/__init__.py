@@ -3,6 +3,7 @@ from .booking_service import (
     cancel_booking,
     create_booking,
     get_booking,
+    get_booking_summary,
     list_bookings,
 )
 from .root_service import get_service_status
@@ -12,6 +13,7 @@ __all__ = [
     "cancel_booking",
     "create_booking",
     "get_booking",
+    "get_booking_summary",
     "get_service_status",
     "list_bookings",
 ]

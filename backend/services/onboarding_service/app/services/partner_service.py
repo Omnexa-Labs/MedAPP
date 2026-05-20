@@ -15,6 +15,7 @@ from ..schemas.partner import (
     ApplicationReviewRequest,
     ApplicationStatus,
     PartnerApplicationCreate,
+    PartnerApplicationSummaryOut,
     TeamMemberCreate,
     ReviewAction,
 )
@@ -148,6 +149,23 @@ async def list_applications(db: AsyncSession, principal: Principal, *, status_fi
         stmt = stmt.where(PartnerApplication.status == status_filter.value)
     rows = await db.scalars(stmt)
     return list(rows.all())
+
+
+async def get_application_summary(db: AsyncSession, principal: Principal) -> PartnerApplicationSummaryOut:
+    applications = await list_applications(db, principal)
+    recent_applications = applications[:3]
+    statuses = {status.value: 0 for status in ApplicationStatus}
+    for application in applications:
+        statuses[application.status] = statuses.get(application.status, 0) + 1
+    return PartnerApplicationSummaryOut(
+        total_count=len(applications),
+        draft_count=statuses[ApplicationStatus.DRAFT.value],
+        submitted_count=statuses[ApplicationStatus.SUBMITTED.value],
+        under_review_count=statuses[ApplicationStatus.UNDER_REVIEW.value],
+        approved_count=statuses[ApplicationStatus.APPROVED.value],
+        rejected_count=statuses[ApplicationStatus.REJECTED.value],
+        recent_applications=[application for application in recent_applications],
+    )
 
 
 async def get_application(db: AsyncSession, principal: Principal, application_id: UUID) -> PartnerApplication:

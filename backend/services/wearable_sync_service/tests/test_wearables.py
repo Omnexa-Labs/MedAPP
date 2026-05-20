@@ -62,6 +62,16 @@ async def test_sync_pushes_samples_to_ehr(client):
     assert payload["failed_count"] == 0
     assert len(calls) == 2
 
+    summary = await client.get("/v1/wearables/summary")
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert body["total_devices"] == 1
+    assert body["active_devices"] == 1
+    assert body["total_samples"] == 2
+    assert body["synced_samples"] == 2
+    assert body["failed_samples"] == 0
+    assert len(body["recent_samples"]) == 2
+
 
 @pytest.mark.asyncio
 async def test_sync_surfaces_ehr_failures(client):

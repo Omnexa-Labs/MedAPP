@@ -4,7 +4,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -19,6 +19,7 @@ from ..schemas.wearable import (
     WearableSampleOut,
     WearableSyncRequest,
     WearableSyncResult,
+    WearableSummaryOut,
 )
 
 
@@ -90,6 +91,43 @@ async def list_device_samples(session: AsyncSession, principal: Principal, devic
         .order_by(WearableSample.recorded_at.asc())
     )
     return list(result.all())
+
+
+async def get_wearable_summary(session: AsyncSession, principal: Principal) -> WearableSummaryOut:
+    owner_user_id = _principal_uuid(principal)
+    owner_user_id_text = str(owner_user_id)
+
+    totals_stmt = select(
+        func.count(WearableDevice.id),
+        func.count(WearableDevice.id).filter(WearableDevice.is_active.is_(True)),
+    ).where(WearableDevice.owner_user_id == owner_user_id_text)
+    totals_result = await session.execute(totals_stmt)
+    total_devices, active_devices = totals_result.one()
+
+    sample_totals_stmt = select(
+        func.count(WearableSample.id),
+        func.count(WearableSample.id).filter(WearableSample.synced_to_ehr.is_(True)),
+        func.count(WearableSample.id).filter(WearableSample.sync_status == "failed"),
+    ).where(WearableSample.owner_user_id == owner_user_id_text)
+    sample_totals_result = await session.execute(sample_totals_stmt)
+    total_samples, synced_samples, failed_samples = sample_totals_result.one()
+
+    recent_samples_result = await session.scalars(
+        select(WearableSample)
+        .where(WearableSample.owner_user_id == owner_user_id_text)
+        .order_by(WearableSample.recorded_at.desc(), WearableSample.created_at.desc())
+        .limit(5)
+    )
+    recent_samples = list(recent_samples_result.all())
+
+    return WearableSummaryOut(
+        total_devices=total_devices or 0,
+        active_devices=active_devices or 0,
+        total_samples=total_samples or 0,
+        synced_samples=synced_samples or 0,
+        failed_samples=failed_samples or 0,
+        recent_samples=[WearableSampleOut.model_validate(sample) for sample in recent_samples],
+    )
 
 
 async def _push_sample_to_ehr(client: httpx.AsyncClient, owner_user_id: UUID, device: WearableDevice, sample: WearableSampleCreate) -> UUID:
