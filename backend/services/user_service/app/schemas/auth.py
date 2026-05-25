@@ -8,6 +8,11 @@ class SignupRequest(BaseModel):
     last_name: str = Field(min_length=1, max_length=255)
     phone: str | None = Field(default=None, max_length=32)
     role: str = "user"
+    # Short-lived JWT issued by /auth/otp/signup-verify. When present and
+    # valid, the matching contact (email or phone) is created as already
+    # verified. When absent, the user is created unverified — the legacy
+    # path, kept for back-compat during the mobile rollout.
+    verification_token: str | None = Field(default=None, max_length=2048)
 
     model_config = {
         "json_schema_extra": {
@@ -49,6 +54,10 @@ class TokenPair(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+    # When the client is exchanging the refresh token after a biometric
+    # unlock, set this flag so the server can emit a `user.biometric_login`
+    # audit event. Purely informational — does not change validation logic.
+    biometric: bool = False
 
 
 class LogoutRequest(BaseModel):

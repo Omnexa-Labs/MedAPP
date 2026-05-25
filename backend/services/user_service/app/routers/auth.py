@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import events
-from ..deps import ClientIp, DbSession, UserAgent
+from ..deps import ClientIp, DbSession, DeviceId, UserAgent
 from ..schemas import (
     LoginRequest,
     LogoutRequest,
@@ -48,27 +48,52 @@ async def login(
     db: AsyncSession = DbSession,
     ip: str | None = ClientIp,
     ua: str | None = UserAgent,
+    device_id: str | None = DeviceId,
 ) -> TokenPair:
     try:
-        _user, tokens = await auth_service.login(db, payload, ip=ip, user_agent=ua)
+        _user, tokens = await auth_service.login(
+            db, payload, ip=ip, user_agent=ua, device_id=device_id
+        )
     except auth_service.AuthError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     return tokens
 
 
-# Refresh is a token-rotation endpoint: the old refresh token is invalidated and a new
-# pair is issued if the presented token is still valid.
+# Refresh is a token-rotation endpoint: the old refresh token is invalidated
+# and a new pair is issued if the presented token is still valid. Biometric
+# Step 2: the X-Device-Id header must match the device the token was issued
+# for (NULL on legacy rows is grandfathered).
 @router.post("/refresh", response_model=TokenPair)
 async def refresh(
     payload: RefreshRequest,
+    request: Request,
     db: AsyncSession = DbSession,
     ip: str | None = ClientIp,
     ua: str | None = UserAgent,
+    device_id: str | None = DeviceId,
 ) -> TokenPair:
     try:
-        return await auth_service.refresh(db, payload.refresh_token, ip=ip, user_agent=ua)
+        tokens, audit_meta = await auth_service.refresh(
+            db,
+            payload.refresh_token,
+            ip=ip,
+            user_agent=ua,
+            device_id=device_id,
+            biometric=payload.biometric,
+        )
     except auth_service.AuthError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+
+    # Commit before publishing so a rabbit outage can't roll back the auth.
+    await db.commit()
+    if audit_meta.get("biometric_login"):
+        await events.publish(
+            request.app,
+            event_type="user.biometric_login",
+            subject=audit_meta["user_id"],
+            data={"device_id": audit_meta.get("device_id")},
+        )
+    return tokens
 
 
 # Logout is intentionally idempotent so clients can retry safely.

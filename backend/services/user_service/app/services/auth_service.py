@@ -95,6 +95,31 @@ async def signup(
         if clash:
             raise AuthError("Phone already exists")
 
+    # Decide verification flags from the optional signup-verify token.
+    # The token pins (channel, recipient); we trust it only if the
+    # recipient matches the signup payload's matching contact. A token
+    # bound to a different contact is treated as absent — account is
+    # created unverified rather than failing (which would leak "you
+    # used the wrong token here" semantics mid-signup).
+    email_verified = False
+    phone_verified = False
+    verified_channel: str | None = None
+    if payload.verification_token:
+        # Lazy import to avoid a circular dep (otp_service imports
+        # issue_tokens_for_user from this module).
+        from .otp_service import verify_signup_verify_token
+
+        try:
+            channel, recipient = verify_signup_verify_token(payload.verification_token)
+        except AuthError:
+            channel, recipient = None, None
+        if channel == "email" and recipient == payload.email.lower():
+            email_verified = True
+            verified_channel = "email"
+        elif channel == "sms" and payload.phone and recipient == payload.phone:
+            phone_verified = True
+            verified_channel = "sms"
+
     # Generic app users do not require KYC. Provider/admin roles do.
     kyc_status = "not_required" if payload.role == "user" else "pending"
     user = User(
@@ -105,9 +130,14 @@ async def signup(
         last_name=payload.last_name,
         role=payload.role,
         kyc_status=kyc_status,
+        email_verified=email_verified,
+        phone_verified=phone_verified,
     )
     db.add(user)
     await db.flush()
+    audit_meta: dict = {"role": payload.role}
+    if verified_channel:
+        audit_meta["verified_channel"] = verified_channel
     await _audit(
         db,
         actor_id=user.id,
@@ -115,7 +145,7 @@ async def signup(
         target_user_id=user.id,
         ip=ip,
         user_agent=user_agent,
-        meta={"role": payload.role},
+        meta=audit_meta,
     )
     return user
 
@@ -129,6 +159,7 @@ async def login(
     *,
     ip: str | None = None,
     user_agent: str | None = None,
+    device_id: str | None = None,
 ) -> tuple[User, TokenPair]:
     # Use the same path for credential verification and audit logging so the
     # observable security trail stays consistent.
@@ -149,7 +180,9 @@ async def login(
         )
         raise AuthError("invalid credentials") from exc
 
-    tokens = await issue_tokens_for_user(db, user, ip=ip, user_agent=user_agent)
+    tokens = await issue_tokens_for_user(
+        db, user, ip=ip, user_agent=user_agent, device_id=device_id
+    )
     await _audit(
         db,
         actor_id=user.id,
@@ -157,6 +190,7 @@ async def login(
         target_user_id=user.id,
         ip=ip,
         user_agent=user_agent,
+        meta={"device_id": device_id} if device_id else None,
     )
     return user, tokens
 
@@ -167,9 +201,15 @@ async def issue_tokens_for_user(
     *,
     ip: str | None = None,
     user_agent: str | None = None,
+    device_id: str | None = None,
 ) -> TokenPair:
     """Issue an access + refresh pair for a user (used by login and by
-    OTP-verified phone signup/login)."""
+    OTP-verified phone signup/login).
+
+    `device_id` is the mobile client's per-install identifier
+    (`X-Device-Id` header). Persisting it lets the refresh path enforce
+    that the same install must present the same id — see `refresh()`.
+    """
     # Access tokens are short-lived and signed; refresh tokens are opaque and
     # stored hashed so the server can revoke them without keeping secrets in DB.
     access = issue_access_token(
@@ -187,6 +227,7 @@ async def issue_tokens_for_user(
             expires_at=_now() + timedelta(days=settings.jwt_refresh_ttl_days),
             user_agent=user_agent,
             ip_address=ip,
+            device_id=device_id,
         )
     )
     await db.flush()
@@ -206,7 +247,26 @@ async def refresh(
     *,
     ip: str | None = None,
     user_agent: str | None = None,
-) -> TokenPair:
+    device_id: str | None = None,
+    biometric: bool = False,
+) -> tuple[TokenPair, dict]:
+    """Rotate a refresh token. Returns `(tokens, audit_meta)`.
+
+    `audit_meta` carries side-channel signals the router uses to emit
+    domain events AFTER the request transaction commits (so a rabbit
+    outage can't roll back the auth):
+
+        biometric_login: bool — set when the client sent `biometric=true`
+                                AND the rotation succeeded. The router
+                                publishes `user.biometric_login`.
+        user_id: str          — subject for the event.
+
+    `device_id` enforcement: if the stored row has a non-null device_id,
+    the request MUST present the same value. If the row's device_id is
+    NULL (issued before this column existed), the check is skipped — a
+    one-time grace window during the mobile rollout. The next rotation
+    will record the new device_id and start enforcing.
+    """
     # Refresh rotation is strict: only the latest valid token can produce a new pair.
     token_hash = _hash_token(raw_token)
     record = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
@@ -230,6 +290,27 @@ async def refresh(
     if (_as_utc(record.expires_at) or _now()) <= _now():
         raise AuthError("refresh token expired")
 
+    # Device-binding check. NULL stored device_id = legacy row, grandfather
+    # it. A stored non-null value MUST match the incoming header — a
+    # mismatch is the exact signature of a stolen-token replay from a
+    # different install. Revoke the chain and log it.
+    if record.device_id is not None and record.device_id != device_id:
+        await _revoke_all_for_user(db, record.user_id, reason="device_mismatch")
+        await _audit(
+            db,
+            actor_id=record.user_id,
+            action="refresh.device_mismatch",
+            target_user_id=record.user_id,
+            ip=ip,
+            user_agent=user_agent,
+            meta={
+                "expected_device_id": record.device_id,
+                "presented_device_id": device_id,
+            },
+        )
+        await db.commit()
+        raise AuthError("refresh token bound to a different device")
+
     user = await db.get(User, record.user_id)
     if not user or not user.is_active:
         raise AuthError("user inactive")
@@ -238,6 +319,9 @@ async def refresh(
     new_hash = _hash_token(new_raw)
     record.revoked_at = _now()
     record.replaced_by = new_hash
+    # New row carries the device_id from the current request — for legacy
+    # rows (record.device_id is None) the next rotation onwards starts
+    # enforcing.
     db.add(
         RefreshToken(
             user_id=user.id,
@@ -245,6 +329,7 @@ async def refresh(
             expires_at=_now() + timedelta(days=settings.jwt_refresh_ttl_days),
             user_agent=user_agent,
             ip_address=ip,
+            device_id=device_id if device_id is not None else record.device_id,
         )
     )
 
@@ -255,12 +340,33 @@ async def refresh(
         algorithm=settings.jwt_algorithm,
         ttl_minutes=settings.jwt_access_ttl_minutes,
     )
+
+    # In-band audit row. The biometric domain event is published AFTER
+    # commit by the router; we drop a row here so the audit table tells
+    # the story even if rabbit is down.
+    if biometric:
+        await _audit(
+            db,
+            actor_id=user.id,
+            action="user.biometric_login",
+            target_user_id=user.id,
+            ip=ip,
+            user_agent=user_agent,
+            meta={"device_id": device_id} if device_id else None,
+        )
+
     await db.flush()
-    return TokenPair(
+    tokens = TokenPair(
         access_token=access,
         refresh_token=new_raw,
         expires_in=settings.jwt_access_ttl_minutes * 60,
     )
+    audit_meta = {
+        "user_id": str(user.id),
+        "biometric_login": biometric,
+        "device_id": device_id,
+    }
+    return tokens, audit_meta
 
 
 async def _revoke_all_for_user(db: AsyncSession, user_id: UUID, *, reason: str) -> None:

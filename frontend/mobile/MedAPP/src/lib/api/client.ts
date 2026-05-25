@@ -19,6 +19,18 @@ export function registerAuthTokenProvider(provider: AuthTokenProvider): void {
   authTokenProvider = provider;
 }
 
+// Per-install device id sent as X-Device-Id on every request. The
+// backend uses it to bind refresh tokens to this install (biometric
+// Step 2). Provider returns null until the device-id helper has
+// warmed its in-memory cache; that's fine — the backend grandfathers
+// missing headers on legacy refresh-token rows.
+type DeviceIdProvider = () => string | null;
+let deviceIdProvider: DeviceIdProvider | null = null;
+
+export function registerDeviceIdProvider(provider: DeviceIdProvider): void {
+  deviceIdProvider = provider;
+}
+
 export interface RequestOptions {
   signal?: AbortSignal;
   headers?: Record<string, string>;
@@ -38,6 +50,14 @@ function buildHeaders(opts: RequestOptions, hasBody: boolean): Headers {
   if (withAuth) {
     const token = authTokenProvider?.();
     if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+  // X-Device-Id is unconditional — login + refresh + every authed
+  // endpoint should carry it, since the backend uses it for refresh-
+  // token binding AND for audit log enrichment. Caller-supplied
+  // headers always win (tests can override).
+  if (!headers.has("X-Device-Id")) {
+    const deviceId = deviceIdProvider?.();
+    if (deviceId) headers.set("X-Device-Id", deviceId);
   }
   return headers;
 }

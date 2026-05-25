@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { secureStorage } from "@/lib/storage/secure-storage";
-import { registerAuthTokenProvider } from "@/lib/api/client";
+import { registerAuthTokenProvider, registerDeviceIdProvider } from "@/lib/api/client";
+import { getDeviceId, getDeviceIdCached } from "@/lib/device/device-id";
 import type { User } from "@/types/user";
 
 // Global auth state.
@@ -31,6 +32,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   hydrate: async () => {
     try {
+      // Warm the device-id cache before any request fires. The api
+      // client's X-Device-Id provider reads the synchronous cache;
+      // priming it here means even the /me probe below carries the
+      // header. New installs generate + persist a fresh id on this
+      // call.
+      await getDeviceId();
+
       const token = await secureStorage.getAccessToken();
       if (!token) {
         set({ token: null, user: null, isAuthenticated: false, isHydrating: false });
@@ -71,3 +79,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // Register the token getter so lib/api/client.ts can attach Authorization
 // without importing this store (which would be a cycle).
 registerAuthTokenProvider(() => useAuthStore.getState().token);
+// Same pattern for X-Device-Id. The cached accessor is synchronous; if
+// the cache is empty (race before hydrate finishes), the header is
+// dropped from that one request — backend handles it as the legacy
+// path.
+registerDeviceIdProvider(() => getDeviceIdCached());

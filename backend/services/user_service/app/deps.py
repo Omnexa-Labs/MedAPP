@@ -8,7 +8,7 @@ from shared.auth import Principal
 
 from .db import SessionLocal
 from .models import User
-from .services import LogSmsNotifier, SmsNotifier
+from .services import EmailNotifier, LogEmailNotifier, LogSmsNotifier, SmsNotifier
 from .services.auth_service import AuthError, decode_access_token
 
 
@@ -33,6 +33,23 @@ def get_client_ip(request: Request) -> str | None:
 
 def get_user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent")
+
+
+def get_device_id(request: Request) -> str | None:
+    """Per-install device id sent by the mobile client.
+
+    Biometric Step 2: bind refresh tokens to a stable per-install id so a
+    token exfiltrated from a backup cannot be replayed from another
+    install. Returns None for clients that don't send it — handled by
+    the auth service so old mobile builds still work during the rollout.
+    """
+    value = request.headers.get("x-device-id")
+    if value is None:
+        return None
+    trimmed = value.strip()
+    if not trimmed or len(trimmed) > 64:
+        return None
+    return trimmed
 
 
 async def current_principal(
@@ -78,9 +95,18 @@ def get_sms_notifier() -> SmsNotifier:
     return LogSmsNotifier()
 
 
+def get_email_notifier() -> EmailNotifier:
+    """Overridable in tests via app.dependency_overrides. Real impl (SES /
+    SendGrid / SMTP) wires in at deploy time; until then the log notifier
+    writes a structured event so dev/test flows work without provider keys."""
+    return LogEmailNotifier()
+
+
 CurrentPrincipal = Depends(current_principal)
 CurrentUser = Depends(current_user)
 DbSession = Depends(get_db)
 ClientIp = Depends(get_client_ip)
 UserAgent = Depends(get_user_agent)
+DeviceId = Depends(get_device_id)
 SmsDep = Depends(get_sms_notifier)
+EmailDep = Depends(get_email_notifier)

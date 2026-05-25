@@ -83,6 +83,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-font",
     "expo-secure-store",
+    // Biometric sign-in. iOS requires NSFaceIDUsageDescription before
+    // FaceID can be prompted; the config plugin sets it so the string
+    // lives in version control rather than in raw Info.plist. Android
+    // needs no extra config — USE_BIOMETRIC + USE_FINGERPRINT are
+    // added automatically by the package's AndroidManifest merge.
+    [
+      "expo-local-authentication",
+      {
+        faceIDPermission: "Allow MedApp to use FaceID to sign you in.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

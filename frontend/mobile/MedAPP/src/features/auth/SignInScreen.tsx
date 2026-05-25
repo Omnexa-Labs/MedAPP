@@ -32,6 +32,11 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { ApiError } from "@/types/api";
 import { LoginSchema, type LoginFormValues } from "@/features/auth/schema";
 import { useLogin } from "@/features/auth/hooks/use-login";
+import {
+  BiometricLoginAbort,
+  useBiometricCapability,
+  useBiometricLogin,
+} from "@/features/auth/hooks/use-biometric-login";
 
 interface Props {
   onSuccess?: () => void;
@@ -39,8 +44,30 @@ interface Props {
 
 export function SignInScreen({ onSuccess }: Props) {
   const login = useLogin();
+  const biometric = useBiometricLogin();
+  const biometricCapability = useBiometricCapability();
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // Run the biometric flow. user_cancel is silent (the user changed
+  // their mind); refresh_failed clears the stale token and tells the
+  // user to use password; biometric_failed shows a non-fatal hint.
+  const onBiometric = async (kind: "face" | "fingerprint") => {
+    setFormError(null);
+    try {
+      await biometric.mutateAsync(kind);
+      onSuccess?.();
+    } catch (e) {
+      if (e instanceof BiometricLoginAbort) {
+        if (e.kind === "user_cancel") return; // silent
+        if (e.kind === "no_credentials") setFormError("Sign in with your password first to enable biometric.");
+        else if (e.kind === "biometric_failed") setFormError("Biometric not recognised. Try again or use your password.");
+        else if (e.kind === "refresh_failed") setFormError("Your session expired. Please sign in with your password.");
+        return;
+      }
+      setFormError("Something went wrong. Please try again.");
+    }
+  };
 
   const {
     control,
@@ -296,32 +323,41 @@ export function SignInScreen({ onSuccess }: Props) {
                   )}
                 </Pressable>
 
-                {/* Divider */}
-                <View className="my-sm flex-row items-center gap-sm py-sm">
-                  <View className="h-px flex-1 bg-outline-variant/30" />
-                  <Text className="font-label-sm text-label-sm uppercase tracking-wider text-outline">
-                    Or continue with
-                  </Text>
-                  <View className="h-px flex-1 bg-outline-variant/30" />
-                </View>
-
-                {/* Biometric grid */}
-                <View className="flex-row gap-sm">
-                  <BiometricButton
-                    icon="face"
-                    label="FaceID"
-                    onPress={() => {
-                      /* TODO: biometric auth — pending expo-local-authentication wire-up */
-                    }}
-                  />
-                  <BiometricButton
-                    icon="fingerprint"
-                    label="Fingerprint"
-                    onPress={() => {
-                      /* TODO: biometric auth — pending expo-local-authentication wire-up */
-                    }}
-                  />
-                </View>
+                {/* Biometric grid — only renders when the device has the
+                    sensor enrolled AND a refresh token is stored locally
+                    (i.e. the user has signed in with their password at
+                    least once on this device). Hiding the buttons rather
+                    than showing them disabled avoids a confusing "tap
+                    does nothing" path. */}
+                {biometricCapability.ready && biometricCapability.available && (
+                  <>
+                    <View className="my-sm flex-row items-center gap-sm py-sm">
+                      <View className="h-px flex-1 bg-outline-variant/30" />
+                      <Text className="font-label-sm text-label-sm uppercase tracking-wider text-outline">
+                        Or continue with
+                      </Text>
+                      <View className="h-px flex-1 bg-outline-variant/30" />
+                    </View>
+                    <View className="flex-row gap-sm">
+                      {biometricCapability.kinds.includes("face") && (
+                        <BiometricButton
+                          icon="face"
+                          label="FaceID"
+                          disabled={biometric.isPending}
+                          onPress={() => onBiometric("face")}
+                        />
+                      )}
+                      {biometricCapability.kinds.includes("fingerprint") && (
+                        <BiometricButton
+                          icon="fingerprint"
+                          label="Fingerprint"
+                          disabled={biometric.isPending}
+                          onPress={() => onBiometric("fingerprint")}
+                        />
+                      )}
+                    </View>
+                  </>
+                )}
               </View>
 
               {/* Footer */}
@@ -412,14 +448,18 @@ interface BiometricButtonProps {
   icon: React.ComponentProps<typeof MaterialIcons>["name"];
   label: string;
   onPress: () => void;
+  disabled?: boolean;
 }
 
-function BiometricButton({ icon, label, onPress }: BiometricButtonProps) {
+function BiometricButton({ icon, label, onPress, disabled }: BiometricButtonProps) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      style={{ opacity: disabled ? 0.5 : 1 }}
       className="flex-1 items-center justify-center rounded-xl border border-outline-variant bg-surface p-sm active:scale-95"
     >
       <MaterialIcons name={icon} size={24} color="#00685f" />

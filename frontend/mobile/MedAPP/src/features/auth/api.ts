@@ -45,6 +45,23 @@ interface SignupRequestWire {
   last_name: string;
   phone?: string;
   role?: string;
+  verification_token?: string;
+}
+
+// Signup-OTP wire shapes (separate from the passwordless-login OTP).
+interface SignupOtpStartWire {
+  channel: "sms" | "email";
+  phone?: string;
+  email?: string;
+}
+
+interface SignupOtpVerifyWire extends SignupOtpStartWire {
+  code: string;
+}
+
+interface SignupOtpVerifyResponseWire {
+  verification_token: string;
+  expires_in: number;
 }
 
 // ---- App-facing types ----------------------------------------------------
@@ -85,6 +102,31 @@ export interface SignUpFullPayload {
   enableBiometric: boolean;
   enableTwoFactor: boolean;
   shareAnonymousData: boolean;
+  // Verified contact from the OTP step between Step 1 and Step 2. The
+  // backend marks the matching contact (email or phone) as verified at
+  // creation time. Phone (when channel=sms) is persisted on the user;
+  // email is already in step 1's email field.
+  verification?: {
+    channel: "sms" | "email";
+    recipient: string;
+    token: string;
+  };
+}
+
+export interface SignupOtpStartPayload {
+  channel: "sms" | "email";
+  recipient: string;
+}
+
+export interface SignupOtpVerifyPayload {
+  channel: "sms" | "email";
+  recipient: string;
+  code: string;
+}
+
+export interface SignupOtpVerifyResult {
+  verificationToken: string;
+  expiresIn: number;
 }
 
 // ---- Adapter -------------------------------------------------------------
@@ -146,9 +188,9 @@ export const authApi = {
   },
 
   async signUpFull(payload: SignUpFullPayload): Promise<LoginResponse> {
-    // Backend signup takes first/last/phone/role only. Step 2 and Step 3 data
-    // are deferred — they belong on PATCH /me + a preferences endpoint that
-    // doesn't exist yet. Dropping them here is intentional, not a bug.
+    // Backend signup takes first/last/phone/role/verification_token. Step 2
+    // and Step 3 data are deferred — they belong on PATCH /me + a preferences
+    // endpoint that doesn't exist yet. Dropping them here is intentional.
     const body: SignupRequestWire = {
       email: payload.email,
       password: payload.password,
@@ -156,13 +198,76 @@ export const authApi = {
       last_name: payload.lastName,
       role: "user",
     };
+    // If the user verified a phone via OTP, persist it on the account so
+    // the verified flag is meaningful.
+    if (payload.verification?.channel === "sms") {
+      body.phone = payload.verification.recipient;
+    }
+    if (payload.verification?.token) {
+      body.verification_token = payload.verification.token;
+    }
     await client.post<UserOutWire>("/v1/auth/signup", body, { withAuth: false });
     return authApi.login({ email: payload.email, password: payload.password });
+  },
+
+  // Begin signup-time contact verification. Channel is "sms" or "email";
+  // recipient is the E.164 phone or the email address. The backend
+  // refuses (409) if the contact already belongs to a user — the caller
+  // should map that to "looks like you already have an account".
+  async signupOtpStart(payload: SignupOtpStartPayload): Promise<{ expiresIn: number }> {
+    const wire: SignupOtpStartWire = { channel: payload.channel };
+    if (payload.channel === "sms") wire.phone = payload.recipient;
+    else wire.email = payload.recipient;
+    const r = await client.post<{ sent: boolean; expires_in: number }>(
+      "/v1/auth/otp/signup-start",
+      wire,
+      { withAuth: false },
+    );
+    return { expiresIn: r.expires_in };
+  },
+
+  async signupOtpVerify(payload: SignupOtpVerifyPayload): Promise<SignupOtpVerifyResult> {
+    const wire: SignupOtpVerifyWire = { channel: payload.channel, code: payload.code };
+    if (payload.channel === "sms") wire.phone = payload.recipient;
+    else wire.email = payload.recipient;
+    const r = await client.post<SignupOtpVerifyResponseWire>(
+      "/v1/auth/otp/signup-verify",
+      wire,
+      { withAuth: false },
+    );
+    return { verificationToken: r.verification_token, expiresIn: r.expires_in };
   },
 
   async me(): Promise<User> {
     const u = await client.get<UserOutWire>("/v1/me");
     return adaptUser(u);
+  },
+
+  // Exchange a stored refresh token for a fresh access/refresh pair.
+  // Used by the biometric sign-in flow: biometric unlocks the keychain,
+  // we read the refresh token, this call gets a new access token. The
+  // backend rotates the refresh token on every call — the returned
+  // refresh_token is the one to persist.
+  //
+  // `biometric` defaults to false. The biometric hook passes true so
+  // the server emits a `user.biometric_login` audit + domain event.
+  // The X-Device-Id header is attached by the api client automatically;
+  // the backend uses it to bind this refresh chain to this install.
+  async refresh(refreshToken: string, options?: { biometric?: boolean }): Promise<LoginResponse> {
+    const tokens = await client.post<TokenPairWire>(
+      "/v1/auth/refresh",
+      { refresh_token: refreshToken, biometric: options?.biometric ?? false },
+      { withAuth: false },
+    );
+    const user = await client.get<UserOutWire>("/v1/me", {
+      withAuth: false,
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    return {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      user: adaptUser(user),
+    };
   },
 
   async signOut(refreshToken: string): Promise<void> {

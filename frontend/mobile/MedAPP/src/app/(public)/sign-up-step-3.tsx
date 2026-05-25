@@ -18,10 +18,11 @@ export default function SignUpStep3Route() {
   // Deep-link / restart guard: bounce back to whichever step is missing.
   useEffect(() => {
     if (!draft.step1) router.replace("/(public)/sign-up");
+    else if (!draft.verification) router.replace("/(public)/sign-up-verify");
     else if (!draft.step2) router.replace("/(public)/sign-up-step-2");
-  }, [draft.step1, draft.step2]);
+  }, [draft.step1, draft.verification, draft.step2]);
 
-  if (!draft.step1 || !draft.step2) return null;
+  if (!draft.step1 || !draft.verification || !draft.step2) return null;
 
   return (
     <SignUpStep3Screen
@@ -41,6 +42,7 @@ export default function SignUpStep3Route() {
             bloodType: draft.step2!.bloodType,
             gender: draft.step2!.gender,
             primaryGoal: draft.step2!.primaryGoal,
+            verification: draft.verification!,
             ...step3,
           });
           draft.reset();

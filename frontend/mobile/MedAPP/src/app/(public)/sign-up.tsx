@@ -1,5 +1,6 @@
 // Sign-up route — Step 1 of a 3-step flow.
-// Step 1 values land in the in-memory draft store; the route pushes to Step 2.
+// Step 1 values land in the in-memory draft store; the route pushes to the
+// OTP verify screen, then onward to Step 2.
 
 import { router } from "expo-router";
 import { SignUpStep1Screen } from "@/features/auth/SignUpStep1Screen";
@@ -12,7 +13,10 @@ export default function SignUpRoute() {
     <SignUpStep1Screen
       onNext={(values) => {
         setStep1(values);
-        router.push("/(public)/sign-up-step-2");
+        // Step 1 → contact verification → Step 2. The verify screen
+        // captures phone (if user picks SMS) and the verification
+        // token, both of which the final submit consumes.
+        router.push("/(public)/sign-up-verify");
       }}
     />
   );

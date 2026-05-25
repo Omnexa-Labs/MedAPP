@@ -9,6 +9,12 @@ import * as SecureStore from "expo-secure-store";
 
 const TOKEN_KEY = "medapp.auth.accessToken";
 const REFRESH_KEY = "medapp.auth.refreshToken";
+// Per-install device id, sent as X-Device-Id on every request. The
+// backend binds refresh tokens to this id so a token exfiltrated from
+// a backup cannot be replayed from a different install. Stored
+// separately from tokens — logout intentionally does NOT clear it,
+// since the install's identity outlives a single sign-in.
+const DEVICE_ID_KEY = "medapp.device.id";
 
 export const secureStorage = {
   async getAccessToken(): Promise<string | null> {
@@ -29,6 +35,13 @@ export const secureStorage = {
   async clearRefreshToken(): Promise<void> {
     await SecureStore.deleteItemAsync(REFRESH_KEY);
   },
+  async getDeviceId(): Promise<string | null> {
+    return SecureStore.getItemAsync(DEVICE_ID_KEY);
+  },
+  async setDeviceId(id: string): Promise<void> {
+    await SecureStore.setItemAsync(DEVICE_ID_KEY, id);
+  },
+  /** Clears tokens. Device id intentionally retained — see comment above. */
   async clearAll(): Promise<void> {
     await Promise.all([
       SecureStore.deleteItemAsync(TOKEN_KEY),

@@ -29,7 +29,7 @@ def _compile_uuid_sqlite(element, compiler, **kw):  # noqa: ARG001
 
 
 # Import after compiler overrides so model resolution uses them.
-from app.deps import get_db, get_sms_notifier  # noqa: E402
+from app.deps import get_db, get_email_notifier, get_sms_notifier  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 from app.services import InMemoryNotifier  # noqa: E402
@@ -78,8 +78,13 @@ async def client(session_factory, notifier) -> AsyncIterator[AsyncClient]:
         async def send(self, *, phone: str, body: str) -> None:
             await notifier.send_sms(phone=phone, body=body)
 
+    class _EmailAdapter:
+        async def send(self, *, email: str, subject: str, body: str) -> None:
+            await notifier.send_email(email=email, subject=subject, body=body)
+
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_sms_notifier] = lambda: _SmsAdapter()
+    app.dependency_overrides[get_email_notifier] = lambda: _EmailAdapter()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c

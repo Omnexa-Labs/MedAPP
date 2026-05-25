@@ -9,7 +9,14 @@ from .auth import (
     TokenPair,
 )
 from .kyc import KycDocument, KycReviewRequest, KycSubmissionOut, KycSubmitRequest
-from .otp import OtpStartRequest, OtpStartResponse, OtpVerifyRequest
+from .otp import (
+    OtpStartRequest,
+    OtpStartResponse,
+    OtpVerifyRequest,
+    SignupOtpStartRequest,
+    SignupOtpVerifyRequest,
+    SignupOtpVerifyResponse,
+)
 from .user import UserOut, UserUpdate
 
 __all__ = [
@@ -24,6 +31,9 @@ __all__ = [
     "OtpStartRequest",
     "OtpStartResponse",
     "OtpVerifyRequest",
+    "SignupOtpStartRequest",
+    "SignupOtpVerifyRequest",
+    "SignupOtpVerifyResponse",
     "KycDocument",
     "KycSubmitRequest",
     "KycSubmissionOut",
