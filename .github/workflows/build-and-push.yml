@@ -1,0 +1,203 @@
+name: build-and-push
+
+# Per-service build + scan + sign + push.
+#
+# Replaces the old static-matrix backend-build.yml with:
+#
+#   1. Change detection — only services whose code changed get rebuilt.
+#      A PR that touches one service no longer rebuilds 19.
+#   2. The shared `backend/Dockerfile` (slice 4) — single hardened
+#      multi-stage non-root image, parameterised by SERVICE + SERVICE_PORT.
+#   3. Trivy scan failing on HIGH/CRITICAL — supply-chain hygiene.
+#   4. Cosign keyless signing via GitHub OIDC + Sigstore Fulcio + Rekor.
+#      Slice 5+ flips Binary Authorization on prod to require these
+#      attestations.
+#
+# Triggers: pushes to main (build + push :sha + :latest), and PRs
+# (build + scan only — no push, no sign).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/build-and-push.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/build-and-push.yml"
+
+env:
+  REGION: europe-west1
+  ARTIFACT_REPO: medapp
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ── Detect which services changed ────────────────────────────────────────
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.services }}
+      has_changes: ${{ steps.filter.outputs.services != '[]' }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          list-files: shell
+          # Each filter outputs `true` when its paths change. The
+          # `services` aggregate output is a JSON array of changed
+          # service names — used as the build matrix below.
+          filters: |
+            api_gateway: 'backend/services/api_gateway/**'
+            user_service: 'backend/services/user_service/**'
+            doctor_service: 'backend/services/doctor_service/**'
+            nurse_service: 'backend/services/nurse_service/**'
+            hospital_service: 'backend/services/hospital_service/**'
+            booking_service: 'backend/services/booking_service/**'
+            payment_service: 'backend/services/payment_service/**'
+            telemedicine_service: 'backend/services/telemedicine_service/**'
+            notification_service: 'backend/services/notification_service/**'
+            lab_service: 'backend/services/lab_service/**'
+            ehr_service: 'backend/services/ehr_service/**'
+            social_service: 'backend/services/social_service/**'
+            analytics_service: 'backend/services/analytics_service/**'
+            hms_service: 'backend/services/hms_service/**'
+            pms_service: 'backend/services/pms_service/**'
+            onboarding_service: 'backend/services/onboarding_service/**'
+            wearable_sync_service: 'backend/services/wearable_sync_service/**'
+            inbox_service: 'backend/services/inbox_service/**'
+            # A change to shared/ or the shared Dockerfile rebuilds
+            # every service.
+            shared:
+              - 'backend/shared/**'
+              - 'backend/Dockerfile'
+              - 'backend/.dockerignore'
+      - id: build_list
+        run: |
+          # When the shared filter fires, build everything. Otherwise
+          # build only the services that actually changed.
+          if [[ "${{ steps.filter.outputs.shared }}" == "true" ]]; then
+            echo 'services=["api_gateway","user_service","doctor_service","nurse_service","hospital_service","booking_service","payment_service","telemedicine_service","notification_service","lab_service","ehr_service","social_service","analytics_service","hms_service","pms_service","onboarding_service","wearable_sync_service","inbox_service"]' >> "$GITHUB_OUTPUT"
+          else
+            CHANGED=$(echo '${{ steps.filter.outputs.changes }}' | jq -c '[.[] | select(. != "shared")]')
+            echo "services=${CHANGED}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Build + scan + (on main) push + sign ─────────────────────────────────
+  build:
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write       # Workload Identity + Cosign keyless
+      packages: write       # not strictly needed for AR; harmless
+      security-events: write  # SARIF upload to GitHub Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.services) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Service-port lookup. Keeping this inline rather than in a JSON
+      # file is uglier but means a contributor can't introduce a port
+      # collision without touching this file.
+      - id: port
+        run: |
+          case "${{ matrix.service }}" in
+            api_gateway)            echo "port=8000" >> "$GITHUB_OUTPUT" ;;
+            user_service)           echo "port=8001" >> "$GITHUB_OUTPUT" ;;
+            doctor_service)         echo "port=8002" >> "$GITHUB_OUTPUT" ;;
+            nurse_service)          echo "port=8003" >> "$GITHUB_OUTPUT" ;;
+            hospital_service)       echo "port=8004" >> "$GITHUB_OUTPUT" ;;
+            booking_service)        echo "port=8005" >> "$GITHUB_OUTPUT" ;;
+            payment_service)        echo "port=8006" >> "$GITHUB_OUTPUT" ;;
+            telemedicine_service)   echo "port=8007" >> "$GITHUB_OUTPUT" ;;
+            notification_service)   echo "port=8008" >> "$GITHUB_OUTPUT" ;;
+            lab_service)            echo "port=8009" >> "$GITHUB_OUTPUT" ;;
+            ehr_service)            echo "port=8010" >> "$GITHUB_OUTPUT" ;;
+            social_service)         echo "port=8011" >> "$GITHUB_OUTPUT" ;;
+            analytics_service)      echo "port=8012" >> "$GITHUB_OUTPUT" ;;
+            hms_service)            echo "port=8013" >> "$GITHUB_OUTPUT" ;;
+            pms_service)            echo "port=8014" >> "$GITHUB_OUTPUT" ;;
+            onboarding_service)     echo "port=8015" >> "$GITHUB_OUTPUT" ;;
+            wearable_sync_service)  echo "port=8016" >> "$GITHUB_OUTPUT" ;;
+            inbox_service)          echo "port=8017" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unknown service" && exit 1 ;;
+          esac
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Authenticate to GCP (push step only — PRs build locally and skip auth).
+      - id: auth
+        if: github.event_name == 'push'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # ── Build (PRs build only; main pushes too) ─────────────────────────
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: ${{ github.event_name == 'pull_request' }}
+          push: ${{ github.event_name == 'push' }}
+          provenance: true
+          sbom: true
+          build-args: |
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+            SERVICE=${{ matrix.service }}
+            SERVICE_PORT=${{ steps.port.outputs.port }}
+          tags: |
+            ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT || 'medapp-dev' }}/${{ env.ARTIFACT_REPO }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT || 'medapp-dev' }}/${{ env.ARTIFACT_REPO }}/${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      # ── Trivy scan (every event) ────────────────────────────────────────
+      # Fails the job on HIGH or CRITICAL CVE in the rendered image.
+      # Findings also upload to the GitHub Security tab as SARIF.
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT || 'medapp-dev' }}/${{ env.ARTIFACT_REPO }}/${{ matrix.service }}:${{ github.sha }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+          category: trivy-${{ matrix.service }}
+
+      # ── Cosign keyless signing (push only, after Trivy is green) ────────
+      # Uses the workflow's OIDC token; Fulcio mints an ephemeral cert
+      # and Rekor records it. No long-lived key material lives anywhere.
+      - name: Install Cosign
+        if: github.event_name == 'push'
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: "v2.4.1"
+
+      - name: Cosign keyless sign
+        if: github.event_name == 'push'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/${{ env.ARTIFACT_REPO }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}"
+          cosign sign --yes "$IMAGE"

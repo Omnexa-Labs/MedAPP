@@ -8,7 +8,15 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.payment import Payment, PaymentEvent, PaymentRefund, PaymentStatus
-from ..schemas.payment import PaymentCreate, PaymentMethod, PaymentRefundCreate, PaymentStatus as PaymentStatusSchema, WebhookIn
+from ..schemas.payment import (
+    PaymentCreate,
+    PaymentMethod,
+    PaymentRefundCreate,
+    PaymentRefundOut,
+    PaymentStatus as PaymentStatusSchema,
+    WebhookIn,
+)
+from .idempotency import execute_idempotent
 
 
 class PaymentError(RuntimeError):
@@ -68,27 +76,63 @@ async def get_payment(session: AsyncSession, principal, payment_id: UUID) -> Pay
     return payment
 
 
-async def refund_payment(session: AsyncSession, principal, payment_id: UUID, payload: PaymentRefundCreate) -> PaymentRefund:
-    payment = await get_payment(session, principal, payment_id)
-    if payment.status != PaymentStatus.SUCCEEDED:
-        raise HTTPException(status.HTTP_409_CONFLICT, "only succeeded payments can be refunded")
+async def refund_payment(
+    session: AsyncSession,
+    principal,
+    payment_id: UUID,
+    payload: PaymentRefundCreate,
+    idempotency_key: str,
+) -> dict:
+    """Refund a payment idempotently.
 
-    amount_cents = payload.amount_cents or payment.amount_cents
-    if amount_cents > payment.amount_cents:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "refund exceeds payment amount")
+    Audit finding B-17: refund retries must not produce duplicate refund
+    rows. The (user, payment, key) tuple uniquely identifies the request;
+    a retry with the same body returns the cached response, a retry with
+    a different body returns 409, and the original payment row is only
+    flipped to REFUNDED once.
 
-    refund = PaymentRefund(
-        payment_id=payment.id,
-        amount_cents=amount_cents,
-        reason=payload.reason,
-        status="requested",
-        provider_reference=f"rf_{uuid4().hex}",
-        processed_at=datetime.now(UTC),
+    Returns a dict (not the ORM row) so the cached response is preserved
+    verbatim across replays.
+    """
+    user_id = _principal_uuid(principal)
+
+    async def _do_refund() -> dict:
+        payment = await get_payment(session, principal, payment_id)
+        if payment.status != PaymentStatus.SUCCEEDED:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "only succeeded payments can be refunded",
+            )
+
+        amount_cents = payload.amount_cents or payment.amount_cents
+        if amount_cents > payment.amount_cents:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, "refund exceeds payment amount"
+            )
+
+        refund = PaymentRefund(
+            payment_id=payment.id,
+            amount_cents=amount_cents,
+            reason=payload.reason,
+            status="requested",
+            provider_reference=f"rf_{uuid4().hex}",
+            processed_at=datetime.now(UTC),
+        )
+        payment.status = PaymentStatus.REFUNDED
+        session.add(refund)
+        await session.flush()
+        await session.refresh(refund)
+        return PaymentRefundOut.model_validate(refund).model_dump(mode="json")
+
+    body, _status = await execute_idempotent(
+        session=session,
+        user_id=user_id,
+        scope=f"refund:{payment_id}",
+        key=idempotency_key,
+        request_payload=payload.model_dump(mode="json"),
+        action=_do_refund,
     )
-    payment.status = PaymentStatus.REFUNDED
-    session.add(refund)
-    await session.flush()
-    return refund
+    return body
 
 
 async def handle_webhook_event(session: AsyncSession, provider: str, payload: WebhookIn) -> PaymentEvent:

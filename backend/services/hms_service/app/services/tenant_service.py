@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 ALEMBIC_DIR = Path(__file__).resolve().parent.parent.parent / "alembic"
 ALEMBIC_INI = Path(__file__).resolve().parent.parent.parent / "alembic.ini"
+
+# Postgres identifier rules allow more than this, but we restrict to a safe
+# subset because we MUST interpolate (CREATE DATABASE does not accept bind
+# parameters). Audit finding #3 fix — never trust any value, not even one
+# we just composed locally, in a DDL statement.
+_SAFE_DB_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
 
 async def provision_tenant(body: TenantCreate, db: AsyncSession) -> TenantRegistry:
@@ -51,13 +58,24 @@ async def provision_tenant(body: TenantCreate, db: AsyncSession) -> TenantRegist
 def _create_database(db_name: str) -> None:
     import psycopg
 
+    # Audit finding #3: CREATE DATABASE cannot be parameterised, so we must
+    # interpolate. Refuse anything that doesn't match the strict identifier
+    # allow-list. This protects against a malicious tenant slug ever
+    # reaching the DDL.
+    if not _SAFE_DB_NAME_RE.fullmatch(db_name):
+        raise ValueError(
+            f"refusing to create database with unsafe name {db_name!r} "
+            "(must match ^[a-z][a-z0-9_]{0,62}$)"
+        )
     dsn = settings.admin_database_url_sync
     with psycopg.connect(dsn, autocommit=True) as conn:
-        conn.execute(f"SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
+        conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
         if conn.fetchone():
             logger.info("database %s already exists, skipping creation", db_name)
             return
-        conn.execute(text(f'CREATE DATABASE "{db_name}"'))
+        # db_name is verified by the allow-list above, so this interpolation
+        # is safe. Quoting still belt-and-braces.
+        conn.execute(f'CREATE DATABASE "{db_name}"')
         logger.info("created database %s", db_name)
 
 

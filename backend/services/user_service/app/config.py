@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     # JWT
     # Keep the fallback long enough to avoid weak-HMAC warnings in local tests;
     # production should always override this via `USER_JWT_SECRET`.
-    jwt_secret: str = "change-me-please-use-a-real-32-byte-secret"
+    # Audit finding #2: no default secret. Set USER_JWT_SECRET in env.
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_ttl_minutes: int = 15
     jwt_refresh_ttl_days: int = 30

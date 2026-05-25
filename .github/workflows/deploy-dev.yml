@@ -1,0 +1,73 @@
+name: deploy-dev
+
+# Auto-deploy to dev on every push to main, after build-and-push has
+# produced + signed the per-service images. The image_tag is the
+# commit SHA — same tag the build workflow pushed.
+#
+# Staging and prod deploys are manual via deploy.yml; this workflow is
+# the only auto-deploy path and intentionally targets dev only.
+
+on:
+  workflow_run:
+    workflows: ["build-and-push"]
+    branches: [main]
+    types: [completed]
+
+# Run only one auto-deploy at a time per commit; cancel-in-progress means
+# a flurry of merges collapses to "deploy the latest" — earlier deploys
+# get cancelled (rolling deploys don't queue up).
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Only deploy when the upstream build job actually succeeded.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENV: dev
+      REGION: europe-west1
+      IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Check out the commit the build ran against, not whatever's
+          # at the tip of main right now — keeps deploy/image versions
+          # consistent under concurrent merges.
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: medapp-${{ env.ENV }}
+          location: ${{ env.REGION }}
+
+      - name: Deploy Helm
+        run: |
+          helm upgrade --install medapp infra/helm/medapp \
+            --set env=${ENV} \
+            --set projectId=${{ secrets.GCP_PROJECT }} \
+            --set namespace=medapp-${ENV} \
+            --set image.registry=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/medapp \
+            --set image.tag=${IMAGE_TAG} \
+            --wait --timeout 10m
+
+      - name: Smoke test api_gateway healthz
+        run: |
+          kubectl --namespace medapp-${ENV} rollout status deployment/api-gateway --timeout 5m
+          # Port-forward and curl rather than trusting external DNS / ingress
+          # — keeps the smoke independent of Slice 6's GCLB wiring.
+          kubectl --namespace medapp-${ENV} port-forward svc/api-gateway 8000:8000 &
+          PF_PID=$!
+          sleep 5
+          curl -fsS http://127.0.0.1:8000/healthz
+          kill $PF_PID || true

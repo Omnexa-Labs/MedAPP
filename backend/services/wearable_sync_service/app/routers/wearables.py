@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
 
+from .. import events
 from ..deps import DbSession, get_current_principal
 from ..schemas.wearable import (
     WearableDeviceCreate,
@@ -61,4 +62,27 @@ async def sync_samples(
     db: AsyncSession = DbSession,
     principal: Principal = Depends(get_current_principal),
 ):
-    return await sync_wearable_samples(db, principal, payload, request.app.state.http)
+    result = await sync_wearable_samples(db, principal, payload, request.app.state.http)
+    # Audit finding B-20: write the event to the outbox INSIDE the same
+    # DB session as the sample rows. The DB-session dep commits both
+    # atomically on yield-exit, so a broker outage CANNOT lose the event
+    # — the background drain worker picks it up when rabbit is back.
+    # Only enqueue when at least one sample reached EHR (0-synced batch
+    # carries no new clinical signal).
+    if result.synced_count > 0:
+        await events.enqueue_outbox(
+            db,
+            event_type="wearable.vitals.uploaded",
+            subject=principal.subject,
+            data={
+                "patient_id": principal.subject,
+                "synced_count": result.synced_count,
+                "failed_count": result.failed_count,
+                "device": {
+                    "provider": result.device.provider,
+                    "external_id": result.device.external_id,
+                },
+                "sample_kinds": sorted({s.kind for s in result.samples if s.sync_status == "synced"}),
+            },
+        )
+    return result

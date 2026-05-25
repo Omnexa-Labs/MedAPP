@@ -11,7 +11,8 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://medapp:medapp@postgres:5432/hms_{tenant_slug}"
     )
     admin_database_url_sync: str = "postgresql+psycopg://medapp:medapp@postgres:5432/postgres"
-    jwt_secret: str = "change-me-change-me-change-me-change-me"
+    # Audit finding #2: no default secret. Set HMS_JWT_SECRET in env.
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     amqp_url: str = "amqp://medapp:medapp@rabbitmq:5672/"
     otlp_endpoint: str | None = None

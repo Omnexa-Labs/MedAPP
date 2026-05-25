@@ -1,0 +1,25 @@
+{{/*
+PodDisruptionBudget per service. Keeps node-pool autoscaling / Autopilot
+maintenance from evicting all replicas at once.
+
+Single-replica services have minAvailable: 0 (no PDB protection — full
+disruption is acceptable since there's only one pod). Multi-replica
+services keep at least one pod up; rolling updates respect this too.
+*/}}
+{{- range $name, $cfg := .Values.services }}
+{{- if gt (int $cfg.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "medapp.kname" $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "medapp.labels" (dict "serviceName" $name "root" $) | nindent 4 }}
+spec:
+  minAvailable: {{ $cfg.minAvailable | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 6 }}
+{{- end }}
+{{- end }}

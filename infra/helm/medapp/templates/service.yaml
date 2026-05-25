@@ -1,0 +1,30 @@
+{{- range $name, $cfg := .Values.services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "medapp.kname" $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "medapp.labels" (dict "serviceName" $name "root" $) | nindent 4 }}
+  {{- if and $cfg.exposedViaIngress $.Values.ingress.enabled }}
+  # GKE Ingress reads this annotation when wiring the GCLB backend; it
+  # tells the LB which BackendConfig (Cloud Armor + health-check
+  # config) to attach. Only the GCLB-facing service needs it.
+  annotations:
+    cloud.google.com/backend-config: '{"default": "{{ include "medapp.kname" $name }}"}'
+    cloud.google.com/neg: '{"ingress": true}'
+  {{- end }}
+spec:
+  # ClusterIP only. Even api_gateway is reached via the L7 LB Ingress,
+  # not a NodePort or LoadBalancer Service. No service is internet-
+  # reachable at the Service layer.
+  type: ClusterIP
+  selector:
+    {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $cfg.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

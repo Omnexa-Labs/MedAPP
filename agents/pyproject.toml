@@ -10,14 +10,43 @@ dependencies = [
   "pydantic-settings>=2.3",
   "structlog>=24.1",
   "tenacity>=9.0",
+  "qdrant-client>=1.12",
+  "pyjwt[crypto]>=2.9",
 ]
 
 [project.optional-dependencies]
 # Pick exactly one when you choose a provider. None are installed by default.
+# Groq + OpenAI share the OpenAI wire format, so both ship via the `openai` SDK.
 openai = ["openai>=1.40"]
+groq = ["openai>=1.40"]
 anthropic = ["anthropic>=0.40"]
 google = ["google-generativeai>=0.7"]
+
+# Local embedding model — only needed if you want bge-small in-process.
+# Default deployment uses MockEmbedding (dev) or an in-VPC embedding service.
+local-embed = ["sentence-transformers>=2.5"]
+
+# Event-bus consumer (RabbitMQ via aio-pika). Required by agents that
+# subscribe to domain events — e.g. smart_recommend_agent. Pull-mode
+# endpoints still work without this extra.
+events = ["aio-pika>=9.4"]
+
+dev = [
+  "pytest>=8",
+  "pytest-asyncio>=0.23",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# The source layout is `agents/shared/...` from the repo root, but pyproject
+# lives at `agents/pyproject.toml`, so hatch's project root is `agents/`.
+# We ship `shared/` as a wheel package. Imports as `agents.shared` work when
+# running from the repo root because `agents/` is an implicit PEP 420
+# namespace package (no agents/__init__.py).
+[tool.hatch.build.targets.wheel]
+packages = ["shared"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

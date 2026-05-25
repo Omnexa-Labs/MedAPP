@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
 
+from .. import events
 from ..deps import DbSession, get_current_principal
 from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, PatientSummaryOut, VitalCreate, VitalOut, VitalTimelineOut
 from ..services import create_consent, delete_consent, get_patient_bundle, get_patient_summary, list_vitals, record_vital
@@ -26,8 +27,31 @@ async def read_summary(patient_id: UUID, db: AsyncSession = DbSession, principal
 
 
 @router.post("/{patient_id}/vitals", response_model=VitalOut, status_code=status.HTTP_201_CREATED)
-async def write_vital(patient_id: UUID, payload: VitalCreate, db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
-    return await record_vital(db, principal, patient_id, payload)
+async def write_vital(
+    patient_id: UUID,
+    payload: VitalCreate,
+    request: Request,
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    vital = await record_vital(db, principal, patient_id, payload)
+    # Publish after the write returns — by the time downstream consumers
+    # query EHR, the row is durable. Best-effort; broker hiccups never
+    # turn a 201 into a 5xx.
+    await events.publish(
+        request.app,
+        event_type="ehr.vital.recorded",
+        subject=str(patient_id),
+        data={
+            "patient_id": str(patient_id),
+            "vital_id": str(vital.vital_id),
+            "kind": vital.kind,
+            "value": vital.value,
+            "unit": vital.unit,
+            "recorded_at": vital.recorded_at.isoformat(),
+        },
+    )
+    return vital
 
 
 @router.get("/{patient_id}/vitals", response_model=VitalTimelineOut)

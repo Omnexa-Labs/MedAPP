@@ -6,7 +6,8 @@ class Settings(BaseSettings):
 
     service_name: str = "onboarding_service"
     database_url: str = "postgresql+asyncpg://medapp:medapp@postgres:5432/medapp_onboarding"
-    jwt_secret: str = "change-me-change-me-change-me-change-me"
+    # Audit finding #2: no default secret. Set ONBOARDING_JWT_SECRET in env.
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"

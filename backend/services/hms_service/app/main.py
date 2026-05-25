@@ -1,3 +1,5 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,6 +12,8 @@ from .middleware import TenantContextMiddleware
 from .routers import appointments, billing, dashboard, patients, pharmacy, staff, tenants
 from .routers import dev_auth
 from .tenant import tenant_db_manager
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -31,7 +35,28 @@ async def _init_dev_db():
         await conn.run_sync(Base.metadata.create_all)
 
 
+def _validate_dev_mode() -> None:
+    """Audit finding B-4: HMS's dev_auth router can mint admin tokens for
+    any patient. The router only mounts when `settings.dev_mode` is True
+    (good), but `HMS_DEV_MODE=true` can still be set in any environment
+    via env vars. Production must refuse to boot with dev_mode on, even
+    if a misconfigured deploy slips the flag through."""
+    env = os.getenv("ENV", "").lower()
+    if env == "production" and settings.dev_mode:
+        raise RuntimeError(
+            "hms_service: HMS_DEV_MODE=true is forbidden when ENV=production "
+            "(dev_auth would mint admin tokens for any patient)"
+        )
+    if settings.dev_mode:
+        logger.warning(
+            "hms_service.dev_mode_enabled — dev_auth /v1/auth/login is mounted "
+            "and will mint admin tokens for the dev hospital. Never enable "
+            "in production."
+        )
+
+
 def create_app() -> FastAPI:
+    _validate_dev_mode()
     app = FastAPI(
         title="MedApp - Hospital Management System",
         version="0.1.0",

@@ -6,6 +6,7 @@ from shared.observability import configure_logging, instrument_app
 
 from .config import settings
 from .routers import bookings, root
+from .services import BookingRateLimiter
 
 
 @asynccontextmanager
@@ -21,6 +22,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
+
+    # Audit finding B-22: single shared limiter per process. Tests swap
+    # this instance via app.state to use a tighter window.
+    app.state.booking_rate_limiter = BookingRateLimiter(
+        max_calls=settings.create_rate_max,
+        window_seconds=settings.create_rate_window_seconds,
+    )
+
     app.include_router(root.router)
     app.include_router(bookings.router)
 

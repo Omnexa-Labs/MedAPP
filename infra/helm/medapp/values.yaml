@@ -1,29 +1,241 @@
+# MedApp umbrella chart — values.
+#
+# `env` / `projectId` / `namespace` are set via --set on the deploy
+# command line. Image registry, Workload-Identity SA names, and
+# Cloud SQL peering CIDR are pinned per env in the deploy step.
+
+env: dev
+projectId: medapp-dev
+namespace: medapp-dev
+
 image:
-  registry: europe-west1-docker.pkg.dev/medapp-dev/images
+  # Aligned with the bootstrap module's Artifact Registry repo
+  # (`medapp`, not the old `images` placeholder).
+  registry: europe-west1-docker.pkg.dev/medapp-dev/medapp
   tag: latest
   pullPolicy: IfNotPresent
 
-services:
-  api_gateway: { port: 8000, replicas: 2 }
-  user_service: { port: 8001, replicas: 2 }
-  doctor_service: { port: 8002, replicas: 2 }
-  nurse_service: { port: 8003, replicas: 2 }
-  hospital_service: { port: 8004, replicas: 2 }
-  booking_service: { port: 8005, replicas: 2 }
-  payment_service: { port: 8006, replicas: 2 }
-  telemedicine_service: { port: 8007, replicas: 2 }
-  notification_service: { port: 8008, replicas: 2 }
-  lab_service: { port: 8009, replicas: 2 }
-  ehr_service: { port: 8010, replicas: 2 }
-  social_service: { port: 8011, replicas: 2 }
-  analytics_service: { port: 8012, replicas: 2 }
-  concierge_agent: { port: 9001, replicas: 2 }
-  smart_recommend_agent: { port: 9002, replicas: 1 }
-  medical_chat_agent: { port: 9003, replicas: 2 }
-  lab_reader_agent: { port: 9004, replicas: 1 }
-  vitals_watcher_agent: { port: 9005, replicas: 1 }
-  booking_agent: { port: 9006, replicas: 1 }
-
+# Default resource envelope. Per-service overrides go in `services.<name>.resources`.
 resources:
-  requests: { cpu: 100m, memory: 256Mi }
-  limits:   { cpu: 1,   memory: 1Gi }
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+# Default security context applied to every pod + container. Pod
+# Security Standards `restricted` at the namespace will reject any pod
+# that softens these — that's the audit C-10 belt-and-braces.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  startup:
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 30   # 30 * 5s = 150s grace before liveness takes over
+  readiness:
+    periodSeconds: 10
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 20
+    failureThreshold: 3
+
+# ── NetworkPolicy peers ────────────────────────────────────────────────────
+networkPolicy:
+  enabled: true
+  kubeSystemNamespace: "kube-system"
+
+  # Cloud SQL private IP range — reserved by the network module's
+  # `google_compute_global_address.private_services` (/16). Egress to
+  # this range is allowed on Postgres + Cloud SQL Auth Proxy ports.
+  cloudSqlPeeringCidr: "10.40.0.0/16"
+
+  # GFE / Google L7 Load Balancer health-check + traffic source ranges.
+  # Used only by the api_gateway ingress rule.
+  gclbHealthCheckCidrs:
+    - "35.191.0.0/16"
+    - "130.211.0.0/22"
+
+# ── Ingress (GKE L7 LB + Cloud Armor) ──────────────────────────────────────
+# When `enabled: true` the chart renders an `Ingress` for api_gateway with
+# a `ManagedCertificate` (Google-managed cert) and a `BackendConfig`
+# that pins the Cloud Armor policy created by Terraform. The Ingress is
+# the ONLY internet-facing entry point — every other service is reached
+# via the intra-namespace NetworkPolicy.
+#
+# Default false so the chart installs on a fresh cluster before Slice 6
+# Terraform creates the Cloud Armor policy. Flip on once Terraform's
+# `cloud_armor_policy_name` is known.
+ingress:
+  enabled: false
+  # Hostname the ManagedCertificate is issued for. Set per env via
+  # --set ingress.host=api-dev.medapp.example.
+  host: ""
+  # Pre-allocated global static IP name (created via
+  # `gcloud compute addresses create` or a separate Terraform stack
+  # outside the env). Required because GKE Ingress IPs are ephemeral
+  # otherwise.
+  globalIpName: ""
+  # Cloud Armor policy name from Terraform's cloud_armor module output.
+  cloudArmorPolicy: ""
+
+# ── External Secrets Operator ──────────────────────────────────────────────
+# When `enabled: true` the chart renders one ExternalSecret per service
+# that pulls from `medapp-<env>-<service>` in Google Secret Manager. The
+# ESO controller projects the result into a K8s Secret named after the
+# service (kname-sanitised), which the Deployment envFroms.
+#
+# Default false so the chart installs cleanly on a cluster where the
+# External Secrets Operator CRDs are not yet present (one-time install
+# from infra/helm/platform). Flip to true after the operator is in.
+externalSecrets:
+  enabled: false
+  # K8s ClusterSecretStore that ESO uses to talk to Google Secret
+  # Manager. Created by the platform chart; the medapp chart only
+  # references it by name.
+  storeName: "gcp-secret-manager"
+  refreshInterval: "1h"
+
+# ── Service catalog ────────────────────────────────────────────────────────
+# The GSA email is computed at render time from the service key + the
+# chart's projectId (see templates/serviceaccount.yaml). Set a per-
+# service `gsa` field here only when a service needs to impersonate an
+# external GSA in another project.
+services:
+  api_gateway:
+    port: 8000
+    replicas: 2
+    minAvailable: 1
+    exposedViaIngress: true   # api_gateway is the only service GCLB reaches
+
+  user_service:
+    port: 8001
+    replicas: 2
+    minAvailable: 1
+
+  doctor_service:
+    port: 8002
+    replicas: 2
+    minAvailable: 1
+
+  nurse_service:
+    port: 8003
+    replicas: 2
+    minAvailable: 1
+
+  hospital_service:
+    port: 8004
+    replicas: 2
+    minAvailable: 1
+
+  booking_service:
+    port: 8005
+    replicas: 2
+    minAvailable: 1
+
+  payment_service:
+    port: 8006
+    replicas: 2
+    minAvailable: 1
+
+  telemedicine_service:
+    port: 8007
+    replicas: 2
+    minAvailable: 1
+
+  notification_service:
+    port: 8008
+    replicas: 2
+    minAvailable: 1
+
+  lab_service:
+    port: 8009
+    replicas: 2
+    minAvailable: 1
+
+  ehr_service:
+    port: 8010
+    replicas: 2
+    minAvailable: 1
+
+  social_service:
+    port: 8011
+    replicas: 2
+    minAvailable: 1
+
+  analytics_service:
+    port: 8012
+    replicas: 2
+    minAvailable: 1
+
+  hms_service:
+    port: 8013
+    replicas: 2
+    minAvailable: 1
+
+  pms_service:
+    port: 8014
+    replicas: 2
+    minAvailable: 1
+
+  onboarding_service:
+    port: 8015
+    replicas: 2
+    minAvailable: 1
+
+  wearable_sync_service:
+    port: 8016
+    replicas: 2
+    minAvailable: 1
+
+  inbox_service:
+    port: 8017
+    replicas: 2
+    minAvailable: 1
+
+  # Agent layer
+  concierge_agent:
+    port: 9001
+    replicas: 2
+    minAvailable: 1
+
+  smart_recommend_agent:
+    port: 9002
+    replicas: 1
+    minAvailable: 0
+
+  medical_chat_agent:
+    port: 9003
+    replicas: 2
+    minAvailable: 1
+
+  lab_reader_agent:
+    port: 9004
+    replicas: 1
+    minAvailable: 0
+
+  vitals_watcher_agent:
+    port: 9005
+    replicas: 1
+    minAvailable: 0
+
+  booking_agent:
+    port: 9006
+    replicas: 1
+    minAvailable: 0

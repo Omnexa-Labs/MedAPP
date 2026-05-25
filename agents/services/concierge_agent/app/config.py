@@ -10,7 +10,16 @@ class Settings(BaseSettings):
     llm_provider: str = "mock"
     max_tokens: int = 4096
 
-    service_token: str = "change-me"
+    # JWT — used to verify /chat callers. Must be shared with user_service
+    # which mints the tokens. Empty default fails in ENV=production
+    # (see agents/shared/auth.py::validate_jwt_secret).
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+
+    # Outbound service token: bearer the agent presents to backend services.
+    # Long-term should be a minted JWT (like wearable_sync mints for EHR).
+    # Empty default — backend services will reject the call until configured.
+    service_token: str = ""
 
     booking_service_url: str = "http://booking_service:8005"
     user_service_url: str = "http://user_service:8001"

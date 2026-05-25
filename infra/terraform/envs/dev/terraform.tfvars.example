@@ -1,2 +1,8 @@
 project_id = "medapp-dev"
 region     = "europe-west1"
+
+# Add your laptop's public IP here if you want kubectl to work directly.
+# Otherwise everything goes through CI / an IAP-tunneled jumpbox.
+# master_authorized_cidrs = [
+#   { name = "operator-laptop", cidr = "203.0.113.4/32" },
+# ]

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from shared.observability import configure_logging, instrument_app
 
+from . import events
 from .config import settings
 from .services.lab_service import build_qdrant_client
 from .routers import lab, root
@@ -13,7 +14,11 @@ from .routers import lab, root
 async def lifespan(app: FastAPI):
     configure_logging(settings.log_level)
     app.state.qdrant = build_qdrant_client()
-    yield
+    await events.init_bus(app)
+    try:
+        yield
+    finally:
+        await events.close_bus(app)
 
 
 def create_app() -> FastAPI:

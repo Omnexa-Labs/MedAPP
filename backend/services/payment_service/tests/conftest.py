@@ -15,6 +15,8 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.compiler import compiles
 
+import os
+
 TEST_ROOT = Path(__file__).resolve().parent
 SERVICE_ROOT = TEST_ROOT.parent
 BACKEND_ROOT = SERVICE_ROOT.parent.parent
@@ -24,6 +26,11 @@ for path in (SERVICE_ROOT, SHARED_ROOT):
     value = str(path)
     if value not in sys.path:
         sys.path.insert(0, value)
+
+# Audit findings C-8 + B-16: webhooks now read the secret from settings and
+# fail closed when unset. Set known test secrets before app/settings import.
+os.environ.setdefault("PAYMENT_STRIPE_WEBHOOK_SECRET", "stripe-test-secret-for-pytest")
+os.environ.setdefault("PAYMENT_MPESA_WEBHOOK_SECRET", "mpesa-test-secret-for-pytest")
 
 from app.deps import get_current_principal, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402

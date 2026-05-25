@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from shared.auth import Principal
+from shared.auth import Principal, validate_jwt_secret
 from shared.observability import configure_logging, instrument_app
 
 from .config import ROUTES, settings
@@ -143,16 +143,33 @@ async def _forward_request(request: Request, full_path: str, *, require_auth: bo
     return Response(content=resp.content, status_code=resp.status_code, headers=forwarded_headers)
 
 
+def _parse_cors_origins(raw: str) -> list[str]:
+    """Comma-separated origins, trimmed. Empty → no CORS middleware at all."""
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
 def create_app() -> FastAPI:
+    # Audit finding #2: refuse to boot with a known-weak JWT secret in
+    # production. Outside production we log a warning so dev / CI keep
+    # working with a fixed test secret.
+    validate_jwt_secret(settings.jwt_secret, service_name=settings.service_name)
+
     app = FastAPI(title="MedApp - API Gateway", version="0.1.0", lifespan=lifespan)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["X-Request-Id"],
-    )
+
+    # Audit finding #6: CORS allow-list from config, not `*`. The previous
+    # default (`allow_origins=["*"], allow_credentials=True`) is undefined
+    # per the browser CORS spec — most browsers refuse credentials but
+    # some forward them. Either way it was wide open; now it's explicit.
+    cors_origins = _parse_cors_origins(settings.cors_origins)
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=True,
+            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
+            expose_headers=["X-Request-Id"],
+        )
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
 
     @app.middleware("http")

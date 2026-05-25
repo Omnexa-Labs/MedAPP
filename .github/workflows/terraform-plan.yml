@@ -1,0 +1,31 @@
+name: terraform-plan
+
+# Per-env Terraform plan on PRs that touch infra/terraform/**. Requires the
+# bootstrap stack to be applied first AND the env's GitHub Environment to
+# carry GCP_WIF_PROVIDER + GCP_TERRAFORM_SA secrets. Before bootstrap is
+# applied this workflow will fail on the auth step — that's expected.
+
+on:
+  pull_request:
+    paths: ["infra/terraform/**"]
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, id-token: write, pull-requests: write }
+    strategy:
+      fail-fast: false
+      matrix: { env: [dev, staging] }
+    environment: ${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SA }}
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+      - working-directory: infra/terraform/envs/${{ matrix.env }}
+        run: |
+          terraform init -input=false
+          terraform plan -no-color

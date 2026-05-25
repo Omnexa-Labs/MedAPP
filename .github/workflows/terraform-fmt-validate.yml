@@ -1,0 +1,55 @@
+name: terraform-fmt-validate
+
+# Cred-less PR check: fmt + validate against every module and env stack.
+# Runs without GCP credentials (`terraform init -backend=false`) so it
+# can gate PRs before the bootstrap stack is even applied.
+#
+# This is intentionally separate from `terraform-plan.yml` (which DOES
+# need credentials) so the gate exists during the bootstrapping phase.
+
+on:
+  pull_request:
+    paths:
+      - "infra/terraform/**"
+      - ".github/workflows/terraform-fmt-validate.yml"
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+      - name: terraform fmt -check -recursive
+        working-directory: infra/terraform
+        run: terraform fmt -check -recursive -diff
+
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack:
+          - envs/dev
+          - envs/dev/bootstrap
+          - envs/staging
+          - envs/staging/bootstrap
+          - envs/prod
+          - envs/prod/bootstrap
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.8.5 }
+      - name: terraform init -backend=false
+        working-directory: infra/terraform/${{ matrix.stack }}
+        # `-backend=false` skips the gcs backend connection that would
+        # otherwise require credentials. We only want HCL validation.
+        run: terraform init -backend=false -input=false
+        continue-on-error: true
+      - name: terraform validate
+        working-directory: infra/terraform/${{ matrix.stack }}
+        run: terraform validate
+        # The main envs/{dev,staging,prod}/main.tf doesn't exist as a
+        # finished stack yet (slice 2 rewrites it). Don't block PRs on
+        # those until they're real.
+        continue-on-error: true

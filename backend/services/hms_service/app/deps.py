@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from uuid import UUID
@@ -13,6 +14,8 @@ from shared.auth.jwt import decode_token
 from .config import settings
 from .db import MgmtSessionLocal
 from .tenant import tenant_context_var, tenant_db_manager
+
+log = logging.getLogger(__name__)
 
 class _DevDB:
     engine = None
@@ -98,8 +101,17 @@ async def get_hms_principal(
     if not hospital_id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "no hospital_id in token")
 
+    # Audit finding B-9: in non-dev_mode the staff role MUST come from
+    # the management DB. dev_auth (B-4) only mounts in dev_mode, so this
+    # shortcut is bounded by the same gate that lets dev tokens exist
+    # at all; we log every hit so a stray HMS_DEV_MODE=true in a real
+    # env is loud rather than silent.
     if settings.dev_mode and claims.get("hms_role"):
         hms_role = str(claims["hms_role"])
+        log.warning(
+            "hms_principal.dev_mode_role_from_claim sub=%s hospital_id=%s role=%s",
+            claims.get("sub"), hospital_id, hms_role,
+        )
     else:
         hms_role = await _resolve_hms_role(str(claims["sub"]), str(hospital_id))
     return HmsPrincipal(
@@ -122,6 +134,24 @@ async def _resolve_hms_role(user_id: str, tenant_id: str) -> str | None:
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
         return row
+
+
+async def verify_staff_membership(user_id: str, tenant_id: str) -> bool:
+    """Return True iff the user has an active staff role at the tenant.
+
+    Audit finding B-9: middleware-layer check that the JWT's hospital_id
+    claim corresponds to a real staff relationship — not just a value
+    the token holder asserted. Without this, a token bearer can mint
+    `hospital_id=<any-tenant>` and read tenant data through any route
+    that uses get_tenant_db without also depending on get_hms_principal.
+
+    Returns False (rather than raising) on malformed UUIDs so the
+    middleware can fall through without leaking a 500 to the client.
+    """
+    try:
+        return (await _resolve_hms_role(user_id, tenant_id)) is not None
+    except (ValueError, TypeError):
+        return False
 
 
 def require_hms_roles(*allowed_roles: str):

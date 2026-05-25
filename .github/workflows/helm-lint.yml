@@ -1,0 +1,59 @@
+name: helm-lint
+
+# Cred-less PR check: lint + template-render the medapp chart against
+# every env's values. Catches missing template helpers, malformed YAML,
+# selector/matchLabels drift, and Go-template typos before they hit a
+# deploy.
+
+on:
+  pull_request:
+    paths:
+      - "infra/helm/**"
+      - ".github/workflows/helm-lint.yml"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: "v3.16.0"
+      - name: helm lint
+        run: helm lint infra/helm/medapp
+      - name: helm template (dev)
+        run: |
+          helm template medapp infra/helm/medapp \
+            --set env=dev \
+            --set projectId=medapp-dev \
+            --set namespace=medapp-dev \
+            > /tmp/dev.yaml
+          wc -l /tmp/dev.yaml
+      - name: helm template (staging)
+        run: |
+          helm template medapp infra/helm/medapp \
+            --set env=staging \
+            --set projectId=medapp-staging \
+            --set namespace=medapp-staging \
+            > /tmp/staging.yaml
+      - name: helm template (prod)
+        run: |
+          helm template medapp infra/helm/medapp \
+            --set env=prod \
+            --set projectId=medapp-prod \
+            --set namespace=medapp-prod \
+            > /tmp/prod.yaml
+      # Sanity: rendered output must contain the security-critical bits.
+      # If a template change accidentally drops them, fail the PR loud.
+      - name: Verify required hardening fields present
+        run: |
+          set -e
+          for f in /tmp/dev.yaml /tmp/staging.yaml /tmp/prod.yaml; do
+            grep -q "runAsNonRoot: true" $f || { echo "MISSING runAsNonRoot in $f"; exit 1; }
+            grep -q "readOnlyRootFilesystem: true" $f || { echo "MISSING readOnlyRootFilesystem in $f"; exit 1; }
+            grep -q "drop:" $f || { echo "MISSING capabilities.drop in $f"; exit 1; }
+            grep -q "pod-security.kubernetes.io/enforce: restricted" $f || { echo "MISSING PSS restricted label in $f"; exit 1; }
+            grep -q "kind: NetworkPolicy" $f || { echo "MISSING NetworkPolicy in $f"; exit 1; }
+            grep -q "name: default-deny-all" $f || { echo "MISSING default-deny in $f"; exit 1; }
+          done
+          echo "All hardening fields present in dev/staging/prod renders."

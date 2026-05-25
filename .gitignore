@@ -34,6 +34,11 @@ Thumbs.db
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+# Real (non-example) tfvars often hold project ids, billing accounts, or
+# org-specific values — keep them off the public tree. Examples (.tfvars.example)
+# are committed.
+terraform.tfvars
+*.auto.tfvars
 ml/datasets/*
 !ml/datasets/.gitkeep
 ml/models/*

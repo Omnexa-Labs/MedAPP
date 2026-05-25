@@ -165,6 +165,26 @@ services:
       HMS_AMQP_URL: amqp://medapp:medapp@rabbitmq/
     ports: ["8020:8020"]
 
+  pms_service:
+    build: { <<: *py-build, dockerfile: backend/services/pms_service/Dockerfile }
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      PMS_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pms
+      PMS_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PMS_MEDAPP_WEBHOOK_SECRET: ${PMS_MEDAPP_WEBHOOK_SECRET:-change-me-in-production}
+      PMS_MEDAPP_DISPENSE_WEBHOOK_URL: ${PMS_MEDAPP_DISPENSE_WEBHOOK_URL:-}
+    ports: ["8030:8030"]
+
+  pms_web:
+    build:
+      context: ../../frontend/pms_web
+      dockerfile: Dockerfile
+    depends_on: [pms_service]
+    environment:
+      NEXT_PUBLIC_PMS_API_URL: ${PMS_PUBLIC_API_URL:-http://localhost:8030}
+    ports: ["3002:3000"]
+
   # ── Agents (Claude-powered) ────────────────────────────────────────────────
   concierge_agent:
     build: { <<: *py-build, dockerfile: agents/services/concierge_agent/Dockerfile }

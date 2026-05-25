@@ -8,7 +8,13 @@ class Settings(BaseSettings):
     llm_provider: str = "mock"
     max_tokens: int = 4096
 
-    service_token: str = "change-me"
+    # JWT — verifies /chat callers. Empty default fails in ENV=production
+    # (see agents/shared/auth.py::validate_jwt_secret).
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+
+    # Outbound service token. Empty default until short-lived JWTs are wired.
+    service_token: str = ""
 
     user_service_url: str = "http://user_service:8001"
     doctor_service_url: str = "http://doctor_service:8002"

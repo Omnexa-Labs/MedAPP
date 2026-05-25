@@ -1,0 +1,114 @@
+{{/*
+One Deployment per entry in .Values.services. The container's
+emptyDir mounts for /tmp and /app/var are how a readOnlyRootFilesystem
+pod still has writable scratch space — without them, anything that
+shells out to a tempfile breaks.
+*/}}
+{{- range $name, $cfg := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "medapp.kname" $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    {{- include "medapp.labels" (dict "serviceName" $name "root" $) | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  selector:
+    matchLabels:
+      {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 8 }}
+        # Non-selector labels added at the pod level so NetworkPolicies
+        # can match by them too.
+        medapp.tier: {{ if hasSuffix "_agent" $name }}agent{{ else }}service{{ end }}
+      annotations:
+        # Roll the pods when configmap/secret content changes (slice 4
+        # wires this when ExternalSecret is in place).
+        checksum/values: {{ $.Values | toYaml | sha256sum | trunc 16 }}
+    spec:
+      serviceAccountName: {{ include "medapp.kname" $name }}
+      automountServiceAccountToken: true
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      # Restricted profile bars host* settings; explicit false is the
+      # belt to the namespace's braces.
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+      containers:
+        - name: app
+          image: "{{ $.Values.image.registry }}/{{ $name }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $cfg.port }}
+              protocol: TCP
+          securityContext:
+            {{- toYaml $.Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml ($cfg.resources | default $.Values.resources) | nindent 12 }}
+          # Scratch writable volumes — required because the container
+          # runs with readOnlyRootFilesystem.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: var
+              mountPath: /app/var
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: {{ $.Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ $.Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ $.Values.probes.startup.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ $.Values.probes.readiness.periodSeconds }}
+            failureThreshold: {{ $.Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: {{ $.Values.probes.liveness.periodSeconds }}
+            failureThreshold: {{ $.Values.probes.liveness.failureThreshold }}
+          envFrom:
+            # Per-service ConfigMap (operator-managed) + Secret
+            # (ExternalSecret-projected when slice 5's external-secrets
+            # flag is on; otherwise absent). `optional: true` so the
+            # pod still boots if either is missing — important during
+            # the bootstrap window before ESO is installed.
+            - configMapRef:
+                name: {{ include "medapp.kname" $name }}-config
+                optional: true
+            - secretRef:
+                name: {{ include "medapp.kname" $name }}
+                optional: true
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: var
+          emptyDir:
+            sizeLimit: 64Mi
+      # Topology spread: at scale Autopilot places pods of the same
+      # service across zones for us. This hint tightens it.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 14 }}
+{{- end }}

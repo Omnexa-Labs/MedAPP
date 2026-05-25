@@ -9,7 +9,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
-BACKEND_DIR = SERVICE_DIR.parents[3]
+# tests/<file> → tests → wearable_sync_service → services → backend
+# Index 1 from SERVICE_DIR walks two levels: services → backend.
+BACKEND_DIR = SERVICE_DIR.parents[1]
 SHARED_DIR = BACKEND_DIR / "shared"
 
 for path in (str(SERVICE_DIR), str(SHARED_DIR)):

@@ -1,0 +1,3 @@
+project_id        = "medapp-prod"
+region            = "europe-west1"
+github_repository = "your-github-org/medapp"

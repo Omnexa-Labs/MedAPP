@@ -34,6 +34,22 @@ class LLMResult:
     usage: dict[str, int] = field(default_factory=dict)
 
 
+@dataclass
+class ImagePart:
+    """Vision input attached to the most recent user `ChatTurn`.
+
+    Providers that support vision (OpenAI 4o / 4.1) translate these into
+    their native multimodal content shape. Providers that don't support
+    vision should raise `NotImplementedError` when this is non-empty —
+    the agent layer decides whether to fall back or error.
+    """
+
+    data: bytes
+    media_type: str  # e.g. "image/png", "image/jpeg"
+    # Optional human label used by some providers for caching / logging.
+    detail: str = "auto"  # OpenAI: "low" | "high" | "auto"
+
+
 # A tool executor is a sync function that takes (name, input_json) and returns a string result.
 ToolExecutor = Callable[[str, dict[str, Any]], str]
 
@@ -47,6 +63,7 @@ class LLMProvider(Protocol):
         tools: list[ToolSpec],
         executor: ToolExecutor,
         max_tokens: int = 4096,
+        images: list[ImagePart] | None = None,
     ) -> LLMResult: ...
 
 
@@ -67,6 +84,7 @@ class MockLLM:
         tools: list[ToolSpec],
         executor: ToolExecutor,
         max_tokens: int = 4096,
+        images: list[ImagePart] | None = None,
     ) -> LLMResult:
         last_user = next((m.content for m in reversed(messages) if m.role == "user"), "")
         tool_calls: list[dict[str, Any]] = []
@@ -81,6 +99,10 @@ class MockLLM:
                 tool_outputs.append(f"[{spec.name}] {result}")
 
         reply_parts = [f"(mock) you said: {last_user}"]
+        if images:
+            # Surface the image-count so vision-path tests can assert the
+            # mock saw the attachment without needing a real provider.
+            reply_parts.append(f"(mock) saw {len(images)} image(s)")
         reply_parts.extend(tool_outputs)
         return LLMResult(
             reply="\n".join(reply_parts),
@@ -94,21 +116,33 @@ def make_provider(name: str) -> LLMProvider:
 
     Keep each branch tiny — the real implementation lives in its own module so
     we don't pull vendor SDKs into the import graph unless that provider is selected.
+
+    Production guard (ADR 0004): selecting a non-BAA provider when
+    `ENV=production` fails loudly at startup. Today that means Groq is
+    blocked in production.
     """
+    import os
+
     name = name.lower()
+    env = os.getenv("ENV", "").lower()
+    non_baa = {"groq", "mock"}
+    if env == "production" and name in non_baa:
+        raise RuntimeError(
+            f"LLM_PROVIDER={name!r} is not permitted when ENV=production. "
+            "Groq is not HIPAA-covered; use 'openai' (under BAA) for production."
+        )
+
     if name == "mock":
         return MockLLM()
-    # Example shapes — uncomment and implement when you pick a provider:
-    # if name == "openai":
-    #     from .providers.openai_provider import OpenAIProvider
-    #     return OpenAIProvider()
-    # if name == "anthropic":
-    #     from .providers.anthropic_provider import AnthropicProvider
-    #     return AnthropicProvider()
-    # if name == "google":
-    #     from .providers.google_provider import GoogleProvider
-    #     return GoogleProvider()
+    if name == "groq":
+        from .providers.groq_provider import GroqProvider
+        return GroqProvider()
+    if name == "openai":
+        from .providers.openai_provider import OpenAIProvider
+        return OpenAIProvider()
+    # Future providers slot in here. Keep the import lazy so each branch only
+    # pulls its SDK when selected.
     raise ValueError(
-        f"Unknown LLM_PROVIDER={name!r}. Implement it in agents/shared/llm.py "
+        f"Unknown LLM_PROVIDER={name!r}. Implement it in agents/shared/providers/ "
         "and register it in make_provider()."
     )

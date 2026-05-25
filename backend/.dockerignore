@@ -1,0 +1,37 @@
+# Keep the build context small and reproducible. Anything Python or test
+# related that the image doesn't need at runtime stays out.
+
+# Python build/cache artefacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.coverage
+**/htmlcov/
+**/dist/
+**/build/
+
+# Virtualenvs — every uv run creates one of these in-tree and we don't
+# need them in the image.
+**/.venv/
+
+# Tests are not shipped in the image. They get re-run in CI from source.
+**/tests/
+
+# Local config not relevant to a production image.
+**/.env
+**/.env.local
+**/*.log
+
+# Editor + OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Alembic version cache (the migrations themselves DO ship — that's
+# `alembic/versions/` — but the local-state cache doesn't)
+**/.terraform/

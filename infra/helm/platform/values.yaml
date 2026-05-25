@@ -1,0 +1,30 @@
+# Platform-level installs the operator runs once per cluster, before
+# the medapp app chart can use externalSecrets.enabled=true.
+#
+# Override projectId + namespace at install time:
+#
+#   helm install platform infra/helm/platform \
+#     --namespace external-secrets --create-namespace \
+#     --set projectId=medapp-dev \
+#     --set namespace=medapp-dev
+
+projectId: medapp-dev
+namespace: medapp-dev
+
+# The ServiceAccount in the medapp namespace that ESO impersonates
+# when pulling secrets. Per-namespace SA + GSA — when slice 4 created
+# per-service GSAs we deferred ESO's own GSA; this module creates the
+# K8s SA and expects a matching `external-secrets-reader-wi@<project>.iam.gserviceaccount.com`
+# GSA to exist (created in slice 5's secret_manager module).
+externalSecretsAuth:
+  ksaName: external-secrets-reader
+  gsaEmail: ""  # Set via --set; pattern: external-secrets-reader-wi@<project>.iam.gserviceaccount.com
+
+external-secrets:
+  enabled: true
+  installCRDs: true
+  # ESO runs in its own namespace (helm install above creates it).
+  # The CSS reaches into medapp-<env> by referencing the per-namespace SA.
+  serviceAccount:
+    create: true
+    name: external-secrets-controller

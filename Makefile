@@ -1,5 +1,5 @@
 
-.PHONY: help dev dev-all up down stop restart rebuild logs ps shell migrate migrate-all revision seed fmt lint test check gen-clients
+.PHONY: help dev dev-all up down stop restart rebuild logs ps shell migrate migrate-all revision seed fmt lint test check gen-clients pms-dev pms-migrate pms-seed pms-test pms-web
 
 SHELL := bash
 COMPOSE_FILE := infra/docker/docker-compose.yml
@@ -120,3 +120,23 @@ check: lint test ## Run lint and tests
 
 gen-clients: ## Regenerate Dart + TS clients from OpenAPI specs
 	bash scripts/gen-clients.sh
+
+# ── PMS (Pharmacy Management System) template ─────────────────────────────────
+
+PMS_SVC_DIR := backend/services/pms_service
+PMS_WEB_DIR := frontend/pms_web
+
+pms-dev: ## Boot pms_service + pms_web via docker compose
+	$(COMPOSE) up -d --build postgres pms_service pms_web
+
+pms-migrate: ## Apply Alembic migrations for pms_service
+	cd $(PMS_SVC_DIR) && UV_LINK_MODE=copy uv run alembic upgrade head
+
+pms-seed: ## Seed the pharmacy with admin staff, drugs, and a supplier
+	cd $(PMS_SVC_DIR) && UV_LINK_MODE=copy uv run python -m app.seed
+
+pms-test: ## Run the pms_service pytest suite
+	cd $(PMS_SVC_DIR) && UV_LINK_MODE=copy uv run --extra test pytest -q
+
+pms-web: ## Start pms_web in dev mode (Next.js on :3002)
+	cd $(PMS_WEB_DIR) && npm install && npm run dev

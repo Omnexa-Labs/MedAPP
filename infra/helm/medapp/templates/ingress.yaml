@@ -1,0 +1,108 @@
+{{/*
+GKE L7 Ingress + ManagedCertificate + BackendConfig for api_gateway.
+
+Wire-up:
+
+   Internet
+      │
+      ▼
+   GCLB (global static IP from values.ingress.globalIpName)
+      │   ← Cloud Armor policy attached via BackendConfig
+      ▼
+   ManagedCertificate (Google-managed cert for values.ingress.host)
+      │
+      ▼
+   Service: api-gateway:8000
+      │
+      ▼
+   Pods (medapp.tier=service, app=api-gateway)
+
+The api_gateway is the ONLY service exposed to GCLB; the slice-3
+NetworkPolicy `allow-gclb-to-api_gateway` opens ingress from the GCLB
+health-check + traffic CIDRs to its pods only.
+*/}}
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.enabled=true but ingress.host is empty. Set --set ingress.host=<your-hostname>" }}
+{{- end }}
+{{- if not .Values.ingress.globalIpName }}
+{{- fail "ingress.enabled=true but ingress.globalIpName is empty. Set --set ingress.globalIpName=<your-static-ip-name>" }}
+{{- end }}
+---
+# BackendConfig attaches the Cloud Armor policy to the api_gateway
+# Service. GKE Ingress reads this CRD when synthesising the GCLB
+# backend service.
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.namespace }}
+spec:
+  {{- if .Values.ingress.cloudArmorPolicy }}
+  securityPolicy:
+    name: {{ .Values.ingress.cloudArmorPolicy | quote }}
+  {{- end }}
+  # Health check probes /healthz on the container port. Matches the
+  # FastAPI app's standard health endpoint.
+  healthCheck:
+    requestPath: /healthz
+    port: 8000
+    type: HTTP
+  # Lock-down: clients must use HTTPS. The HTTP listener (port 80)
+  # gets a 301 to HTTPS at the GCLB level via the FrontendConfig
+  # below.
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: api-gateway-frontend
+  namespace: {{ .Values.namespace }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: PERMANENT_REDIRECT
+---
+# ManagedCertificate triggers Google to provision a free public TLS
+# cert via Let's Encrypt for the named domain. The Ingress references
+# this resource via annotation.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: api-gateway-cert
+  namespace: {{ .Values.namespace }}
+spec:
+  domains:
+    - {{ .Values.ingress.host | quote }}
+---
+# The api-gateway Service picks up the BackendConfig + NEG
+# annotations from templates/service.yaml when `exposedViaIngress: true`
+# AND `ingress.enabled: true` — see that template.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: medapp
+  namespace: {{ .Values.namespace }}
+  annotations:
+    # Use the global L7 LB (external).
+    kubernetes.io/ingress.class: "gce"
+    # The static IP that the LB binds to. Created out-of-band:
+    #   gcloud compute addresses create medapp-prod-ip --global
+    kubernetes.io/ingress.global-static-ip-name: {{ .Values.ingress.globalIpName | quote }}
+    # The ManagedCertificate above (comma-separated for multi-domain).
+    networking.gke.io/managed-certificates: api-gateway-cert
+    # The FrontendConfig handles the HTTP→HTTPS redirect.
+    networking.gke.io/v1beta1.FrontendConfig: api-gateway-frontend
+spec:
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8000
+{{- end }}

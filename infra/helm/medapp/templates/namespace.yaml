@@ -1,0 +1,23 @@
+# Namespace with Pod Security Standards `restricted` enforcement.
+#
+# Audit finding C-10: the K8s admission controller will refuse to admit
+# any pod that breaks the restricted profile — no root containers, no
+# privileged hostPath, no host network, no NET_RAW, no allowPrivilege-
+# Escalation. This is the platform-level safety net behind the
+# container-level securityContext that every Deployment also sets.
+#
+# `enforce` blocks the pod from being created. `audit` + `warn` mirror
+# the same profile so any drift is loud in logs.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    medapp.env: {{ .Values.env }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

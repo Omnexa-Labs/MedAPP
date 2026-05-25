@@ -1,0 +1,105 @@
+name: deploy
+
+# Manual promotion to staging or prod. Dev auto-deploys via deploy-dev.yml
+# on every successful build.
+#
+# Protection comes from the GitHub Environment (`staging` / `prod`):
+# required reviewers, wait timer, allowed branches. See
+# docs/runbooks/github-environments.md for the one-time setup.
+#
+# Rollback: re-run this workflow with `image_tag` set to the prior SHA.
+
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target env (dev is auto-deployed; pick staging or prod)"
+        required: true
+        type: choice
+        options: [staging, prod]
+        default: staging
+      image_tag:
+        description: "Image tag to deploy (commit SHA from a green build-and-push run)"
+        required: true
+
+# One promotion per env at a time. Concurrent staging deploys queue;
+# overlapping prod runs are explicitly blocked rather than cancelled
+# (prod rollouts must not be interrupted mid-flight).
+concurrency:
+  group: deploy-${{ github.event.inputs.env }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # GitHub Environment carries the env-specific secrets AND the
+    # required-reviewer protection rule. The job pauses at the
+    # `environment` resolution step until an approver clicks Approve.
+    environment: ${{ github.event.inputs.env }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ENV: ${{ github.event.inputs.env }}
+      REGION: europe-west1
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.image_tag }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      # Cosign verify before deploying to prod. Reject any image whose
+      # Sigstore signature can't be traced to a build-and-push run on
+      # this repo's main branch. Belt-and-braces alongside Binary
+      # Authorization's admission-time check.
+      - name: Install Cosign
+        if: github.event.inputs.env == 'prod'
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: "v2.4.1"
+
+      - name: Verify image signatures (prod only)
+        if: github.event.inputs.env == 'prod'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -e
+          for svc in api_gateway user_service doctor_service nurse_service hospital_service \
+                     booking_service payment_service telemedicine_service notification_service \
+                     lab_service ehr_service social_service analytics_service hms_service \
+                     pms_service onboarding_service wearable_sync_service inbox_service; do
+            IMAGE="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/medapp/${svc}:${{ github.event.inputs.image_tag }}"
+            echo "Verifying ${IMAGE}"
+            cosign verify "$IMAGE" \
+              --certificate-identity-regexp "https://github.com/${{ github.repository }}/.github/workflows/build-and-push.yml@.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com
+          done
+
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: medapp-${{ env.ENV }}
+          location: ${{ env.REGION }}
+
+      - name: Deploy Helm
+        run: |
+          helm upgrade --install medapp infra/helm/medapp \
+            --set env=${ENV} \
+            --set projectId=${{ secrets.GCP_PROJECT }} \
+            --set namespace=medapp-${ENV} \
+            --set image.registry=${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/medapp \
+            --set image.tag=${{ github.event.inputs.image_tag }} \
+            --wait --timeout 10m
+
+      - name: Smoke test
+        run: |
+          kubectl --namespace medapp-${ENV} rollout status deployment/api-gateway --timeout 5m
+          kubectl --namespace medapp-${ENV} port-forward svc/api-gateway 8000:8000 &
+          PF_PID=$!
+          sleep 5
+          curl -fsS http://127.0.0.1:8000/healthz
+          kill $PF_PID || true

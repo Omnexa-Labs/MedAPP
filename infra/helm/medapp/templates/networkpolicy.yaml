@@ -1,0 +1,150 @@
+{{- if .Values.networkPolicy.enabled }}
+# ── Default deny ────────────────────────────────────────────────────────────
+# Every pod in the namespace starts with NO ingress and NO egress allowed.
+# The rules below open back up only what's actually needed. Audit C-10
+# expects this — without it, a compromised pod can pivot freely.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+# ── DNS egress ─────────────────────────────────────────────────────────────
+# Every pod needs to resolve names against kube-system's CoreDNS (or
+# Autopilot's NodeLocal DNSCache, which still listens on 53). UDP first,
+# TCP for fallback on >512-byte responses.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.kubeSystemNamespace }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+# ── Intra-namespace mesh ───────────────────────────────────────────────────
+# Pods in the namespace can talk to each other (service-to-service
+# calls — api_gateway → user_service, etc.). This is permissive but
+# bounded to the namespace, which is the env. Tighter per-service rules
+# can be layered on later without removing this baseline.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal-namespace
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+
+# ── Cloud SQL egress ───────────────────────────────────────────────────────
+# Allow egress to the Service Networking peering range reserved by the
+# network module. Pod connects to Cloud SQL on 5432 (Postgres) or via
+# the Cloud SQL Auth Proxy sidecar pattern (3307) when slice 4 wires it.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudsql-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.cloudSqlPeeringCidr | quote }}
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 3307
+
+# ── Egress to public internet (via Cloud NAT) ──────────────────────────────
+# We can't restrict by FQDN at the L4 NetPol level — that's WAF/Cloud
+# Armor territory in slice 6. For now, allow all egress to non-RFC1918
+# destinations so pods can reach Stripe / Groq / Anthropic / etc. The
+# `except` blocks exclude the cluster's own pod and service ranges so
+# this rule cannot bypass the intra-namespace policy above.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internet-egress
+  namespace: {{ .Values.namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+# ── GCLB ingress to api_gateway ────────────────────────────────────────────
+# The Google L7 Load Balancer health-check and traffic sources are
+# fixed CIDRs Google publishes. Only api_gateway accepts traffic from
+# them — every other service is reachable only via the intra-namespace
+# rule above.
+{{- range $name, $cfg := .Values.services }}
+{{- if $cfg.exposedViaIngress }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gclb-to-{{ include "medapp.kname" $name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "medapp.selectorLabels" (dict "serviceName" $name "root" $) | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        {{- range $.Values.networkPolicy.gclbHealthCheckCidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $cfg.port }}
+{{- end }}
+{{- end }}
+{{- end }}

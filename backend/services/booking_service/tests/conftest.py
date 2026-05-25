@@ -31,6 +31,7 @@ def _compile_uuid_sqlite(element, compiler, **kw):  # noqa: ARG001
 from app.deps import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
+from app.services import BookingRateLimiter  # noqa: E402
 from shared.auth import Principal, get_current_principal  # noqa: E402
 
 
@@ -59,6 +60,16 @@ def principal() -> Principal:
 @pytest.fixture
 def admin_principal() -> Principal:
     return Principal(subject="22222222-2222-2222-2222-222222222222", role="admin")
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Audit finding B-22: ``app`` is module-level so the limiter state
+    leaks across tests. Wipe it before each test runs."""
+    limiter = getattr(app.state, "booking_rate_limiter", None)
+    if limiter is not None:
+        limiter.reset()
+    yield
 
 
 @pytest_asyncio.fixture
@@ -103,6 +114,18 @@ async def admin_client(session_factory, admin_principal):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def tight_rate_limiter():
+    """Replace app.state.booking_rate_limiter with a 2-call / 60s instance.
+    Restored at teardown so other tests aren't affected."""
+    original = app.state.booking_rate_limiter
+    app.state.booking_rate_limiter = BookingRateLimiter(
+        max_calls=2, window_seconds=60
+    )
+    yield app.state.booking_rate_limiter
+    app.state.booking_rate_limiter = original
 
 
 @pytest.fixture

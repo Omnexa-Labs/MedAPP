@@ -1,0 +1,32 @@
+# Dependabot keeps GitHub Actions + base images + Python deps current.
+# Security best practice: an unpinned action or a stale base image is a
+# common supply-chain attack surface.
+
+version: 2
+updates:
+  # Pin GitHub Actions to specific SHAs over time. Dependabot opens PRs
+  # when a new release is tagged and the SHA is published.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Backend Python deps (uv lock file).
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      python-minor:
+        update-types: ["minor", "patch"]
+
+  # Per-service Dockerfiles — pull base image security patches.
+  - package-ecosystem: docker
+    directory: "/backend"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

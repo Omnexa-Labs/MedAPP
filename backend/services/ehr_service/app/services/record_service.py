@@ -32,14 +32,30 @@ def _is_clinician(principal: Principal) -> bool:
     return principal.role in {"doctor", "nurse", "admin"}
 
 
-async def _authorize_patient_access(session: AsyncSession, principal: Principal, patient: PatientRecord) -> UUID:
+async def _authorize_patient_access(
+    session: AsyncSession, principal: Principal, patient: PatientRecord
+) -> tuple[UUID, str]:
+    """Return (requester_id, mode).
+
+    `mode` is one of:
+      - "self": the patient is reading their own record
+      - "consent": a clinician with an active Consent row
+      - "admin_override": admin role bypassing both clinician and consent
+        checks. Audit finding #5 — this used to be invisible in the audit
+        trail; we now tag every admin-override audit row so reviewers can
+        spot operator access at a glance (`reason` starts with
+        `"[admin_override]"`).
+    """
     requester_id = _principal_uuid(principal)
-    if requester_id != patient.user_id:
-        if principal.role != "admin" and not _is_clinician(principal):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
-        if principal.role != "admin" and not await _has_active_consent(session, patient.id, requester_id):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
-    return requester_id
+    if requester_id == patient.user_id:
+        return requester_id, "self"
+    if principal.role == "admin":
+        return requester_id, "admin_override"
+    if not _is_clinician(principal):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+    if not await _has_active_consent(session, patient.id, requester_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+    return requester_id, "consent"
 
 
 async def create_patient_if_missing(session: AsyncSession, patient_user_id: UUID, *, display_name: str | None = None) -> PatientRecord:
@@ -71,17 +87,42 @@ async def _has_active_consent(session: AsyncSession, patient_id: UUID, doctor_us
     return consent is not None
 
 
-async def record_access(session: AsyncSession, accessor_user_id: UUID, patient_id: UUID, resource: str, reason: str) -> None:
-    session.add(AccessAudit(accessor_user_id=accessor_user_id, patient_id=patient_id, resource=resource, reason=reason))
+async def record_access(
+    session: AsyncSession,
+    accessor_user_id: UUID,
+    patient_id: UUID,
+    resource: str,
+    reason: str,
+    *,
+    mode: str = "self",
+) -> None:
+    """Write one row to the AccessAudit trail.
+
+    `mode` annotates the reason for compliance review. `admin_override`
+    is prefixed loudly so a reviewer running `SELECT * FROM access_audit
+    WHERE reason LIKE '[admin_override]%'` can find every operator access
+    without scanning the whole table (audit finding #5).
+    """
+    annotated_reason = (
+        f"[admin_override] {reason}" if mode == "admin_override" else reason
+    )
+    session.add(
+        AccessAudit(
+            accessor_user_id=accessor_user_id,
+            patient_id=patient_id,
+            resource=resource,
+            reason=annotated_reason,
+        )
+    )
     await session.flush()
 
 
 async def get_patient_bundle(session: AsyncSession, principal: Principal, patient_user_id: UUID, *, reason: str = "patient record access") -> PatientBundleOut:
     patient = await _load_patient(session, patient_user_id)
 
-    requester_id = await _authorize_patient_access(session, principal, patient)
+    requester_id, mode = await _authorize_patient_access(session, principal, patient)
 
-    await record_access(session, requester_id, patient.id, "patient_bundle", reason)
+    await record_access(session, requester_id, patient.id, "patient_bundle", reason, mode=mode)
     vitals = await list_vitals(session, principal, patient_user_id, reason=reason, enforce_access=False)
     consents = list(
         (
@@ -105,7 +146,7 @@ async def get_patient_summary(
     reason: str = "patient summary access",
 ) -> PatientSummaryOut:
     patient = await _load_patient(session, patient_user_id)
-    requester_id = await _authorize_patient_access(session, principal, patient)
+    requester_id, mode = await _authorize_patient_access(session, principal, patient)
 
     latest_vitals_result = await session.scalars(
         select(VitalReading)
@@ -124,7 +165,7 @@ async def get_patient_summary(
         ).all()
     )
 
-    await record_access(session, requester_id, patient.id, "patient_summary", reason)
+    await record_access(session, requester_id, patient.id, "patient_summary", reason, mode=mode)
     return PatientSummaryOut(
         patient=PatientOut.model_validate(patient),
         latest_vitals=[VitalOut.model_validate(vital) for vital in reversed(latest_vitals)],
@@ -161,13 +202,16 @@ async def list_vitals(
     reason: str = "vitals timeline access",
     enforce_access: bool = True,
 ) -> list[VitalReading]:
-    requester_id = _principal_uuid(principal)
     patient = await _load_patient(session, patient_user_id)
-    if enforce_access and requester_id != patient.user_id:
-        if principal.role != "admin" and not _is_clinician(principal):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
-        if principal.role != "admin" and not await _has_active_consent(session, patient.id, requester_id):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
+    if enforce_access:
+        # Centralised authorization — same admin-override tagging as the
+        # bundle/summary paths (audit finding #5).
+        requester_id, mode = await _authorize_patient_access(session, principal, patient)
+    else:
+        # Internal callers (e.g. get_patient_bundle) have already authorized
+        # and audited; we just need the requester id for downstream use.
+        requester_id = _principal_uuid(principal)
+        mode = "self"
 
     stmt = select(VitalReading).where(VitalReading.patient_id == patient.id).order_by(VitalReading.recorded_at.asc())
     if from_date is not None:
@@ -177,7 +221,7 @@ async def list_vitals(
     result = await session.scalars(stmt)
     vitals = list(result.all())
     if enforce_access:
-        await record_access(session, requester_id, patient.id, "vitals_read", reason)
+        await record_access(session, requester_id, patient.id, "vitals_read", reason, mode=mode)
     return vitals
 
 

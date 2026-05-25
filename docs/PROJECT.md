@@ -82,6 +82,20 @@ The agents call MedApp backend services as tools. They are not a separate produc
 - Insurance claims processing.
 - Clinical decision support.
 - Wearable hardware manufacturing.
+
+### 3.7 Partner templates — Pharmacy Management System (PMS)
+Most independent pharmacies in our target markets have no digital system. To
+onboard them as partners we ship a **standalone PMS template** they can
+deploy on their own:
+
+- `backend/services/pms_service` (FastAPI, port 8030) + `frontend/pms_web`
+  (Next.js, port 3002), one Postgres DB per pharmacy.
+- Full POS, inventory, batches, suppliers, purchase orders, prescriptions,
+  dispensing, customers, sales, reports, staff/auth.
+- Runs fully standalone. Optional MedApp integration via three contract
+  endpoints: inbound HMAC-signed prescription webhook, outbound dispense
+  confirmation, and a stock-availability lookup for routing.
+- Handover guide: [`docs/PMS_HANDOVER.md`](./PMS_HANDOVER.md).
 ---
 
 ## 4. Architecture

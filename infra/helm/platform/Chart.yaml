@@ -1,0 +1,15 @@
+apiVersion: v2
+name: medapp-platform
+description: |
+  One-time cluster install: External Secrets Operator + ClusterSecretStore
+  that the medapp chart leans on. Installed by an operator after the
+  cluster comes up, before the first medapp deploy with externalSecrets.enabled=true.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+dependencies:
+  - name: external-secrets
+    version: "0.10.4"
+    repository: https://charts.external-secrets.io
+    condition: external-secrets.enabled

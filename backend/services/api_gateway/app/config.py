@@ -5,10 +5,20 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_prefix="GW_", extra="ignore")
 
     service_name: str = "api-gateway"
-    jwt_secret: str = "change-me-change-me-change-me-change-me"
+    # Audit finding #2: no default secret. Set GW_JWT_SECRET in env.
+    # validate_jwt_secret() at startup refuses to boot in production with
+    # an empty or known-weak value.
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
+
+    # Audit finding #6: CORS allow-list. Comma-separated origins (or empty
+    # to disable CORS entirely). The old default was `["*"]` with
+    # `allow_credentials=True` — undefined behaviour per the browser spec
+    # AND wide-open to any origin. Set GW_CORS_ORIGINS explicitly per
+    # environment.
+    cors_origins: str = ""
 
     user_service_url: str = "http://user_service:8001"
     doctor_service_url: str = "http://doctor_service:8002"
