@@ -37,7 +37,7 @@
 | I-5 | High | GKE `deletion_protection = false` even in prod-shaped configs | `infra/terraform/modules/gke/main.tf:10` |
 | I-6 | High | Dev overlay uses mutable `latest` tag | `infra/k8s/overlays/dev/kustomization.yaml:9` |
 | I-7 | High | `backend-ci.yml` and `agents-ci.yml` lack a top-level `permissions:` block; workflows inherit broad defaults | `ci/.github/workflows/` |
-| I-8 | High | Third-party Actions pinned to tags, not SHAs (`subosito/flutter-action@v2`, etc.) | Same |
+| I-8 | High | Third-party Actions pinned to tags, not SHAs | Same |
 | I-9 | Medium | Staging overlay is near-identical to base — no real isolation | `infra/k8s/overlays/staging/kustomization.yaml` |
 | I-10 | Medium | Prod overlay only changes replica count — no resource bumps, no PDBs | `infra/k8s/overlays/prod/kustomization.yaml:6-11` |
 | I-11 | Medium | No ServiceAccount `RoleBinding`s defined for the ServiceAccounts referenced in deployments | `infra/k8s/base/*.yaml` |

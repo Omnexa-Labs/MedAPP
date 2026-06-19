@@ -105,20 +105,20 @@ revision: ## Create a new Alembic revision; use SERVICE=user_service MESSAGE="ad
 seed: ## Seed local databases with fixtures
 	bash scripts/seed.sh
 
-fmt: ## Format Python and Flutter code
+fmt: ## Format Python and mobile frontend code
 	ruff format backend agents
-	cd frontend/mobile && dart format lib test
+	cd frontend/mobile/MedAPP && npm run format
 
-lint: ## Lint Python and Flutter code
+lint: ## Lint Python and mobile frontend code
 	ruff check backend agents
-	cd frontend/mobile && flutter analyze
+	cd frontend/mobile/MedAPP && npm run lint
 
 test: ## Run the backend Python test suite
 	@python scripts/service_tests.py
 
 check: lint test ## Run lint and tests
 
-gen-clients: ## Regenerate Dart + TS clients from OpenAPI specs
+gen-clients: ## Regenerate TypeScript clients from OpenAPI specs
 	bash scripts/gen-clients.sh
 
 # ── PMS (Pharmacy Management System) template ─────────────────────────────────

@@ -2,7 +2,7 @@
 
 ```
                           ┌─────────────────────────┐
-                          │      Mobile (Flutter)   │
+                          │ Mobile (React Native)   │
                           └────────────┬────────────┘
                                        │ HTTPS
                                 ┌──────▼───────┐
@@ -51,7 +51,7 @@ Agents are FastAPI services that wrap Claude Opus 4.7 with the Anthropic SDK's b
 - **Auth**: JWT issued by `user_service`, verified at the gateway and re-verified per service.
 - **Storage**: Cloud SQL/Postgres for transactional state; GCS for binaries; MongoDB for narrative text and traces; Qdrant for retrieval; Redis for cache and short-lived state; RabbitMQ plus outbox for cross-service sync.
 - **Observability**: OpenTelemetry → OTLP collector → Jaeger + Prometheus. Structured JSON logs.
-- **Frontend**: Flutter (mobile) + Next.js (internal admin only).
+- **Frontend**: React Native / Expo (mobile) + Next.js (internal admin only).
 - **ML**: separate workspace, GPU node pool, MLflow registry. Inference is FastAPI services behind the gateway.
 
 See [storage architecture](storage.md) for the service ownership map and agent read-model guidance.

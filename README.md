@@ -8,7 +8,7 @@ Mobile-first global healthcare ecosystem — telemedicine, EHR-lite, AI assistan
 backend/          FastAPI microservices + shared libs
 agents/           Claude-powered FastAPI agents (concierge, recommend, chat, lab, vitals, booking)
 frontend/
-  mobile/         Flutter app (iOS/Android)
+  mobile/         React Native / Expo app (iOS/Android/web)
   admin_web/      Next.js admin console
 infra/
   terraform/      GCP infrastructure as code (GKE, Cloud SQL, GCS, …)
@@ -18,7 +18,7 @@ infra/
 ci/.github/       GitHub Actions workflows (reusable per workspace)
 packages/
   openapi/        Canonical OpenAPI specs per service
-  clients/        Generated Dart + TS clients (do not edit by hand)
+  clients/        Generated TS clients (do not edit by hand)
 docs/             ADRs, architecture diagrams, runbooks, API docs
 scripts/          Dev tooling, codegen, db scripts
 ```
@@ -26,12 +26,12 @@ scripts/          Dev tooling, codegen, db scripts
 ## Quick start (local dev)
 
 ```bash
-# 1. Install: Docker Desktop, Python 3.12, uv, Node 20, Flutter 3.22+, gcloud SDK
+# 1. Install: Docker Desktop, Python 3.12, uv, Node 20, npm/pnpm, gcloud SDK
 # 2. Boot the backend stack (Postgres, Redis, RabbitMQ, backend services)
 make dev
 
 # 3. Run mobile app
-cd frontend/mobile && flutter run
+cd frontend/mobile/MedAPP && npm install && npm run start
 ```
 
 See `docs/runbooks/local-dev.md` for the full setup walkthrough.

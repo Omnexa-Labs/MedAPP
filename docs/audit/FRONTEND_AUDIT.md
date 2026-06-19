@@ -7,7 +7,7 @@
 ## 1. Stack confirmation
 
 The commit `15d5501` ("…refactor mobile app to React Native") completed
-cleanly: there are no remaining Flutter assets in `frontend/mobile`.
+cleanly: there are no remaining legacy mobile assets in `frontend/mobile`.
 The mobile app is React Native 0.74 with Expo ~51 and TypeScript. The
 three web apps are all Next.js 14 with React 18, TanStack Query,
 Tailwind, Zustand, and React Hook Form + Zod.

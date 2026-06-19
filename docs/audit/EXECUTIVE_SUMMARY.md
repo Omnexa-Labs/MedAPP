@@ -498,7 +498,7 @@ for the decisions locked.
   project-wide `secretmanager.secretAccessor`, no `logging.viewer`.
 - **CI workflows relocated** from `ci/.github/workflows/` →
   `.github/workflows/`. GitHub Actions only reads from the repo root —
-  the existing workflows had never run. The dead `flutter-ci.yml` was
+  the existing workflows had never run. The dead mobile CI workflow was
   removed (mobile is React Native now); `backend-build.yml`'s Artifact
   Registry path corrected from `images/` to `medapp/` to match the
   bootstrap module. The hardcoded service matrix in `backend-ci` /

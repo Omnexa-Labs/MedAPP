@@ -4,8 +4,8 @@
 
 - Docker Desktop (with WSL2 on Windows)
 - Python 3.12 + `uv`
-- Node 20 + pnpm
-- Flutter 3.22+
+- Node 20 + npm/pnpm
+- Android Studio and Android SDK for mobile Android builds
 - gcloud SDK (for cloud work, optional locally)
 
 ## First run
@@ -30,9 +30,9 @@ Open:
 ## Mobile app
 
 ```bash
-cd frontend/mobile
-flutter pub get
-flutter run --dart-define=ENV=dev --dart-define=API_BASE_URL=http://10.0.2.2:8000
+cd frontend/mobile/MedAPP
+npm install
+EXPO_PUBLIC_APP_ENV=dev EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8000 npm run android
 ```
 
 `10.0.2.2` is the Android emulator's host-loopback. On iOS sim use `http://localhost:8000`.
@@ -41,4 +41,4 @@ flutter run --dart-define=ENV=dev --dart-define=API_BASE_URL=http://10.0.2.2:800
 
 - **Postgres won't accept connections** — `make down && docker volume rm medapp_pgdata && make dev`.
 - **Alembic "Target database is not up to date"** — run `make migrate` again; check for unmerged migration heads with `uv run alembic heads` inside the service directory.
-- **Flutter can't reach API** — confirm the right `API_BASE_URL` for your platform.
+- **Mobile app can't reach API** — confirm the right `EXPO_PUBLIC_API_BASE_URL` for your platform.
