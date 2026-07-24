@@ -32,7 +32,7 @@ class LogSmsNotifier:
 
 class LogEmailNotifier:
     async def send(self, *, email: str, subject: str, body: str) -> None:
-        log.info("email.sent", email=_mask_email(email), subject=subject)
+        log.info("email.sent", email=_mask_email(email), subject=subject, body=body)
 
 
 @dataclass

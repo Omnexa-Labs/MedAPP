@@ -9,7 +9,7 @@
 //   - hover:/group-hover: → dropped (no hover on touch)
 //   - active:scale-95 → Pressable `pressed` state
 
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
@@ -38,15 +38,23 @@ export function SplashScreen({ onGetStarted }: Props) {
         colors={["transparent", "rgba(0,104,95,0.05)"]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          ...(Platform.OS === "web" ? { pointerEvents: "none" } : {}),
+        }}
+        pointerEvents={Platform.OS === "web" ? undefined : "none"}
       />
 
       {/* Decorative top blob — Stitch uses `blur-3xl` over `bg-primary/10`. RN
           can't blur cheaply, so we use a low-opacity solid circle which reads
           the same at this scale. */}
       <View
-        pointerEvents="none"
+        pointerEvents={Platform.OS === "web" ? undefined : "none"}
+        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
         className="pointer-events-none absolute left-1/2 top-0 w-full max-w-container-max -translate-x-1/2 px-gutter pt-xl opacity-20"
       >
         <View className="mx-auto h-64 w-64 rounded-full bg-primary/10" />
@@ -63,11 +71,20 @@ export function SplashScreen({ onGetStarted }: Props) {
               className="mb-md rounded-[32px] border border-outline-variant/30 bg-white p-lg"
               style={{
                 // Stitch shadow → RN platform shadow.
-                shadowColor: "#475569",
-                shadowOpacity: 0.05,
-                shadowRadius: 20,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 3,
+                ...Platform.select({
+                  ios: {
+                    shadowColor: "#475569",
+                    shadowOpacity: 0.05,
+                    shadowRadius: 20,
+                    shadowOffset: { width: 0, height: 4 },
+                  },
+                  web: {
+                    boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)",
+                  },
+                  android: {
+                    elevation: 3,
+                  },
+                }),
               }}
             >
               <MaterialIcons name="health-and-safety" size={64} color="#00685f" />
@@ -98,11 +115,20 @@ export function SplashScreen({ onGetStarted }: Props) {
                   // bg-primary → bg-primary-container on press (hover→press substitution).
                   backgroundColor: pressed ? "#008378" : "#00685f",
                   // shadow-lg ≈ this drop shadow on iOS; elevation 6 on Android.
-                  shadowColor: "#00685f",
-                  shadowOpacity: 0.25,
-                  shadowRadius: 12,
-                  shadowOffset: { width: 0, height: 6 },
-                  elevation: 6,
+                  ...Platform.select({
+                    ios: {
+                      shadowColor: "#00685f",
+                      shadowOpacity: 0.25,
+                      shadowRadius: 12,
+                      shadowOffset: { width: 0, height: 6 },
+                    },
+                    web: {
+                      boxShadow: "0px 6px 12px rgba(0, 104, 95, 0.25)",
+                    },
+                    android: {
+                      elevation: 6,
+                    },
+                  }),
                 })}
               >
                 <Text className="font-label-md text-label-md text-on-primary">Get Started</Text>

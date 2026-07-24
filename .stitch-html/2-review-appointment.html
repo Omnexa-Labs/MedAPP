@@ -1,0 +1,317 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport">
+<title>Review Appointment - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Manrope:wght@100..900&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#eaefed",
+                        "clinical-info": "#0058be",
+                        "on-background": "#171d1c",
+                        "tertiary-container": "#2170e4",
+                        "outline": "#6d7a77",
+                        "on-tertiary-container": "#fefcff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-container-low": "#f0f5f2",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "surface-bright": "#f5faf8",
+                        "tertiary": "#0058be",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#dee4e1",
+                        "outline-variant": "#bcc9c6",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#edf2f0",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#3d4947",
+                        "on-secondary-container": "#57657a",
+                        "clinical-error": "#ba1a1a",
+                        "on-primary-container": "#f4fffc",
+                        "surface-bg": "#f5faf8",
+                        "on-tertiary-fixed": "#001a42",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-primary-fixed-variant": "#005049",
+                        "error": "#ba1a1a",
+                        "background": "#f5faf8",
+                        "on-primary-fixed": "#00201d",
+                        "clinical-success": "#00685f",
+                        "surface": "#f5faf8",
+                        "inverse-primary": "#6bd8cb",
+                        "secondary-fixed": "#d5e3fc",
+                        "primary-container": "#008378",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-surface": "#171d1c",
+                        "surface-tint": "#006a61",
+                        "inverse-surface": "#2c3130",
+                        "on-error-container": "#93000a",
+                        "primary": "#006a61",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "secondary-container": "#d5e3fc",
+                        "surface-container-highest": "#dee4e1",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#89f5e7",
+                        "secondary": "#515f74",
+                        "surface-container-high": "#e4e9e7"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "8px",
+                        "lg": "12px",
+                        "xl": "16px",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "base": "8px",
+                        "xl": "80px",
+                        "md": "24px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "lg": "48px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "headline-xl": ["Manrope"],
+                        "caption": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f5faf8; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-effect { backdrop-filter: blur(12px); background-color: rgba(245, 250, 248, 0.8); }
+        .safe-bottom { padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- Top App Bar (Shared Component Strategy) -->
+<header class="docked full-width top-0 sticky z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter h-16 max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<button class="hover:bg-surface-variant/50 transition-colors p-2 rounded-full Active: scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Review Appointment</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="hover:bg-surface-variant/50 transition-colors p-2 rounded-full Active: scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter py-md safe-bottom">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Specialist & Main Info -->
+<div class="lg:col-span-8 space-y-md">
+<!-- Specialist Card -->
+<section class="bg-surface-container-lowest rounded-xl p-md shadow-sm border border-outline-variant/30 transition-all hover:shadow-md">
+<div class="flex flex-col md:flex-row gap-md items-start md:items-center">
+<div class="relative">
+<img alt="Dr. Julian Sterling" class="w-24 h-24 md:w-32 md:h-32 rounded-lg object-cover border-2 border-primary/10" data-alt="A professional portrait of a senior male physician with kind eyes and graying hair, wearing a white lab coat and stethoscope around his neck. The setting is a clean, bright medical office with soft, daylight-balanced lighting that highlights the clinical vitality and professional trust of the healthcare brand. The aesthetic is modern corporate with a serene and reliable mood." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiCdPvTk5RydHAjrMHk72Eu7sJRi3EI57s2zitwSnJw6fR-Ha-75XWdA2MjoxR9CgW1wk4Y8yWmBM9J3gwdHmLwACfEvc95ECOnqZEK6DpOt3Oo7QykCYlrP8rJJWJufV5bAB3vX_s7TNJHzOGgSULtrFO6uXN_V3vctBselslwyizvCrqX9Nt3f-WdJe5uLMji_TUyIxJIg3P9U5o7jTAfkBlf9jQB3IC9HNo2nT-65KTN6CRo5NF1wubrcTf-0jyGZE5avuAlAfI">
+<div class="absolute -bottom-2 -right-2 bg-clinical-success text-white p-1 rounded-full border-2 border-white">
+<span class="material-symbols-outlined text-sm block" style="font-variation-settings: &quot;FILL&quot; 1;">verified</span>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex flex-wrap gap-2 mb-2">
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm text-label-sm uppercase tracking-wider">Cardiology Specialist</span>
+<span class="bg-clinical-info/10 text-clinical-info px-3 py-1 rounded-full font-label-sm text-label-sm uppercase tracking-wider">Top Rated</span>
+</div>
+<h2 class="font-headline-lg-mobile md:font-headline-md text-primary mb-1">Dr. Julian Sterling</h2>
+<p class="text-on-surface-variant font-body-md">Senior Cardiologist • Mayo Clinic</p>
+<div class="flex items-center gap-1 mt-3 text-clinical-success">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: &quot;FILL&quot; 1;">star</span>
+<span class="font-label-md text-label-md">4.9 (1,240 Reviews)</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Appointment Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Date & Time Section -->
+<section class="bg-surface-container-low rounded-xl p-md border border-outline-variant/20">
+<h3 class="font-label-md text-label-md text-outline uppercase tracking-widest mb-4">Time &amp; Schedule</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<div class="bg-primary-container/20 p-3 rounded-lg">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: &quot;FILL&quot; 1;">calendar_today</span>
+</div>
+<div>
+<p class="text-on-surface-variant text-label-sm">Date</p>
+<p class="font-label-md text-body-md text-on-surface">Tuesday, Oct 24, 2023</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-primary-container/20 p-3 rounded-lg">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: &quot;FILL&quot; 1;">schedule</span>
+</div>
+<div>
+<p class="text-on-surface-variant text-label-sm">Time</p>
+<p class="font-label-md text-body-md text-on-surface">10:30 AM (GMT -5)</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Consultation Type -->
+<section class="bg-surface-container-low rounded-xl p-md border border-outline-variant/20">
+<h3 class="font-label-md text-label-md text-outline uppercase tracking-widest mb-4">Service Details</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<div class="bg-tertiary-fixed p-3 rounded-lg">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: &quot;FILL&quot; 1;">medical_services</span>
+</div>
+<div>
+<p class="text-on-surface-variant text-label-sm">Type</p>
+<p class="font-label-md text-body-md text-on-surface">Standard Consultation</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="bg-tertiary-fixed p-3 rounded-lg">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: &quot;FILL&quot; 1;">history_edu</span>
+</div>
+<div>
+<p class="text-on-surface-variant text-label-sm">Duration</p>
+<p class="font-label-md text-body-md text-on-surface">45 Minutes</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Location & Map -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden shadow-sm">
+<div class="p-md">
+<h3 class="font-label-md text-label-md text-outline uppercase tracking-widest mb-2">Location</h3>
+<p class="font-headline-md text-on-surface mb-1">Mayo Clinic</p>
+<p class="text-on-surface-variant font-body-md">200 First St SW, Rochester, MN 55905, USA</p>
+</div>
+<div class="relative h-48 w-full group overflow-hidden">
+<img alt="Mayo Clinic Map" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" data-alt="A clean, minimalist satellite map view of a modern clinical hospital campus. The map utilizes a clinical color palette with soft teals and slate blues, indicating parking zones, green spaces, and modern architecture. The lighting is bright and even, suggesting a high-tech medical district with high navigational clarity." data-location="Rochester, MN" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCOTvYsWV2PFO0EtmEWCfHutvCkwuSh5d8aUo1P0HPth1GgB-5Wo3rQNnjqVyuY6lsIvYBM-t0uaYle-DYA6zc4o-b6RK1nTuOAhL_BwE4b0aeuUtAwI3znBb4wG5m9N-jiut88YG49JLwik87wzlxiJ1Ril6E6SL8KCfWig9-XBeDz0lpccIi1ksW5hMU7iPmwadTOpw7Bz2Xnvp2lUIrnrBT0FwLu0qRiLQOFFJuY6eScX-ADTfJILoi0_T8Ii5YNw7ODwaOakto">
+<div class="absolute inset-0 bg-black/5 flex items-center justify-center">
+<div class="bg-white p-3 rounded-full shadow-lg border-2 border-primary animate-bounce">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: &quot;FILL&quot; 1;">location_on</span>
+</div>
+</div>
+<div class="absolute bottom-4 right-4 glass-effect px-4 py-2 rounded-lg border border-white/20 shadow-sm flex items-center gap-2 pointer-events-none">
+<span class="material-symbols-outlined text-primary text-sm">directions</span>
+<span class="font-label-md text-on-surface">Get Directions</span>
+</div>
+</div>
+</section><section class="bg-surface-container-highest/30 rounded-xl p-md border border-primary/10 mt-md">
+    <button class="w-full py-4 bg-primary text-white rounded-lg font-headline-md shadow-md hover:shadow-lg hover:bg-primary-container transition-all Active: scale-95 duration-150 flex items-center justify-center gap-3">
+        Confirm Booking
+        <span class="material-symbols-outlined">arrow_forward</span>
+    </button>
+    <p class="text-center text-on-surface-variant text-label-sm mt-6 flex items-center justify-center gap-2">
+        <span class="material-symbols-outlined text-sm">lock</span>
+        Secure encrypted checkout
+    </p>
+</section>
+</div>
+<!-- Cost Summary Sidebar -->
+<aside class="lg:col-span-4">
+<div class="sticky top-24 space-y-md">
+
+<!-- Important Info Card -->
+<section class="bg-clinical-info/5 rounded-xl p-sm border border-clinical-info/10">
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-clinical-info">info</span>
+<p class="text-on-secondary-container text-label-sm leading-relaxed">
+                                Free cancellation until 24 hours before the appointment. After that, a $10 processing fee may apply.
+                            </p>
+</div>
+</section>
+</div>
+</aside>
+</div>
+</main>
+<!-- Bottom Navigation Bar (Shared Component Strategy) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface dark:bg-surface-container-lowest shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] rounded-t-xl px-4 py-2 pb-safe md:hidden">
+<div class="flex justify-around items-center w-full">
+<div class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all Active: scale-90 duration-200">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</div>
+<!-- Records maps closely to Overview/Assistant intent, but here we prioritize matching the prompt labels -->
+<div class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all Active: scale-90 duration-200">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all Active: scale-90 duration-200">
+<span class="material-symbols-outlined">inbox</span>
+<span class="font-label-sm text-label-sm">Inbox</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all Active: scale-90 duration-200">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all Active: scale-90 duration-200">
+<span class="material-symbols-outlined">health_and_safety</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</div>
+</div>
+</nav>
+<!-- Desktop Navigation (Integrated into layout as per instructions) -->
+<div class="hidden md:flex fixed left-0 top-16 bottom-0 w-20 bg-surface-container-low border-r border-outline-variant/10 flex-col items-center py-gutter gap-lg z-40">
+<div class="p-3 bg-primary-container text-on-primary-container rounded-full shadow-sm">
+<span class="material-symbols-outlined" style="font-variation-settings: &quot;FILL&quot; 1;">calendar_month</span>
+</div>
+<div class="flex flex-col gap-6 text-on-surface-variant">
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors">home</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors">analytics</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors">chat_bubble</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors">diversity_3</span>
+<span class="material-symbols-outlined hover:text-primary cursor-pointer transition-colors">fitness_center</span>
+</div>
+</div>
+<script>
+        // Simple micro-interaction for the confirm button
+        const confirmBtn = document.querySelector('button.bg-primary');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', function() {
+                const originalContent = this.innerHTML;
+                this.innerHTML = `<span class="material-symbols-outlined animate-spin">sync</span> Processing...`;
+                this.disabled = true;
+                this.classList.add('opacity-80');
+                
+                setTimeout(() => {
+                    this.innerHTML = `<span class="material-symbols-outlined">check_circle</span> Booking Confirmed!`;
+                    this.classList.replace('bg-primary', 'bg-clinical-success');
+                }, 1500);
+            });
+        }
+    </script>
+
+
+</body></html>

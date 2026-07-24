@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -63,6 +63,7 @@ async def create_doctor_profile(
 async def list_doctor_profiles(
     db: AsyncSession,
     *,
+    q: str | None = None,
     specialty: str | None = None,
     only_listable: bool = True,
 ) -> list[DoctorProfile]:
@@ -71,6 +72,22 @@ async def list_doctor_profiles(
         stmt = stmt.where(DoctorProfile.is_listable.is_(True))
     if specialty:
         stmt = stmt.where(DoctorProfile.specialty.ilike(f"%{specialty}%"))
+    # Free-text search added in the Find-Care wiring work (audit ref:
+    # plan merry-seeking-gem). Case-insensitive substring across the
+    # most-searched fields. ILIKE is the same primitive list_drugs
+    # uses in hms_service — no tsvector index yet; revisit if list
+    # sizes pass ~5k.
+    if q:
+        needle = f"%{q.strip()}%"
+        if needle != "%%":
+            stmt = stmt.where(
+                or_(
+                    DoctorProfile.first_name.ilike(needle),
+                    DoctorProfile.last_name.ilike(needle),
+                    DoctorProfile.specialty.ilike(needle),
+                    DoctorProfile.bio.ilike(needle),
+                )
+            )
     stmt = stmt.order_by(DoctorProfile.last_name.asc(), DoctorProfile.first_name.asc())
     result = await db.scalars(stmt)
     return list(result.all())

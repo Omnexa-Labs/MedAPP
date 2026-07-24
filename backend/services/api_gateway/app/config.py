@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # AND wide-open to any origin. Set GW_CORS_ORIGINS explicitly per
     # environment.
     cors_origins: str = ""
+    # Optional regex applied to the Origin header. Useful in development to
+    # allow any localhost port without listing each one. Example:
+    #   GW_CORS_ORIGIN_REGEX=http://localhost:\d+
+    # Never set this in production — use cors_origins with an explicit list.
+    cors_origin_regex: str = ""
 
     user_service_url: str = "http://user_service:8001"
     doctor_service_url: str = "http://doctor_service:8002"
@@ -34,6 +39,8 @@ class Settings(BaseSettings):
     social_service_url: str = "http://social_service:8011"
     analytics_service_url: str = "http://analytics_service:8012"
     onboarding_service_url: str = "http://onboarding_service:8013"
+    pharmacy_service_url: str = "http://pharmacy_service:8015"
+    pharmacist_service_url: str = "http://pharmacist_service:8016"
 
     # Agents
     concierge_agent_url: str = "http://concierge_agent:9001"
@@ -67,6 +74,8 @@ ROUTES: dict[str, str] = {
     "/v1/social": settings.social_service_url,
     "/v1/admin": settings.analytics_service_url,
     "/v1/onboarding": settings.onboarding_service_url,
+    "/v1/pharmacies": settings.pharmacy_service_url,
+    "/v1/pharmacists": settings.pharmacist_service_url,
     "/agents/concierge": settings.concierge_agent_url,
     "/agents/recommend": settings.smart_recommend_agent_url,
     "/agents/chat": settings.medical_chat_agent_url,

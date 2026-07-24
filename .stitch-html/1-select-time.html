@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Book Appointment - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed": "#89f5e7",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-primary-fixed": "#00201d",
+                        "surface-container": "#eaefed",
+                        "outline-variant": "#bcc9c6",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-error": "#ffffff",
+                        "on-secondary-container": "#57657a",
+                        "surface-container-highest": "#dee4e1",
+                        "inverse-on-surface": "#edf2f0",
+                        "on-primary-container": "#f4fffc",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-background": "#171d1c",
+                        "surface-tint": "#006a61",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "surface-variant": "#dee4e1",
+                        "background": "#f5faf8",
+                        "on-tertiary-container": "#fefcff",
+                        "surface": "#f5faf8",
+                        "inverse-primary": "#6bd8cb",
+                        "surface-bright": "#f5faf8",
+                        "on-surface-variant": "#3d4947",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "tertiary": "#0058be",
+                        "secondary-fixed": "#d5e3fc",
+                        "primary-container": "#008378",
+                        "primary": "#00685f",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#d6dbd9",
+                        "secondary": "#515f74",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "secondary-container": "#d5e3fc",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "surface-container-high": "#e4e9e7",
+                        "outline": "#6d7a77",
+                        "surface-container-low": "#f0f5f2",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-surface": "#171d1c",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "error-container": "#ffdad6",
+                        "inverse-surface": "#2c3130",
+                        "tertiary-container": "#2170e4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "lg": "48px",
+                        "container-max": "1280px",
+                        "sm": "12px",
+                        "md": "24px",
+                        "gutter": "24px",
+                        "xs": "4px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #f5faf8; color: #171d1c; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-body-md antialiased">
+<!-- Top Navigation -->
+<header class="bg-surface/80 backdrop-blur-md sticky top-0 z-40 border-b border-outline-variant/30 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<button class="cursor-pointer active:scale-95 duration-200 text-on-surface-variant p-xs">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">MedApp</h1>
+</div>
+<div class="cursor-pointer active:scale-95 duration-200">
+<img alt="Profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A clean, professional portrait of a modern user with soft natural lighting. The image maintains a high-key medical aesthetic with a neutral, bright background that complements a premium healthcare UI. The subject is calm and approachable, fitting the modern humanist design language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDMSBkhqGrvc8C1JrlKyqgnYmqSa2gepW2UOHo6CAxJkVHLcxBK1wDjDNxw_AH7iZGJAf5wCsLhREDddUnIAMIpDLLGyCZewtsj4PjRxgd1tQ-52UbY9rxJtDY4Za25IE9bSn_R5kthRlpfb-ui-psa7vfupGNp_W3Scx7tkhWsBUT27nkY5LsdwwnB8JROivIHQO6TI184sOcLVh7XyyagrEJVtu9_LtZHcNSuUw3bdr0b1qLuG2geAHz156xdoScVg5ZkC5mQw6FU"/>
+</div>
+</div>
+</header>
+<main class="max-w-[480px] mx-auto pb-32">
+<!-- Doctor Info Card -->
+<section class="px-gutter pt-md pb-base">
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/10 flex items-center gap-md">
+<div class="relative">
+<img alt="Dr. Sarah Jenkins" class="w-20 h-20 rounded-xl object-cover" data-alt="A professional medical headshot of a female doctor wearing a white coat and a stethoscope. She is smiling warmly in a bright, modern clinic environment with soft teal accents and clean white walls. The lighting is bright and professional, evoking trust and emotional accessibility in a clinical yet human setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDl7Ao6Zlxrvg6hZCBJTCl40sfWi4jza2v_8V2IvenJxJRKcNiS5oSwi_3sak71g9LTAwWORqC63YbXcdPYebOLPq7sqLDZ3gK1ge88lmh8urol79cqtLcvqFW2FQgsaVKt3XZVUdomuZCytDil2ZqoQVZ1cY5BIkgZlao0j2WEiUZ42sDIx2QIJ6DWDYMaJG6IN22BOtX0PgVgM2tMFIe3uJHq2nh9Maeqz2xK3p5gtus1s64KG66RTL6zJ_k4rxovmczrWcxNaiqo"/>
+<div class="absolute -bottom-1 -right-1 bg-primary text-on-primary p-1 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-on-surface">Dr. Sarah Jenkins</h2>
+<p class="font-body-md text-on-surface-variant">Senior Cardiologist</p>
+</div>
+</div>
+<div class="flex items-center mt-xs gap-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px] text-tertiary" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-on-surface font-bold">4.9</span>
+<span class="font-label-sm text-outline">(1.2k reviews)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Horizontal Calendar View -->
+<section class="mt-md">
+<div class="px-gutter flex justify-between items-center mb-sm">
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface">Select Date</h3>
+<button class="text-primary font-label-md">See Calendar</button>
+</div>
+<div class="flex gap-sm overflow-x-auto px-gutter py-xs hide-scrollbar">
+<!-- Inactive Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-surface-container-low rounded-xl border border-outline-variant/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm text-on-surface-variant">Mon</span>
+<span class="font-headline-md text-headline-md text-on-surface">12</span>
+</div>
+<!-- Active Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-primary text-on-primary rounded-xl shadow-lg shadow-primary/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm opacity-90">Tue</span>
+<span class="font-headline-md text-headline-md">13</span>
+</div>
+<!-- Inactive Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-surface-container-low rounded-xl border border-outline-variant/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm text-on-surface-variant">Wed</span>
+<span class="font-headline-md text-headline-md text-on-surface">14</span>
+</div>
+<!-- Inactive Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-surface-container-low rounded-xl border border-outline-variant/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm text-on-surface-variant">Thu</span>
+<span class="font-headline-md text-headline-md text-on-surface">15</span>
+</div>
+<!-- Inactive Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-surface-container-low rounded-xl border border-outline-variant/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm text-on-surface-variant">Fri</span>
+<span class="font-headline-md text-headline-md text-on-surface">16</span>
+</div>
+<!-- Inactive Date -->
+<div class="flex flex-col items-center justify-center min-w-[64px] h-20 bg-surface-container-low rounded-xl border border-outline-variant/20 cursor-pointer active:scale-95 transition-transform">
+<span class="font-label-sm text-on-surface-variant">Sat</span>
+<span class="font-headline-md text-headline-md text-on-surface">17</span>
+</div>
+</div>
+</section>
+<!-- Time Slots -->
+<section class="mt-lg px-gutter">
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface mb-md">Available Slots</h3>
+<!-- Morning Category -->
+<div class="mb-lg">
+<div class="flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">wb_sunny</span>
+<span class="font-label-md text-secondary uppercase tracking-wider">Morning</span>
+</div>
+<div class="grid grid-cols-3 gap-sm">
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">09:00 AM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">09:30 AM</button>
+<button class="py-sm rounded-lg bg-primary-container text-on-primary-container border border-primary font-label-md active:scale-95 transition-all">10:00 AM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">10:45 AM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">11:30 AM</button>
+</div>
+</div>
+<!-- Afternoon Category -->
+<div class="mb-lg">
+<div class="flex items-center gap-xs mb-sm">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">light_mode</span>
+<span class="font-label-md text-secondary uppercase tracking-wider">Afternoon</span>
+</div>
+<div class="grid grid-cols-3 gap-sm">
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">01:30 PM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">02:00 PM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">02:30 PM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">03:15 PM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">04:00 PM</button>
+<button class="py-sm rounded-lg bg-surface-container-lowest border border-outline-variant/30 font-label-md text-on-surface hover:border-primary active:scale-95 transition-all">05:00 PM</button>
+</div>
+</div>
+</section><!-- Consultation Type Section -->
+<section class="mt-md mb-lg">
+<div class="px-gutter mb-sm">
+<h3 class="font-headline-md text-headline-md font-bold text-on-surface">Consultation Type</h3>
+</div>
+<div class="flex gap-sm overflow-x-auto px-gutter py-xs hide-scrollbar">
+<!-- Selected Chip -->
+<button class="flex-none px-md py-sm rounded-full bg-primary text-on-primary font-label-md active:scale-95 transition-all">
+      Standard Consultation
+    </button>
+<!-- Unselected Chips -->
+<button class="flex-none px-md py-sm rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/30 font-label-md active:scale-95 transition-all">
+      Follow-up Visit
+    </button>
+<button class="flex-none px-md py-sm rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/30 font-label-md active:scale-95 transition-all">
+      Specialist Review
+    </button>
+<button class="flex-none px-md py-sm rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/30 font-label-md active:scale-95 transition-all">
+      Diagnostic Report
+    </button>
+</div>
+</section>
+<!-- Reason for Visit -->
+<section class="px-gutter mb-lg">
+<label class="font-label-md text-on-surface mb-sm block">Reason for Visit</label>
+<div class="relative">
+<textarea class="w-full bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-md focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none resize-none font-body-md text-on-surface" placeholder="Describe your symptoms or reason for the appointment..." rows="3"></textarea>
+</div>
+</section>
+</main>
+<!-- Bottom Action Bar (Fixed) -->
+<div class="fixed bottom-0 left-0 w-full bg-surface/80 backdrop-blur-xl border-t border-outline-variant/20 px-gutter pt-md pb-md z-50">
+<div class="max-w-[480px] mx-auto flex items-center justify-center">
+<button class="flex-1 bg-primary text-on-primary py-md px-lg rounded-full font-label-md shadow-lg shadow-primary/25 hover:bg-primary-container transition-colors active:scale-95 duration-150 flex justify-center items-center gap-sm">
+                Book Now
+                <span class="material-symbols-outlined text-[20px]">calendar_add_on</span>
+</button>
+</div>
+</div>
+<!-- Bottom Navigation Shell (Contextually suppressed for transactional screen, but following schema logic if it were top-level) -->
+<!-- Nav suppressed as per "The Destination Rule" for task-focused booking journey -->
+</body></html>

@@ -23,13 +23,12 @@ variable "services" {
 
 variable "baseline_roles" {
   type        = list(string)
-  description = "Roles granted to every service GSA. Defaults cover logging, tracing, profiling, Cloud SQL client, and secret-accessor."
+  description = "Roles granted to every service GSA. Defaults cover logging, tracing, profiling, and Cloud SQL client. Secret access is granted per secret by the secret_manager module."
   default = [
     "roles/logging.logWriter",
     "roles/cloudtrace.agent",
     "roles/cloudprofiler.agent",
     "roles/cloudsql.client",
-    "roles/secretmanager.secretAccessor",
   ]
 }
 

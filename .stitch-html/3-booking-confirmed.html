@@ -1,0 +1,233 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    body {
+      background-color: #f5faf8; /* background from theme */
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "primary-fixed": "#89f5e7",
+                  "on-tertiary-fixed": "#001a42",
+                  "on-primary-fixed": "#00201d",
+                  "surface-container": "#eaefed",
+                  "outline-variant": "#bcc9c6",
+                  "secondary-fixed-dim": "#b9c7df",
+                  "on-error": "#ffffff",
+                  "on-secondary-container": "#57657a",
+                  "surface-container-highest": "#dee4e1",
+                  "inverse-on-surface": "#edf2f0",
+                  "on-primary-container": "#f4fffc",
+                  "on-primary-fixed-variant": "#005049",
+                  "on-background": "#171d1c",
+                  "surface-tint": "#006a61",
+                  "error": "#ba1a1a",
+                  "on-secondary": "#ffffff",
+                  "on-primary": "#ffffff",
+                  "primary-fixed-dim": "#6bd8cb",
+                  "surface-variant": "#dee4e1",
+                  "background": "#f5faf8",
+                  "on-tertiary-container": "#fefcff",
+                  "surface": "#f5faf8",
+                  "inverse-primary": "#6bd8cb",
+                  "surface-bright": "#f5faf8",
+                  "on-surface-variant": "#3d4947",
+                  "tertiary-fixed": "#d8e2ff",
+                  "on-error-container": "#93000a",
+                  "tertiary": "#0058be",
+                  "secondary-fixed": "#d5e3fc",
+                  "primary-container": "#008378",
+                  "primary": "#00685f",
+                  "on-tertiary": "#ffffff",
+                  "surface-dim": "#d6dbd9",
+                  "secondary": "#515f74",
+                  "on-secondary-fixed-variant": "#3a485b",
+                  "secondary-container": "#d5e3fc",
+                  "tertiary-fixed-dim": "#adc6ff",
+                  "surface-container-high": "#e4e9e7",
+                  "outline": "#6d7a77",
+                  "surface-container-low": "#f0f5f2",
+                  "on-tertiary-fixed-variant": "#004395",
+                  "on-surface": "#171d1c",
+                  "surface-container-lowest": "#ffffff",
+                  "on-secondary-fixed": "#0d1c2e",
+                  "error-container": "#ffdad6",
+                  "inverse-surface": "#2c3130",
+                  "tertiary-container": "#2170e4"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "xl": "80px",
+                  "lg": "48px",
+                  "container-max": "1280px",
+                  "sm": "12px",
+                  "md": "24px",
+                  "gutter": "24px",
+                  "xs": "4px",
+                  "base": "8px"
+          },
+          "fontFamily": {
+                  "headline-xl": ["Manrope"],
+                  "headline-lg-mobile": ["Manrope"],
+                  "label-sm": ["Inter"],
+                  "headline-lg": ["Manrope"],
+                  "body-lg": ["Inter"],
+                  "headline-md": ["Manrope"],
+                  "label-md": ["Inter"],
+                  "body-md": ["Inter"]
+          },
+          "fontSize": {
+                  "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                  "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                  "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                  "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                  "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                  "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                  "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                  "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md text-body-md overflow-x-hidden">
+<!-- Top AppBar (From Shared Components JSON) -->
+<header class="bg-surface/80 backdrop-blur-md sticky top-0 z-40 border-b border-outline-variant/30 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary cursor-pointer active:scale-95 duration-200" data-icon="close">close</span>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Booking Confirmed</h1>
+</div>
+<div class="flex items-center gap-md">
+<span class="material-symbols-outlined text-primary cursor-pointer active:scale-95 duration-200" data-icon="share">share</span>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center px-gutter pt-lg pb-xl w-full max-w-md mx-auto pb-[100px]">
+<!-- Success Hero Section -->
+<section class="flex flex-col items-center text-center mb-lg">
+<div class="w-24 h-24 rounded-full bg-primary-container flex items-center justify-center mb-md shadow-[0px_10px_30px_rgba(0,106,97,0.15)]">
+<span class="material-symbols-outlined text-on-primary-container text-[48px]" style="font-variation-settings: &quot;FILL&quot; 1;">check_circle</span>
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-xs">Appointment Confirmed!</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[280px]">Your video consultation has been successfully scheduled.</p>
+</section>
+<!-- Appointment Detail Card -->
+<div class="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] mb-lg relative overflow-hidden">
+<!-- Decorative Gradient Corner -->
+<div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary-fixed/30 to-transparent pointer-events-none"></div>
+<div class="flex items-center gap-md mb-md">
+<img alt="Doctor Profile" class="w-16 h-16 rounded-full object-cover border-2 border-primary-container" data-alt="A professional headshot of a friendly male doctor wearing a clean white coat and a stethoscope. He has a warm, reassuring smile against a soft-focus medical office background. The lighting is bright and airy, consistent with a premium healthcare app brand and a light-mode aesthetic using soft teals and whites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBY0HJu9pclri3oxwL_s4FE5tEf3lzQMD37ejrTkRzvXtQ8mhAvPdb5tj8oZ8SGGGSW1N_zMsEz3ztpdqOjnz2trJqlzRRZkkNKEbSa2zRV3Yt0xpr9RZBXFLEbQIEH5wDzJ2y1v1p5OHWC7m1un8ls5PG3Gjci_lP1om6nj9dIptXOuKeRYJEye9_XFqz2OvPiAubVT-boQ1wKZK4owZBQ2yPBIU6RKDuCryTkV9e_V0sbN-aciOCLw5_l-Fz01jY1KdlcQ6KHCVIM">
+<div>
+<h3 class="font-headline-md text-[18px] text-on-surface">Dr. Sarah Jenkins</h3>
+<p class="font-label-md text-label-md text-primary">Senior Cardiologist</p>
+</div>
+</div>
+<hr class="border-outline-variant/20 mb-md">
+<div class="space-y-md">
+<!-- Date & Time -->
+<div class="flex items-start gap-md">
+<div class="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-secondary" data-icon="calendar_today">calendar_today</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-xs">Date &amp; Time</p>
+<p class="font-body-md text-body-md font-semibold text-on-surface">Tuesday, Oct 24, 2023</p>
+<p class="font-body-md text-body-md text-on-surface-variant">10:30 AM — 11:00 AM (EST)</p>
+</div>
+</div>
+<!-- Consultation Type -->
+<div class="flex items-start gap-md">
+<div class="w-10 h-10 rounded-lg bg-tertiary-fixed flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-tertiary" data-icon="video_chat">video_chat</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-xs">Consultation Type</p>
+<div class="flex items-center gap-xs">
+<p class="font-body-md text-body-md font-semibold text-on-surface">Video Call</p>
+<span class="px-2 py-0.5 rounded-full bg-primary-fixed text-[10px] font-bold text-on-primary-fixed-variant uppercase">Remote</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Preparation Card (Bento Style) -->
+<div class="w-full bg-surface-container-low rounded-xl p-md border border-outline-variant/20 mb-xl">
+<h4 class="font-label-md text-label-md text-on-surface mb-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]" data-icon="lightbulb">lightbulb</span>
+        Before your appointment
+      </h4>
+<ul class="space-y-sm">
+<li class="flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="check">check</span>
+<span class="font-label-md text-label-md">Test your microphone and camera</span>
+</li>
+<li class="flex items-center gap-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="check">check</span>
+<span class="font-label-md text-label-md">Join the link 5 minutes before start</span>
+</li>
+</ul>
+</div>
+<!-- Action Buttons -->
+<div class="w-full space-y-md">
+<button class="w-full h-14 bg-primary text-on-primary rounded-xl font-headline-md text-[18px] flex items-center justify-center gap-sm shadow-md active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined" data-icon="event_available">event_available</span>
+        Add to Calendar
+      </button>
+<button class="w-full h-14 bg-surface border-2 border-primary text-primary rounded-xl font-headline-md text-[18px] flex items-center justify-center gap-sm active:scale-95 transition-transform duration-200">
+<span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
+        View My Appointments
+      </button>
+</div>
+</main><nav class="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-md border-t border-outline-variant/30 px-gutter py-sm z-40">
+  <div class="flex justify-between items-center max-w-container-max mx-auto">
+    <a href="#" class="flex flex-col items-center gap-xs text-on-surface-variant">
+      <span class="material-symbols-outlined" data-icon="home">home</span>
+      <span class="font-['Manrope'] text-[10px] font-semibold">Home</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-xs text-on-surface-variant">
+      <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+      <span class="font-['Manrope'] text-[10px] font-semibold">Overview</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-xs text-on-surface-variant">
+      <span class="material-symbols-outlined" data-icon="chat_bubble">chat_bubble</span>
+      <span class="font-['Manrope'] text-[10px] font-semibold">Inbox</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-xs text-on-surface-variant">
+      <span class="material-symbols-outlined" data-icon="groups">groups</span>
+      <span class="font-['Manrope'] text-[10px] font-semibold">Community</span>
+    </a>
+    <a href="#" class="flex flex-col items-center gap-xs text-on-surface-variant">
+      <span class="material-symbols-outlined" data-icon="eco">eco</span>
+      <span class="font-['Manrope'] text-[10px] font-semibold">Lifestyle</span>
+    </a>
+  </div>
+</nav>
+<!-- Bottom Nav (Suppressed for focused Transactional screen as per "Relevance Check" rule) -->
+<!-- Note: The shell is suppressed because this is a "Success/Confirmation" splash screen journey -->
+
+
+</body></html>

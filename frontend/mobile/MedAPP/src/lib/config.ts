@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 // Typed reader over the `extra` block in app.config.ts.
 //
@@ -16,7 +17,7 @@ export interface AppConfig {
 function readExtra(): AppConfig {
   const extra = (Constants.expoConfig?.extra ?? {}) as Partial<AppConfig>;
   const appEnv = extra.appEnv;
-  const apiBaseUrl = extra.apiBaseUrl;
+  let apiBaseUrl = extra.apiBaseUrl;
   const partnerOnboardingUrl = extra.partnerOnboardingUrl;
 
   if (!appEnv || !apiBaseUrl || !partnerOnboardingUrl) {
@@ -27,6 +28,13 @@ function readExtra(): AppConfig {
         partnerOnboardingUrl,
       })}`,
     );
+  }
+
+  // app.config.ts defaults non-macOS dev builds to http://10.0.2.2:8000 (the
+  // Android emulator's loopback to the host). Browsers cannot reach that
+  // address — replace it with localhost when running as a web app.
+  if (Platform.OS === "web" && apiBaseUrl.includes("10.0.2.2")) {
+    apiBaseUrl = apiBaseUrl.replace("10.0.2.2", "localhost");
   }
 
   return { appEnv, apiBaseUrl, partnerOnboardingUrl };

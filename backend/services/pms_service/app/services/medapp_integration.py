@@ -32,6 +32,29 @@ def verify_signature(body: bytes, signature_header: str | None) -> bool:
     return hmac.compare_digest(expected, provided)
 
 
+def verify_partner_signature(
+    method: str, path_with_query: str, body: bytes, signature_header: str | None
+) -> bool:
+    """HMAC-SHA256 over the canonical (METHOD\\npath?query\\nbody) triple.
+
+    Used to authenticate MedApp pharmacy_service → pms_service calls
+    (e.g. stock-availability) without relying on staff JWTs. The
+    canonical form MUST stay byte-for-byte identical to the signing
+    code in pharmacy_service.app.services.stock_service._sign_request
+    — they're a contract.
+
+    Header format: raw hex digest (no `sha256=` prefix), in
+    `X-MedApp-Signature`. Constant-time comparison.
+    """
+    if not signature_header:
+        return False
+    secret = settings.medapp_webhook_secret.encode("utf-8")
+    msg = f"{method.upper()}\n{path_with_query}\n".encode("utf-8") + body
+    expected = hmac.new(secret, msg, hashlib.sha256).hexdigest()
+    provided = signature_header.strip()
+    return hmac.compare_digest(expected, provided)
+
+
 async def _resolve_drug(name: str, hint: UUID | None, db: AsyncSession) -> Drug | None:
     if hint is not None:
         drug = (

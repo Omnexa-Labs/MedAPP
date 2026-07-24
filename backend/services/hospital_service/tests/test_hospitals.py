@@ -76,3 +76,24 @@ async def test_reviews_endpoint_returns_public_reviews(admin_client, patient_cli
     items = reviews_resp.json()
     assert len(items) == 1
     assert items[0]["title"] == "Excellent care"
+
+
+@pytest.mark.asyncio
+async def test_hospital_directory_search_by_q(admin_client, patient_client, hospital_sample):
+    create_resp = await admin_client.post("/v1/hospitals", json=hospital_sample)
+    assert create_resp.status_code == 201
+
+    # Match by name fragment.
+    by_name = await patient_client.get("/v1/hospitals", params={"q": "nile"})
+    assert by_name.status_code == 200
+    assert len(by_name.json()["items"]) == 1
+
+    # Match by description fragment.
+    by_desc = await patient_client.get("/v1/hospitals", params={"q": "multispecialty"})
+    assert by_desc.status_code == 200
+    assert len(by_desc.json()["items"]) == 1
+
+    # No match.
+    none = await patient_client.get("/v1/hospitals", params={"q": "zzz-no-match"})
+    assert none.status_code == 200
+    assert none.json()["items"] == []

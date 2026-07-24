@@ -52,11 +52,14 @@ async def create(
 
 @router.get("", response_model=DoctorList)
 async def index(
+    q: str | None = None,
     specialty: str | None = None,
     only_listable: bool = True,
     db: AsyncSession = DbSession,
 ) -> DoctorList:
-    profiles = await list_doctor_profiles(db, specialty=specialty, only_listable=only_listable)
+    profiles = await list_doctor_profiles(
+        db, q=q, specialty=specialty, only_listable=only_listable,
+    )
     return DoctorList(items=[DoctorProfileOut.model_validate(profile) for profile in profiles])
 
 

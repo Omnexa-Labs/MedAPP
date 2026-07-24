@@ -65,3 +65,26 @@ async def test_service_area_requires_radius_fields(nurse_client, nurse_payload):
         json={"service_area_type": "radius", "center_latitude": 0.1, "radius_km": 10},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_nurse_directory_search_by_q(nurse_client, admin_client, nurse_payload):
+    # Seed one nurse via the nurse principal, then list as admin.
+    create_resp = await nurse_client.post("/v1/nurses", json=nurse_payload)
+    assert create_resp.status_code == 201
+
+    # Match by specialty: "community care" -> "community" hit.
+    by_specialty = await admin_client.get("/v1/nurses", params={"q": "community"})
+    assert by_specialty.status_code == 200
+    assert len(by_specialty.json()["items"]) == 1
+
+    # Match by last name.
+    by_name = await admin_client.get("/v1/nurses", params={"q": "atieno"})
+    assert by_name.status_code == 200
+    assert len(by_name.json()["items"]) == 1
+    assert by_name.json()["items"][0]["last_name"] == "Atieno"
+
+    # No match.
+    none = await admin_client.get("/v1/nurses", params={"q": "zzz-no-match"})
+    assert none.status_code == 200
+    assert none.json()["items"] == []

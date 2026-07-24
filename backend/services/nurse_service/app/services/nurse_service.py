@@ -4,7 +4,7 @@ from math import asin, cos, radians, sin, sqrt
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -76,6 +76,7 @@ async def create_nurse_profile(db: AsyncSession, principal: Principal, payload: 
 async def list_nurse_profiles(
     db: AsyncSession,
     *,
+    q: str | None = None,
     specialty: str | None = None,
     only_listable: bool = True,
     within_km: float | None = None,
@@ -87,6 +88,19 @@ async def list_nurse_profiles(
         stmt = stmt.where(NurseProfile.is_listable.is_(True))
     if specialty:
         stmt = stmt.where(NurseProfile.specialty.ilike(f"%{specialty}%"))
+    # Free-text search across name + specialty + bio. Same contract as
+    # /v1/doctors. See doctor_service.profile_service for the rationale.
+    if q:
+        needle = f"%{q.strip()}%"
+        if needle != "%%":
+            stmt = stmt.where(
+                or_(
+                    NurseProfile.first_name.ilike(needle),
+                    NurseProfile.last_name.ilike(needle),
+                    NurseProfile.specialty.ilike(needle),
+                    NurseProfile.bio.ilike(needle),
+                )
+            )
     stmt = stmt.order_by(NurseProfile.last_name.asc(), NurseProfile.first_name.asc())
     result = await db.scalars(stmt)
     nurses = list(result.all())
