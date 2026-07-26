@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..deps import DbSession, require_roles
+from ..deps import DbSession, get_principal, require_roles
 from ..models.core import Drug, DrugBatch
 from ..schemas.integrations import (
     MedAppPrescriptionWebhook,
@@ -14,6 +14,46 @@ from ..schemas.integrations import (
     StockAvailabilityRow,
 )
 from ..services import inventory_service, medapp_integration
+
+
+_PARTNER_STOCK_ROLES = {"pharmacy_admin", "pharmacist", "cashier"}
+
+
+async def _require_partner_or_staff(
+    request: Request,
+    x_medapp_signature: str | None = Header(default=None),
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Accept EITHER a valid MedApp partner-token signature OR a
+    pharmacy-staff JWT in one of the stock-read roles.
+
+    Partner signature is preferred — it's the path the MedApp directory
+    uses. The staff path keeps the legacy in-app stock-check page (PMS
+    UI) working. If both headers are present, we try the signature
+    first; falling through to JWT means a stale signature won't break
+    a staff session that's also authenticated.
+    """
+    if x_medapp_signature:
+        # Canonical form must include the query string. Starlette's
+        # `request.url.path` excludes it; build the path+query manually.
+        raw_query = request.url.query or ""
+        path_with_query = request.url.path + (f"?{raw_query}" if raw_query else "")
+        body = await request.body()
+        if medapp_integration.verify_partner_signature(
+            request.method, path_with_query, body, x_medapp_signature
+        ):
+            return
+    if authorization:
+        # Fall through to the existing JWT path — re-uses the same role
+        # constraints the route had before partner tokens were added.
+        principal = await get_principal(authorization=authorization)
+        if principal.role in _PARTNER_STOCK_ROLES:
+            return
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"requires one of {sorted(_PARTNER_STOCK_ROLES)}, got '{principal.role}'",
+        )
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing partner signature or bearer token")
 
 router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
 
@@ -46,12 +86,14 @@ async def medapp_prescription_webhook(
 async def stock_availability(
     drug_name: str | None = Query(default=None),
     db: AsyncSession = DbSession,
-    _=Depends(require_roles("pharmacy_admin", "pharmacist", "cashier")),
+    _=Depends(_require_partner_or_staff),
 ):
     """Stock availability read endpoint.
 
-    Auth-gated for now (PMS staff). When MedApp wires in for real, swap the
-    dependency for a partner-token / IP-allowlist check.
+    Accepts either a MedApp partner-token signature (X-MedApp-Signature
+    over METHOD\\npath?query\\nbody, HMAC-SHA256 with the shared MedApp
+    webhook secret) OR a pharmacy-staff JWT in one of {pharmacy_admin,
+    pharmacist, cashier}. See `_require_partner_or_staff`.
     """
     stmt = select(Drug).where(Drug.is_active.is_(True))
     if drug_name:

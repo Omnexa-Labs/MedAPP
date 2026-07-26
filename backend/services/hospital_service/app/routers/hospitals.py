@@ -25,13 +25,16 @@ async def create(payload: HospitalCreate, db: AsyncSession = DbSession, principa
 
 @router.get("", response_model=HospitalList)
 async def index(
+    q: str | None = None,
     specialty: str | None = None,
     insurance: str | None = None,
     city: str | None = None,
     country: str | None = None,
     db: AsyncSession = DbSession,
 ):
-    hospitals = await list_hospitals(db, specialty=specialty, insurance=insurance, city=city, country=country)
+    hospitals = await list_hospitals(
+        db, q=q, specialty=specialty, insurance=insurance, city=city, country=country,
+    )
     return HospitalList(items=[HospitalOut.model_validate(hospital) for hospital in hospitals])
 
 

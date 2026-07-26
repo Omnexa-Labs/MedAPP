@@ -2,7 +2,13 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    EmailStr,
+    Field,
+    StringConstraints,
+)
 
 from .medical import MedicalHistory
 
@@ -19,8 +25,12 @@ class UserOut(BaseModel):
     id: UUID
     email: EmailStr
     phone: str | None = None
-    first_name: str
-    last_name: str
+    first_name: str = Field(
+        validation_alias=AliasChoices("first_name", "firstname", "firstName")
+    )
+    last_name: str = Field(
+        validation_alias=AliasChoices("last_name", "lastname", "surname", "lastName")
+    )
     role: str
     dob: date | None = None
     gender: str | None = None
@@ -33,6 +43,7 @@ class UserOut(BaseModel):
 
     model_config = {
         "from_attributes": True,
+        "populate_by_name": True,
         "json_schema_extra": {
             "examples": [
                 {
@@ -74,8 +85,14 @@ class UserUpdate(BaseModel):
     # Audit finding B-12: `medical_history` is no longer a free-form dict.
     # It's `MedicalHistory` (Pydantic, ``extra="forbid"`` recursively) so
     # the platform never accepts PHI shapes it can't account for.
-    first_name: str | None = None
-    last_name: str | None = None
+    first_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("first_name", "firstname", "firstName"),
+    )
+    last_name: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("last_name", "lastname", "surname", "lastName"),
+    )
     dob: date | None = None
     gender: str | None = None
     allergies: list[_AllergyEntry] | None = Field(default=None, max_length=50)
@@ -83,6 +100,7 @@ class UserUpdate(BaseModel):
 
     model_config = {
         "extra": "forbid",
+        "populate_by_name": True,
         "json_schema_extra": {
             "examples": [
                 {

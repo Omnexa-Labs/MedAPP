@@ -59,6 +59,195 @@ entirely on hardening these defaults, not on writing new features.
    writable root filesystem and no NetworkPolicy. *(Status: open — infra
    slice.)*
 
+## Hardening slice 16 — Signup OTP verification (phone OR email) (2026-05-25)
+
+Wedges a contact-verification step into the mobile sign-up wizard
+(Step 1 → Verify → Step 2 → Step 3) so accounts are never created
+with an unreachable email or phone, and the backend doesn't
+accumulate unverified ghost accounts.
+
+**Why between Step 1 and Step 2** (not before all of signup, not after
+all of signup): catches typos before the user invests in Step 2/3,
+doesn't create DB rows that may never be verified, and feels less
+like a "punishment screen" than a post-submit OTP gate.
+
+**Channel choice**: user picks email OR phone per signup. Email
+pre-fills from Step 1; phone is collected inline on the verify screen
+(Step 1 doesn't capture it). Backend supports both via the existing
+`SmsNotifier` + `EmailNotifier` interfaces — the log-based stubs
+remain the dev default; real SES/Twilio integrations land at deploy
+time.
+
+**Changes — backend:**
+
+- **New OTP routes**
+  ([routers/otp.py](../../backend/services/user_service/app/routers/otp.py))
+  - `POST /v1/auth/otp/signup-start` (phone OR email)
+  - `POST /v1/auth/otp/signup-verify` → returns a short-lived JWT
+- **New `signup_verify` OTP purpose** in
+  [services/otp_service.py](../../backend/services/user_service/app/services/otp_service.py).
+  Does NOT require an existing user (existing OTP `login` purpose
+  requires one). Refuses to send if the contact already belongs to an
+  existing user — 409, no enumeration leak via OTP delivery.
+- **Signup-verify JWT** — 15-minute TTL, pins `(channel, recipient)`,
+  signed with the existing JWT secret. Issued by `verify_signup_otp`,
+  consumed by `auth_service.signup`.
+- **`SignupRequest.verification_token`** optional field
+  ([schemas/auth.py](../../backend/services/user_service/app/schemas/auth.py)).
+  When present and valid AND recipient matches the signup payload,
+  the backend sets `email_verified=True` or `phone_verified=True` at
+  creation time. Mismatched token = ignored (account created
+  unverified) so we don't leak "you used the wrong token here"
+  semantics mid-signup.
+- **Email channel** in `start_otp` ([services/otp_service.py](../../backend/services/user_service/app/services/otp_service.py)).
+  `EmailDep` added to deps.py; tests' conftest now overrides both
+  notifiers from the existing `InMemoryNotifier` fixture.
+
+**Changes — frontend:**
+
+- **New 4th wizard step** (the OTP screen) — [SignUpVerifyScreen.tsx](../../frontend/mobile/MedAPP/src/features/auth/SignUpVerifyScreen.tsx)
+  with two sub-states (picker → code entry). Resend countdown mirrors
+  the backend's cooldown. 409 maps to "looks like you already have an
+  account" with a sign-in CTA; 400 on verify maps to "wrong code".
+- **New hooks** [`useSignupOtpStart` / `useSignupOtpVerify`](../../frontend/mobile/MedAPP/src/features/auth/hooks/use-signup-otp.ts).
+- **`useSignUpDraft` extended** with a `verification` field +
+  `setVerification` action. Final submit at Step 3 forwards the
+  token; the backend stamps the verified flag.
+- **Step 2 and Step 3 guards** now also check `verification` —
+  deep-link / app-restart bounces back to the verify screen rather
+  than dead-ending the wizard.
+- **`authApi.signUpFull`** forwards `verification_token` to the
+  backend and persists `phone` on the user when channel=sms (so the
+  verified flag is meaningful).
+
+**Tests — backend** ([test_signup_otp.py](../../backend/services/user_service/tests/test_signup_otp.py),
+11 new):
+
+1. Phone signup end-to-end → `phone_verified=true`, `email_verified=false`.
+2. Email signup end-to-end → `email_verified=true`, `phone_verified=false`.
+3. Existing-email signup-start → 409.
+4. Existing-phone signup-start → 409.
+5. Token bound to a different email → account still created, but
+   unverified (no silent failure mid-signup).
+6. Legacy signup without token → unverified account (back-compat).
+7. Wrong OTP code → 400.
+8. Code is single-use — second verify with the same code → 400.
+9. Email channel with phone field present → 422.
+10. SMS channel with email field present → 422.
+11. Invalid phone format → 422.
+
+**Validation:**
+
+| Suite              | Result   |
+|--------------------|----------|
+| user_service       | 71 / 71  |
+
+**Posture after this slice:**
+
+- New signups land in the DB with at least one verified contact
+  (email OR phone). PHI-relevant notifications can safely target a
+  verified channel.
+- The existing-contact check at OTP-start prevents OTP-delivery
+  enumeration AND prevents the wizard from finishing on a duplicate.
+- The verify token is short-lived (15 min) and pins
+  `(channel, recipient)`. A token leaked from a screenshot can't be
+  reused for a different signup.
+
+**Deferred:**
+
+- Real email delivery (SES / SendGrid). The `LogEmailNotifier` stub
+  is enough for dev + tests; production wiring is an operator config
+  step.
+- Verifying BOTH email and phone in one signup. Today the user picks
+  one. If product needs both verified at signup, add a second OTP
+  loop after Step 3.
+- Resending to a different channel mid-flow (e.g. user typed an email,
+  wants to switch to phone). Today the user taps "Change channel" and
+  the start call resets the picker.
+
+## Hardening slice 15 — Device-bound refresh tokens + biometric login (2026-05-25)
+
+**First mobile↔backend integration slice.** Step 1 of biometric auth
+was a frontend-only wire-up (see [features/auth/README.md](../../frontend/mobile/MedAPP/src/features/auth/README.md));
+Step 2 closes the loop with backend hardening so an exfiltrated
+refresh token cannot be replayed from another install.
+
+**Changes:**
+
+- **`refresh_tokens.device_id`** column added — nullable for back-compat
+  with rows that pre-date this slice. Alembic migration
+  [20260525_0002_refresh_token_device_id.py](../../backend/services/user_service/alembic/versions/20260525_0002_refresh_token_device_id.py).
+- **`X-Device-Id` header** plumbed into the auth router via a new
+  `DeviceId` dep ([deps.py](../../backend/services/user_service/app/deps.py))
+  and through to `auth_service.login` + `auth_service.refresh`. The
+  service:
+  - Persists `device_id` on issuance (login, OTP-verified signup, refresh).
+  - Enforces a match on refresh **only if the stored row has a non-null
+    `device_id`** — legacy rows are grandfathered for one rotation.
+  - On mismatch: revokes the entire chain, writes a
+    `refresh.device_mismatch` audit row, raises 401.
+- **`biometric: true` flag** on the refresh request body — when present
+  AND rotation succeeds, the service writes a `user.biometric_login`
+  audit row in the same transaction, and the router publishes a
+  `user.biometric_login` domain event after commit.
+- **Mobile**:
+  - [lib/device/device-id.ts](../../frontend/mobile/MedAPP/src/lib/device/device-id.ts)
+    generates + persists a v4 UUID on first launch. Stored in
+    SecureStore separately from tokens (logout does NOT clear it —
+    the install's identity outlives a sign-in).
+  - `lib/api/client.ts` attaches `X-Device-Id` on every request via
+    a registered provider (same pattern as the auth-token provider).
+  - `authApi.refresh(refreshToken, { biometric: true })` passes the
+    flag on the biometric path.
+
+**Posture after this slice:**
+
+- A refresh token leaked from a device backup cannot be replayed from
+  a different install — the backend rejects mismatched device ids and
+  revokes the chain.
+- Biometric logins are auditable. `audit_log` carries one
+  `user.biometric_login` row per biometric refresh; the domain event
+  feeds SIEM if/when one is wired.
+- Login + signup flows still work for old mobile builds that don't
+  send `X-Device-Id` — the row gets a NULL device_id and the FIRST
+  refresh-with-header stamps the new install id, starting enforcement.
+
+**Validation:**
+
+| Suite                                          | Result      |
+|------------------------------------------------|-------------|
+| `tests/test_device_binding.py` (new, 9 tests)  | ✅ 9/9       |
+| `tests/test_refresh.py` (existing)             | ✅ unchanged |
+| user_service full suite                        | ✅ 60/60     |
+
+Test coverage:
+1. Legacy login without `X-Device-Id` → row has NULL device_id.
+2. Legacy NULL row refresh without header → succeeds (grandfathered).
+3. Login with `X-Device-Id` → row carries it.
+4. Matched header on refresh → success.
+5. **Mismatched header → 401, whole chain revoked.**
+6. Missing header on a row that HAS a device_id → 401.
+7. Legacy row's first refresh-with-header stamps the new chain.
+8. `biometric: true` writes the audit row.
+9. `biometric: false` / omitted does NOT write the audit row.
+
+**Migration note (rolling deploy):**
+
+1. Apply the migration first — the new column is nullable so this is a
+   no-op for existing rows.
+2. Deploy the backend — old mobile builds keep working (no header →
+   legacy path).
+3. Ship the mobile build — new sign-ins record + enforce. Existing
+   sessions transition on the next refresh.
+
+**Deferred:**
+- WebAuthn / passkey (signed challenge instead of token replay). Bigger
+  surface, useful when a real audit demands it.
+- OTP-verified phone signup doesn't yet pull `X-Device-Id` — the
+  `issue_tokens_for_user` signature accepts it but the OTP router
+  doesn't pass it through. One-line change when the OTP signup path
+  ships to mobile.
+
 ## Hardening slice 14 — CMEK, Cloud Armor, Managed Prometheus alerts (2026-05-25)
 
 **CI/CD rollout slice 6.** Final infra slice: customer-managed encryption
@@ -498,7 +687,7 @@ for the decisions locked.
   project-wide `secretmanager.secretAccessor`, no `logging.viewer`.
 - **CI workflows relocated** from `ci/.github/workflows/` →
   `.github/workflows/`. GitHub Actions only reads from the repo root —
-  the existing workflows had never run. The dead `flutter-ci.yml` was
+  the existing workflows had never run. The dead mobile CI workflow was
   removed (mobile is React Native now); `backend-build.yml`'s Artifact
   Registry path corrected from `images/` to `medapp/` to match the
   bootstrap module. The hardcoded service matrix in `backend-ci` /

@@ -14,6 +14,7 @@
 import { useEffect } from "react";
 import {
   Image,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -21,6 +22,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import Animated, {
   Easing,
@@ -86,7 +88,7 @@ export function HomeScreen() {
           {/* MedAI hero card */}
           <View className="mt-md overflow-hidden rounded-3xl bg-primary-container p-md">
             <Animated.View
-              pointerEvents="none"
+              pointerEvents={Platform.OS === "web" ? undefined : "none"}
               style={[
                 {
                   position: "absolute",
@@ -96,12 +98,14 @@ export function HomeScreen() {
                   width: 160,
                   borderRadius: 80,
                   backgroundColor: "rgba(255,255,255,0.10)",
+                  ...(Platform.OS === "web" ? { pointerEvents: "none" } : {}),
                 },
                 pulseStyle,
               ]}
             />
             <View
-              pointerEvents="none"
+              pointerEvents={Platform.OS === "web" ? undefined : "none"}
+              style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
               className="absolute -bottom-5 -left-5 h-24 w-24 rounded-full bg-primary/20"
             />
             <View className="z-10 gap-sm">
@@ -120,6 +124,7 @@ export function HomeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Talk to MedAI"
+                onPress={() => router.push("/(app)/ai-assistant" as Href)}
                 className="mt-sm w-fit flex-row items-center gap-sm self-start rounded-full bg-white px-md py-sm active:scale-95"
                 style={{
                   shadowColor: "#000",
@@ -142,8 +147,24 @@ export function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 16, paddingHorizontal: 4, paddingBottom: 8 }}
             >
-              <QuickService icon="medical-services" label="Find Care" tint="secondary" />
-              <QuickService icon="groups" label="Socials" tint="tertiary" />
+              <QuickService
+                icon="medical-services"
+                label="Find Care"
+                tint="secondary"
+                // The route exists at src/app/(app)/find-care.tsx — the
+                // cast is here only because expo-router's typed-routes
+                // generator runs at `expo start`, so the cached
+                // .expo/types/router.d.ts may not list the new route
+                // until the dev server is restarted. Safe to drop once
+                // the union refreshes.
+                onPress={() => router.push("/(app)/find-care" as Href)}
+              />
+              <QuickService
+                icon="groups"
+                label="Socials"
+                tint="tertiary"
+                onPress={() => router.push("/(app)/community" as Href)}
+              />
               <QuickService icon="sync-alt" label="Smart Sync" tint="primary" />
               <QuickService icon="mail" label="Inbox" tint="neutral" />
               <QuickService icon="emergency" label="SOS" tint="error" />
@@ -202,7 +223,11 @@ export function HomeScreen() {
           </Section>
 
           {/* Upcoming Appointments */}
-          <Section title="Upcoming Appointments">
+          <Section
+            title="Upcoming Appointments"
+            actionLabel="View All"
+            onAction={() => router.push("/(app)/appointments" as Href)}
+          >
             <View
               className="gap-sm rounded-3xl border border-outline-variant/30 bg-white p-md"
               style={cardShadow}
@@ -247,6 +272,19 @@ export function HomeScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Join video call"
+                onPress={() =>
+                  // Route was added in this iteration. Expo Router's typedRoutes
+                  // regenerates the union on next dev server start — cast bypasses
+                  // the strict pathname check until then.
+                  router.push({
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    pathname: "/(app)/waiting-room" as any,
+                    params: {
+                      doctorName: "Dr. Sarah Jenkins",
+                      doctorSpecialty: "Cardiologist • 15 Years Exp.",
+                    },
+                  })
+                }
                 className="w-full flex-row items-center justify-center gap-sm rounded-full bg-primary py-sm active:scale-95"
                 style={({ pressed }) => ({
                   backgroundColor: pressed ? "#008378" : "#00685f",
@@ -266,8 +304,12 @@ export function HomeScreen() {
 
         <BottomNav
           active="home"
-          onTabPress={(_key) => {
-            // TODO: route to other tabs once their features ship.
+          onTabPress={(key) => {
+            // Overview, Community, and Lifestyle have shipped; Inbox still a stub.
+            if (key === "overview") router.push("/(app)/overview" as Href);
+            else if (key === "inbox") router.push("/(app)/inbox" as Href);
+            else if (key === "community") router.push("/(app)/community" as Href);
+            else if (key === "lifestyle") router.push("/(app)/lifestyle" as Href);
           }}
         />
       </SafeAreaView>
@@ -279,21 +321,30 @@ export function HomeScreen() {
 // Local primitives. Promote to components/ui once a second screen needs them.
 // ---------------------------------------------------------------------------
 
-const cardShadow = {
-  shadowColor: "#475569",
-  shadowOpacity: 0.05,
-  shadowRadius: 20,
-  shadowOffset: { width: 0, height: 4 },
-  elevation: 2,
-};
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: "#475569",
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  web: {
+    boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)",
+  },
+  android: {
+    elevation: 2,
+  },
+}) || {};
 
 function Section({
   title,
   actionLabel,
+  onAction,
   children,
 }: {
   title: string;
   actionLabel?: string;
+  onAction?: () => void;
   children: React.ReactNode;
 }) {
   return (
@@ -303,7 +354,13 @@ function Section({
           {title}
         </Text>
         {actionLabel ? (
-          <Pressable accessibilityRole="button" hitSlop={6}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${actionLabel} ${title}`}
+            hitSlop={6}
+            onPress={onAction}
+            className="active:scale-95"
+          >
             <Text className="font-label-md text-label-md text-primary">{actionLabel}</Text>
           </Pressable>
         ) : null}
@@ -327,16 +384,19 @@ function QuickService({
   icon,
   label,
   tint,
+  onPress,
 }: {
   icon: IconName;
   label: string;
   tint: Tint;
+  onPress?: () => void;
 }) {
   const t = TINTS[tint];
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      onPress={onPress}
       className="items-center gap-sm active:scale-95"
     >
       <View

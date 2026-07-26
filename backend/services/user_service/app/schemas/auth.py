@@ -1,11 +1,19 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import AliasChoices, BaseModel, EmailStr, Field, field_validator
 
 
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    first_name: str = Field(min_length=1, max_length=255)
-    last_name: str = Field(min_length=1, max_length=255)
+    first_name: str = Field(
+        validation_alias=AliasChoices("first_name", "firstname", "firstName"),
+        min_length=1,
+        max_length=255,
+    )
+    last_name: str = Field(
+        validation_alias=AliasChoices("last_name", "lastname", "surname", "lastName"),
+        min_length=1,
+        max_length=255,
+    )
     phone: str | None = Field(default=None, max_length=32)
     role: str = "user"
     # Short-lived JWT issued by /auth/otp/signup-verify. When present and
@@ -15,13 +23,14 @@ class SignupRequest(BaseModel):
     verification_token: str | None = Field(default=None, max_length=2048)
 
     model_config = {
+        "populate_by_name": True,
         "json_schema_extra": {
             "examples": [
                 {
                     "email": "user@medapp.com",
                     "password": "password123",
-                    "first_name": "Amina",
-                    "last_name": "Mensah",
+                    "firstname": "Amina",
+                    "surname": "Mensah",
                     "phone": "+233241234567",
                     "role": "user",
                 }

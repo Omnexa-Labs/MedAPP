@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -5,13 +6,12 @@ from threading import Lock
 from uuid import uuid4
 
 import httpx
-import jwt
 import structlog
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from shared.auth import Principal, validate_jwt_secret
+from shared.auth import Principal, decode_token, validate_jwt_secret
 from shared.observability import configure_logging, instrument_app
 
 from .config import ROUTES, settings
@@ -21,6 +21,16 @@ PUBLIC_ROUTE_PREFIXES = ("/v1/auth", "/v1/webhooks")
 BODY_SIZE_WHITELIST_PREFIXES = ("/v1/lab", "/v1/patients")
 AUTH_ROUTE_LIMIT = 10
 AUTH_ROUTE_WINDOW_SECONDS = 60
+
+# The user_service mints tokens with aud="medapp.platform" / iss="medapp"
+# (see shared.auth.jwt). PyJWT defaults to verify_aud=True, so decoding
+# without supplying the expected audience raises InvalidAudienceError on
+# every valid token — that's how the gateway was returning 401 for tokens
+# it had just forwarded the login for. Resolve the expected values from
+# env, falling back to the platform defaults so the gateway accepts
+# tokens its own user_service issued out of the box.
+_EXPECTED_AUDIENCE = os.getenv("MEDAPP_DEFAULT_JWT_AUDIENCE", "medapp.platform")
+_EXPECTED_ISSUER = os.getenv("MEDAPP_DEFAULT_JWT_ISSUER", "medapp")
 
 _auth_route_requests: dict[str, deque[float]] = defaultdict(deque)
 _auth_route_lock = Lock()
@@ -50,6 +60,11 @@ def _resolve_upstream(path: str) -> str | None:
 
 def _rewrite_path(path: str, upstream: str) -> str:
     normalized = path.lstrip("/")
+
+    # The user_service is the only one not using /v1/ prefix in its internal routes.
+    if upstream == settings.user_service_url and normalized.startswith("v1/"):
+        normalized = normalized.removeprefix("v1/")
+
     if upstream == settings.user_service_url and normalized.startswith("profile"):
         if normalized == "profile":
             return "v1/me"
@@ -70,7 +85,13 @@ def _body_size_is_allowed(path: str) -> bool:
 
 
 def _extract_principal_from_token(token: str) -> Principal:
-    claims = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    claims = decode_token(
+        token,
+        secret=settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+        audience=_EXPECTED_AUDIENCE,
+        issuer=_EXPECTED_ISSUER,
+    )
     return Principal(subject=str(claims["sub"]), role=str(claims["role"]))
 
 
@@ -155,21 +176,6 @@ def create_app() -> FastAPI:
     validate_jwt_secret(settings.jwt_secret, service_name=settings.service_name)
 
     app = FastAPI(title="MedApp - API Gateway", version="0.1.0", lifespan=lifespan)
-
-    # Audit finding #6: CORS allow-list from config, not `*`. The previous
-    # default (`allow_origins=["*"], allow_credentials=True`) is undefined
-    # per the browser CORS spec — most browsers refuse credentials but
-    # some forward them. Either way it was wide open; now it's explicit.
-    cors_origins = _parse_cors_origins(settings.cors_origins)
-    if cors_origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
-            expose_headers=["X-Request-Id"],
-        )
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
 
     @app.middleware("http")
@@ -191,9 +197,37 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def auth_rate_limit(request: Request, call_next):
-        if request.url.path.startswith("/v1/auth") and not await _allow_auth_route(request):
+        if (
+            request.method != "OPTIONS"
+            and request.url.path.startswith("/v1/auth")
+            and not await _allow_auth_route(request)
+        ):
             return JSONResponse(status_code=status.HTTP_429_TOO_MANY_REQUESTS, content={"error": "rate limit exceeded"})
         return await call_next(request)
+
+    # Added last so it's the outermost middleware.
+    cors_origins = _parse_cors_origins(settings.cors_origins)
+    cors_mw_kwargs: dict = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+        "expose_headers": ["*"],
+        "max_age": 3600,
+    }
+    if settings.cors_origin_regex:
+        cors_mw_kwargs["allow_origin_regex"] = settings.cors_origin_regex
+        if cors_origins:
+            cors_mw_kwargs["allow_origins"] = cors_origins
+        app.add_middleware(CORSMiddleware, **cors_mw_kwargs)
+    elif cors_origins:
+        cors_mw_kwargs["allow_origins"] = cors_origins
+        app.add_middleware(CORSMiddleware, **cors_mw_kwargs)
+    else:
+        # Dev fallback: allow everything from any origin.
+        # Credentials must be false if using "*" for origins.
+        cors_mw_kwargs["allow_origins"] = ["*"]
+        cors_mw_kwargs["allow_credentials"] = False
+        app.add_middleware(CORSMiddleware, **cors_mw_kwargs)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

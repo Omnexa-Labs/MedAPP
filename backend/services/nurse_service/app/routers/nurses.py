@@ -25,6 +25,7 @@ async def create(payload: NurseCreate, db: AsyncSession = DbSession, principal: 
 
 @router.get("", response_model=NurseList)
 async def index(
+    q: str | None = None,
     specialty: str | None = None,
     only_listable: bool = True,
     within_km: float | None = Query(default=None, ge=0),
@@ -35,6 +36,7 @@ async def index(
     try:
         profiles = await list_nurse_profiles(
             db,
+            q=q,
             specialty=specialty,
             only_listable=only_listable,
             within_km=within_km,

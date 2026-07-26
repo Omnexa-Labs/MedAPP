@@ -102,11 +102,13 @@ export function SignInScreen({ onSuccess }: Props) {
       {/* Decorative corner blobs — Stitch uses heavy blur + low opacity.
           Solid low-opacity circles read identically at these scales. */}
       <View
-        pointerEvents="none"
+        pointerEvents={Platform.OS === "web" ? undefined : "none"}
+        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
         className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-fixed opacity-10"
       />
       <View
-        pointerEvents="none"
+        pointerEvents={Platform.OS === "web" ? undefined : "none"}
+        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
         className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-tertiary-fixed opacity-[0.05]"
       />
 
@@ -143,11 +145,20 @@ export function SignInScreen({ onSuccess }: Props) {
                 <View
                   className="mb-md h-16 w-16 items-center justify-center rounded-xl bg-primary-container active:scale-95"
                   style={{
-                    shadowColor: "#475569",
-                    shadowOpacity: 0.15,
-                    shadowRadius: 12,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: 4,
+                    ...Platform.select({
+                      ios: {
+                        shadowColor: "#475569",
+                        shadowOpacity: 0.15,
+                        shadowRadius: 12,
+                        shadowOffset: { width: 0, height: 4 },
+                      },
+                      web: {
+                        boxShadow: "0px 4px 12px rgba(71, 85, 105, 0.15)",
+                      },
+                      android: {
+                        elevation: 4,
+                      },
+                    }),
                   }}
                 >
                   <MaterialIcons name="medical-services" size={32} color="#f4fffc" />
@@ -166,11 +177,20 @@ export function SignInScreen({ onSuccess }: Props) {
               <View
                 className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-md"
                 style={{
-                  shadowColor: "#475569",
-                  shadowOpacity: 0.05,
-                  shadowRadius: 20,
-                  shadowOffset: { width: 0, height: 4 },
-                  elevation: 2,
+                  ...Platform.select({
+                    ios: {
+                      shadowColor: "#475569",
+                      shadowOpacity: 0.05,
+                      shadowRadius: 20,
+                      shadowOffset: { width: 0, height: 4 },
+                    },
+                    web: {
+                      boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)",
+                    },
+                    android: {
+                      elevation: 2,
+                    },
+                  }),
                 }}
               >
                 {/* Email field */}
@@ -308,11 +328,20 @@ export function SignInScreen({ onSuccess }: Props) {
                   style={({ pressed }) => ({
                     opacity: isSubmitting ? 0.6 : 1,
                     backgroundColor: pressed ? "#008378" : "#00685f",
-                    shadowColor: "#00685f",
-                    shadowOpacity: 0.15,
-                    shadowRadius: 6,
-                    shadowOffset: { width: 0, height: 2 },
-                    elevation: 3,
+                    ...Platform.select({
+                      ios: {
+                        shadowColor: "#00685f",
+                        shadowOpacity: 0.15,
+                        shadowRadius: 6,
+                        shadowOffset: { width: 0, height: 2 },
+                      },
+                      web: {
+                        boxShadow: "0px 2px 6px rgba(0, 104, 95, 0.15)",
+                      },
+                      android: {
+                        elevation: 3,
+                      },
+                    }),
                   })}
                 >
                   <Text className="font-label-md text-label-md text-on-primary">

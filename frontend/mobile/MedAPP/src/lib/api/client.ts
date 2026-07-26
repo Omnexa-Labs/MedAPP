@@ -69,10 +69,23 @@ async function parseError(response: Response): Promise<ApiError> {
   try {
     const body = await response.json();
     if (typeof body === "object" && body !== null) {
-      const b = body as { message?: string; code?: string; details?: unknown; error?: string };
-      message = b.message ?? b.error ?? message;
+      // FastAPI's HTTPException emits `{"detail": "..."}`; our own
+      // gateway error envelope uses `{"error": "..."}`; misc handlers
+      // sometimes use `message`. Accept all three so 4xx bodies surface
+      // a real message instead of the generic "Request failed with
+      // status N" fallback. `detail` can be a string OR a list of
+      // validation errors — only use it when it's a string.
+      const b = body as {
+        message?: string;
+        code?: string;
+        details?: unknown;
+        error?: string;
+        detail?: unknown;
+      };
+      const detailString = typeof b.detail === "string" ? b.detail : undefined;
+      message = b.message ?? b.error ?? detailString ?? message;
       code = b.code;
-      details = b.details;
+      details = b.details ?? (typeof b.detail !== "string" ? b.detail : undefined);
     }
   } catch {
     // Body wasn't JSON. Use the default message.

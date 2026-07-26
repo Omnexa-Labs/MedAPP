@@ -49,8 +49,25 @@ export default function SignUpStep3Route() {
           router.replace("/(app)");
         } catch (e) {
           if (e instanceof ApiError) {
-            if (e.isNetwork) setErrorMessage("Network error. Check your connection.");
-            else setErrorMessage(e.message);
+            if (e.isNetwork) {
+              setErrorMessage("Network error. Check your connection.");
+            } else if (e.status === 409) {
+              // user_service surfaces conflicts as
+              // {"detail": "Email already exists"} / "Phone already exists".
+              // Forward that wording verbatim so the user knows whether to
+              // change the email or the phone. Fall back to a generic
+              // hint when the backend didn't send a usable detail.
+              const lower = e.message.toLowerCase();
+              if (lower.includes("email")) {
+                setErrorMessage("That email is already registered. Try signing in or use a different email.");
+              } else if (lower.includes("phone")) {
+                setErrorMessage("That phone number is already registered. Use a different number.");
+              } else {
+                setErrorMessage("An account with these details already exists. Try signing in instead.");
+              }
+            } else {
+              setErrorMessage(e.message);
+            }
           } else {
             setErrorMessage("Something went wrong. Please try again.");
           }

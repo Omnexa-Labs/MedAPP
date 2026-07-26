@@ -848,7 +848,7 @@ A service ships when **all** of these are true:
 
 - Specific SQL schemas — those belong in models / migrations.
 - Wire-level event payloads — those belong in `backend/shared/events/schemas/`.
-- The Flutter side — see [`docs/FRONTEND.md`](../docs/FRONTEND.md).
+- The mobile frontend — see [`docs/FRONTEND.md`](../docs/FRONTEND.md).
 - The agentic side — see [`agents/README.md`](../agents/README.md).
 - Infra — see [`infra/`](../infra/).
 - Why we chose microservices / GCP / FastAPI — see [`docs/adr/`](../docs/adr/).

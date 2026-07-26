@@ -47,15 +47,17 @@ RUN pip install --no-cache-dir uv==0.5.11 setuptools wheel
 # Layout under /install — copied wholesale into runtime later.
 WORKDIR /build
 
-COPY backend/shared /build/shared
+COPY backend/shared /shared
 COPY backend/services/${SERVICE} /build/service
 
 # Install the service + its shared dep into /install/usr/local. The
 # --prefix lets us copy the entire site-packages tree into the runtime
 # stage's Python without dragging in apt-installed system packages.
+# /shared matches the path uv resolves from `pyproject.toml`'s
+# `medapp-shared = { path = "../../shared" }` when the service sits at /build/service.
 RUN uv pip install --system --no-build-isolation \
         --prefix=/install \
-        /build/shared && \
+        /shared && \
     uv pip install --system --no-build-isolation \
         --prefix=/install \
         /build/service
@@ -68,7 +70,7 @@ ARG SERVICE_PORT
 
 # Curl is needed for HEALTHCHECK. Everything else is removed.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl=7.* && \
+    apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Non-root user matching the Helm chart's runAsUser=10001.

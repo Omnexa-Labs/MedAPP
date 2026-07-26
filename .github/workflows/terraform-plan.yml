@@ -2,7 +2,7 @@ name: terraform-plan
 
 # Per-env Terraform plan on PRs that touch infra/terraform/**. Requires the
 # bootstrap stack to be applied first AND the env's GitHub Environment to
-# carry GCP_WIF_PROVIDER + GCP_TERRAFORM_SA secrets. Before bootstrap is
+# carry GCP_WIF_PROVIDER + GCP_DEPLOYER_SA secrets. Before bootstrap is
 # applied this workflow will fail on the auth step — that's expected.
 
 on:

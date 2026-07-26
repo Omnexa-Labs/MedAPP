@@ -103,7 +103,7 @@ deploy on their own:
 ### 4.1 The picture
 ```
 ┌──────────────────────────────┐         ┌──────────────────────────────┐
-│   Mobile (Flutter)           │         │   Admin Web (Next.js, later) │
+│   Mobile (React Native/Expo) │         │   Admin Web (Next.js, later) │
 └──────────────┬───────────────┘         └─────────────┬────────────────┘
          │                                       │
          └────────────┬──────────────────────────┘
@@ -152,7 +152,7 @@ agents/                 LLM-driven agents (Python, provider TBD)
     booking_agent/          9006
 
 frontend/
-  mobile/               Flutter app (RUNNABLE — Android/iOS/web scaffolded)
+  mobile/               React Native / Expo app (RUNNABLE — Android/iOS/web scaffolded)
   admin_web/            Next.js console (placeholder)
 
 infra/
@@ -161,9 +161,9 @@ infra/
   helm/medapp/          Helm umbrella chart
   docker/               docker-compose for full local stack
 
-ci/.github/workflows/   GitHub Actions: backend-ci, agents-ci, flutter-ci, terraform-plan, deploy
+ci/.github/workflows/   GitHub Actions: backend-ci, agents-ci, mobile-ci, terraform-plan, deploy
 docs/                   Architecture overview, ADRs, runbooks, this handbook
-packages/               OpenAPI specs + generated Dart/TS clients
+packages/               OpenAPI specs + generated TS clients
 scripts/                Codegen, migrations, seeds
 ```
 
@@ -251,11 +251,11 @@ That keeps agent latency low, avoids cross-service joins, and protects canonical
 
 | Layer | Choice | Why |
 |---|---|---|
-| Mobile | Flutter 3.24+ (Dart) | Single codebase for iOS/Android/web |
+| Mobile | React Native 0.83 + Expo SDK 55 + TypeScript | Single codebase for iOS/Android/web |
 | Backend | FastAPI (Python 3.12) | Team familiarity, async, OpenAPI for free |
 | Agents | FastAPI + provider-agnostic LLM | Same stack as backend; provider deferred |
-| State (mobile) | Riverpod 2.x | Composable, testable, type-safe |
-| HTTP (mobile) | Dio | Interceptors, error handling, retry |
+| State (mobile) | Zustand + TanStack Query | Local UI/session state plus server-state caching |
+| HTTP (mobile) | TypeScript API client | Centralized API access and auth handling |
 | Relational DB | PostgreSQL 16 (SQLAlchemy 2.x async + asyncpg, sync via psycopg2) | Per-service relational store |
 | Object storage | GCS | Large binaries and signed downloads |
 | Document DB | MongoDB 7 (motor async driver) | Unstructured / semi-structured data (chat transcripts, EHR document metadata, social feed) |
@@ -279,8 +279,7 @@ That keeps agent latency low, avoids cross-service joins, and protects canonical
 ```bash
 # Prereqs (each is a one-time install)
 #   Python 3.12 + uv  (https://github.com/astral-sh/uv)
-#   Node 20 + pnpm
-#   Flutter 3.24+ stable
+#   Node 20 + npm/pnpm
 #   Docker Desktop (WSL2 backend on Windows)
 #   gcloud SDK (only for cloud work)
 
@@ -302,12 +301,12 @@ Open:
 ### 6.2 Running just the mobile app (no backend)
 
 ```bash
-cd frontend/mobile
-flutter pub get
-flutter run
+cd frontend/mobile/MedAPP
+npm install
+npm run start
 ```
 
-The mobile app ships with `USE_MOCK_API=true` by default — it serves canned data so the frontend team can develop without booting anything else. See `frontend/mobile/README.md` and `docs/FRONTEND.md`.
+The mobile app is an Expo app. See `frontend/mobile/MedAPP/README.md`, `frontend/mobile/MedAPP/src/README.md`, and `docs/FRONTEND.md`.
 
 ### 6.3 Running a single backend service
 
@@ -340,14 +339,14 @@ cd backend/services/user_service && pytest -q
 cd agents && pytest -q
 
 # Mobile
-cd frontend/mobile && flutter test
+cd frontend/mobile/MedAPP && npm test
 ```
 
 ### 6.6 Linting & formatting
 
 ```bash
-make fmt    # ruff format Python + dart format
-make lint   # ruff check + flutter analyze
+make fmt    # ruff format Python + frontend formatters
+make lint   # ruff check + frontend lint
 ```
 
 ---
@@ -440,7 +439,7 @@ Open ADRs use the template in `adr/template.md`.
 
 | If you want to… | Go here |
 |---|---|
-| Run the mobile app | `frontend/mobile/README.md` and [docs/FRONTEND.md](FRONTEND.md) |
+| Run the mobile app | `frontend/mobile/MedAPP/README.md` and [docs/FRONTEND.md](FRONTEND.md) |
 | Understand the architecture in detail | [docs/architecture/overview.md](architecture/overview.md) |
 | Write a new backend service | `backend/README.md` + read `user_service` as a template |
 | Write a new agent | `agents/README.md` + read `concierge_agent` as a template |

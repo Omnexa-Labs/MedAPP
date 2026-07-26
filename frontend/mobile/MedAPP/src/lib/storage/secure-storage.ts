@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 // Thin wrapper over expo-secure-store for sensitive credentials.
 // Only stores small strings (SecureStore has a ~2KB per-key cap on Android).
@@ -16,36 +17,55 @@ const REFRESH_KEY = "medapp.auth.refreshToken";
 // since the install's identity outlives a single sign-in.
 const DEVICE_ID_KEY = "medapp.device.id";
 
+// expo-secure-store has no web implementation. On web we fall back to
+// localStorage — less secure than hardware-backed storage, but acceptable
+// for development. localStorage is not sessionStorage: tokens survive a
+// tab close the same way native tokens survive an app restart.
+const webStore = {
+  getItemAsync: (key: string): Promise<string | null> =>
+    Promise.resolve(localStorage.getItem(key)),
+  setItemAsync: (key: string, value: string): Promise<void> => {
+    localStorage.setItem(key, value);
+    return Promise.resolve();
+  },
+  deleteItemAsync: (key: string): Promise<void> => {
+    localStorage.removeItem(key);
+    return Promise.resolve();
+  },
+};
+
+const store = Platform.OS === "web" ? webStore : SecureStore;
+
 export const secureStorage = {
   async getAccessToken(): Promise<string | null> {
-    return SecureStore.getItemAsync(TOKEN_KEY);
+    return store.getItemAsync(TOKEN_KEY);
   },
   async setAccessToken(token: string): Promise<void> {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    await store.setItemAsync(TOKEN_KEY, token);
   },
   async clearAccessToken(): Promise<void> {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await store.deleteItemAsync(TOKEN_KEY);
   },
   async getRefreshToken(): Promise<string | null> {
-    return SecureStore.getItemAsync(REFRESH_KEY);
+    return store.getItemAsync(REFRESH_KEY);
   },
   async setRefreshToken(token: string): Promise<void> {
-    await SecureStore.setItemAsync(REFRESH_KEY, token);
+    await store.setItemAsync(REFRESH_KEY, token);
   },
   async clearRefreshToken(): Promise<void> {
-    await SecureStore.deleteItemAsync(REFRESH_KEY);
+    await store.deleteItemAsync(REFRESH_KEY);
   },
   async getDeviceId(): Promise<string | null> {
-    return SecureStore.getItemAsync(DEVICE_ID_KEY);
+    return store.getItemAsync(DEVICE_ID_KEY);
   },
   async setDeviceId(id: string): Promise<void> {
-    await SecureStore.setItemAsync(DEVICE_ID_KEY, id);
+    await store.setItemAsync(DEVICE_ID_KEY, id);
   },
   /** Clears tokens. Device id intentionally retained — see comment above. */
   async clearAll(): Promise<void> {
     await Promise.all([
-      SecureStore.deleteItemAsync(TOKEN_KEY),
-      SecureStore.deleteItemAsync(REFRESH_KEY),
+      store.deleteItemAsync(TOKEN_KEY),
+      store.deleteItemAsync(REFRESH_KEY),
     ]);
   },
 };

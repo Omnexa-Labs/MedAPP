@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -67,6 +67,7 @@ async def create_hospital(db: AsyncSession, principal: Principal, payload: Hospi
 async def list_hospitals(
     db: AsyncSession,
     *,
+    q: str | None = None,
     specialty: str | None = None,
     insurance: str | None = None,
     city: str | None = None,
@@ -81,6 +82,20 @@ async def list_hospitals(
         stmt = stmt.where(HospitalProfile.country.ilike(f"%{country.strip()}%"))
     if insurance:
         stmt = stmt.where(HospitalProfile.insurance_accepted.contains([insurance.strip()]))
+    # Free-text search added for the Find-Care wiring (plan
+    # merry-seeking-gem). Case-insensitive substring across the
+    # fields a patient is most likely to type.
+    if q:
+        needle = f"%{q.strip()}%"
+        if needle != "%%":
+            stmt = stmt.where(
+                or_(
+                    HospitalProfile.name.ilike(needle),
+                    HospitalProfile.description.ilike(needle),
+                    HospitalProfile.specialty.ilike(needle),
+                    HospitalProfile.city.ilike(needle),
+                )
+            )
     stmt = stmt.order_by(HospitalProfile.name.asc())
     result = await db.scalars(stmt)
     return list(result.all())
