@@ -40,9 +40,9 @@ jobs:
       services: ${{ steps.filter.outputs.services }}
       has_changes: ${{ steps.filter.outputs.services != '[]' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           list-files: shell
           # Each filter outputs `true` when its paths change. The
@@ -99,7 +99,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.detect.outputs.services) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Service-port lookup. Keeping this inline rather than in a JSON
       # file is uglier but means a contributor can't introduce a port
@@ -128,18 +128,18 @@ jobs:
             *) echo "unknown service" && exit 1 ;;
           esac
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Authenticate to GCP (push step only — PRs build locally and skip auth).
       - id: auth
         if: github.event_name == 'push'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOYER_SA }}
 
       - if: github.event_name == 'push'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGION }}-docker.pkg.dev
           username: oauth2accesstoken
@@ -147,7 +147,7 @@ jobs:
 
       # ── Build (PRs build only; main pushes too) ─────────────────────────
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: backend/Dockerfile
@@ -169,7 +169,7 @@ jobs:
       # Fails the job on HIGH or CRITICAL CVE in the rendered image.
       # Findings also upload to the GitHub Security tab as SARIF.
       - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT || 'medapp-dev' }}/${{ env.ARTIFACT_REPO }}/${{ matrix.service }}:${{ github.sha }}
           format: sarif
@@ -180,7 +180,7 @@ jobs:
 
       - name: Upload Trivy SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
           category: trivy-${{ matrix.service }}
