@@ -34,7 +34,7 @@ jobs:
       REGION: europe-west1
       IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Check out the commit the build ran against, not whatever's
           # at the tip of main right now — keeps deploy/image versions

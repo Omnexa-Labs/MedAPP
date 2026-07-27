@@ -17,7 +17,7 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
         with: { terraform_version: 1.8.5 }
       - name: terraform fmt -check -recursive
@@ -37,7 +37,7 @@ jobs:
           - envs/prod
           - envs/prod/bootstrap
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hashicorp/setup-terraform@v4
         with: { terraform_version: 1.8.5 }
       - name: terraform init -backend=false

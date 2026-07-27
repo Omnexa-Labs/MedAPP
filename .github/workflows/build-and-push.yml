@@ -40,7 +40,7 @@ jobs:
       services: ${{ steps.filter.outputs.services }}
       has_changes: ${{ steps.filter.outputs.services != '[]' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - id: filter
         uses: dorny/paths-filter@v4
         with:
@@ -99,7 +99,7 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.detect.outputs.services) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Service-port lookup. Keeping this inline rather than in a JSON
       # file is uglier but means a contributor can't introduce a port
