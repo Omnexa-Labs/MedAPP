@@ -5,12 +5,44 @@
 //   - BottomNav "Community" tab (from Home and Overview).
 //   - Home screen's "Socials" quick service tile.
 //
+// ============================================================================
+// SHELL MIGRATION — the inline app bar is gone
+// ============================================================================
+// This was one of the last three hand-rolled patient app bars. It drew an
+// avatar on the LEFT of a re-typeset "MedApp" <Text> wordmark with a bell on
+// the right — which docs/BRAND.md §App shell forbids twice over ("logo on the
+// left; avatar + notifications grouped on the right", and §Logo rules forbid
+// re-typesetting the mark as text). It is now <PatientShell activeTab="community">.
+//
+// Deleted with the bar:
+//   * the avatar/wordmark/bell lockup and its `border-2 border-primary/20`
+//     ring — PatientAppBar draws the real <Logo /> and an AvatarWithFallback
+//     (photo → initials → silhouette).
+//   * the bell's literal `color="#3d4947"` glyph — the LIGHT value of
+//     `on-surface-variant`, frozen in JS. The shared bar tints the bell with
+//     the `primary` TOKEN (Figma 101:109), resolved per mode.
+//   * `StatusBar style="dark"`, likewise frozen to one mode — the shell
+//     resolves it from the active scheme.
+//   * the local <SafeAreaView> / <BottomNav> scaffolding the shell now owns.
+//     The BottomNav's `onTabPress` routing moved onto the shell verbatim.
+//   * the `appBarShadow` note — that constant was already gone; the comment
+//     describing it went with the bar it described.
+//
+// Scroll reserve UNCHANGED at 140: PatientShell renders BottomNav as an
+// `absolute bottom-0` overlay (see the LAYOUT NOTE in PatientShell.tsx), so it
+// still occupies no layout space and this screen still pads for it itself.
+//
+// This is a TAB ROOT, so `hideBack` keeps its `true` default — no back button.
+//
 // Translation rules (same as the other screens):
 //   - The comp ships a desktop SideNav + a mobile BottomNav. On a phone
 //     we keep the BottomNav (this is a browse destination, like Overview /
 //     Find Care — back-arrow chat screens are the exception). The desktop
 //     SideNav is dropped.
-//   - backdrop-blur glass header → opaque bg-surface + border + shadow.
+//   - card / tile / segmented-thumb shadows → all DELETED, and the card
+//     surfaces now go through the shared <Card />. None of them is a sheet,
+//     menu, dialog, toast or FAB, so none qualifies for the sanctioned
+//     floating pair.
 //   - hover:* / group-hover:* / focus:ring / active:translate → dropped or
 //     mapped to active:scale-95.
 //   - bg-gradient-to-br ... opacity-20 corner wash on group cards →
@@ -23,14 +55,14 @@
 // expo-* APIs here.
 
 import { useMemo, useState } from "react";
-import { Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, type Href } from "expo-router";
+// No expo-router import: this screen's only navigation was the bottom-nav
+// switch, which now lives in PatientShell.
 import { MaterialIcons } from "@expo/vector-icons";
+import { Card } from "@/components/ui";
+import { PatientShell } from "@/components/shell";
 import { useAuthStore } from "@/store/auth-store";
-import { BottomNav } from "@/features/home/components/BottomNav";
 import { ExploreScreen } from "@/features/community/ExploreScreen";
 import { CommunityHubScreen } from "@/features/community/CommunityHubScreen";
 
@@ -187,9 +219,7 @@ export function CommunityScreen() {
   // Heart Healthy Living hub group ("h1") so both the Community feed and
   // the Hub's "My Groups" have content on first open. Carousel ids are
   // "g*", Hub catalog ids are "h*" — they share this one membership Set.
-  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(
-    () => new Set(["g1", "h1"]),
-  );
+  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(() => new Set(["g1", "h1"]));
 
   const toggleJoin = (groupId: string) => {
     setJoinedGroups((prev) => {
@@ -212,160 +242,141 @@ export function CommunityScreen() {
   );
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* Top app bar — avatar + MedApp + notifications (matches Home) */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
-        >
-          <View className="h-10 w-10 overflow-hidden rounded-full border-2 border-primary/20">
-            {user?.avatarUrl ? (
-              <Image source={{ uri: user.avatarUrl }} className="h-full w-full" />
-            ) : (
-              <View className="h-full w-full items-center justify-center bg-primary-container">
-                <Text className="font-label-md text-label-md text-on-primary-container">
-                  {firstName[0]?.toUpperCase() ?? "?"}
+    <PatientShell
+      activeTab="community"
+      // Same source the local lockup read: the auth store's user. The bar's
+      // fallback chain (photo → initials → silhouette) subsumes the hand-rolled
+      // `firstName[0]?.toUpperCase() ?? "?"` branch.
+      avatarUri={user?.avatarUrl}
+      avatarInitials={firstName[0]}
+      avatarLabel={user?.displayName ?? "Your profile"}
+      // Routing moved off the deleted <BottomNav> unchanged.
+      // No `onTabPress`: PatientShell owns the tab map now. The switch that was
+      // here handled three of five — `inbox` fell through with a comment calling
+      // it "still a stub", but /(app)/inbox has shipped, so the tab was dead for
+      // no reason. See PatientShell.tsx.
+      // No `unreadCount` / `onNotificationsPress`: the local bell was an inert
+      // Pressable with no handler and no count, so there is nothing to forward.
+      // No `onAvatarPress`: the local avatar was a plain <Image>, not a button.
+    >
+      {/* paddingBottom 140 is KEPT — the shell's BottomNav is still an
+          absolute overlay and reserves no layout space. */}
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Feed toggle (segmented control). The active thumb carried a
+            `segmentShadow`; it is gone. A segmented-control thumb is not one
+            of docs/BRAND.md's floating roles (sheet, menu, dialog, toast,
+            FAB) — it is a tile inside a track, and the surface-tone step from
+            `surface-container-low` to `surface-container-lowest` plus the
+            `text-primary` label is what marks it selected. */}
+        <View className="mt-md flex-row rounded-full bg-surface-container-low p-xs">
+          {FEED_TABS.map((tab) => {
+            const isActive = tab === activeTab;
+            return (
+              <Pressable
+                key={tab}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                onPress={() => setActiveTab(tab)}
+                className={`flex-1 rounded-full py-sm ${
+                  isActive ? "bg-surface-container-lowest" : ""
+                }`}
+              >
+                <Text
+                  className={`text-center font-label-md text-label-md ${
+                    isActive ? "text-primary" : "text-on-surface-variant"
+                  }`}
+                >
+                  {tab}
                 </Text>
-              </View>
-            )}
-          </View>
-          <Text className="font-headline-md text-headline-md text-primary">MedApp</Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            hitSlop={8}
-            className="rounded-full p-sm active:scale-95"
-          >
-            <MaterialIcons name="notifications" size={24} color="#3d4947" />
-          </Pressable>
+              </Pressable>
+            );
+          })}
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Feed toggle (segmented control) */}
-          <View className="mt-md flex-row rounded-full bg-surface-container-low p-xs">
-            {FEED_TABS.map((tab) => {
-              const isActive = tab === activeTab;
-              return (
+        {activeTab === "Explore" ? (
+          /* Explore is its own discovery layout (search, trending hero,
+             specialists, topics, suggested community) — it replaces the
+             insights header + groups + feed entirely. */
+          <ExploreScreen />
+        ) : activeTab === "Community" ? (
+          /* Community tab → the Community Hub (group management). Shares
+             the same membership state as the carousel. Note: reaching
+             THIS view requires selecting the in-screen Community tab; the
+             bottom-nav Community button lands on the default feed. */
+          <CommunityHubScreen joinedGroups={joinedGroups} onToggleJoin={toggleJoin} />
+        ) : (
+          <>
+            {/* Header */}
+            <View className="mt-md">
+              <Text className="font-headline-md text-on-surface" style={{ fontSize: 24 }}>
+                Practitioner Insights
+              </Text>
+              <Text className="mt-xs font-body-md text-body-md text-on-surface-variant">
+                Stay updated with verified health professionals.
+              </Text>
+            </View>
+
+            {/* Suggested Groups carousel */}
+            <View className="mt-lg">
+              <View className="mb-sm flex-row items-center justify-between">
+                <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
+                  Suggested Groups
+                </Text>
+                {/* "View All" opens the Community Hub (the full group
+                    browser) by switching to the Community tab. */}
                 <Pressable
-                  key={tab}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: isActive }}
-                  onPress={() => setActiveTab(tab)}
-                  className={`flex-1 rounded-full py-sm ${
-                    isActive ? "bg-surface-container-lowest" : ""
-                  }`}
-                  style={isActive ? segmentShadow : undefined}
+                  accessibilityRole="button"
+                  accessibilityLabel="View all groups"
+                  hitSlop={6}
+                  onPress={() => setActiveTab("Community")}
                 >
-                  <Text
-                    className={`text-center font-label-md text-label-md ${
-                      isActive ? "text-primary" : "text-on-surface-variant"
-                    }`}
-                  >
-                    {tab}
-                  </Text>
+                  <Text className="font-label-md text-label-md text-primary">View All</Text>
                 </Pressable>
-              );
-            })}
-          </View>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 16, paddingBottom: 8 }}
+              >
+                {SUGGESTED_GROUPS.map((g) => (
+                  <GroupCard
+                    key={g.id}
+                    group={g}
+                    joined={joinedGroups.has(g.id)}
+                    onToggleJoin={() => toggleJoin(g.id)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
 
-          {activeTab === "Explore" ? (
-            /* Explore is its own discovery layout (search, trending hero,
-               specialists, topics, suggested community) — it replaces the
-               insights header + groups + feed entirely. */
-            <ExploreScreen />
-          ) : activeTab === "Community" ? (
-            /* Community tab → the Community Hub (group management). Shares
-               the same membership state as the carousel. Note: reaching
-               THIS view requires selecting the in-screen Community tab; the
-               bottom-nav Community button lands on the default feed. */
-            <CommunityHubScreen joinedGroups={joinedGroups} onToggleJoin={toggleJoin} />
-          ) : (
-            <>
-              {/* Header */}
-              <View className="mt-md">
-                <Text className="font-headline-md text-on-surface" style={{ fontSize: 24 }}>
-                  Practitioner Insights
+            {/* Recommended banner — a "For You" discovery affordance, so it's
+                hidden once the user narrows to Following/Community. */}
+            {activeTab === "For You" ? (
+              <View className="mt-lg rounded-xl border border-primary/20 bg-primary-container/10 p-md">
+                <Text className="mb-xs font-label-md text-label-md text-primary">
+                  Recommended for You
                 </Text>
-                <Text className="mt-xs font-body-md text-body-md text-on-surface-variant">
-                  Stay updated with verified health professionals.
+                <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 14 }}>
+                  Discover insights from experts in your circle of interest.
                 </Text>
               </View>
+            ) : null}
 
-              {/* Suggested Groups carousel */}
-              <View className="mt-lg">
-                <View className="mb-sm flex-row items-center justify-between">
-                  <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-                    Suggested Groups
-                  </Text>
-                  {/* "View All" opens the Community Hub (the full group
-                      browser) by switching to the Community tab. */}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="View all groups"
-                    hitSlop={6}
-                    onPress={() => setActiveTab("Community")}
-                  >
-                    <Text className="font-label-md text-label-md text-primary">View All</Text>
-                  </Pressable>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 16, paddingBottom: 8 }}
-                >
-                  {SUGGESTED_GROUPS.map((g) => (
-                    <GroupCard
-                      key={g.id}
-                      group={g}
-                      joined={joinedGroups.has(g.id)}
-                      onToggleJoin={() => toggleJoin(g.id)}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Recommended banner — a "For You" discovery affordance, so it's
-                  hidden once the user narrows to Following/Community. */}
-              {activeTab === "For You" ? (
-                <View className="mt-lg rounded-xl border border-primary/20 bg-primary-container/10 p-md">
-                  <Text className="mb-xs font-label-md text-label-md text-primary">
-                    Recommended for You
-                  </Text>
-                  <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 14 }}>
-                    Discover insights from experts in your circle of interest.
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* Feed — sliced by the active tab. */}
-              <View className="mt-lg gap-lg">
-                {visiblePosts.length > 0 ? (
-                  visiblePosts.map((post) => <PostCard key={post.id} post={post} />)
-                ) : (
-                  <EmptyFeed />
-                )}
-              </View>
-            </>
-          )}
-        </ScrollView>
-
-        <BottomNav
-          active="community"
-          onTabPress={(key) => {
-            // Home is the (app) index route. Overview + Lifestyle have shipped.
-            if (key === "home") router.push("/(app)" as Href);
-            else if (key === "overview") router.push("/(app)/overview" as Href);
-            else if (key === "lifestyle") router.push("/(app)/lifestyle" as Href);
-            // community is the current screen; inbox still a stub.
-          }}
-        />
-      </SafeAreaView>
-    </View>
+            {/* Feed — sliced by the active tab. */}
+            <View className="mt-lg gap-lg">
+              {visiblePosts.length > 0 ? (
+                visiblePosts.map((post) => <PostCard key={post.id} post={post} />)
+              ) : (
+                <EmptyFeed />
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </PatientShell>
   );
 }
 
@@ -385,10 +396,7 @@ function GroupCard({
   // Joining bumps the displayed count by one (the user themselves).
   const memberLabel = formatMembers(group.memberBase + (joined ? 1 : 0));
   return (
-    <View
-      className="w-[200px] overflow-hidden rounded-xl border border-surface-variant bg-surface-container-lowest p-md"
-      style={cardShadow}
-    >
+    <Card className="w-[200px] overflow-hidden">
       {/* Corner gradient wash (bg-gradient-to-br ... opacity-20). */}
       <LinearGradient
         colors={group.wash}
@@ -397,10 +405,9 @@ function GroupCard({
         style={{ position: "absolute", inset: 0, opacity: 0.2 }}
         pointerEvents="none"
       />
-      <View
-        className={`mb-sm h-12 w-12 items-center justify-center rounded-lg ${group.bg}`}
-        style={iconShadow}
-      >
+      {/* The 48px glyph plate carried its own `iconShadow`. An icon plate is a
+          tile, not a floating surface — its own tonal fill is the separation. */}
+      <View className={`mb-sm h-12 w-12 items-center justify-center rounded-lg ${group.bg}`}>
         <MaterialIcons name={group.icon} size={24} color={group.fg} />
       </View>
       <Text className="mb-xs font-label-md text-label-md text-on-surface">{group.name}</Text>
@@ -416,9 +423,7 @@ function GroupCard({
           joined ? "bg-primary-container" : "border border-primary"
         }`}
       >
-        {joined ? (
-          <MaterialIcons name="check" size={14} color="#f4fffc" />
-        ) : null}
+        {joined ? <MaterialIcons name="check" size={14} color="#f4fffc" /> : null}
         <Text
           className={`font-label-sm text-label-sm ${
             joined ? "text-on-primary-container" : "text-primary"
@@ -427,7 +432,7 @@ function GroupCard({
           {joined ? "Joined" : "Join"}
         </Text>
       </Pressable>
-    </View>
+    </Card>
   );
 }
 
@@ -437,10 +442,14 @@ function PostCard({ post }: { post: FeedPost }) {
   const likeCount = post.likes + (liked ? 1 : 0);
 
   return (
-    <View
-      className="overflow-hidden rounded-[20px] border border-surface-variant bg-surface-container-lowest"
-      style={cardShadow}
-    >
+    // FLAGGED for a later pass, NOT adopted onto the shared <Card />: this card
+    // is edge-to-edge — the media band and the action bar bleed to the border
+    // and each section carries its own padding — while <Card /> applies a single
+    // 24px inset to everything inside it. Adopting it here would be a layout
+    // rewrite, which is out of scope for a shadow sweep. The shadow is gone
+    // regardless, and the hairline is now full-strength `outline-variant`
+    // (BRAND's hairline token) since it is the only separation left.
+    <View className="overflow-hidden rounded-[20px] border border-outline-variant bg-card-surface">
       {/* Header */}
       <View className="flex-row items-start gap-sm p-md">
         <Image
@@ -488,9 +497,7 @@ function PostCard({ post }: { post: FeedPost }) {
           {post.imageBadge ? (
             <View className="absolute bottom-3 right-3 flex-row items-center gap-xs rounded-full border border-surface-variant/50 bg-surface/90 px-sm py-xs">
               <MaterialIcons name="article" size={14} color="#00685f" />
-              <Text className="font-label-sm text-label-sm text-on-surface">
-                {post.imageBadge}
-              </Text>
+              <Text className="font-label-sm text-label-sm text-on-surface">{post.imageBadge}</Text>
             </View>
           ) : null}
         </View>
@@ -507,10 +514,7 @@ function PostCard({ post }: { post: FeedPost }) {
               <Text className="mb-xs font-label-md text-label-md text-on-tertiary-fixed">
                 {post.infoCard.title}
               </Text>
-              <Text
-                className="font-body-md text-on-tertiary-fixed/80"
-                style={{ fontSize: 14 }}
-              >
+              <Text className="font-body-md text-on-tertiary-fixed/80" style={{ fontSize: 14 }}>
                 {post.infoCard.text}
               </Text>
             </View>
@@ -532,9 +536,7 @@ function PostCard({ post }: { post: FeedPost }) {
               size={22}
               color={liked ? "#ba1a1a" : "#3d4947"}
             />
-            <Text className="font-label-sm text-label-sm text-on-surface-variant">
-              {likeCount}
-            </Text>
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">{likeCount}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -581,54 +583,16 @@ function EmptyFeed() {
     body: "Follow specialists and communities to see their posts in this feed.",
   };
   return (
-    <View
-      className="items-center gap-sm rounded-[20px] border border-surface-variant bg-surface-container-lowest px-md py-lg"
-      style={cardShadow}
-    >
+    <Card className="items-center gap-sm">
       <View className="h-14 w-14 items-center justify-center rounded-full bg-primary-container/15">
         <MaterialIcons name={copy.icon} size={28} color="#00685f" />
       </View>
       <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
         {copy.title}
       </Text>
-      <Text
-        className="text-center font-body-md text-on-surface-variant"
-        style={{ fontSize: 14 }}
-      >
+      <Text className="text-center font-body-md text-on-surface-variant" style={{ fontSize: 14 }}>
         {copy.body}
       </Text>
-    </View>
+    </Card>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Shadows — same Platform.select pattern as the other screens.
-// ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.05, shadowRadius: 20, shadowOffset: { width: 0, height: 4 } },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const iconShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 } },
-    web: { boxShadow: "0px 1px 4px rgba(71, 85, 105, 0.08)" },
-    android: { elevation: 1 },
-  }) || {};
-
-const segmentShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
-    web: { boxShadow: "0px 2px 8px rgba(71, 85, 105, 0.08)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const appBarShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.05, shadowRadius: 20, shadowOffset: { width: 0, height: 4 } },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 3 },
-  }) || {};

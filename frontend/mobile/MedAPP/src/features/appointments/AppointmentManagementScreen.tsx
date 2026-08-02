@@ -6,37 +6,60 @@
 //   - HomeScreen → Upcoming Appointments section header → "View All"
 //   - (future) Any "My Appointments" entry across the app
 //
-// This is a root-level destination screen — it shows BottomNav with
-// Home active (no dedicated tab for appointments in BottomNav, so we keep
-// home highlighted since it's the entry path most users will use).
+// ============================================================================
+// THIS IS A DETAIL SCREEN (product-owner ruling, 2026-08-01)
+// ============================================================================
+// It used to describe itself as "a root-level destination screen" and wore the
+// patient tab bar with Home forced active, on the reasoning that Home "is the
+// entry path most users will use". The PO has ruled the other way: Appointments
+// is NOT one of the five patient tabs, so the bar could only ever render a lie —
+// either nothing selected, or Home selected while the user is demonstrably not
+// on Home. Figma has no `Active=Appointments` value to fake it with, and that
+// absence is deliberate (`Patient BottomTabBar` set 740:1015 ships exactly the
+// five tab values).
+//
+// So the chrome is now the canonical detail chrome, which is one rule in
+// docs/BRAND.md §App shell and not two: "Detail screens don't get the bottom nav
+// — they get a back button in the app bar instead."
+//
+//   was   hand-rolled bar (avatar + "MedApp" wordmark + dead bell) + BottomNav
+//   then  <DetailAppBar title="Appointments" /> inside a hand-rolled
+//         SafeAreaView + StatusBar wrapper, Figma 193:120, no bottom nav
+//   now   <DetailShell title="Appointments">, which owns that wrapper too —
+//         the 15 improvised copies of it are what DetailShell exists to delete
+//
+// What that trade actually costs and buys:
+//   - GAINED a real way out. The old bar had none; the only exit was a tab,
+//     which navigated somewhere unrelated.
+//   - LOST the five-tab jump-off. Intended: a detail screen returns to where it
+//     was pushed from, and both entry points (BookingConfirmed, HomeScreen
+//     "View All") are themselves tab roots.
+//   - LOST a dead bell (a Pressable with no `onPress` at all) and a wordmark
+//     rendered as `<Text>`. Neither belongs on a detail bar — 193:120's own
+//     description: "No logo — the logo belongs only on tab-root screens."
+//   - The 28px body `<Text>Appointments</Text>` is GONE, because the bar now
+//     carries the screen name and two identical headings one above the other is
+//     a stutter for a screen reader as much as for the eye. The subtitle line
+//     ("Manage your clinical sessions and history.") is kept.
+//
+// Entry points are unchanged and both push, so `router.back()` — DetailAppBar's
+// default — is always correct here.
 //
 // Translation rules:
-//   - sticky glass-nav header → opaque bg-surface/80 + border + shadow.
 //   - tabs (Upcoming | Past) → segmented control with bottom underline.
 //   - status pills (Confirmed / In Review / Completed) → inline-coloured pills.
 //   - Past tab uses muted/grayscale cards with "View Summary" CTA.
 //   - location_on → location-on. calendar_today → calendar-today.
-//   - grid_view → "Home" stays active since there is no Appointments tab.
 //   - Seed data with two upcoming + two past appointments. Replace with
 //     useQuery(["appointments"]) once GET /v1/appointments ships.
 
 import { useState } from "react";
-import {
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { router, type Href } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-import { useAuthStore } from "@/store/auth-store";
-import { BottomNav } from "@/features/home/components/BottomNav";
-
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { router } from "expo-router";
+import { DetailShell } from "@/components/shell";
+import { Button, Icon } from "@/components/ui";
+import { blendTokens, useTokenColor } from "@/lib/tokens";
+import { useResolvedScheme } from "@/lib/theme";
 
 type AppointmentStatus = "confirmed" | "in_review" | "completed";
 
@@ -105,18 +128,45 @@ const PAST_APPOINTMENTS: PastAppointment[] = [
   },
 ];
 
+/**
+ * Status chip tones, taken from the design system's own status vocabulary
+ * (`Badge`'s TONE table) rather than invented here — same tint-over-accent
+ * shape, so the two agree when this screen finally adopts `Badge`.
+ *
+ * Both entries used to be literals, and the pair was the textbook version of
+ * the hex-in-two-roles trap:
+ *
+ *   confirmed  bg rgba(0,104,95,0.12)  = `primary` at a tint  -> bg-primary/10
+ *              text #00685f            = `primary` as CONTENT -> text-primary
+ *   in_review  bg rgba(0,131,120,0.15) = `primary-container`  -> see below
+ *              text #008378            = `primary-container`  -> see below
+ *
+ * `#008378` is literally the light value of `primary-container`, and matching
+ * the hex is exactly what must NOT be done here: `primary-container` is a
+ * SURFACE token whose dark value is #005049, so using it as the chip's label
+ * colour would have painted dark teal text on a dark teal wash the moment the
+ * app flipped. A container token's content pair is `on-primary-container`,
+ * never the container itself.
+ *
+ * "In Review" is therefore the `info` tone — `tertiary`, the accent the design
+ * system already reserves for informational status. That also fixes a second
+ * defect the literals hid: at #00685f vs #008378 the two statuses differed by
+ * one barely-perceptible shade of the same teal, i.e. a clinical state
+ * signalled by colour alone at a distance no one can resolve (docs/BRAND.md
+ * §Colour rules).
+ */
 const STATUS_STYLES: Record<
   UpcomingAppointment["status"],
   { bg: string; text: string; label: string }
 > = {
   confirmed: {
-    bg: "rgba(0,104,95,0.12)",
-    text: "#00685f",
+    bg: "bg-primary/10",
+    text: "text-primary",
     label: "Confirmed",
   },
   in_review: {
-    bg: "rgba(0,131,120,0.15)",
-    text: "#008378",
+    bg: "bg-tertiary/10",
+    text: "text-tertiary",
     label: "In Review",
   },
 };
@@ -126,115 +176,136 @@ const STATUS_STYLES: Record<
 // ---------------------------------------------------------------------------
 
 export function AppointmentManagementScreen() {
-  const user = useAuthStore((s) => s.user);
-  const firstName = user?.displayName?.trim().split(/\s+/)[0] || "there";
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* ----------------------------------------------------------------
-            App bar — root tab style (avatar + MedApp + notifications)
-        ---------------------------------------------------------------- */}
+    /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
+       The `useResolvedScheme()` StatusBar line this screen hand-rolled is now
+       the shell's, verbatim and in one place; the local hook call is gone.
+
+       `claimsBottomInset` is left at its default. The old wrapper passed
+       `edges={["top","left","right"]}` — correct only while the deleted bottom
+       nav was sitting in that inset. With no nav and nothing pinned, the shell
+       claims it so the list cannot run under the gesture bar.
+
+       No `onBack`: both entry points (BookingConfirmed, HomeScreen "View All")
+       push, so DetailAppBar's default `router.back()` is right, and it no-ops
+       rather than throwing if this screen is ever deep-linked with no history.
+       The bar takes no `style`/`className`, so this screen cannot grow a private
+       variant of it again — which is how it got a frozen `#00685f` bell before. */
+    <DetailShell title="Appointments">
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 24,
+          paddingTop: 16,
+          // 32, not the 140 this screen carried. That 140 was sized to clear the
+          // bottom nav; the nav is gone and the shell now adds the bottom inset
+          // on top, so keeping it would leave ~170px of dead space under the last
+          // card. 32 is what the three sibling booking screens use.
+          paddingBottom: 32,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Subtitle only — the screen name now lives in the app bar (see the
+            header note). Repeating it here at 28px would announce
+            "Appointments, heading. Appointments." */}
+        <Text className="font-body-md text-on-surface-variant mb-md">
+          Manage your clinical sessions and history.
+        </Text>
+
+        {/* ==================================================================
+            "Book new" — the missing head of the new-booking funnel
+            ==================================================================
+            Until this button, this screen offered Reschedule and nothing else,
+            which meant a patient could move an appointment they already had and
+            could not make one they didn't. There was no "book" affordance
+            anywhere in the app except on the practitioner profile, and the only
+            way into that profile is the provider directory, which had no inbound
+            link at all. This is one of the two ends that reconnects.
+
+            IT ROUTES TO `find-care`, NOT TO `select-time-slot`, and that is the
+            whole decision. `select-time-slot` is a slot picker FOR a
+            practitioner — its own params are practitionerName /
+            practitionerSpecialty / practitionerAvatar, which is exactly what
+            Reschedule passes it two hundred lines below, because a reschedule
+            already knows the doctor. A NEW booking does not. A "Book" button
+            that jumped straight to the slot picker would have to either invent a
+            practitioner or push no params and land the screen in its
+            expired/no-data state, and a push that lands a screen in its "session
+            expired" state is not a working link. So the order is the honest one:
+            choose a provider, then a slot.
+
+              Appointments -> Book new -> find-care -> provider card
+                           -> practitioner-telehealth-profile -> Book appointment
+                           -> select-time-slot -> review-appointment
+                           -> booking-confirmed
+
+            `find-care` is a directory root and takes no params, so there is
+            nothing to carry — the push is complete as written.
+
+            The shared `Button`, not a sixth hand-rolled Pressable: this file
+            already draws four (Reschedule / Cancel / View Summary and the tabs),
+            all of them private, and the flagged structural clean-up above says
+            those move to the design system as one job. A NEW control has no
+            reason to join the queue.
+
+            `shadow={false}` is not cosmetic. `Button`'s primary variant carries
+            the `elevation/cta` blur by default, and this screen's closing note
+            states plainly that nothing on it floats — no sheet, menu, dialog,
+            toast or FAB — which is why every shadow here was deleted rather than
+            retokenised. An inline CTA in a scrolling page is not a floating
+            surface, so it must opt out or that statement stops being true.
+
+            It sits above the segmented control on purpose: booking is not a
+            property of the Upcoming tab or the Past tab, and putting it inside
+            either would make it disappear when you switched. */}
+        <Button
+          label="Book new appointment"
+          variant="primary"
+          size="cta"
+          leadingIcon="add"
+          shadow={false}
+          onPress={() =>
+            // Route added in an earlier iteration — typedRoutes regenerates the
+            // pathname union on the next dev server start, matching the cast the
+            // Reschedule push below already uses.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            router.push("/(app)/find-care" as any)
+          }
+          className="mb-md"
+        />
+
+        {/* Tabs */}
         <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
+          className="mb-md flex-row border-b border-outline-variant/40"
+          style={{ marginHorizontal: -4 }}
         >
-          <View className="flex-row items-center gap-sm">
-            <View className="h-10 w-10 overflow-hidden rounded-full border-2 border-primary/20">
-              {user?.avatarUrl ? (
-                <Image
-                  source={{ uri: user.avatarUrl }}
-                  className="h-full w-full"
-                  accessibilityLabel="Your profile"
-                />
-              ) : (
-                <View className="h-full w-full items-center justify-center bg-primary-container">
-                  <Text className="font-label-md text-label-md text-on-primary-container">
-                    {firstName[0]?.toUpperCase() ?? "?"}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text className="font-headline-md text-headline-md text-primary">
-              MedApp
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            hitSlop={8}
-            className="rounded-full p-sm active:scale-95"
-          >
-            <MaterialIcons name="notifications" size={24} color="#00685f" />
-          </Pressable>
+          <TabButton
+            label="Upcoming"
+            active={tab === "upcoming"}
+            onPress={() => setTab("upcoming")}
+          />
+          <TabButton
+            label="Past"
+            active={tab === "past"}
+            onPress={() => setTab("past")}
+          />
         </View>
 
-        <ScrollView
-          contentContainerStyle={{
-            paddingHorizontal: 24,
-            paddingTop: 16,
-            paddingBottom: 140,
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Title + subtitle */}
-          <Text
-            className="text-on-surface mb-xs"
-            style={{
-              fontSize: 28,
-              fontWeight: "700",
-              letterSpacing: -0.3,
-            }}
-          >
-            Appointments
-          </Text>
-          <Text className="font-body-md text-on-surface-variant mb-md">
-            Manage your clinical sessions and history.
-          </Text>
-
-          {/* Tabs */}
-          <View
-            className="mb-md flex-row border-b border-outline-variant/40"
-            style={{ marginHorizontal: -4 }}
-          >
-            <TabButton
-              label="Upcoming"
-              active={tab === "upcoming"}
-              onPress={() => setTab("upcoming")}
-            />
-            <TabButton
-              label="Past"
-              active={tab === "past"}
-              onPress={() => setTab("past")}
-            />
-          </View>
-
-          {/* List */}
-          <View className="gap-md">
-            {tab === "upcoming"
-              ? UPCOMING_APPOINTMENTS.map((a) => (
-                  <UpcomingCard key={a.id} appointment={a} />
-                ))
-              : PAST_APPOINTMENTS.map((a) => (
-                  <PastCard key={a.id} appointment={a} />
-                ))}
-          </View>
-        </ScrollView>
-
-        <BottomNav
-          active="home"
-          onTabPress={(key) => {
-            if (key === "home") router.replace("/(app)" as Href);
-            else if (key === "overview") router.push("/(app)/overview" as Href);
-            else if (key === "inbox") router.push("/(app)/inbox" as Href);
-            else if (key === "community") router.push("/(app)/community" as Href);
-            else if (key === "lifestyle") router.push("/(app)/lifestyle" as Href);
-          }}
-        />
-      </SafeAreaView>
-    </View>
+        {/* List */}
+        <View className="gap-md">
+          {tab === "upcoming"
+            ? UPCOMING_APPOINTMENTS.map((a) => (
+                <UpcomingCard key={a.id} appointment={a} />
+              ))
+            : PAST_APPOINTMENTS.map((a) => (
+                <PastCard key={a.id} appointment={a} />
+              ))}
+        </View>
+      </ScrollView>
+      {/* No bottom nav — DetailShell has no prop for one, structurally, and
+          docs/BRAND.md §App shell forbids one on a detail screen. */}
+    </DetailShell>
   );
 }
 
@@ -251,6 +322,17 @@ function TabButton({
   active: boolean;
   onPress: () => void;
 }) {
+  // Both were literals, and both are the SAME role in two states rather than
+  // two colours: the selected tab's indicator and its label are the accent
+  // (`primary`), the unselected label is de-emphasised body content
+  // (`on-surface-variant`). `#3d4947` is the light value of the latter, but the
+  // match is a coincidence — read as a colour it would have stayed a
+  // near-black grey on a near-black page, which is what the dark capture shows
+  // for "Past". `transparent` stays literal: the unselected tab has no
+  // indicator, which is an absence, not a colour.
+  const accent = useTokenColor("primary");
+  const muted = useTokenColor("on-surface-variant");
+
   return (
     <Pressable
       accessibilityRole="tab"
@@ -262,7 +344,7 @@ function TabButton({
         paddingVertical: 14,
         alignItems: "center",
         borderBottomWidth: 2,
-        borderBottomColor: active ? "#00685f" : "transparent",
+        borderBottomColor: active ? accent : "transparent",
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -270,7 +352,7 @@ function TabButton({
         style={{
           fontSize: 14,
           fontWeight: "600",
-          color: active ? "#00685f" : "#3d4947",
+          color: active ? accent : muted,
         }}
       >
         {label}
@@ -289,12 +371,31 @@ function UpcomingCard({
   appointment: UpcomingAppointment;
 }) {
   const statusStyle = STATUS_STYLES[appointment.status];
+  // Icon `color` and a Pressable's style-callback background are the two things
+  // that cannot be a class, so they resolve by TOKEN NAME for the current mode
+  // (src/lib/tokens.ts) instead of carrying a hex.
+  const mutedGlyph = useTokenColor("on-surface-variant");
+  const accent = useTokenColor("primary");
+  const danger = useTokenColor("error");
+  // The pressed wash is the same accent at the same 8% the literals used, so
+  // the press feels identical — it just composites over whichever card surface
+  // is underneath in the current mode.
+  const accentPressed = useTokenColor("primary", 0.08);
+  const dangerPressed = useTokenColor("error", 0.08);
 
   return (
-    <View
-      className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-md"
-      style={cardShadow}
-    >
+    // Card: no drop shadow (docs/BRAND.md §Elevation). The hairline goes from
+    // `outline-variant/30` to FULL strength, because with the blur gone the
+    // hairline and the fill step are the entire separation — a 30% hairline
+    // against a near-equal background is no edge at all.
+    //
+    // FLAGGED for a later pass, deliberately NOT done here: this is not the
+    // shared `Card`. Adopting it would take the radius 12 -> 24 on this card
+    // only, and UpcomingCard/PastCard are a matched pair rendered in the same
+    // list — half-migrating them would trade one inconsistency for a worse,
+    // more local one. Both should move to `Card` together, along with this
+    // screen's ~30 literal hexes, as one job.
+    <View className="rounded-xl border border-outline-variant bg-surface-container-lowest p-md">
       {/* Header row */}
       <View className="mb-md flex-row items-start justify-between gap-sm">
         <View className="flex-1 flex-row items-center gap-md">
@@ -324,7 +425,8 @@ function UpcomingCard({
               {appointment.specialty}
             </Text>
             <View className="mt-xs flex-row items-center gap-xs">
-              <MaterialIcons name="location-on" size={14} color="#3d4947" />
+              {/* Decorative — the facility name is right beside it. */}
+              <Icon chrome="location-on" size={14} color={mutedGlyph} />
               <Text
                 className="text-on-surface-variant"
                 style={{ fontSize: 12 }}
@@ -336,18 +438,19 @@ function UpcomingCard({
           </View>
         </View>
 
-        {/* Status pill */}
+        {/* Status pill — tone table above; both halves are classes now, so the
+            tint and its label flip together instead of one of them freezing. */}
         <View
+          className={statusStyle.bg}
           style={{
-            backgroundColor: statusStyle.bg,
             paddingHorizontal: 10,
             paddingVertical: 4,
             borderRadius: 999,
           }}
         >
           <Text
+            className={statusStyle.text}
             style={{
-              color: statusStyle.text,
               fontSize: 11,
               fontWeight: "700",
             }}
@@ -361,7 +464,8 @@ function UpcomingCard({
       <View
         className="mb-md flex-row items-center gap-sm rounded-lg bg-surface-container-low p-sm"
       >
-        <MaterialIcons name="calendar-today" size={20} color="#00685f" />
+        {/* Decorative — the date is the content of the row. */}
+        <Icon chrome="calendar-today" size={20} color={accent} />
         <View className="flex-1">
           <Text
             className="text-on-surface"
@@ -406,14 +510,12 @@ function UpcomingCard({
             paddingHorizontal: 16,
             borderRadius: 10,
             borderWidth: 1.5,
-            borderColor: "#00685f",
-            backgroundColor: pressed
-              ? "rgba(0,104,95,0.08)"
-              : "transparent",
+            borderColor: accent,
+            backgroundColor: pressed ? accentPressed : "transparent",
             alignItems: "center",
           })}
         >
-          <Text style={{ color: "#00685f", fontSize: 14, fontWeight: "600" }}>
+          <Text style={{ color: accent, fontSize: 14, fontWeight: "600" }}>
             Reschedule
           </Text>
         </Pressable>
@@ -426,17 +528,15 @@ function UpcomingCard({
             paddingHorizontal: 16,
             borderRadius: 10,
             borderWidth: 1.5,
-            borderColor: "#ba1a1a",
-            backgroundColor: pressed
-              ? "rgba(186,26,26,0.08)"
-              : "transparent",
+            borderColor: danger,
+            backgroundColor: pressed ? dangerPressed : "transparent",
             alignItems: "center",
           })}
           onPress={() => {
             // TODO: hook into DELETE /v1/appointments/:id once ready.
           }}
         >
-          <Text style={{ color: "#ba1a1a", fontSize: 14, fontWeight: "600" }}>
+          <Text style={{ color: danger, fontSize: 14, fontWeight: "600" }}>
             Cancel
           </Text>
         </Pressable>
@@ -450,6 +550,18 @@ function UpcomingCard({
 // ---------------------------------------------------------------------------
 
 function PastCard({ appointment }: { appointment: PastAppointment }) {
+  const { scheme } = useResolvedScheme();
+  const mutedGlyph = useTokenColor("on-surface-variant");
+  // The avatar placeholder silhouette is deliberately low-emphasis, which is
+  // what `outline` is for — it clears the 3:1 icon floor in both modes without
+  // reading as content.
+  const placeholderGlyph = useTokenColor("outline");
+  // M3 state layer rather than a second grey: the tonal button's own surface
+  // tinted 8% towards its content colour. The literals were `#dee4e1` resting
+  // and `#d6dbd9` pressed — two hand-picked light greys that both stayed light
+  // grey in dark mode, taking near-black "View Summary" text with them.
+  const summaryPressed = blendTokens("surface-container-highest", "on-surface", 0.08, scheme);
+
   return (
     <View
       className="rounded-xl border border-surface-container-highest bg-surface-container p-md"
@@ -457,17 +569,24 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
     >
       <View className="mb-md flex-row items-start justify-between gap-sm">
         <View className="flex-1 flex-row items-center gap-md">
+          {/* Avatar placeholder plate. `#d6dbd9` was `surface-dim`'s light
+              value, which is the trap in miniature: `surface-dim` is the PAGE
+              at its dimmest, and in dark mode it is #0E1514 — the plate would
+              have vanished into the card it sits on. The role is a plate raised
+              off a `surface-container` card, i.e. `surface-container-highest`,
+              which steps the correct way in both modes. */}
           <View
+            className="bg-surface-container-highest"
             style={{
               width: 56,
               height: 56,
               borderRadius: 12,
-              backgroundColor: "#d6dbd9",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <MaterialIcons name="person" size={28} color="#6d7a77" />
+            {/* Decorative — the doctor's name is beside it. */}
+            <Icon chrome="person" size={28} color={placeholderGlyph} />
           </View>
           <View className="flex-1">
             <Text
@@ -490,7 +609,8 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
               {appointment.specialty}
             </Text>
             <View className="mt-xs flex-row items-center gap-xs">
-              <MaterialIcons name="location-on" size={14} color="#3d4947" />
+              {/* Decorative — the facility name is right beside it. */}
+              <Icon chrome="location-on" size={14} color={mutedGlyph} />
               <Text
                 className="text-on-surface-variant"
                 style={{ fontSize: 12 }}
@@ -502,15 +622,22 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
           </View>
         </View>
 
+        {/* "Completed" is the NEUTRAL status tone — a finished appointment
+            carries no accent — which is `Badge`'s neutral pair: a surface step
+            up from the card, labelled `on-surface-variant`. Same two tokens
+            the literals happened to equal in light, chosen for the role. */}
         <View
+          className="bg-surface-container-highest"
           style={{
-            backgroundColor: "#dee4e1",
             paddingHorizontal: 10,
             paddingVertical: 4,
             borderRadius: 999,
           }}
         >
-          <Text style={{ color: "#3d4947", fontSize: 11, fontWeight: "700" }}>
+          <Text
+            className="text-on-surface-variant"
+            style={{ fontSize: 11, fontWeight: "700" }}
+          >
             Completed
           </Text>
         </View>
@@ -529,15 +656,21 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
         onPress={() => {
           // TODO: route to consultation summary screen once ready.
         }}
+        className="bg-surface-container-highest"
         style={({ pressed }) => ({
           width: "100%",
           paddingVertical: 10,
           borderRadius: 10,
-          backgroundColor: pressed ? "#d6dbd9" : "#dee4e1",
+          // Resting fill is the class above; only the pressed state needs a
+          // resolved value, because NativeWind can't drive a style callback.
+          ...(pressed ? { backgroundColor: summaryPressed } : null),
           alignItems: "center",
         })}
       >
-        <Text style={{ color: "#171d1c", fontSize: 13, fontWeight: "600" }}>
+        {/* `#171d1c` is `on-surface`'s light value, and here it genuinely IS
+            on-surface — the label of a tonal surface, not a filled accent. It
+            flips to #DEE4E1 on the dark plate. */}
+        <Text className="text-on-surface" style={{ fontSize: 13, fontWeight: "600" }}>
           View Summary
         </Text>
       </Pressable>
@@ -546,29 +679,44 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
 }
 
 // ---------------------------------------------------------------------------
-// Shadows
+// Shadows — none. There is no `appBarShadow` constant here any more.
 // ---------------------------------------------------------------------------
-
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const cardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.05,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    web: { boxShadow: "0px 4px 16px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
+// `appBarShadow` (black `0 2px 8px`) and `cardShadow` (slate-grey `0 4px 16px`)
+// are gone with their callers; the last thing keeping `appBarShadow` even as a
+// documented ghost was the hand-rolled bar, and that is gone too. Neither
+// existed as a Figma effect or a token, and docs/BRAND.md §Elevation gives bars
+// and cards surface tone plus a hairline. Nothing on this screen floats — no
+// sheet, menu, dialog, toast or FAB — so nothing keeps a blur. DetailAppBar
+// cannot be given one: it accepts no `style` and no `className`.
+//
+// ---------------------------------------------------------------------------
+// DONE IN THE DARK-MODE PASS (2026-08-02): the literals are gone
+// ---------------------------------------------------------------------------
+// Every literal colour above is now a token, chosen by the ROLE of the element
+// rather than by matching its light-mode hex — the two `#3d4947`s are
+// `on-surface-variant` because they are de-emphasised content, but `#008378`
+// is NOT `primary-container`, because that token is a surface and was being
+// used as a label. See STATUS_STYLES.
+//
+// The raw `MaterialIcons` import went with them. It had to: an icon's `color`
+// is a prop, not a class, so tokenising the four glyphs meant touching those
+// exact call sites, and docs/BRAND.md allows exactly one file to import an icon
+// library. All four are decorative and sit beside their own label, so they pass
+// no `label` and stay hidden from assistive tech.
+//
+// ---------------------------------------------------------------------------
+// STILL FLAGGED, deliberately NOT done here
+// ---------------------------------------------------------------------------
+//  1. STRUCTURE. The two cards are still not the shared `Card`, and the two
+//     status pills are still not the shared `Badge` — they only borrow those
+//     components' tokens. Adopting them takes the card radius 12 -> 24 and the
+//     pill to uppercase 10px, i.e. a layout change. UpcomingCard and PastCard
+//     are a matched pair in one list and must move together, in one job.
+//  2. TYPE. This screen sets 10, 11, 13 and 15px inline and none of it is on
+//     the BRAND ramp; 10 and 11 are under the 12sp floor outright (the status
+//     pills, the two uppercase eyebrows, "Completed on …", "View Summary").
+//     Out of scope for a colour pass — resizing type reflows all four cards —
+//     but it is a live accessibility defect, not a preference.
+//  3. AVATARS. `UpcomingCard` still <Image>s a Google-CDN URI with no fallback,
+//     which docs/BRAND.md §App shell forbids ("photo -> initials -> person
+//     silhouette"). `AvatarWithFallback` is the fix and belongs with (1).

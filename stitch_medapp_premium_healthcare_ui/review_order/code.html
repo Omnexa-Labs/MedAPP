@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Review Prescription Order</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+    </style>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                            "on-primary-fixed-variant": "#005049",
+                            "on-surface-variant": "#3d4947",
+                            "on-surface": "#171d1c",
+                            "on-background": "#171d1c",
+                            "primary-fixed": "#89f5e7",
+                            "tertiary": "#0058be",
+                            "outline": "#6d7a77",
+                            "on-tertiary-fixed-variant": "#004395",
+                            "tertiary-fixed": "#d8e2ff",
+                            "on-secondary-fixed-variant": "#3a485b",
+                            "surface-container": "#eaefed",
+                            "on-secondary": "#ffffff",
+                            "inverse-surface": "#2c3130",
+                            "surface-container-low": "#f0f5f2",
+                            "surface": "#f5faf8",
+                            "secondary-fixed-dim": "#b9c7df",
+                            "surface-tint": "#006a61",
+                            "on-primary-fixed": "#00201d",
+                            "tertiary-container": "#2170e4",
+                            "inverse-primary": "#6bd8cb",
+                            "secondary-fixed": "#d5e3fc",
+                            "outline-variant": "#bcc9c6",
+                            "error-container": "#ffdad6",
+                            "on-error": "#ffffff",
+                            "surface-variant": "#dee4e1",
+                            "surface-container-highest": "#dee4e1",
+                            "on-tertiary": "#ffffff",
+                            "primary": "#00685f",
+                            "on-secondary-container": "#57657a",
+                            "surface-container-high": "#e4e9e7",
+                            "primary-container": "#008378",
+                            "surface-container-lowest": "#ffffff",
+                            "on-secondary-fixed": "#0d1c2e",
+                            "on-primary": "#ffffff",
+                            "secondary-container": "#d5e3fc",
+                            "primary-fixed-dim": "#6bd8cb",
+                            "on-error-container": "#93000a",
+                            "error": "#ba1a1a",
+                            "on-primary-container": "#f4fffc",
+                            "on-tertiary-fixed": "#001a42",
+                            "background": "#f5faf8",
+                            "surface-dim": "#d6dbd9",
+                            "tertiary-fixed-dim": "#adc6ff",
+                            "on-tertiary-container": "#fefcff",
+                            "surface-bright": "#f5faf8",
+                            "secondary": "#515f74",
+                            "inverse-on-surface": "#edf2f0"
+                    },
+                    "borderRadius": {
+                            "DEFAULT": "0.25rem",
+                            "lg": "0.5rem",
+                            "xl": "0.75rem",
+                            "full": "9999px"
+                    },
+                    "spacing": {
+                            "gutter": "24px",
+                            "xl": "80px",
+                            "lg": "48px",
+                            "container-max": "1280px",
+                            "sm": "12px",
+                            "xs": "4px",
+                            "md": "24px",
+                            "base": "8px"
+                    },
+                    "fontFamily": {
+                            "headline-md": ["Manrope"],
+                            "body-md": ["Inter"],
+                            "body-lg": ["Inter"],
+                            "headline-xl": ["Manrope"],
+                            "label-sm": ["Inter"],
+                            "label-md": ["Inter"],
+                            "headline-lg-mobile": ["Manrope"],
+                            "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                            "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                            "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                            "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                            "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                            "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                            "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                            "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                            "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen antialiased flex flex-col pb-32">
+<!-- Transactional Header (Nav Suppressed) -->
+<header class="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-outline-variant/20">
+<div class="flex items-center h-16 px-4 md:px-gutter max-w-container-max mx-auto">
+<button aria-label="Go back" class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-variant/50 hover:text-primary transition-colors -ml-2">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="ml-2 font-headline-md text-headline-md text-on-surface">Review Order</h1>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-3xl mx-auto px-4 md:px-gutter py-md md:py-lg">
+<!-- Progress Stepper -->
+<div class="relative flex items-center justify-between mb-lg px-2">
+<!-- Background Line -->
+<div class="absolute top-4 left-0 w-full h-[2px] bg-surface-variant -z-10"></div>
+<!-- Progress Line (Active to Step 3) -->
+<div class="absolute top-4 left-0 w-full h-[2px] bg-primary -z-10"></div>
+<!-- Step 1: Cart -->
+<div class="flex flex-col items-center gap-xs bg-background px-2">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_0_12px_rgba(0,104,95,0.3)]">
+<span class="material-symbols-outlined text-[18px]" data-icon="check" style="font-variation-settings: 'wght' 600;">check</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Cart</span>
+</div>
+<!-- Step 2: Details -->
+<div class="flex flex-col items-center gap-xs bg-background px-2">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-[0_0_12px_rgba(0,104,95,0.3)]">
+<span class="material-symbols-outlined text-[18px]" data-icon="check" style="font-variation-settings: 'wght' 600;">check</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Details</span>
+</div>
+<!-- Step 3: Review (Active) -->
+<div class="flex flex-col items-center gap-xs bg-background px-2">
+<div class="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-md text-label-md ring-4 ring-primary/20">
+                    3
+                </div>
+<span class="font-label-sm text-label-sm text-primary font-bold">Review</span>
+</div>
+</div>
+<!-- Pharmacy Details Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] p-md mb-md">
+<h2 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-4">Pickup Location</h2>
+<div class="flex items-start gap-4">
+<div class="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[24px]" data-icon="local_pharmacy">local_pharmacy</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-1">MediCare Central</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">123 Healthway Blvd, Suite 100<br/>Medical District, NY 10001</p>
+<div class="mt-3 flex items-center gap-2 bg-surface-container-low w-fit px-3 py-1.5 rounded-full">
+<span class="material-symbols-outlined text-primary text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-label-sm text-label-sm text-primary">Open until 9:00 PM</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Order Summary Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] p-md mb-md">
+<div class="flex justify-between items-center mb-4">
+<h2 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Prescription</h2>
+<button class="font-label-md text-label-md text-primary hover:text-primary-container transition-colors">Edit</button>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-16 h-16 rounded-lg bg-surface-container overflow-hidden shrink-0 border border-outline-variant/20">
+<img alt="Medication" class="w-full h-full object-cover" data-alt="A clean, brightly lit macro photograph of a white prescription pill bottle lying on its side, next to a small cluster of round, white medicinal tablets scattered on a sterile, light blue-grey clinical surface. The lighting is soft and even, creating a modern healthcare environment aesthetic. The focus is incredibly sharp on the pills, conveying precision and medical accuracy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAGpn1_YRbM6vz89Y11ugZZJT8cbLxjIGaQy3AYZ8ZxHwBSvqUro1TwEpmWkMu5AQgsK4kpkamENXae1Yeuy6Ib7Wx3uwew0ENWKGRWAIBWd_IjscOeQvCZ4v_dKx0JDG5-cfJMKyYe1wDtAbY4QK0yguWV6tS5qcESufoSe1lEqmihsUFP8WxLSIdkXNeumocbMwxhCOMXxrg0gWCYKexuegPYBKNNSA0rKfzqppjXi5Pct8pHaJhWO8nWD3BC5mtllHhapY1dMZTQ"/>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-on-surface">Lisinopril 10mg</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Qty: 30 tablets • 30 day supply</p>
+</div>
+</div>
+<div class="mt-4 pt-4 border-t border-outline-variant/20 flex gap-2 items-start">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5" data-icon="info">info</span>
+<p class="font-label-sm text-label-sm text-secondary">Prescription required at pickup. Please bring a valid ID.</p>
+</div>
+</section>
+<!-- Cost Breakdown Card -->
+<section class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] p-md mb-lg">
+<h2 class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest mb-4">Payment Summary</h2>
+<!-- Insurance applied banner -->
+<div class="flex items-center gap-3 p-3 bg-surface-container rounded-lg mb-6 border border-primary/10">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[18px]" data-icon="verified_user">verified_user</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface">BlueCross Health Plan</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Insurance applied successfully</p>
+</div>
+</div>
+<!-- Line Items -->
+<div class="space-y-4 font-body-md text-body-md text-on-surface-variant">
+<div class="flex justify-between items-center">
+<span>Retail Price</span>
+<span>$24.99</span>
+</div>
+<div class="flex justify-between items-center text-primary font-medium">
+<span>Insurance Coverage</span>
+<span>-$14.99</span>
+</div>
+<div class="flex justify-between items-center">
+<span>Taxes</span>
+<span>$0.00</span>
+</div>
+<div class="h-[1px] bg-outline-variant/30 w-full my-2"></div>
+<div class="flex justify-between items-end">
+<span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wide">Total Due</span>
+<span class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface text-primary">$10.00</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Sticky Action Area (Level 2 Elevation) -->
+<div class="fixed bottom-0 left-0 w-full bg-surface/95 backdrop-blur-xl border-t border-outline-variant/20 p-4 md:px-gutter z-50 pb-safe shadow-[0px_-10px_30px_rgba(71,85,105,0.08)]">
+<div class="max-w-3xl mx-auto flex items-center justify-between gap-4">
+<div class="hidden sm:block">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Total Due at Pickup</p>
+<p class="font-headline-md text-headline-md text-on-surface">$10.00</p>
+</div>
+<button class="flex-1 sm:flex-none w-full sm:w-auto bg-primary hover:bg-primary-container text-on-primary font-label-md text-label-md py-4 px-8 rounded-full transition-all duration-200 shadow-md active:scale-95 flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-on-primary-fixed-variant">
+<span class="material-symbols-outlined" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+                Confirm Order
+            </button>
+</div>
+</div>
+</body></html>

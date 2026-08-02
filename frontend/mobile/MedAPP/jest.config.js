@@ -13,6 +13,13 @@ module.exports = {
   ],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
+    // Jest doesn't run Metro's SVG transformer, so icon .svg imports (Health
+    // Icons) are stubbed with a plain component. Tests assert behaviour and
+    // labels, not glyph geometry.
+    "\\.svg$": "<rootDir>/src/test/svg-mock.tsx",
   },
+  setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
   testMatch: ["<rootDir>/src/**/*.test.{ts,tsx}", "<rootDir>/src/**/__tests__/**/*.{ts,tsx}"],
+  // src/test holds mocks/setup, not specs — don't treat them as test suites.
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/src/test/"],
 };

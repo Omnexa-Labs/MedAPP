@@ -1,614 +1,775 @@
-// Select Time & Consultation Type screen — translated from the Stitch
-// "Book Appointment" HTML.
+// Select Time & Consultation Type — step 1 of the booking journey.
 //
-// Entry points (all "Book Appointment" CTAs in the app):
-//   - PractitionerTelehealthProfileScreen → "Book Appointment"
-//   - (future) Any partner / clinic detail screen with a booking CTA
+// Figma page 144:107. Frames reconciled against, all five of them:
+//   756:4384  default (light)     757:5286  loading (skeletons)
+//   759:2169  dark                757:5597  no slots for the chosen date
+//   758:2091  keyboard open
 //
-// This is a PUSHED, task-focused screen. Per the Stitch comp:
-//   - BottomNav is suppressed (transactional journey).
-//   - Sticky "Book Now" CTA at the bottom advances to ReviewAppointment.
+// Entry points: every "Book Appointment" CTA (PractitionerTelehealthProfile
+// today; any clinic/partner detail screen later). PUSHED and task-focused, so no
+// BottomNav — docs/BRAND.md §App shell.
 //
-// Translation rules (HTML → React Native):
-//   - backdrop-blur header / action bar → opaque bg-surface/80 + border + shadow.
-//   - hover:* / focus:ring → dropped.
-//   - overflow-x-auto → horizontal ScrollView with showsHorizontalScrollIndicator={false}.
-//   - 3-col grid for time slots → flex-row flex-wrap with width: "31%".
-//   - calendar_add_on → event-available (closest MaterialIcons match).
-//   - verified → check-circle (consistent with other profile screens).
-//   - wb_sunny → wb-sunny; light_mode → light-mode.
-//   - Doctor + slots are seeded; replace with useQuery(["practitioner", id])
-//     and useQuery(["slots", id, date]) once /v1/practitioners and
-//     /v1/slots ship.
+// ===========================================================================
+// WHAT THIS PASS CHANGED, AND WHY EACH ONE IS REQUIRED WORK
+// ===========================================================================
 //
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
+// REHYDRATION (the worst defect in the flow). The screen took only the three
+// practitioner params and hardcoded its four choices — `"tue-13"`, `"10:00 AM"`,
+// `"Standard Consultation"`, `""`. "Edit" on the review screen is `router.back()`,
+// so it landed here on a picker that had silently thrown away every choice the
+// user made and pre-selected a DIFFERENT slot. Two consequences, and the second
+// is the dangerous one:
+//   - four choices lost on every edit, with no warning;
+//   - a medical appointment time the user never chose sitting pre-selected under
+//     a live "Book Now" — which is also why `canProceed` had always been dead
+//     code (`selectedSlot` and `selectedType` could never be empty).
+// Now every one of date/time/mode/type/reason seeds its `useState` INITIALISER,
+// and slot and type start EMPTY when no param is supplied. An initialiser, not a
+// `useEffect`: an effect keyed on params re-runs on any params identity change
+// and would stomp an edit the user had already made.
+//
+// CONSULTATION MODE is a new axis. Modality (in person / video) was collapsed
+// into consultation TYPE, so the screen could not emit it — which is why screen 2
+// draws a map for a video call and screen 3's checklist tells a remote patient to
+// arrive ten minutes early. It is now its own section and its own param.
+//
+// UNAVAILABLE IS NOT COLOUR. Slots and dates that cannot be booked come from the
+// payload and render as ChoiceChip/DatePill `unavailable`: DASHED hairline,
+// content at 38%, not pressable, announced as "…, unavailable". docs/BRAND.md
+// §Colour rules — never colour alone. The disabled CTA is designed too, and it is
+// now reachable.
+//
+// KEYBOARD. 758:2091 draws the keyboard open with the docked bar riding above it
+// and the Reason field at its 2px focus border, i.e. keyboard-open is intended
+// behaviour and its absence was a defect. The KeyboardAvoidingView sits BELOW the
+// app bar (DetailShell's own header explains why the shell does not provide one
+// and that its `flex-1` body takes a KAV as a direct child) and WRAPS the docked
+// bar, so the bar lifts with the keyboard instead of hiding behind it.
+//
+// STATE BRANCHES. Three of the five frames had no code at all: loading (757:5286,
+// skeletons — the frame draws no spinner), no-slots (757:5597, scoped to the
+// Available Slots section so the rest of the form stays usable), and keyboard.
+// They come off `useSlots`, which is the seam the tests drive.
+//
+// THE PUSH STARVED SCREEN 2 (this pass). Screen 2 reads fourteen params and was
+// sent nine. The five missing ones each gate a block the frame draws, so all
+// five blocks rendered `null` on every real run and only a test that supplied
+// them by hand ever saw them: `endTime` (the time row's range), `timezone` (its
+// badge), `duration` (the whole Duration row, "From provider" badge included)
+// and `locationName`/`locationAddress` (the entire Location section, and with it
+// the Directions action — required item 5). They are threaded now, from the
+// availability payload, and dropped when the payload has none rather than
+// defaulted. `endTime` also stops api.ts assuming a 30-minute window: the booked
+// `ends_at` is the provider's.
+//
+// THE RATING WAS INVENTED (this pass). `SEED_RATING = { value: 4.9, count: 1200 }`
+// put a score and a review count beside a NAMED clinician. The frame says 4.8
+// (326 reviews); neither number came from anywhere, and both read as fact. It is
+// the practitioner payload's now — and absent when the payload has no rating,
+// which is `Show rating = false` in 780:5363, not a placeholder.
+//
+// ===========================================================================
+// DELETED
+// ===========================================================================
+//   SEED_RATING                    see above. A hardcoded 4.9 (1,200 reviews)
+//                                  under a real clinician's name.
+//   MaterialIcons import           an icon library in a screen — Icon.tsx is the
+//                                  only file allowed to import one.
+//   every hex literal              13 of them, `#00685f` … `#f5faf8`, each one
+//                                  freezing this screen in light mode against
+//                                  759:2169. Now classes or `useTokenColor`.
+//   SEED_DOCTOR + its CDN URI      a bare <Image> on a Google CDN is a grey box
+//                                  offline. PractitionerSummaryRow's
+//                                  AvatarWithFallback is the fallback BRAND
+//                                  §App shell requires.
+//   the app-bar "profile" avatar   756:4384's action slot is EMPTY, and what was
+//                                  there was a hardcoded photograph of a
+//                                  stranger labelled "Your profile".
+//   the `"May"` literal            `${d.day}, May ${d.date}` asserted a month it
+//                                  was never given. DatePill's third line is the
+//                                  real month and the param is now an ISO date.
+//   private SlotGroup + date tile  and BOTH long FLAGGED comment blocks that
+//                                  explained why they could not be migrated. The
+//                                  designer answered them: 11:104 gained
+//                                  `Layout=Hug|Fill` and `State=Unavailable`.
+//   px-gutter (24)                 the frame's gutter is 16 (x=16, width 361 in a
+//                                  393 frame) and so is BRAND §Spacing. The
+//                                  24px `gutter` alias is legacy by its own
+//                                  comment in tailwind.config.js.
+//   4 shadow constants             already gone in the 2026-07-31 elevation
+//                                  sweep; the reasoning holds and nothing here
+//                                  floats, so nothing came back.
+//
+// STILL FLAGGED FOR THE DESIGNER (unresolved, not invented):
+//   "See Calendar" (756:4413's action slot) and the no-slots "See calendar"
+//   button (757:5597) both point at a full-month calendar picker that has no
+//   frame and no route. The control is drawn in two frames so it is kept, but
+//   `openCalendar` is a documented no-op — see the handler.
+//
+// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API here.
+// This file uses none.
 
 import { useMemo, useState } from "react";
-import {
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+import { DetailShell } from "@/components/shell";
+import {
+  Button,
+  Card,
+  ChoiceChip,
+  ChoiceChipRow,
+  DatePill,
+  DockedActionBar,
+  Icon,
+  Input,
+  PractitionerSummaryRow,
+  SectionHeader,
+} from "@/components/ui";
+import { useTokenColor } from "@/lib/tokens";
+import {
+  parseClockMinutes,
+  useDateStrip,
+  useSlots,
+  type DateOption,
+  type Slot,
+} from "./hooks/use-booking-availability";
 
 // ---------------------------------------------------------------------------
-// Seed data
+// Constants
 // ---------------------------------------------------------------------------
 
-const SEED_DOCTOR = {
-  name: "Dr. Sarah Jenkins",
-  specialty: "Senior Cardiologist",
-  rating: 4.9,
-  reviewCount: "1.2k",
-  avatarUri:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuDl7Ao6Zlxrvg6hZCBJTCl40sfWi4jza2v_8V2IvenJxJRKcNiS5oSwi_3sak71g9LTAwWORqC63YbXcdPYebOLPq7sqLDZ3gK1ge88lmh8urol79cqtLcvqFW2FQgsaVKt3XZVUdomuZCytDil2ZqoQVZ1cY5BIkgZlao0j2WEiUZ42sDIx2QIJ6DWDYMaJG6IN22BOtX0PgVgM2tMFIe3uJHq2nh9Maeqz2xK3p5gtus1s64KG66RTL6zJ_k4rxovmczrWcxNaiqo",
-};
+/** 756:4384: every Body child sits at x=16 in a 393 frame. Also BRAND §Spacing. */
+const GUTTER = 16;
 
-type DateOption = { id: string; day: string; date: number };
-const DATE_OPTIONS: DateOption[] = [
-  { id: "mon-12", day: "Mon", date: 12 },
-  { id: "tue-13", day: "Tue", date: 13 },
-  { id: "wed-14", day: "Wed", date: 14 },
-  { id: "thu-15", day: "Thu", date: 15 },
-  { id: "fri-16", day: "Fri", date: 16 },
-  { id: "sat-17", day: "Sat", date: 17 },
-];
+/** Clears the docked bar (88 tall + inset) with the frame's 24 of breathing room. */
+const SCROLL_BOTTOM_PAD = 120;
 
-const MORNING_SLOTS = ["09:00 AM", "09:30 AM", "10:00 AM", "10:45 AM", "11:30 AM"];
-const AFTERNOON_SLOTS = [
-  "01:30 PM",
-  "02:00 PM",
-  "02:30 PM",
-  "03:15 PM",
-  "04:00 PM",
-  "05:00 PM",
-];
+/** The frame's 3-up slot grid, and the 12 gap on both axes. */
+const SLOT_COLUMNS = 3;
+const SLOT_GAP = 12;
 
-type ConsultationType =
-  | "Standard Consultation"
-  | "Follow-up Visit"
-  | "Specialist Review"
-  | "Diagnostic Report";
-const CONSULTATION_TYPES: ConsultationType[] = [
+/** docs/BRAND.md §Iconography: "20px in dense rows." */
+const GLYPH = 20;
+
+/** 756:4384. Type is one-of-N and no longer carries modality — see CONSULTATION_MODES. */
+const CONSULTATION_TYPES = [
   "Standard Consultation",
   "Follow-up Visit",
   "Specialist Review",
   "Diagnostic Report",
+] as const;
+
+export type ConsultationMode = "in-person" | "video";
+
+/**
+ * The new axis. Two chips, 96 and 72 wide in the frame — i.e. hug, not fill.
+ * The label is what the user reads; the id is what screens 2 and 3 branch on.
+ */
+const CONSULTATION_MODES: { id: ConsultationMode; label: string }[] = [
+  { id: "in-person", label: "In person" },
+  { id: "video", label: "Video" },
 ];
+
+// ---------------------------------------------------------------------------
+// Params
+// ---------------------------------------------------------------------------
+
+type Params = {
+  practitionerId?: string;
+  practitionerName?: string;
+  practitionerSpecialty?: string;
+  practitionerAvatar?: string;
+  /**
+   * The practitioner's rating, as the practitioner payload states it. Two params
+   * because route params are strings; both must read as numbers or NEITHER is
+   * shown. See `asRating`.
+   */
+  practitionerRating?: string;
+  practitionerReviewCount?: string;
+  /** The five rehydrated choices. */
+  date?: string;
+  time?: string;
+  mode?: string;
+  type?: string;
+  reason?: string;
+};
+
+/** Narrow an arbitrary param string to the mode union, never to a guess. */
+function asMode(value: string | undefined): ConsultationMode | undefined {
+  return value === "in-person" || value === "video" ? value : undefined;
+}
+
+/**
+ * The rating, or nothing.
+ *
+ * This replaces `SEED_RATING = { value: 4.9, count: 1200 }`, which was a
+ * hardcoded score and review count rendered beside a NAMED clinician — the frame
+ * says 4.8 (326 reviews), and both numbers were a statement of fact about a real
+ * person that no payload had made. Same class of defect as the fabricated
+ * booking reference: presented as data, sourced from nowhere.
+ *
+ * `PractitionerSummaryRow` needs both halves (the row reads "4.8 (326 reviews)"),
+ * so a rating with no count is not half a rating — it is no rating, and the row
+ * degrades to `Show rating = false` exactly as 780:5363 draws it. Out-of-range
+ * values are dropped rather than clamped: a 7.4 clamped to 5 is a made-up score.
+ */
+function asRating(
+  value: string | undefined,
+  count: string | undefined,
+): { value: number; count: number } | undefined {
+  if (value === undefined || count === undefined) return undefined;
+  const parsedValue = Number(value);
+  const parsedCount = Number(count);
+  if (!Number.isFinite(parsedValue) || parsedValue < 0 || parsedValue > 5) return undefined;
+  if (!Number.isInteger(parsedCount) || parsedCount < 0) return undefined;
+  return { value: parsedValue, count: parsedCount };
+}
+
+/**
+ * "09:00 AM" + "09:45 AM" -> "45 minutes"; 756:4356's Duration row.
+ *
+ * Derived from the two instants the PAYLOAD gives, which is what makes the row's
+ * "From provider" badge true — the badge used to sit over a hardcoded
+ * "45 Minutes". An end that is not after the start yields nothing rather than a
+ * negative or zero duration, and the row does not render.
+ *
+ * The wording is chosen so screen 2's `parseDurationMinutes` reads it back
+ * exactly ("45 minutes" -> 45, "1 hr 15 min" -> 75) — it is a display string on
+ * the way out and a fallback for `ends_at` on the way in.
+ */
+function durationLabel(start: string, end: string | undefined): string | undefined {
+  if (!end) return undefined;
+  const from = parseClockMinutes(start);
+  const to = parseClockMinutes(end);
+  if (from === undefined || to === undefined) return undefined;
+  const total = to - from;
+  if (total <= 0) return undefined;
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours === 0) return `${minutes} minutes`;
+  return minutes === 0 ? `${hours} hr` : `${hours} hr ${minutes} min`;
+}
+
+/** Route params serialise `undefined` as the string "undefined"; drop it instead. */
+function defined(params: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export function SelectTimeSlotScreen() {
-  const params = useLocalSearchParams<{
-    practitionerName?: string;
-    practitionerSpecialty?: string;
-    practitionerAvatar?: string;
-  }>();
+  const params = useLocalSearchParams<Params>();
+  const dates = useDateStrip();
 
-  const doctor = {
-    name: params.practitionerName ?? SEED_DOCTOR.name,
-    specialty: params.practitionerSpecialty ?? SEED_DOCTOR.specialty,
-    avatarUri: params.practitionerAvatar ?? SEED_DOCTOR.avatarUri,
-    rating: SEED_DOCTOR.rating,
-    reviewCount: SEED_DOCTOR.reviewCount,
-  };
-
-  const [selectedDateId, setSelectedDateId] = useState<string>("tue-13");
-  const [selectedSlot, setSelectedSlot] = useState<string>("10:00 AM");
-  const [selectedType, setSelectedType] =
-    useState<ConsultationType>("Standard Consultation");
-  const [reason, setReason] = useState("");
-
-  const selectedDate = useMemo(
-    () => DATE_OPTIONS.find((d) => d.id === selectedDateId) ?? DATE_OPTIONS[0],
-    [selectedDateId],
+  /**
+   * The strip's first BOOKABLE day, not its first day: a dashed date can never
+   * be tapped, so defaulting onto one would open the screen in the no-slots
+   * state with no way back to a date that has slots.
+   */
+  const firstBookableIso = useMemo(
+    () => (dates.find((d) => !d.unavailable) ?? dates[0])?.iso ?? "",
+    [dates],
   );
 
-  const canProceed = Boolean(selectedDate && selectedSlot && selectedType);
+  // ------------------------------------------------------------------
+  // Rehydration. INITIALISERS, not a useEffect — see the header note.
+  // `time` and `type` deliberately start EMPTY: pre-selecting a medical
+  // appointment slot the user never chose is how a wrong booking gets
+  // confirmed, and it is what made `canProceed` dead code.
+  // ------------------------------------------------------------------
+  const [selectedDateId, setSelectedDateId] = useState<string>(
+    () => params.date ?? firstBookableIso,
+  );
+  const [selectedSlot, setSelectedSlot] = useState<string>(() => params.time ?? "");
+  const [mode, setMode] = useState<ConsultationMode>(() => asMode(params.mode) ?? "in-person");
+  const [selectedType, setSelectedType] = useState<string>(() => params.type ?? "");
+  const [reason, setReason] = useState<string>(() => params.reason ?? "");
+
+  const selectedDate = useMemo<DateOption | undefined>(
+    () => dates.find((d) => d.iso === selectedDateId) ?? dates[0],
+    [dates, selectedDateId],
+  );
+
+  /**
+   * The availability payload — not just the grid. `timezoneLabel` and `location`
+   * are the clinic facts screen 2 draws its timezone badge, its Location card
+   * and its "Directions" action from; they were never threaded, so all three
+   * rendered `null` in every real run while the frame drew them.
+   */
+  const { slots, isLoading, timezoneLabel, location } = useSlots(
+    params.practitionerId,
+    selectedDateId,
+  );
+
+  /** 756:4384 groups by period; the group set comes from the data, not a literal. */
+  const groups = useMemo(() => {
+    const byPeriod = new Map<string, Slot[]>();
+    for (const s of slots) {
+      const bucket = byPeriod.get(s.period);
+      if (bucket) bucket.push(s);
+      else byPeriod.set(s.period, [s]);
+    }
+    return [...byPeriod.entries()];
+  }, [slots]);
+
+  const isEmpty = !isLoading && slots.length === 0;
+
+  /**
+   * The chosen slot as the payload described it, not just its label. This is
+   * where `endTime` comes from — `BookingCreate.ends_at` is REQUIRED, and until
+   * it is threaded api.ts has to fall back to an assumed 30 minutes on every
+   * booking. A slot the current payload does not contain (a rehydrated time on a
+   * date whose grid has changed) resolves to nothing, and nothing derived from
+   * it is sent.
+   */
+  const selectedSlotDetail = useMemo(
+    () => slots.find((s) => s.time === selectedSlot),
+    [slots, selectedSlot],
+  );
+
+  /**
+   * No longer dead. Loading and no-slots each disable the CTA (both frames draw
+   * it disabled), and slot/type are genuinely empty until chosen.
+   */
+  const canProceed =
+    !isLoading && !isEmpty && Boolean(selectedDate) && selectedSlot !== "" && selectedType !== "";
+
+  /**
+   * FLAGGED, and kept rather than deleted or faked. 756:4413's action slot and
+   * 757:5597's button both point at a full-month calendar picker; there is no
+   * frame for that picker and no route to it. Navigating somewhere plausible
+   * would be inventing a screen, and hiding the control would drop something two
+   * frames draw. So it is a documented no-op until the picker is designed.
+   */
+  const openCalendar = () => {};
 
   const proceedToReview = () => {
-    if (!canProceed) return;
+    if (!canProceed || !selectedDate) return;
     router.push({
       // Route added this iteration — typedRoutes regenerates on dev server start.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pathname: "/(app)/review-appointment" as any,
-      params: {
-        practitionerName: doctor.name,
-        practitionerSpecialty: doctor.specialty,
-        practitionerAvatar: doctor.avatarUri,
-        date: `${selectedDate.day}, May ${selectedDate.date}`,
+      // ---------------------------------------------------------------
+      // What screen 2 actually needs.
+      //
+      // It was sent nine params and reads fourteen. The five it never got are
+      // not decoration: `endTime` and `timezone` are the time row's range and
+      // its badge, `duration` is the whole Duration row INCLUDING the "From
+      // provider" badge, and `locationName`/`locationAddress` gate the entire
+      // Location section — which is where required item 5's "Directions" action
+      // lives. Every one of those blocks rendered `null` on every real run
+      // while the frame drew them, because this push had no slot for them.
+      //
+      // `defined()` strips the absent ones: expo-router serialises an undefined
+      // param as the literal string "undefined", and screen 2's `text()` guard
+      // would then treat "undefined" as a clinic name.
+      // ---------------------------------------------------------------
+      params: defined({
+        practitionerId: params.practitionerId,
+        practitionerName: params.practitionerName,
+        practitionerSpecialty: params.practitionerSpecialty,
+        practitionerAvatar: params.practitionerAvatar,
+        // ISO, not "Tue, May 13". Screens 2 and 3 both render "Tuesday, 13 May
+        // 2025", so formatting belongs at the leaf — and the rehydration round
+        // trip above needs a key that survives reformatting.
+        date: selectedDate.iso,
         time: selectedSlot,
+        // The slot's own end. api.ts prefers this over `durationMinutes`, so the
+        // booked window is the provider's rather than a 30-minute assumption.
+        endTime: selectedSlotDetail?.endTime,
+        timezone: timezoneLabel,
+        duration: durationLabel(selectedSlot, selectedSlotDetail?.endTime),
+        locationName: location?.name,
+        locationAddress: location?.address,
+        mode,
         type: selectedType,
         reason,
-      },
+      }),
     });
   };
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* ----------------------------------------------------------------
-            App bar
-        ---------------------------------------------------------------- */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
-        >
-          <View className="flex-row items-center gap-sm">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => router.back()}
-              className="rounded-full p-xs active:scale-95"
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#3d4947" />
-            </Pressable>
-            <Text className="font-headline-md text-headline-md text-primary">
-              MedApp
-            </Text>
-          </View>
-          <View className="h-8 w-8 overflow-hidden rounded-full border border-outline-variant">
-            <Image
-              source={{
-                uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuDMSBkhqGrvc8C1JrlKyqgnYmqSa2gepW2UOHo6CAxJkVHLcxBK1wDjDNxw_AH7iZGJAf5wCsLhREDddUnIAMIpDLLGyCZewtsj4PjRxgd1tQ-52UbY9rxJtDY4Za25IE9bSn_R5kthRlpfb-ui-psa7vfupGNp_W3Scx7tkhWsBUT27nkY5LsdwwnB8JROivIHQO6TI184sOcLVh7XyyagrEJVtu9_LtZHcNSuUw3bdr0b1qLuG2geAHz156xdoScVg5ZkC5mQw6FU",
-              }}
-              className="h-full w-full"
-              accessibilityLabel="Your profile"
-            />
-          </View>
-        </View>
+    /* ------------------------------------------------------------------
+       DetailShell owns the safe area, the StatusBar and the detail bar.
 
+       NO `actions`: 756:4384's app bar has an EMPTY action slot. What was
+       there was a hardcoded Google-CDN photograph of a stranger labelled
+       "Your profile" — not in the frame, and not the user.
+
+       `claimsBottomInset={false}`: DockedActionBar renders its OWN
+       <SafeAreaView edges={["bottom"]}> so its fill runs under the gesture
+       bar. If the shell claimed the inset too, the padding doubles.
+    ------------------------------------------------------------------ */
+    <DetailShell title="Book Appointment" claimsBottomInset={false}>
+      {/* The KAV wraps the scroll body AND the docked bar, which is what makes
+          the bar ride above the keyboard in 758:2091 instead of sitting behind
+          it. It is a direct child of the shell's flex-1 body, i.e. BELOW the app
+          bar — a KAV above the bar lifts the bar off the top of the screen. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 140 }}
+          contentContainerStyle={{ paddingTop: GUTTER, paddingBottom: SCROLL_BOTTOM_PAD }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ------------------------------------------------------------
-              Doctor info card
-          ------------------------------------------------------------ */}
-          <View className="px-gutter pt-md pb-base">
-            <View
-              className="flex-row items-center gap-md rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-md"
-              style={cardShadow}
-            >
-              <View className="relative">
-                <Image
-                  source={{ uri: doctor.avatarUri }}
-                  style={{ width: 80, height: 80, borderRadius: 12 }}
-                  accessibilityLabel={doctor.name}
-                />
-                <View
-                  className="absolute items-center justify-center rounded-full bg-primary"
-                  style={{ bottom: -4, right: -4, padding: 3 }}
-                >
-                  <MaterialIcons name="check-circle" size={16} color="#ffffff" />
-                </View>
-              </View>
-              <View className="flex-1">
-                <Text
-                  className="font-headline-md text-on-surface"
-                  style={{ fontSize: 18, fontWeight: "700" }}
-                  numberOfLines={1}
-                >
-                  {doctor.name}
-                </Text>
-                <Text className="font-body-md text-on-surface-variant" numberOfLines={1}>
-                  {doctor.specialty}
-                </Text>
-                <View className="mt-xs flex-row items-center gap-xs">
-                  <MaterialIcons name="star" size={18} color="#0058be" />
-                  <Text
-                    className="font-label-md text-on-surface"
-                    style={{ fontWeight: "700" }}
-                  >
-                    {doctor.rating}
-                  </Text>
-                  <Text className="font-label-sm text-outline">
-                    ({doctor.reviewCount} reviews)
-                  </Text>
-                </View>
-              </View>
-            </View>
+          {/* ----------------------------------------------------------
+              Practitioner — 756:4384 y=16
+          ---------------------------------------------------------- */}
+          <View className="px-4">
+            {isLoading ? (
+              <PractitionerSkeleton />
+            ) : (
+              <PractitionerSummaryRow
+                surface="card"
+                verified
+                name={params.practitionerName ?? ""}
+                specialty={params.practitionerSpecialty ?? ""}
+                avatarUri={params.practitionerAvatar}
+                // From the practitioner payload or absent — never a constant.
+                rating={asRating(params.practitionerRating, params.practitionerReviewCount)}
+              />
+            )}
           </View>
 
-          {/* ------------------------------------------------------------
-              Date selector
-          ------------------------------------------------------------ */}
-          <View className="mt-md">
-            <View className="mb-sm flex-row items-center justify-between px-gutter">
-              <Text
-                className="font-headline-md text-on-surface"
-                style={{ fontSize: 18, fontWeight: "700" }}
-              >
-                Select Date
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="See full calendar"
-                hitSlop={6}
-                className="active:scale-95"
-              >
-                <Text className="font-label-md text-primary">See Calendar</Text>
-              </Pressable>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                gap: 12,
-                paddingHorizontal: 24,
-                paddingVertical: 4,
-              }}
-            >
-              {DATE_OPTIONS.map((d) => {
-                const active = d.id === selectedDateId;
-                return (
-                  <Pressable
-                    key={d.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${d.day} ${d.date}`}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setSelectedDateId(d.id)}
-                    style={({ pressed }) => [
-                      {
-                        minWidth: 64,
-                        height: 80,
-                        borderRadius: 12,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: active
-                          ? "#00685f"
-                          : "#f0f5f2",
-                        borderWidth: active ? 0 : 1,
-                        borderColor: "rgba(188,201,198,0.5)",
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                      active ? dateActiveShadow : undefined,
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "500",
-                        color: active ? "#ffffff" : "#3d4947",
-                        opacity: active ? 0.9 : 1,
-                      }}
-                    >
-                      {d.day}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 22,
-                        fontWeight: "700",
-                        color: active ? "#ffffff" : "#171d1c",
-                        marginTop: 2,
-                      }}
-                    >
-                      {d.date}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* ------------------------------------------------------------
-              Time slots
-          ------------------------------------------------------------ */}
-          <View className="mt-lg px-gutter">
-            <Text
-              className="font-headline-md text-on-surface mb-md"
-              style={{ fontSize: 18, fontWeight: "700" }}
-            >
-              Available Slots
-            </Text>
-
-            <SlotGroup
-              icon="wb-sunny"
-              label="Morning"
-              slots={MORNING_SLOTS}
-              selected={selectedSlot}
-              onSelect={setSelectedSlot}
-            />
-            <SlotGroup
-              icon="light-mode"
-              label="Afternoon"
-              slots={AFTERNOON_SLOTS}
-              selected={selectedSlot}
-              onSelect={setSelectedSlot}
-            />
-          </View>
-
-          {/* ------------------------------------------------------------
-              Consultation type chips
-          ------------------------------------------------------------ */}
-          <View className="mt-sm">
-            <View className="px-gutter mb-sm">
-              <Text
-                className="font-headline-md text-on-surface"
-                style={{ fontSize: 18, fontWeight: "700" }}
-              >
-                Consultation Type
-              </Text>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                gap: 10,
-                paddingHorizontal: 24,
-                paddingVertical: 4,
-              }}
-            >
-              {CONSULTATION_TYPES.map((t) => {
-                const active = t === selectedType;
-                return (
-                  <Pressable
-                    key={t}
-                    accessibilityRole="button"
-                    accessibilityLabel={t}
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setSelectedType(t)}
-                    style={({ pressed }) => ({
-                      paddingHorizontal: 20,
-                      paddingVertical: 10,
-                      borderRadius: 999,
-                      borderWidth: active ? 0 : 1,
-                      borderColor: "rgba(188,201,198,0.5)",
-                      backgroundColor: active
-                        ? "#00685f"
-                        : "#e4e9e7",
-                      opacity: pressed ? 0.85 : 1,
-                    })}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "600",
-                        color: active ? "#ffffff" : "#3d4947",
-                      }}
-                    >
-                      {t}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* ------------------------------------------------------------
-              Reason for visit
-          ------------------------------------------------------------ */}
-          <View className="mt-lg mb-md px-gutter">
-            <Text className="font-label-md text-on-surface mb-sm">
-              Reason for Visit
-            </Text>
-            <View
-              className="rounded-xl border border-outline-variant/50 bg-surface-container-lowest"
-              style={cardShadow}
-            >
-              <TextInput
-                value={reason}
-                onChangeText={setReason}
-                placeholder="Describe your symptoms or reason for the appointment…"
-                placeholderTextColor="#6d7a77"
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                style={{
-                  minHeight: 96,
-                  padding: 16,
-                  fontSize: 16,
-                  lineHeight: 22,
-                  color: "#171d1c",
-                }}
-                accessibilityLabel="Reason for visit"
+          {/* ----------------------------------------------------------
+              Select Date
+          ---------------------------------------------------------- */}
+          <View className="mt-6">
+            <View className="px-4">
+              <SectionHeader
+                title="Select Date"
+                action={{ label: "See Calendar", onPress: openCalendar }}
               />
             </View>
+            {/* Full-bleed: BRAND §Horizontal strips wants the items to scroll
+                edge to edge with a TRAILING inset matching the leading gutter,
+                which is why the 16 is content padding rather than parent
+                padding. The old strip used 24 and had no trailing inset. */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: SLOT_GAP, paddingHorizontal: GUTTER }}
+            >
+              {isLoading
+                ? dates.map((d) => <SkeletonBlock key={d.iso} width={60} height={80} />)
+                : dates.map((d) => (
+                    <DatePill
+                      key={d.iso}
+                      day={d.day}
+                      date={d.date}
+                      month={d.month}
+                      selected={d.iso === selectedDateId}
+                      unavailable={d.unavailable}
+                      onPress={() => {
+                        setSelectedDateId(d.iso);
+                        // The chosen time belongs to the old date. Carrying it
+                        // across would leave a slot selected that this date may
+                        // not offer — and `canProceed` would let it through.
+                        setSelectedSlot("");
+                      }}
+                    />
+                  ))}
+            </ScrollView>
+          </View>
+
+          {/* ----------------------------------------------------------
+              Available Slots — default / loading / empty
+          ---------------------------------------------------------- */}
+          <View className="mt-6 px-4">
+            <SectionHeader title="Available Slots" />
+
+            {isLoading ? (
+              <SlotGridSkeleton />
+            ) : isEmpty ? (
+              <NoSlots
+                dateLabel={
+                  selectedDate ? `${selectedDate.day} ${selectedDate.date} ${selectedDate.month}` : ""
+                }
+                onSeeCalendar={openCalendar}
+              />
+            ) : (
+              groups.map(([period, periodSlots]) => (
+                <SlotGroup
+                  key={period}
+                  label={period}
+                  slots={periodSlots}
+                  selected={selectedSlot}
+                  onSelect={setSelectedSlot}
+                />
+              ))
+            )}
+          </View>
+
+          {/* ----------------------------------------------------------
+              Consultation Mode — NEW. The axis screens 2 and 3 branch on.
+          ---------------------------------------------------------- */}
+          <View className="mt-6 px-4">
+            <SectionHeader title="Consultation Mode" />
+            <ChoiceChipRow>
+              {CONSULTATION_MODES.map((m) => (
+                <ChoiceChip
+                  key={m.id}
+                  label={m.label}
+                  role="radio"
+                  layout="hug"
+                  selected={m.id === mode}
+                  onPress={() => setMode(m.id)}
+                />
+              ))}
+            </ChoiceChipRow>
+          </View>
+
+          {/* ----------------------------------------------------------
+              Consultation Type
+          ---------------------------------------------------------- */}
+          <View className="mt-6">
+            <View className="px-4">
+              <SectionHeader title="Consultation Type" />
+            </View>
+            {/* `scrollable` applies the 16 gutter as its OWN content inset, so
+                the row must sit outside the screen's padding — full-bleed. */}
+            <ChoiceChipRow scrollable>
+              {CONSULTATION_TYPES.map((t) => (
+                <ChoiceChip
+                  key={t}
+                  label={t}
+                  role="radio"
+                  selected={t === selectedType}
+                  onPress={() => setSelectedType(t)}
+                />
+              ))}
+            </ChoiceChipRow>
+          </View>
+
+          {/* ----------------------------------------------------------
+              Reason for Visit — 757:4814, 361x96 multiline
+          ---------------------------------------------------------- */}
+          <View className="mt-6 px-4">
+            <View className="mb-2 flex-row items-center gap-2">
+              <Text className="font-label-md text-label-md text-on-surface">Reason for Visit</Text>
+              {/* The frame labels it optional, and saying so is what stops a
+                  user treating an empty field as an error. */}
+              <Text className="font-label-sm text-label-sm text-on-surface-variant">Optional</Text>
+            </View>
+            <Input
+              multiline
+              numberOfLines={3}
+              value={reason}
+              onChangeText={setReason}
+              placeholder="Describe your symptoms or reason for the appointment…"
+              // RN does not link a sibling <Text> to a TextInput the way an HTML
+              // <label for> does, so the visible heading gives the field no name.
+              accessibilityLabel="Reason for visit"
+            />
           </View>
         </ScrollView>
 
-        {/* ----------------------------------------------------------------
-            Sticky bottom action bar
-        ---------------------------------------------------------------- */}
-        <View
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 50,
+        {/* --------------------------------------------------------------
+            Docked CTA — 781:2281 Single, radius/12 at 56.
+            Inside the KAV, so 758:2091's "bar above the keyboard" is
+            structural rather than something the layout happens to do.
+        -------------------------------------------------------------- */}
+        <DockedActionBar
+          primary={{
+            label: "Book Now",
+            trailingIcon: "chevron-right",
+            onPress: proceedToReview,
+            disabled: !canProceed,
           }}
-        >
-          <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#f5faf8" }}>
-            <View
-              className="border-t border-outline-variant/20 bg-surface px-gutter py-md"
-              style={actionBarShadow}
-            >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Book now"
-                onPress={proceedToReview}
-                disabled={!canProceed}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 10,
-                    paddingVertical: 16,
-                    borderRadius: 999,
-                    backgroundColor: !canProceed
-                      ? "#bcc9c6"
-                      : pressed
-                        ? "#004d46"
-                        : "#00685f",
-                  },
-                  canProceed ? bookButtonShadow : undefined,
-                ]}
-              >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "700",
-                    color: "#ffffff",
-                    letterSpacing: 0.2,
-                  }}
-                >
-                  Book Now
-                </Text>
-                <MaterialIcons name="event-available" size={20} color="#ffffff" />
-              </Pressable>
-            </View>
-          </SafeAreaView>
-        </View>
-      </SafeAreaView>
-    </View>
+        />
+      </KeyboardAvoidingView>
+    </DetailShell>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Slot group — Morning / Afternoon section
+// Slot group — one period's 3-up grid.
+//
+// The private chip is gone. 11:104 gained `Layout=Hug|Fill` (756:4205 /
+// 756:4207), which is exactly the axis the old FLAGGED comment asked for: a
+// `layout="fill"` chip inflates to its grid cell, so the shared primitive can be
+// the grid cell's content and the ragged-gutter argument no longer applies.
 // ---------------------------------------------------------------------------
 
 function SlotGroup({
-  icon,
   label,
   slots,
   selected,
   onSelect,
 }: {
-  icon: IconName;
   label: string;
-  slots: string[];
+  slots: Slot[];
   selected: string;
   onSelect: (slot: string) => void;
 }) {
+  const glyphColor = useTokenColor("on-surface-variant");
+
+  const rows: Slot[][] = [];
+  for (let i = 0; i < slots.length; i += SLOT_COLUMNS) {
+    rows.push(slots.slice(i, i + SLOT_COLUMNS));
+  }
+
   return (
-    <View className="mb-lg">
-      <View className="mb-sm flex-row items-center gap-xs">
-        <MaterialIcons name={icon} size={20} color="#515f74" />
+    <View className="mb-6">
+      <View className="mb-2 flex-row items-center gap-2">
+        {/* Decorative — the word beside it says "Morning". */}
+        <Icon chrome="schedule" size={GLYPH} color={glyphColor} />
         <Text
-          className="font-label-md text-secondary"
+          className="font-label-md text-label-md text-on-surface-variant"
           style={{ textTransform: "uppercase", letterSpacing: 1 }}
         >
           {label}
         </Text>
       </View>
-      <View className="flex-row flex-wrap" style={{ marginHorizontal: -6 }}>
-        {slots.map((s) => {
-          const active = s === selected;
-          return (
-            <View key={s} style={{ width: "33.333%", padding: 6 }}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${label} slot ${s}`}
-                accessibilityState={{ selected: active }}
-                onPress={() => onSelect(s)}
-                style={({ pressed }) => ({
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderWidth: 1,
-                  borderColor: active ? "#00685f" : "rgba(188,201,198,0.5)",
-                  backgroundColor: active
-                    ? "#008378"
-                    : "#ffffff",
-                  opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "600",
-                    color: active ? "#f4fffc" : "#171d1c",
-                  }}
-                >
-                  {s}
-                </Text>
-              </Pressable>
-            </View>
-          );
-        })}
+
+      <View style={{ gap: SLOT_GAP }}>
+        {rows.map((row, rowIndex) => (
+          <View key={row[0].time} className="flex-row" style={{ gap: SLOT_GAP }}>
+            {row.map((slot) => (
+              <View key={slot.time} className="flex-1">
+                <ChoiceChip
+                  label={slot.time}
+                  role="radio"
+                  layout="fill"
+                  selected={slot.time === selected}
+                  unavailable={!slot.available}
+                  onPress={() => onSelect(slot.time)}
+                />
+              </View>
+            ))}
+            {/* 756:5157: a short last row keeps its columns. Without the
+                spacers the two survivors would each take half the width and the
+                grid's rhythm would break on the final row. */}
+            {Array.from({ length: SLOT_COLUMNS - row.length }, (_, i) => (
+              <View key={`spacer-${rowIndex}-${i}`} className="flex-1" />
+            ))}
+          </View>
+        ))}
       </View>
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Shadows
+// No slots — 757:5597.
+//
+// Scoped to the Available Slots SECTION, not the screen: the frame keeps the
+// practitioner, the date strip, mode, type and reason all live, because the
+// user's next action is to pick a different date and that control is right above
+// this block. A full-screen empty state would take it away.
 // ---------------------------------------------------------------------------
 
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};
+function NoSlots({ dateLabel, onSeeCalendar }: { dateLabel: string; onSeeCalendar: () => void }) {
+  const glyphColor = useTokenColor("primary");
 
-const cardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.05,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
+  return (
+    <View className="items-center py-4">
+      <View
+        className="items-center justify-center rounded-full bg-primary-tint"
+        style={{ width: 40, height: 40 }}
+      >
+        {/* Decorative — the sentence below is the message. */}
+        <Icon chrome="search-off" size={GLYPH} color={glyphColor} />
+      </View>
+      <Text className="mt-4 text-center font-body-md text-body-md text-on-surface">
+        No slots on {dateLabel}
+      </Text>
+      <Text className="mt-2 text-center font-label-sm text-label-sm text-on-surface-variant">
+        Try another date in the strip above, or open the calendar to see this
+        practitioner&apos;s next availability.
+      </Text>
+      <View className="mt-4 w-full">
+        <Button
+          label="See calendar"
+          variant="outline"
+          size="docked"
+          pill={false}
+          fullWidth
+          onPress={onSeeCalendar}
+        />
+      </View>
+    </View>
+  );
+}
 
-const dateActiveShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    web: { boxShadow: "0px 4px 10px rgba(0, 104, 95, 0.25)" },
-    android: { elevation: 5 },
-  }) || {};
+// ---------------------------------------------------------------------------
+// Loading — 757:5286.
+//
+// The frame draws SKELETONS, not a spinner: the layout is known before the data
+// is, so holding the shape stops the whole page reflowing when slots land. A
+// spinner would also have to sit somewhere, and wherever it sat would be a
+// position the frame does not draw.
+//
+// These are private on purpose. A skeleton is not one of the frames' shared
+// components (no Figma component instances them), and the house rule in
+// src/components/ui/README.md is that `ui/` holds what the design system
+// defines — inventing a `Skeleton` primitive from a screen would be the same
+// bottom-up drift the booking components were just extracted to fix. If a second
+// screen needs one, that is the moment it moves.
+// ---------------------------------------------------------------------------
 
-const actionBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: -2 },
-    },
-    web: { boxShadow: "0px -2px 8px rgba(0, 0, 0, 0.06)" },
-    android: { elevation: 6 },
-  }) || {};
+function SkeletonBlock({
+  width,
+  height,
+  radius = 12,
+  flex,
+}: {
+  width?: number | `${number}%`;
+  height: number;
+  radius?: number;
+  flex?: boolean;
+}) {
+  return (
+    <View
+      // A token, not a grey literal: a skeleton frozen in light mode is a white
+      // flash on a near-black page every time the screen opens in dark mode.
+      className="bg-surface-container-high"
+      // Hidden from assistive tech: a screen reader must hear the loaded content
+      // or nothing, never eleven unlabelled rectangles.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{ width, height, borderRadius: radius, ...(flex ? { flex: 1 } : null) }}
+    />
+  );
+}
 
-const bookButtonShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 5 },
-    },
-    web: { boxShadow: "0px 5px 12px rgba(0, 104, 95, 0.3)" },
-    android: { elevation: 6 },
-  }) || {};
+function PractitionerSkeleton() {
+  return (
+    <Card className="w-full flex-row items-center gap-3">
+      <SkeletonBlock width={56} height={56} radius={999} />
+      <View className="flex-1" style={{ gap: 8 }}>
+        <SkeletonBlock width="70%" height={20} />
+        <SkeletonBlock width="50%" height={16} />
+        <SkeletonBlock width="40%" height={16} />
+      </View>
+    </Card>
+  );
+}
+
+/** Two groups of three rows, matching the shape the seed grid resolves to. */
+const SKELETON_SLOT_ROWS = 2;
+
+function SlotGridSkeleton() {
+  return (
+    <View style={{ gap: 24 }}>
+      {Array.from({ length: SKELETON_SLOT_ROWS }, (_, group) => (
+        <View key={`group-${group}`} style={{ gap: SLOT_GAP }}>
+          <SkeletonBlock width={96} height={16} />
+          {Array.from({ length: 2 }, (_, row) => (
+            <View key={`row-${row}`} className="flex-row" style={{ gap: SLOT_GAP }}>
+              {Array.from({ length: SLOT_COLUMNS }, (_, col) => (
+                <SkeletonBlock key={`cell-${col}`} height={44} flex />
+              ))}
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lifestyle Hub - MedApp</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;family=Manrope:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container": "#eaefed",
+                    "surface-bright": "#f5faf8",
+                    "inverse-primary": "#6bd8cb",
+                    "surface-container-low": "#f0f5f2",
+                    "on-primary-container": "#f4fffc",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-primary-fixed-variant": "#005049",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "error-container": "#ffdad6",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "on-primary": "#ffffff",
+                    "background": "#f5faf8",
+                    "surface-dim": "#d6dbd9",
+                    "surface-container-highest": "#dee4e1",
+                    "on-surface": "#171d1c",
+                    "on-error": "#ffffff",
+                    "surface-variant": "#dee4e1",
+                    "on-tertiary-fixed": "#001a42",
+                    "tertiary": "#0058be",
+                    "surface-container-high": "#e4e9e7",
+                    "primary": "#00685f",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "secondary-container": "#d5e3fc",
+                    "surface-tint": "#006a61",
+                    "on-tertiary-container": "#fefcff",
+                    "tertiary-container": "#2170e4",
+                    "tertiary-fixed": "#d8e2ff",
+                    "secondary": "#515f74",
+                    "on-secondary": "#ffffff",
+                    "on-background": "#171d1c",
+                    "error": "#ba1a1a",
+                    "secondary-fixed": "#d5e3fc",
+                    "inverse-surface": "#2c3130",
+                    "on-tertiary": "#ffffff",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-surface-variant": "#3d4947",
+                    "primary-container": "#008378",
+                    "outline-variant": "#bcc9c6",
+                    "on-secondary-container": "#57657a",
+                    "primary-fixed": "#89f5e7",
+                    "surface": "#f5faf8",
+                    "on-primary-fixed": "#00201d",
+                    "on-error-container": "#93000a",
+                    "outline": "#6d7a77"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "md": "24px",
+                    "lg": "48px",
+                    "gutter": "24px",
+                    "xs": "4px",
+                    "container-max": "1280px",
+                    "sm": "12px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "headline-xl": ["Manrope"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                    "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                    "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                    "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                    "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                    "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                    "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                    "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        /* Ambient shadows and subtle utilities */
+        .ambient-shadow { box-shadow: 0px 4px 20px rgba(71, 85, 105, 0.05); }
+        .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        
+        /* Hide scrollbar for horizontal logs */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter h-16 bg-surface/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-on-primary-container text-[20px]" data-icon="person">person</span>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-inverse-primary">Lifestyle Hub</h1>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary dark:text-inverse-primary" data-icon="notifications">notifications</span>
+</button>
+</header>
+<main class="pt-16 px-4 max-w-container-max mx-auto w-full flex flex-col gap-6 mt-4">
+<!-- Hero Banner -->
+<section class="relative w-full rounded-2xl overflow-hidden h-48 ambient-shadow group">
+<img alt="Wellness background" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVz7j04UjLrtSVEYGzX9QJDov8s-f8_ls0yrAlAg0Ig4M4A4bTCAL9Qh2aqATHONtOynMFGT7KFn-uWoezdUn2gEKjioASJdvTbFv-w-lNLVMgkYlza7d9oIUJpV2-aeFbGCd-0xzeuhp2YRbiJnWgGGliKgXj0shb4PXOLrogpb8S_wMBOaAjwaEJBigTYYvMpVrMIm-aFdmvZMWCVv_4hvtfBmd_s5fdMacRkSN7R4JNFBq1hvkqTimue3Gmrv2A455DCFCR4cNy"/>
+<div class="absolute inset-0 bg-gradient-to-r from-surface-tint/80 to-transparent"></div>
+<div class="absolute inset-0 p-6 flex flex-col justify-end">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-primary mb-2 shadow-sm">Your Wellness Path</h2>
+<p class="font-body-md text-body-md text-on-primary/90 max-w-[80%]">Track, adapt, and thrive today.</p>
+</div>
+</section>
+<!-- Daily Wellness Logging Entry Point -->
+<section class="bg-primary-container text-on-primary-container rounded-xl p-5 ambient-shadow border border-primary/20 flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-on-primary-container/10 flex items-center justify-center">
+<span class="material-symbols-outlined text-[28px]" data-icon="edit_calendar">edit_calendar</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-lg leading-tight">Log Daily Activity</h3>
+<p class="font-body-md text-body-md text-sm opacity-90">Record your sleep, water, meals, and more</p>
+</div>
+</div>
+<button class="w-full bg-on-primary-container text-primary-container font-label-md text-label-md py-3 rounded-lg shadow-sm hover:opacity-90 transition-opacity active:scale-[0.98] flex items-center justify-center gap-2">
+    Go to Log
+    <span class="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</section><article class="bg-surface-container-lowest rounded-xl ambient-shadow border border-outline-variant/20 p-5 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[22px]">medical_services</span>
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Daily Medications</h3>
+</div>
+<span class="text-primary font-label-md text-sm">2 of 3 taken</span>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Medication Item: Taken -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-outline-variant/10">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px] font-bold">check</span>
+</div>
+<div>
+<p class="font-label-md text-on-surface">Lisinopril 10mg</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">8:00 AM • Taken</p>
+</div>
+</div>
+</div>
+<!-- Medication Item: Pending -->
+<div class="flex items-center justify-between p-3 rounded-lg bg-surface-container-low border border-outline-variant/10">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">schedule</span>
+</div>
+<div>
+<p class="font-label-md text-on-surface">Multivitamin</p>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">9:30 PM • Pending</p>
+</div>
+</div>
+<button class="text-primary font-label-sm px-3 py-1.5 border border-primary/20 rounded-md hover:bg-primary/5 active:scale-95 transition-all">Mark Taken</button>
+</div>
+</div>
+<button class="flex items-center justify-center gap-2 w-full py-2.5 mt-1 border-t border-outline-variant/20 text-primary font-label-md hover:text-primary-container transition-colors">
+<span>View Full Schedule</span>
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</article>
+<!-- Analytics Dashboard Grid -->
+<div class="flex flex-col gap-6">
+<!-- Advanced Nutrition Tracking -->
+<article class="bg-surface-container-lowest rounded-xl ambient-shadow border border-outline-variant/20 p-5 flex flex-col gap-5">
+<div class="flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Daily Nutrient Intake</h3>
+<span class="material-symbols-outlined text-primary text-[22px]">restaurant_menu</span>
+</div>
+<div class="space-y-4">
+<!-- Calories -->
+<div>
+<div class="flex justify-between text-sm mb-1.5">
+<span class="text-on-surface-variant font-label-md">Calories</span>
+<span class="text-on-surface font-label-md font-bold">1,850 <span class="text-on-surface-variant font-normal">/ 2,200 kcal</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+<div class="bg-primary h-full rounded-full transition-all duration-500" style="width: 84%"></div>
+</div>
+</div>
+<!-- Protein -->
+<div>
+<div class="flex justify-between text-sm mb-1.5">
+<span class="text-on-surface-variant font-label-md">Protein</span>
+<span class="text-on-surface font-label-md font-bold">85 <span class="text-on-surface-variant font-normal">/ 100 g</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+<div class="bg-[#0d9488] h-full rounded-full transition-all duration-500" style="width: 85%"></div>
+</div>
+</div>
+<!-- Vitamin B2 -->
+<div>
+<div class="flex justify-between text-sm mb-1.5">
+<span class="text-on-surface-variant font-label-md">Vitamin B2</span>
+<span class="text-on-surface font-label-md font-bold">1.1 <span class="text-on-surface-variant font-normal">/ 1.3 mg</span></span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+<div class="bg-tertiary-container h-full rounded-full transition-all duration-500" style="width: 80%"></div>
+</div>
+</div>
+</div>
+</article>
+<!-- Sleep & Mood Grid -->
+<div class="grid grid-cols-1 gap-6">
+<!-- Sleep Trend Visualization -->
+<article class="bg-surface-container-lowest rounded-xl ambient-shadow border border-outline-variant/20 p-5 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">bedtime</span>
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Sleep Trend</h3>
+</div>
+<span class="text-primary font-label-md text-xs bg-primary-container/40 px-2.5 py-1 rounded-md font-semibold">Avg: 7.2h</span>
+</div>
+<div class="flex items-end justify-between h-28 gap-2 mt-2">
+<!-- Bars for 7 days -->
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">6.5h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[65%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">M</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">7.0h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[70%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">T</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">6.2h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[62%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">W</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">8.1h</div>
+<div class="w-full bg-primary rounded-t-md h-[81%]"></div>
+<span class="text-xs text-on-surface font-label-md font-bold">T</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">7.5h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[75%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">F</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">8.5h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[85%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">S</span>
+</div>
+<div class="flex flex-col items-center gap-1.5 group w-full relative cursor-pointer">
+<div class="absolute -top-8 bg-inverse-surface text-inverse-on-surface text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">7.8h</div>
+<div class="w-full bg-surface-container rounded-t-md h-[78%] group-hover:bg-primary transition-colors"></div>
+<span class="text-xs text-on-surface-variant font-label-sm">S</span>
+</div>
+</div>
+</article>
+<!-- Mood Trend Analysis -->
+<article class="bg-surface-container-lowest rounded-xl ambient-shadow border border-outline-variant/20 p-5 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Mood Over Time</h3>
+<div class="flex bg-surface-container rounded-lg p-1">
+<button class="px-3 py-1 text-xs font-label-md rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors">Day</button>
+<button class="px-3 py-1 text-xs font-label-md rounded-md bg-surface-container-lowest text-on-surface shadow-sm">Week</button>
+<button class="px-3 py-1 text-xs font-label-md rounded-md text-on-surface-variant hover:bg-surface-container-low transition-colors">Month</button>
+</div>
+</div>
+<div class="relative h-36 flex mt-2">
+<!-- Y-axis emojis -->
+<div class="flex flex-col justify-between text-lg pb-7 pr-3 border-r border-outline-variant/20">
+<span>🤩</span>
+<span>🙂</span>
+<span>😐</span>
+<span>😔</span>
+</div>
+<!-- Chart Area -->
+<div class="flex-1 relative pl-2 pb-7">
+<!-- Simulated Line Chart -->
+<svg class="absolute inset-0 w-full h-[calc(100%-1.75rem)] ml-2" preserveaspectratio="none" viewbox="0 0 100 100">
+<path class="text-[#0d9488] opacity-70" d="M0,80 L16.6,50 L33.3,20 L50,40 L66.6,60 L83.3,30 L100,10" fill="none" stroke="currentColor" stroke-width="2"></path>
+</svg>
+<!-- Data Points -->
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[0%] top-[80%] -ml-0.5 -mt-1.5 cursor-pointer ring-4 ring-[#0d9488]/20 hover:ring-[#0d9488]/40 transition-all"></div>
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[16.6%] top-[50%] -ml-0.5 -mt-1.5 cursor-pointer hover:ring-4 ring-[#0d9488]/40 transition-all"></div>
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[33.3%] top-[20%] -ml-0.5 -mt-1.5 cursor-pointer hover:ring-4 ring-[#0d9488]/40 transition-all"></div>
+<div class="absolute w-3 h-3 bg-primary rounded-full left-[50%] top-[40%] -ml-0.5 -mt-1.5 cursor-pointer ring-4 ring-primary/30 z-10 shadow-sm"></div>
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[66.6%] top-[60%] -ml-0.5 -mt-1.5 cursor-pointer hover:ring-4 ring-[#0d9488]/40 transition-all"></div>
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[83.3%] top-[30%] -ml-0.5 -mt-1.5 cursor-pointer hover:ring-4 ring-[#0d9488]/40 transition-all"></div>
+<div class="absolute w-3 h-3 bg-[#0d9488] rounded-full left-[100%] top-[10%] -ml-2.5 -mt-1.5 cursor-pointer hover:ring-4 ring-[#0d9488]/40 transition-all"></div>
+<!-- X-axis labels -->
+<div class="absolute bottom-0 left-0 w-full flex justify-between text-[10px] text-on-surface-variant pl-2">
+<span>Mon</span><span>Tue</span><span>Wed</span><span class="font-bold text-primary">Thu</span><span>Fri</span><span>Sat</span><span class="pr-2">Sun</span>
+</div>
+</div>
+</div>
+</article>
+</div>
+<!-- Grid for smaller stats -->
+<div class="grid grid-cols-2 gap-4">
+<!-- Exercise Activity Trends -->
+<article class="bg-surface-container-lowest rounded-xl p-4 ambient-shadow border border-outline-variant/20 flex flex-col gap-3 items-center justify-center text-center">
+<div class="flex items-center gap-1.5 w-full justify-center mb-1">
+<span class="material-symbols-outlined text-tertiary-container text-[18px]" data-icon="directions_run">directions_run</span>
+<h4 class="font-label-md text-label-md text-on-surface">Weekly Active</h4>
+</div>
+<div class="relative w-20 h-20">
+<svg class="w-full h-full -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.5"></path>
+<path class="text-tertiary-container" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="75, 100" stroke-linecap="round" stroke-width="3.5"></path>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="font-headline-md text-lg font-bold text-on-surface leading-none">150</span>
+<span class="text-[10px] text-on-surface-variant">min</span>
+</div>
+</div>
+<p class="font-label-sm text-xs text-on-surface-variant mt-1">Goal: 200 min</p>
+</article>
+<!-- Water Intake Trend -->
+<article class="bg-surface-container-lowest rounded-xl p-4 ambient-shadow border border-outline-variant/20 flex flex-col justify-between">
+<div class="flex items-center gap-1.5 mb-2">
+<span class="material-symbols-outlined text-[#0d9488] text-[18px]" data-icon="water_drop">water_drop</span>
+<h4 class="font-label-md text-label-md text-on-surface">Water Trend</h4>
+</div>
+<div class="h-16 relative w-full mt-2">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 100 50">
+<!-- Area -->
+<path class="text-[#0d9488]/10" d="M0,45 Q15,20 30,35 T60,25 T100,10 L100,50 L0,50 Z" fill="currentColor"></path>
+<!-- Line -->
+<path class="text-[#0d9488]" d="M0,45 Q15,20 30,35 T60,25 T100,10" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+</div>
+<div class="flex justify-between text-[10px] text-on-surface-variant mt-2 font-label-sm">
+<span>Mon</span>
+<span class="font-bold text-[#0d9488]">Today: 2.1L</span>
+<span>Sun</span>
+</div>
+</article>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface/90 backdrop-blur-lg shadow-[0_-4px_20px_rgba(0,0,0,0.05)] docked full-width md:hidden border-t border-outline-variant/10">
+<!-- Home (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary transition-all active:scale-90 duration-150 gap-1 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="home">home</span>
+<span class="font-label-sm text-[10px]">Home</span>
+</a>
+<!-- Overview (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary transition-all active:scale-90 duration-150 gap-1 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="insights">insights</span>
+<span class="font-label-sm text-[10px]">Overview</span>
+</a>
+<!-- Inbox (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary transition-all active:scale-90 duration-150 gap-1 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="mail">mail</span>
+<span class="font-label-sm text-[10px]">Inbox</span>
+</a>
+<!-- Community (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-inverse-primary transition-all active:scale-90 duration-150 gap-1 w-16" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="groups">groups</span>
+<span class="font-label-sm text-[10px]">Community</span>
+</a>
+<!-- Lifestyle (Active) -->
+<a class="flex flex-col items-center justify-center bg-primary-container/30 dark:bg-primary/20 text-primary dark:text-inverse-primary rounded-xl px-4 py-1.5 transition-all active:scale-90 duration-150 gap-1 min-w-[64px]" href="#">
+<span class="material-symbols-outlined text-[24px]" data-icon="health_metrics" data-weight="fill" style="font-variation-settings: 'FILL' 1;">health_metrics</span>
+<span class="font-label-sm text-[10px] font-bold">Lifestyle</span>
+</a>
+</nav>
+</body></html>

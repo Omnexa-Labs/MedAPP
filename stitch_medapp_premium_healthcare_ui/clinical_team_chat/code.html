@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ICU Night Shift - Clinical Team Chat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #bcc9c6;
+      border-radius: 10px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #6d7a77;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md min-h-screen flex flex-col">
+<!-- TopAppBar Component -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm sticky top-0 z-40">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full overflow-hidden cursor-pointer active:scale-95 duration-200">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional close-up portrait of a female doctor in her late 30s with a warm, confident expression. She is wearing a white medical coat over a professional blouse, standing in a bright, modern clinic with soft, out-of-focus medical equipment in the background. The lighting is high-key and clean, following a premium clinical vitality aesthetic with soft teals and crisp whites." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAz6G9RuZ3n2yBirnG57tMA_R_IMV2D2Au46Yg-pCAFTVpmoY3ghUFVSp5q-nGpBQDSDHsOSFzroGnD22RdR9feeN3Mrk44pZ3ojVTHrk6E2QBWtKiU_2k23idEZo6Nb2paWN3QF24BO2Owi5qmg8afWkVsrQGMyHyB2Jk-e1UQ1bzyIOupZ1-whVPSXLaDrTRrUQbUhB-DyLUksfHwlnlS-872ux7Przt4tC6-EKzzSFGIpcCFY2zqJJg6DswPNwMlb8DjfsGrbjdP"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">MedApp</h1>
+</div>
+<div class="flex items-center gap-md">
+<div class="cursor-pointer active:scale-95 duration-200 text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Layout -->
+<main class="flex-grow flex flex-col md:flex-row w-full max-w-container-max mx-auto px-0 md:px-gutter lg:gap-lg pb-24 md:pb-base">
+<!-- Sidebar: Clinical Team Info (Hidden on mobile, visible on desktop) -->
+<aside class="hidden md:flex flex-col w-80 bg-surface-container-lowest border-r md:border-r-0 md:rounded-xl border-outline-variant/20 shadow-sm my-md h-[calc(100vh-120px)] sticky top-24">
+<div class="p-md border-b border-outline-variant/20">
+<h2 class="font-headline-md text-headline-md text-on-surface">ICU Night Shift</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-xs mt-1">
+<span class="w-2 h-2 bg-primary rounded-full"></span> 8 Members Online
+        </p>
+</div>
+<div class="flex-grow overflow-y-auto custom-scrollbar p-md space-y-md">
+<div>
+<h3 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-sm">Medical Staff</h3>
+<ul class="space-y-sm">
+<li class="flex items-center gap-sm p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="A male physician in professional attire, smiling warmly. The photo has a bright, high-key studio lighting quality with a clean white background, reinforcing a high-end medical professional look with subtle teal accents in the lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdnMBV-u8NkMM8kMMgCgwyS6W_XUo9fX8j8vOcM-Kqcx3DVZvx4YBz5Da0h_h4teXFuLHlagsFaIssvZduOAf39DjC0mGxACBNk02mYL2Mohc3YCqoLl0T8t5mHkwQB5C_2oVpEUVb9URvK4d-fV57-dW0aBt0osW5CMwanMU_lE0eTiTXIruL6gUpLFc9DXS70jBS0V3RGYxo-PO_Fdy3l619i4YhPo7DbpRWcFfevPYb6eUGh3IRrDe_sbxbDpAOQzrSfSp4_oaH"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 bg-primary border-2 border-surface rounded-full"></span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Dr. Sarah Chen</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Attending Physician</p>
+</div>
+</li>
+<li class="flex items-center gap-sm p-2 hover:bg-surface-container-low rounded-lg transition-colors cursor-pointer group">
+<div class="relative">
+<img class="w-10 h-10 rounded-full object-cover" data-alt="A professional nurse wearing navy scrubs, looking towards the camera with a calm and helpful expression. The image is brightly lit with a clean, airy hospital corridor in the background, utilizing the clinical vitality design language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA03Nq7LZt9AhK-mN2P0rdQYcC-u8W3HImAU3QLcDy_XFVfIc-6xoh4sdDcMxd83fpnOjzjMlxnE5aVIB1KTkDOseF74YXn-aYuq2vFkOQdx9LZ286z2owOZULn_dEKqu520a1XyH8VIm_Afdldsz1WMourWbXevRaS1QvGqJFSV9JZQqyzYijf7FmjKchPhGbsfRmQleT8Id_9fedJuWnCjFtc3H3_QSGNC_QBXSEA27j-uV8VByaUX9vsa8yNyq1C7shwHeovO-rd"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 bg-primary border-2 border-surface rounded-full"></span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface font-semibold">Mark Thompson</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Head Nurse</p>
+</div>
+</li>
+</ul>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-sm">Active Patients (Mentions)</h3>
+<ul class="space-y-sm">
+<li class="p-3 bg-secondary-container/30 border border-secondary-container rounded-xl">
+<p class="font-label-md text-label-md text-on-secondary-container font-bold">#Patient-8821</p>
+<p class="font-label-sm text-label-sm text-on-secondary-container/80">Room 402 - Post-Op Stability</p>
+</li>
+<li class="p-3 bg-surface-container border border-outline-variant/30 rounded-xl">
+<p class="font-label-md text-label-md text-on-surface font-bold">#Patient-9014</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Room 408 - Monitoring</p>
+</li>
+</ul>
+</div>
+</div>
+</aside>
+<!-- Chat Interface Canvas -->
+<section class="flex-grow flex flex-col bg-surface-container-lowest md:shadow-sm md:rounded-xl my-0 md:my-md overflow-hidden h-[calc(100vh-140px)] md:h-[calc(100vh-120px)] border-x border-outline-variant/10">
+<!-- Chat Header (Mobile view) -->
+<div class="md:hidden flex items-center justify-between p-md border-b border-outline-variant/20 bg-surface/80 backdrop-blur-sm">
+<div class="flex items-center gap-sm">
+<div class="p-2 bg-primary-container text-on-primary-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="groups">groups</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md-mobile text-on-surface">ICU Night Shift</h2>
+<p class="font-label-sm text-label-sm text-primary">Active Now</p>
+</div>
+</div>
+<button class="p-2 text-on-surface-variant"><span class="material-symbols-outlined" data-icon="info">info</span></button>
+</div>
+<!-- Messages Area -->
+<div class="flex-grow overflow-y-auto custom-scrollbar p-md space-y-md flex flex-col">
+<!-- Timestamp separator -->
+<div class="flex justify-center my-md">
+<span class="px-4 py-1 bg-surface-container text-on-surface-variant font-label-sm text-label-sm rounded-full">Shift started at 19:00</span>
+</div>
+<!-- Incoming Message -->
+<div class="flex items-start gap-sm max-w-[85%]">
+<img class="w-8 h-8 rounded-full object-cover mt-1" data-alt="Doctor avatar" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaHio6VrRoJ9bIiv1e66qhNSQ8fvwTdehionGPR5JfiU8J6MRqxkunpL79ooeXk5prJOsqs9EEG569wzlmobXTz04phfQNm21ASb4KUB669U9HipIh1A5L6YmVz5wdW5q0b17YlNwuHYPM6LoO60eHIAY8qYSi8Vhaxdx9RW-mhBSW3myjMSb6h0DPYhuhOsUFzHGr3InXZ5akzW9oxW56lD5OIf4yEgZVqB4CAKmhouOuWn-vtLNas_a89FQAbQqhT1JCo98YFaqy"/>
+<div class="space-y-1">
+<p class="font-label-sm text-label-sm text-on-surface-variant ml-2">Dr. Sarah Chen</p>
+<div class="bg-surface-container-high p-4 rounded-2xl rounded-tl-none shadow-sm text-on-surface">
+<p class="font-body-md text-body-md">Just completed rounds. <span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">@Mark Thompson</span>, can you verify vitals for <span class="bg-tertiary/10 text-tertiary-container px-1.5 py-0.5 rounded font-semibold">#Patient-8821</span> in 15 mins?</p>
+</div>
+<p class="font-label-sm text-label-sm text-outline-variant ml-2">19:42</p>
+</div>
+</div>
+<!-- Task Bubble -->
+<div class="flex justify-center">
+<div class="w-full max-w-md bg-surface-container-lowest border-2 border-primary/20 rounded-2xl p-4 shadow-sm flex flex-col gap-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="task_alt" data-weight="fill" style="font-variation-settings: 'FILL' 1;">task_alt</span>
+<span class="font-label-md text-label-md text-primary uppercase tracking-wide">New Task Assigned</span>
+</div>
+<span class="px-2 py-0.5 bg-primary-container text-on-primary-container text-[10px] font-bold rounded-full">URGENT</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface font-semibold">Vital Check &amp; Stabilization</p>
+<div class="flex items-center justify-between mt-2 pt-2 border-t border-outline-variant/20">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Assigned to: Mark T.</span>
+</div>
+<button class="text-primary font-label-md text-label-md hover:underline">View Details</button>
+</div>
+</div>
+</div>
+<!-- Outgoing Message -->
+<div class="flex items-start gap-sm max-w-[85%] self-end flex-row-reverse">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary font-bold text-xs">MT</div>
+<div class="space-y-1 items-end flex flex-col">
+<p class="font-label-sm text-label-sm text-on-surface-variant mr-2 text-right">Mark Thompson (You)</p>
+<div class="bg-primary text-on-primary p-4 rounded-2xl rounded-tr-none shadow-md">
+<p class="font-body-md text-body-md">On it, Dr. Chen. I'll update the chart as soon as I'm done. <span class="bg-white/20 text-white px-1.5 py-0.5 rounded font-semibold">#Patient-8821</span> was slightly hypertensive an hour ago.</p>
+</div>
+<div class="flex items-center gap-xs mr-2">
+<p class="font-label-sm text-label-sm text-outline-variant">19:45</p>
+<span class="material-symbols-outlined text-[16px] text-primary" data-icon="done_all">done_all</span>
+</div>
+</div>
+</div>
+<!-- System Message -->
+<div class="flex justify-center my-base">
+<span class="font-label-sm text-label-sm text-outline italic">Nurse Jennifer joined the shift</span>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-md bg-surface border-t border-outline-variant/20">
+<div class="flex flex-col gap-sm">
+<div class="flex gap-sm items-center">
+<div class="flex-grow bg-surface-container-low rounded-2xl border border-outline-variant/30 flex items-center px-md py-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-inner">
+<input class="flex-grow bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline p-0 font-body-md text-body-md" placeholder="Type a message, @member or #patient..." type="text"/>
+<div class="flex items-center gap-sm ml-sm text-on-surface-variant">
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="attach_file">attach_file</span></button>
+<button class="hover:text-primary transition-colors"><span class="material-symbols-outlined" data-icon="add_task">add_task</span></button>
+</div>
+</div>
+<button class="bg-primary text-on-primary w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-primary/20 active:scale-95 transition-all">
+<span class="material-symbols-outlined" data-icon="send" data-weight="fill" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+<div class="flex gap-md px-sm overflow-x-auto pb-1 no-scrollbar">
+<button class="flex items-center gap-xs px-3 py-1.5 bg-surface-container-high border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant whitespace-nowrap hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="alternate_email">alternate_email</span> Mentions
+            </button>
+<button class="flex items-center gap-xs px-3 py-1.5 bg-surface-container-high border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant whitespace-nowrap hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="tag">tag</span> Patients
+            </button>
+<button class="flex items-center gap-xs px-3 py-1.5 bg-surface-container-high border border-outline-variant/30 rounded-full font-label-md text-label-md text-on-surface-variant whitespace-nowrap hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="emergency">emergency</span> Code Alert
+            </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar Component -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-4 pt-2 bg-surface dark:bg-inverse-surface border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] z-50 rounded-t-xl md:hidden">
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:text-primary active:scale-90 transition-transform duration-150 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:text-primary active:scale-90 transition-transform duration-150 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="medical_services">medical_services</span>
+<span class="font-label-sm text-label-sm">Find Care</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-4 py-1 active:scale-90 transition-transform duration-150 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="chat_bubble" data-weight="fill" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+<span class="font-label-sm text-label-sm">Chat</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-4 py-1 hover:text-primary active:scale-90 transition-transform duration-150 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</div>
+</nav>
+<!-- Floating Action Button for Task (Conditional Context) -->
+<button class="fixed bottom-24 right-gutter bg-primary-container text-on-primary-container p-4 rounded-2xl shadow-xl hover:scale-105 active:scale-90 transition-all z-40 flex items-center gap-sm md:bottom-md">
+<span class="material-symbols-outlined" data-icon="assignment_add">assignment_add</span>
+<span class="hidden md:inline font-label-md text-label-md uppercase tracking-wider">New Clinical Task</span>
+</button>
+</body></html>

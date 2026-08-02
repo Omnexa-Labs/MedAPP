@@ -16,9 +16,30 @@
 //     curve), via react-native-svg.
 //   - Weekly Active → real SVG <Circle> ring with strokeDasharray.
 //
+// SHELL MIGRATION — the inline app bar is gone
+//
+// This screen is a patient TAB ROOT, so its chrome is not its own to draw: it
+// renders <PatientShell activeTab="lifestyle"> (docs/BRAND.md §App shell).
+// Deleted with the hand-rolled bar:
+//   * the glass header + its `appBarShadow`. Figma 741:887 carries no effects
+//     and BRAND §Elevation forbids inventing one for a bar.
+//   * the "Lifestyle Hub" <Text> title and the `bg-primary-container` avatar
+//     PLATE with its `#f4fffc`-derived glyph — the tab-root frame wants the
+//     <Logo /> there, and the real avatar is PatientAppBar's
+//     AvatarWithFallback (photo → initials → silhouette). The title string is
+//     preserved as the screen's body heading, below.
+//   * the bell Pressable and its `primary` glyph — the bar owns both now.
+//   * `StatusBar style="dark"`, frozen to one mode; the shell resolves it.
+//   * the local <SafeAreaView> / <BottomNav> scaffolding. The nav's
+//     `onTabPress` routing moved onto the shell verbatim.
+// The ScrollView keeps `paddingBottom: 140`: the shell renders BottomNav
+// `absolute bottom-0`, so it still reserves no layout space.
+//
 // Translation rules (same as the sibling screens):
-//   - glass header / ambient-shadow → opaque bg-surface + Platform.select
-//     shadow.
+//   - card / tile / segmented-thumb shadows → all DELETED. Nothing on this
+//     screen is a sheet, menu, dialog, toast or FAB, so nothing qualifies for
+//     the sanctioned floating pair. The neutral cards now go through the
+//     shared <Card />.
 //   - hero gradient overlay (to-r from surface-tint/80) →
 //     expo-linear-gradient horizontal fill.
 //   - hover tooltips / group-hover bar recolor → dropped (no hover on RN);
@@ -29,9 +50,7 @@
 // expo-* APIs here.
 
 import { useState } from "react";
-import { Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -43,9 +62,11 @@ import Svg, {
   Polyline,
   Stop,
 } from "react-native-svg";
-import { BottomNav } from "@/features/home/components/BottomNav";
-
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+import { Card } from "@/components/ui";
+import { Icon } from "@/components/ui/icons/Icon";
+import { PatientShell } from "@/components/shell";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useTokenColor } from "@/lib/tokens";
 
 const MANAGE_HREF = "/(app)/lifestyle-manage" as Href;
 
@@ -79,9 +100,20 @@ const SLEEP = {
   todayIndex: 3,
 };
 
-// Mood — 7 days on a 1..4 scale (😔→🤩). Thursday highlighted.
+// Mood — 7 days on a 1..4 scale. Thursday highlighted.
+//
+// The y-axis is registry glyphs, not emoji: docs/BRAND.md forbids emoji, and an
+// emoji axis label can't take a token colour so it stayed full-saturation black
+// against a muted chart. Listed TOP-DOWN (best first) because that is the order
+// a vertical axis renders. The 4-point scale reuses the 5-point mood vocabulary
+// from the registry, dropping "distressed".
 const MOOD = {
-  scale: ["🤩", "🙂", "😐", "😔"],
+  scale: [
+    { icon: "mood-great", label: "Great" },
+    { icon: "mood-good", label: "Good" },
+    { icon: "mood-neutral", label: "Neutral" },
+    { icon: "mood-low", label: "Low" },
+  ] as const,
   days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   values: [1, 2.5, 3.8, 3, 2, 3.5, 4], // higher = happier
   todayIndex: 3,
@@ -108,6 +140,17 @@ const SEED_MEDS: Medication[] = [
 ];
 
 export function LifestyleHubScreen() {
+  // Feeds PatientAppBar's AvatarWithFallback. Same store as InboxScreen, reached
+  // through the `useCurrentUser` selector rather than `useAuthStore` directly:
+  // importing the store pulls in @/lib/api/client -> @/lib/config, which throws
+  // without app.config.ts extras and would make this screen untestable.
+  //
+  // The deleted bar had NO source at all — it drew a fixed silhouette plate — so
+  // this is the one place the migration is an upgrade rather than a transfer:
+  // BRAND §App shell mandates photo -> initials -> silhouette, and a signed-in
+  // patient now sees their own face instead of a generic glyph.
+  const user = useCurrentUser();
+  const firstName = user?.displayName?.trim().split(/\s+/)[0] || "there";
   const [meds, setMeds] = useState<Medication[]>(SEED_MEDS);
   const takenCount = meds.filter((m) => m.taken).length;
 
@@ -115,188 +158,203 @@ export function LifestyleHubScreen() {
     setMeds((prev) => prev.map((m) => (m.id === id ? { ...m, taken: true } : m)));
 
   return (
-    <View className="flex-1 bg-surface">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* App bar */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/20 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
+    <PatientShell
+      activeTab="lifestyle"
+      avatarUri={user?.avatarUrl}
+      avatarInitials={firstName[0]}
+      avatarLabel={user?.displayName ?? "Your profile"}
+      // No `onTabPress`: PatientShell owns the tab map now. The switch that was
+      // here handled three of five — `inbox` fell through with a comment calling
+      // it "still a stub", but /(app)/inbox has shipped. See PatientShell.tsx.
+    >
+      {/* `paddingBottom: 140` is UNCHANGED. PatientShell renders BottomNav
+          `absolute bottom-0` (see its LAYOUT NOTE), so the bar still occupies no
+          layout space and the screen still clears it itself. */}
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: 140,
+          paddingTop: 16,
+          gap: 24,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Screen title. The old bar set "Lifestyle Hub" in the slot the
+              tab-root frame reserves for the logo; PatientAppBar has no title
+              prop by design, so the string moves into the body as the screen
+              heading — the same placement InboxScreen uses for "Messages". */}
+        <Text
+          accessibilityRole="header"
+          className="font-headline-xl text-headline-xl text-on-surface"
         >
+          Lifestyle Hub
+        </Text>
+
+        {/* Hero. Shadow deleted and no hairline added: this is a full-bleed
+              photograph under a teal gradient, which separates itself from the
+              page far harder than a 1px line would. */}
+        <View className="h-48 overflow-hidden rounded-2xl">
+          <Image
+            source={{ uri: HERO_IMG }}
+            className="absolute inset-0 h-full w-full"
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={HERO_OVERLAY}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ position: "absolute", inset: 0 }}
+          />
+          <View className="flex-1 justify-end p-md">
+            <Text
+              className="font-headline-md text-on-primary"
+              style={{ fontSize: 24, fontWeight: "700" }}
+            >
+              Your Wellness Path
+            </Text>
+            <Text
+              className="mt-xs font-body-md text-body-md text-on-primary/90"
+              style={{ maxWidth: "80%" }}
+            >
+              Track, adapt, and thrive today.
+            </Text>
+          </View>
+        </View>
+
+        {/* Daily logging entry point.
+              FLAGGED, not adopted onto <Card />: this is a tinted CTA panel on
+              `primary-container`, and <Card /> hard-codes the neutral
+              `card-surface` fill (a `bg-*` passed via className would collide —
+              `cn` is a plain joiner with no tailwind-merge). Shadow deleted; a
+              filled teal panel needs no edge on a near-white page. */}
+        <View className="gap-md rounded-card border border-primary/20 bg-primary-container p-md">
           <View className="flex-row items-center gap-sm">
-            <View className="h-8 w-8 items-center justify-center rounded-full bg-primary-container">
-              <MaterialIcons name="person" size={18} color="#f4fffc" />
+            <View className="h-12 w-12 items-center justify-center rounded-full bg-on-primary-container/10">
+              <MaterialIcons name="edit-calendar" size={26} color="#f4fffc" />
             </View>
-            <Text className="font-headline-md text-headline-md text-primary">Lifestyle Hub</Text>
+            <View className="flex-1">
+              <Text className="font-headline-md text-on-primary-container" style={{ fontSize: 18 }}>
+                Log Daily Activity
+              </Text>
+              <Text className="font-body-md text-on-primary-container/90" style={{ fontSize: 14 }}>
+                Record your sleep, water, meals, and more
+              </Text>
+            </View>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            hitSlop={8}
-            className="rounded-full p-sm active:scale-95"
+            accessibilityLabel="Go to daily log"
+            onPress={() => router.push(MANAGE_HREF)}
+            className="w-full flex-row items-center justify-center gap-xs rounded-lg bg-on-primary-container py-sm active:scale-[0.98]"
           >
-            <MaterialIcons name="notifications" size={24} color="#00685f" />
+            <Text className="font-label-md text-label-md" style={{ color: "#008378" }}>
+              Go to Log
+            </Text>
+            <MaterialIcons name="arrow-forward" size={18} color="#008378" />
           </Pressable>
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, paddingTop: 16, gap: 24 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Hero */}
-          <View className="h-48 overflow-hidden rounded-2xl" style={cardShadow}>
-            <Image source={{ uri: HERO_IMG }} className="absolute inset-0 h-full w-full" resizeMode="cover" />
-            <LinearGradient
-              colors={HERO_OVERLAY}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ position: "absolute", inset: 0 }}
-            />
-            <View className="flex-1 justify-end p-md">
-              <Text className="font-headline-md text-on-primary" style={{ fontSize: 24, fontWeight: "700" }}>
-                Your Wellness Path
-              </Text>
-              <Text className="mt-xs font-body-md text-body-md text-on-primary/90" style={{ maxWidth: "80%" }}>
-                Track, adapt, and thrive today.
-              </Text>
-            </View>
-          </View>
-
-          {/* Daily logging entry point */}
-          <View className="gap-md rounded-xl border border-primary/20 bg-primary-container p-md" style={cardShadow}>
-            <View className="flex-row items-center gap-sm">
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-on-primary-container/10">
-                <MaterialIcons name="edit-calendar" size={26} color="#f4fffc" />
-              </View>
-              <View className="flex-1">
-                <Text className="font-headline-md text-on-primary-container" style={{ fontSize: 18 }}>
-                  Log Daily Activity
-                </Text>
-                <Text className="font-body-md text-on-primary-container/90" style={{ fontSize: 14 }}>
-                  Record your sleep, water, meals, and more
-                </Text>
-              </View>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Go to daily log"
-              onPress={() => router.push(MANAGE_HREF)}
-              className="w-full flex-row items-center justify-center gap-xs rounded-lg bg-on-primary-container py-sm active:scale-[0.98]"
-            >
-              <Text className="font-label-md text-label-md" style={{ color: "#008378" }}>
-                Go to Log
-              </Text>
-              <MaterialIcons name="arrow-forward" size={18} color="#008378" />
-            </Pressable>
-          </View>
-
-          {/* Daily medications */}
-          <View className="gap-md rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-xs">
-                <MaterialIcons name="medical-services" size={22} color="#00685f" />
-                <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-                  Daily Medications
-                </Text>
-              </View>
-              <Text className="font-label-md text-label-md text-primary">
-                {takenCount} of {meds.length} taken
-              </Text>
-            </View>
-            <View className="gap-sm">
-              {meds.map((m) => (
-                <MedRow key={m.id} med={m} onMarkTaken={() => markTaken(m.id)} />
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View full medication schedule"
-              onPress={() => router.push(MANAGE_HREF)}
-              className="flex-row items-center justify-center gap-xs border-t border-outline-variant/20 pt-sm active:opacity-80"
-            >
-              <Text className="font-label-md text-label-md text-primary">View Full Schedule</Text>
-              <MaterialIcons name="arrow-forward" size={18} color="#00685f" />
-            </Pressable>
-          </View>
-
-          {/* Daily nutrient intake */}
-          <View className="gap-md rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
-            <View className="flex-row items-center justify-between">
+        {/* Daily medications */}
+        <Card className="gap-md">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-xs">
+              <MaterialIcons name="medical-services" size={22} color="#00685f" />
               <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-                Daily Nutrient Intake
+                Daily Medications
               </Text>
-              <MaterialIcons name="restaurant-menu" size={22} color="#00685f" />
             </View>
-            <View className="gap-md">
-              {NUTRIENTS.map((n) => (
-                <NutrientBar key={n.label} nutrient={n} />
-              ))}
+            <Text className="font-label-md text-label-md text-primary">
+              {takenCount} of {meds.length} taken
+            </Text>
+          </View>
+          <View className="gap-sm">
+            {meds.map((m) => (
+              <MedRow key={m.id} med={m} onMarkTaken={() => markTaken(m.id)} />
+            ))}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="View full medication schedule"
+            onPress={() => router.push(MANAGE_HREF)}
+            className="flex-row items-center justify-center gap-xs border-t border-outline-variant/20 pt-sm active:opacity-80"
+          >
+            <Text className="font-label-md text-label-md text-primary">View Full Schedule</Text>
+            <MaterialIcons name="arrow-forward" size={18} color="#00685f" />
+          </Pressable>
+        </Card>
+
+        {/* Daily nutrient intake */}
+        <Card className="gap-md">
+          <View className="flex-row items-center justify-between">
+            <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
+              Daily Nutrient Intake
+            </Text>
+            <MaterialIcons name="restaurant-menu" size={22} color="#00685f" />
+          </View>
+          <View className="gap-md">
+            {NUTRIENTS.map((n) => (
+              <NutrientBar key={n.label} nutrient={n} />
+            ))}
+          </View>
+        </Card>
+
+        {/* Sleep trend */}
+        <Card className="gap-md">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-xs">
+              <MaterialIcons name="bedtime" size={20} color="#00685f" />
+              <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
+                Sleep Trend
+              </Text>
+            </View>
+            <View className="rounded-md bg-primary-container/40 px-sm py-xs">
+              <Text className="font-label-md text-label-sm text-primary">Avg: {SLEEP.avg}</Text>
             </View>
           </View>
+          <BarChart
+            labels={SLEEP.days}
+            values={SLEEP.hours}
+            highlightIndex={SLEEP.todayIndex}
+            height={112}
+          />
+        </Card>
 
-          {/* Sleep trend */}
-          <View className="gap-md rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
+        {/* Mood over time */}
+        <MoodCard />
+
+        {/* Exercise + Water row */}
+        <View className="flex-row gap-md">
+          <Card className="flex-1 items-center gap-sm">
+            <View className="flex-row items-center gap-xs">
+              <MaterialIcons name="directions-run" size={18} color="#2170e4" />
+              <Text className="font-label-md text-label-md text-on-surface">Weekly Active</Text>
+            </View>
+            <ProgressRing value={150} goal={200} unit="min" tint="#2170e4" />
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">
+              Goal: 200 min
+            </Text>
+          </Card>
+
+          <Card className="flex-1 gap-sm">
+            <View className="flex-row items-center gap-xs">
+              <MaterialIcons name="water-drop" size={18} color="#0d9488" />
+              <Text className="font-label-md text-label-md text-on-surface">Water Trend</Text>
+            </View>
+            <AreaChart values={WATER.liters} height={64} tint="#0d9488" />
             <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-xs">
-                <MaterialIcons name="bedtime" size={20} color="#00685f" />
-                <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-                  Sleep Trend
-                </Text>
-              </View>
-              <View className="rounded-md bg-primary-container/40 px-sm py-xs">
-                <Text className="font-label-md text-label-sm text-primary">Avg: {SLEEP.avg}</Text>
-              </View>
+              <Text className="font-label-sm text-label-sm text-on-surface-variant">Mon</Text>
+              <Text
+                className="font-label-sm text-label-sm"
+                style={{ color: "#0d9488", fontWeight: "700" }}
+              >
+                Today: {WATER.today}
+              </Text>
+              <Text className="font-label-sm text-label-sm text-on-surface-variant">Sun</Text>
             </View>
-            <BarChart
-              labels={SLEEP.days}
-              values={SLEEP.hours}
-              highlightIndex={SLEEP.todayIndex}
-              height={112}
-            />
-          </View>
-
-          {/* Mood over time */}
-          <MoodCard />
-
-          {/* Exercise + Water row */}
-          <View className="flex-row gap-md">
-            <View className="flex-1 items-center gap-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
-              <View className="flex-row items-center gap-xs">
-                <MaterialIcons name="directions-run" size={18} color="#2170e4" />
-                <Text className="font-label-md text-label-md text-on-surface">Weekly Active</Text>
-              </View>
-              <ProgressRing value={150} goal={200} unit="min" tint="#2170e4" />
-              <Text className="font-label-sm text-label-sm text-on-surface-variant">Goal: 200 min</Text>
-            </View>
-
-            <View className="flex-1 gap-sm rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
-              <View className="flex-row items-center gap-xs">
-                <MaterialIcons name="water-drop" size={18} color="#0d9488" />
-                <Text className="font-label-md text-label-md text-on-surface">Water Trend</Text>
-              </View>
-              <AreaChart values={WATER.liters} height={64} tint="#0d9488" />
-              <View className="flex-row items-center justify-between">
-                <Text className="font-label-sm text-label-sm text-on-surface-variant">Mon</Text>
-                <Text className="font-label-sm text-label-sm" style={{ color: "#0d9488", fontWeight: "700" }}>
-                  Today: {WATER.today}
-                </Text>
-                <Text className="font-label-sm text-label-sm text-on-surface-variant">Sun</Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-
-        <BottomNav
-          active="lifestyle"
-          onTabPress={(key) => {
-            if (key === "home") router.push("/(app)" as Href);
-            else if (key === "overview") router.push("/(app)/overview" as Href);
-            else if (key === "community") router.push("/(app)/community" as Href);
-            // lifestyle is the current screen; inbox still a stub.
-          }}
-        />
-      </SafeAreaView>
-    </View>
+          </Card>
+        </View>
+      </ScrollView>
+    </PatientShell>
   );
 }
 
@@ -321,7 +379,10 @@ function MedRow({ med, onMarkTaken }: { med: Medication; onMarkTaken: () => void
         </View>
         <View>
           <Text className="font-label-md text-label-md text-on-surface">{med.name}</Text>
-          <Text className="font-label-sm uppercase text-on-surface-variant" style={{ fontSize: 10, letterSpacing: 0.5 }}>
+          <Text
+            className="font-label-sm uppercase text-on-surface-variant"
+            style={{ fontSize: 10, letterSpacing: 0.5 }}
+          >
             {med.time} • {med.taken ? "Taken" : "Pending"}
           </Text>
         </View>
@@ -344,13 +405,25 @@ function NutrientBar({ nutrient }: { nutrient: Nutrient }) {
   return (
     <View>
       <View className="mb-xs flex-row items-baseline justify-between">
-        <Text className="font-label-md text-label-md text-on-surface-variant">{nutrient.label}</Text>
+        <Text className="font-label-md text-label-md text-on-surface-variant">
+          {nutrient.label}
+        </Text>
         <Text className="font-label-md text-label-md text-on-surface" style={{ fontWeight: "700" }}>
-          {nutrient.value} <Text className="text-on-surface-variant" style={{ fontWeight: "400" }}>{nutrient.goal}</Text>
+          {nutrient.value}{" "}
+          <Text className="text-on-surface-variant" style={{ fontWeight: "400" }}>
+            {nutrient.goal}
+          </Text>
         </Text>
       </View>
       <View className="h-2 overflow-hidden rounded-full bg-surface-container">
-        <View style={{ width: `${nutrient.pct}%`, height: "100%", backgroundColor: nutrient.color, borderRadius: 999 }} />
+        <View
+          style={{
+            width: `${nutrient.pct}%`,
+            height: "100%",
+            backgroundColor: nutrient.color,
+            borderRadius: 999,
+          }}
+        />
       </View>
     </View>
   );
@@ -381,7 +454,10 @@ function BarChart({
         {values.map((v, i) => {
           const active = i === highlightIndex;
           return (
-            <View key={i} style={{ flex: 1, height: `${(v / max) * 100}%`, justifyContent: "flex-end" }}>
+            <View
+              key={i}
+              style={{ flex: 1, height: `${(v / max) * 100}%`, justifyContent: "flex-end" }}
+            >
               <View
                 style={{
                   height: "100%",
@@ -417,13 +493,20 @@ function BarChart({
 }
 
 function MoodCard() {
+  // Axis glyph colour via the token map, not a Tailwind class: no cssInterop is
+  // registered for icon components.
+  const onSurfaceVariant = useTokenColor("on-surface-variant");
   const [range, setRange] = useState<"Day" | "Week" | "Month">("Week");
   return (
-    <View className="gap-md rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-md" style={cardShadow}>
+    <Card className="gap-md">
       <View className="flex-row items-center justify-between">
         <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
           Mood Over Time
         </Text>
+        {/* Range segmented control. The active thumb carried a `segmentShadow`;
+            deleted — a segmented thumb is a tile inside a track, not one of
+            BRAND's floating roles, and the tonal step from `surface-container`
+            to `surface-container-lowest` plus `text-on-surface` marks it. */}
         <View className="flex-row rounded-lg bg-surface-container p-xs">
           {(["Day", "Week", "Month"] as const).map((r) => {
             const active = r === range;
@@ -434,7 +517,6 @@ function MoodCard() {
                 accessibilityState={{ selected: active }}
                 onPress={() => setRange(r)}
                 className={`rounded-md px-sm py-xs ${active ? "bg-surface-container-lowest" : ""}`}
-                style={active ? segmentShadow : undefined}
               >
                 <Text
                   className={`font-label-md text-label-sm ${active ? "text-on-surface" : "text-on-surface-variant"}`}
@@ -446,13 +528,15 @@ function MoodCard() {
           })}
         </View>
       </View>
-      {/* Emoji y-axis + SVG line chart (the comp's real intent). */}
+      {/* Glyph y-axis + SVG line chart (the comp's real intent). */}
       <View className="flex-row">
         <View className="justify-between pr-sm" style={{ height: 110 }}>
-          {MOOD.scale.map((e) => (
-            <Text key={e} style={{ fontSize: 16 }}>
-              {e}
-            </Text>
+          {MOOD.scale.map((step) => (
+            // <Icon /> takes no accessibility props, so the label lives on a
+            // wrapper — otherwise the axis is silent to a screen reader.
+            <View key={step.icon} accessibilityLabel={step.label}>
+              <Icon name={step.icon} size={16} color={onSurfaceVariant} />
+            </View>
           ))}
         </View>
         <View className="flex-1 border-l border-outline-variant/20 pl-sm">
@@ -483,7 +567,7 @@ function MoodCard() {
           </View>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -509,7 +593,14 @@ function ProgressRing({
   return (
     <View style={{ width: SIZE, height: SIZE, alignItems: "center", justifyContent: "center" }}>
       <Svg width={SIZE} height={SIZE} style={{ position: "absolute" }}>
-        <Circle cx={SIZE / 2} cy={SIZE / 2} r={r} stroke="#eaefed" strokeWidth={STROKE} fill="none" />
+        <Circle
+          cx={SIZE / 2}
+          cy={SIZE / 2}
+          r={r}
+          stroke="#eaefed"
+          strokeWidth={STROKE}
+          fill="none"
+        />
         <Circle
           cx={SIZE / 2}
           cy={SIZE / 2}
@@ -525,7 +616,10 @@ function ProgressRing({
         />
       </Svg>
       <View className="items-center">
-        <Text className="font-headline-md text-on-surface" style={{ fontSize: 18, fontWeight: "700", lineHeight: 20 }}>
+        <Text
+          className="font-headline-md text-on-surface"
+          style={{ fontSize: 18, fontWeight: "700", lineHeight: 20 }}
+        >
           {value}
         </Text>
         <Text className="text-on-surface-variant" style={{ fontSize: 10 }}>
@@ -569,11 +663,27 @@ function LineChart({
   const polyline = pts.map((p) => `${p.x},${p.y}`).join(" ");
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none">
-      <Polyline points={polyline} fill="none" stroke={tint} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <Polyline
+        points={polyline}
+        fill="none"
+        stroke={tint}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
       {pts.map((p, i) => {
         const active = i === highlightIndex;
         return active ? (
-          <Circle key={i} cx={p.x} cy={p.y} r={4} fill={highlightTint} stroke={highlightTint} strokeOpacity={0.25} strokeWidth={4} />
+          <Circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={4}
+            fill={highlightTint}
+            stroke={highlightTint}
+            strokeOpacity={0.25}
+            strokeWidth={4}
+          />
         ) : (
           <Circle key={i} cx={p.x} cy={p.y} r={2.5} fill={tint} />
         );
@@ -606,32 +716,18 @@ function AreaChart({ values, height, tint }: { values: number[]; height: number;
         </SvgLinearGradient>
       </Defs>
       <Path d={area} fill="url(#waterFill)" />
-      <Path d={line} fill="none" stroke={tint} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+      <Path
+        d={line}
+        fill="none"
+        stroke={tint}
+        strokeWidth={2.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Shadows — same Platform.select pattern as the other screens.
-// ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.05, shadowRadius: 20, shadowOffset: { width: 0, height: 4 } },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const appBarShadow =
-  Platform.select({
-    ios: { shadowColor: "#000000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const segmentShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
-    web: { boxShadow: "0px 2px 8px rgba(71, 85, 105, 0.08)" },
-    android: { elevation: 2 },
-  }) || {};
+// `cardShadow` and `segmentShadow` were deleted with their last call sites, and
+// `appBarShadow` went with the hand-rolled bar this screen no longer draws.
+// Nothing on this screen floats — see docs/BRAND.md §Elevation.

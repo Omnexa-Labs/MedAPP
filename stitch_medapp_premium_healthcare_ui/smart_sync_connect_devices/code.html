@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedApp Smart Sync</title>
+<!-- Fonts & Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#0d1c2e",
+                        "outline-variant": "#bcc9c6",
+                        "inverse-surface": "#2c3130",
+                        "surface-variant": "#dee4e1",
+                        "inverse-on-surface": "#edf2f0",
+                        "tertiary": "#0058be",
+                        "primary-container": "#008378",
+                        "clinical-info": "#0058be",
+                        "on-error-container": "#93000a",
+                        "surface-bg": "#f5faf8",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#d5e3fc",
+                        "secondary-fixed": "#d5e3fc",
+                        "surface-container": "#eaefed",
+                        "surface-bright": "#f5faf8",
+                        "primary": "#00685f",
+                        "surface-container-lowest": "#ffffff",
+                        "outline": "#6d7a77",
+                        "on-surface-variant": "#3d4947",
+                        "on-secondary-container": "#57657a",
+                        "surface-container-low": "#f0f5f2",
+                        "surface": "#f5faf8",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-primary-container": "#f4fffc",
+                        "clinical-success": "#00685f",
+                        "secondary": "#515f74",
+                        "surface-container-high": "#e4e9e7",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-tint": "#006a61",
+                        "surface-container-highest": "#dee4e1",
+                        "inverse-primary": "#6bd8cb",
+                        "on-error": "#ffffff",
+                        "on-background": "#171d1c",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "background": "#f5faf8",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-tertiary-fixed": "#001a42",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-container": "#fefcff",
+                        "on-surface": "#171d1c",
+                        "on-primary-fixed": "#00201d",
+                        "on-primary-fixed-variant": "#005049",
+                        "clinical-error": "#ba1a1a",
+                        "tertiary-container": "#2170e4",
+                        "primary-fixed": "#89f5e7",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "md": "24px",
+                        "xs": "4px",
+                        "container-max": "1280px",
+                        "sm": "12px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "label-sm": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "caption": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Manrope"],
+                        "headline-xl": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f5faf8;
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md shadow-sm border-b border-outline-variant/30 dark:border-outline/20">
+<div class="flex justify-between items-center px-gutter py-4 w-full max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary p-2 hover:bg-surface-variant/50 transition-colors rounded-full active:scale-95 duration-200">
+                    arrow_back
+                </button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Smart Sync</h1>
+</div>
+<div class="flex items-center gap-sm">
+<button class="p-2 material-symbols-outlined text-on-surface-variant hover:bg-surface-variant/50 transition-colors rounded-full active:scale-95 duration-200">
+                    notifications
+                </button>
+<div class="w-10 h-10 rounded-full border-2 border-primary-container overflow-hidden">
+<img alt="Doctor Profile" class="w-full h-full object-cover" data-alt="A professional portrait of a female medical provider wearing a white clinical coat and a stethoscope. She has a warm, confident smile, conveying professional trust and reliability. The lighting is soft and high-key, set against a clean, modern medical office background that emphasizes clinical clarity and professional standards." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHWjSdoi4amaQQj9f9P-0ad5QAxdsRLsWwtakJ59jwgAmFU6tB995uTc7rXnl7hDWF-f0V5nlJdRd2k0Y7iYHUtlORxud7ef95wGleOarl3IZQ5bg2lTLdVrkb-fFoFJpxIqgzaMvnKY4gwqYTpFQ564CmU2eWHZ8mhcpyDsirIMu6qCyozDeVX-5qMH4YbzGVmtftOUTAei0uwJtuNVl0ooMIr-y-iOyb2wGWm3pC4Y85grlfypavMYote1ltWacDU-HCpbV62tmh"/>
+</div>
+</div>
+</div>
+</header>
+<main class="pt-24 pb-32 max-w-container-max mx-auto px-gutter min-h-screen">
+<!-- Hero Section -->
+<section class="mb-lg">
+<div class="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary-container/10 to-surface-container-high p-8 flex flex-col md:flex-row items-center gap-8 shadow-sm">
+<div class="w-full md:w-1/2 flex justify-center">
+<div class="relative group">
+<div class="absolute -inset-4 bg-primary/10 rounded-full blur-3xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
+<img alt="Smart Sync Hero" class="relative z-10 w-64 h-64 md:w-80 md:h-80 object-contain drop-shadow-xl animate-float" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAYIYfrKVTgDYDwTawNdAqizUrGVFMkkVvqVmD31EO6Ur6ZVnTMY07yNjGWAgD7wjqsvB0qbldPnubABV_l_HQFiBdepjHDBDwLZ8bqS0GNG66bhzu-Cfb15p_z7ds4fNYCp_dtvbvyUNLUDUnzsYcM5L66D8yxOQiSdX5UGqHr9LRywZ5nooWkloVUbOiSzsgO-KhAHODXcmACLfKTD9lLDs43RMe0ueGfsPQivmwQy9mt5OGnn3PoZH1yXhKnPcYgLHaa2rnB-NB"/>
+</div>
+</div>
+<div class="w-full md:w-1/2 space-y-4 text-center md:text-left">
+<h2 class="font-headline-xl text-headline-xl text-on-surface leading-tight">
+                        Build Your <span class="text-primary">Health Memory</span>
+</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-md">
+                        Syncing your wearables allows for real-time vitals tracking, creating a continuous medical record that helps your clinical team provide proactive, data-driven care.
+                    </p>
+<div class="pt-4 flex flex-wrap justify-center md:justify-start gap-4">
+<span class="flex items-center gap-2 text-primary font-label-md bg-white px-4 py-2 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+                            HIPAA Compliant
+                        </span>
+<span class="flex items-center gap-2 text-primary font-label-md bg-white px-4 py-2 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+                            Real-time Sync
+                        </span>
+</div>
+</div>
+</div>
+</section>
+<!-- Device List -->
+<section class="mb-lg">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Connect Devices</h3>
+<span class="text-label-sm font-label-sm text-outline px-3 py-1 bg-surface-container rounded-full">3 Platforms Available</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Apple Health -->
+<div class="glass-card p-6 rounded-xl flex flex-col items-center text-center hover:shadow-md transition-all duration-300 group">
+<div class="w-20 h-20 mb-4 bg-white rounded-2xl p-2 shadow-sm flex items-center justify-center transition-transform group-hover:scale-105">
+<img alt="Apple Health" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDnVF5JStCPAbPeWiRYbhuGBLwZbGvVXQeQRzZUGMDqlo9T1N1ld5JB67mo7rrodmhFTsyIehy2Joqw9tVlR_VfA1_N-HourfahaQNF2lCgaKjbvuRCnxcA2IaG-bcy4VYSh1_sOiIr44YbVWUd_OG00zji9zC5XuDGPUQwW_tcLybLBlSMrJ3jAE5FepXa9i_R8lU7xd_b9tPShg8NDhwBStpSb5z2BmZA084KaqKdSD_mOAJxEitfAK9qCoLZeL07WFxG_-V5KYDB"/>
+</div>
+<h4 class="font-headline-md text-[20px] text-on-surface mb-1">Apple Health</h4>
+<span class="text-label-sm font-label-sm text-outline mb-6">Not Connected</span>
+<button class="mt-auto w-full py-3 bg-primary text-on-primary font-label-md rounded-lg active:scale-95 transition-transform shadow-md hover:bg-primary/90">
+                        Connect
+                    </button>
+</div>
+<!-- Google Fit -->
+<div class="glass-card p-6 rounded-xl flex flex-col items-center text-center hover:shadow-md transition-all duration-300 group">
+<div class="w-20 h-20 mb-4 bg-white rounded-2xl p-2 shadow-sm flex items-center justify-center transition-transform group-hover:scale-105">
+<img alt="Google Fit" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_IEY_ViSMBWOR_UmGH_RRiDcN2rLWYf3-OwbzkGPoU7qFJVjN_8e3wQTLOyhAn2ZupCeAYruKaSiItfQrOf3xP5OJ896h5GXSWQmmWUnrb3FQjTS5EoiCoq-PeYHUsvPoizyeSPcda1oyxCZCEeUtWnDdXRdgmxXNjp1aGXhNW4KbCFLtxZkRl0O5Q8n4PS-EuomcyG34cCjg1JrpiQvTi6Syma-oagtC0vHuI2xR6o84Kzp7dyzPzTJMPEsLe_T3dwIUlVaA8z6_"/>
+</div>
+<h4 class="font-headline-md text-[20px] text-on-surface mb-1">Google Fit</h4>
+<span class="text-label-sm font-label-sm text-outline mb-6">Not Connected</span>
+<button class="mt-auto w-full py-3 bg-primary text-on-primary font-label-md rounded-lg active:scale-95 transition-transform shadow-md hover:bg-primary/90">
+                        Connect
+                    </button>
+</div>
+<!-- Fitbit -->
+<div class="glass-card p-6 rounded-xl flex flex-col items-center text-center hover:shadow-md transition-all duration-300 group">
+<div class="w-20 h-20 mb-4 bg-white rounded-2xl p-2 shadow-sm flex items-center justify-center transition-transform group-hover:scale-105">
+<img alt="Fitbit" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDV-OpfLrUwYk9K6ReVZ9S89QNm1pyt04nrr1GDLMydNmNV7YNvzNKVrbY7YHxY1lngDxSw_AVCgGIxc2ZZwh6RCgoJh2a2cSegzMcs15Q9sall1GElZ_yxsNHybgR1Ns4HZqrS3vd1gRMNvgACo3D3M9nFyEMqXCjg1gnnqT9QrzmrtCbHT_6mSDoXf2fU1On0LKAYdRRdqHBXXQ8tYrrWwqJQvrlFuxJKeBIjxkziO2dmlXnG8xUJ67De4EXWUQuWcCHILBgE08kF"/>
+</div>
+<h4 class="font-headline-md text-[20px] text-on-surface mb-1">Fitbit</h4>
+<span class="text-label-sm font-label-sm text-outline mb-6">Not Connected</span>
+<button class="mt-auto w-full py-3 bg-primary text-on-primary font-label-md rounded-lg active:scale-95 transition-transform shadow-md hover:bg-primary/90">
+                        Connect
+                    </button>
+</div>
+</div>
+</section>
+<!-- Privacy & Info -->
+<section class="max-w-3xl mx-auto">
+<div class="bg-surface-container-low border border-outline-variant/50 rounded-2xl p-gutter flex items-start gap-4">
+<div class="bg-clinical-info/10 p-3 rounded-full">
+<span class="material-symbols-outlined text-clinical-info">lock</span>
+</div>
+<div>
+<h5 class="font-label-md text-label-md text-on-surface mb-2">Data Privacy &amp; Security</h5>
+<p class="font-caption text-body-md text-on-surface-variant opacity-80 leading-relaxed">
+                        Your health data is your property. MedApp uses end-to-end encryption for all synced vitals. We never share your clinical data with third parties without your explicit consent. All connections are managed through official secure APIs.
+                    </p>
+<button class="mt-4 text-primary font-label-sm hover:underline flex items-center gap-1">
+                        View Privacy Protocol
+                        <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 border-t border-outline-variant/30 bg-surface/80 dark:bg-inverse-surface/80 backdrop-blur-md shadow-lg">
+<div class="flex justify-around items-center w-full py-base bg-surface dark:bg-inverse-surface">
+<!-- Home -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary-container dark:hover:text-primary-fixed active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<!-- Overview (ACTIVE) -->
+<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim font-bold active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<!-- Inbox -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary-container dark:hover:text-primary-fixed active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="font-label-sm text-label-sm">Inbox</span>
+</a>
+<!-- Community -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary-container dark:hover:text-primary-fixed active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</a>
+<!-- Lifestyle -->
+<a class="flex flex-col items-center justify-center text-secondary dark:text-secondary-fixed-dim hover:text-primary-container dark:hover:text-primary-fixed active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="spa">spa</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</a>
+</div>
+</nav>
+<script>
+        // Micro-interaction for buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                if(this.textContent.trim() === 'Connect') {
+                    const originalText = this.textContent;
+                    this.disabled = true;
+                    this.innerHTML = `<span class="flex items-center justify-center gap-2"><span class="animate-spin material-symbols-outlined text-[18px]">sync</span>Connecting...</span>`;
+                    
+                    setTimeout(() => {
+                        this.innerHTML = `<span class="flex items-center justify-center gap-2"><span class="material-symbols-outlined text-[18px]">check_circle</span>Connected</span>`;
+                        this.classList.replace('bg-primary', 'bg-clinical-success');
+                        const statusLabel = this.closest('div').querySelector('.text-outline');
+                        if(statusLabel) {
+                            statusLabel.textContent = 'Active Sync';
+                            statusLabel.classList.replace('text-outline', 'text-clinical-success');
+                            statusLabel.classList.add('bg-clinical-success/10', 'px-2');
+                        }
+                    }, 2000);
+                }
+            });
+        });
+
+        // Simple Floating Animation logic for hero image
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-15px); }
+            }
+            .animate-float {
+                animation: float 5s ease-in-out infinite;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body></html>

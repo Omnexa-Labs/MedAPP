@@ -1,0 +1,269 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Contact Support - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline": "#6d7a77",
+                    "on-tertiary-container": "#fefcff",
+                    "on-surface": "#171d1c",
+                    "surface-container-highest": "#dee4e1",
+                    "surface-container": "#eaefed",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-container": "#2170e4",
+                    "on-secondary-container": "#57657a",
+                    "outline-variant": "#bcc9c6",
+                    "on-error-container": "#93000a",
+                    "secondary": "#515f74",
+                    "on-primary-fixed": "#00201d",
+                    "error": "#ba1a1a",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "inverse-surface": "#2c3130",
+                    "background": "#f5faf8",
+                    "primary-container": "#008378",
+                    "surface-container-low": "#f0f5f2",
+                    "on-surface-variant": "#3d4947",
+                    "secondary-fixed": "#d5e3fc",
+                    "on-primary": "#ffffff",
+                    "inverse-on-surface": "#edf2f0",
+                    "surface-tint": "#006a61",
+                    "on-background": "#171d1c",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-error": "#ffffff",
+                    "surface-variant": "#dee4e1",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-high": "#e4e9e7",
+                    "inverse-primary": "#6bd8cb",
+                    "surface-bright": "#f5faf8",
+                    "primary": "#00685f",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface": "#f5faf8",
+                    "tertiary": "#0058be",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "tertiary-fixed": "#d8e2ff",
+                    "secondary-container": "#d5e3fc",
+                    "primary-fixed": "#89f5e7",
+                    "surface-dim": "#d6dbd9",
+                    "on-primary-fixed-variant": "#005049",
+                    "on-secondary": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "on-primary-container": "#f4fffc"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "sm": "12px",
+                    "container-max": "1280px",
+                    "base": "8px",
+                    "md": "24px",
+                    "xl": "80px",
+                    "lg": "48px",
+                    "gutter": "24px",
+                    "xs": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-xl": ["Manrope"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-lg": ["Manrope"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm dark:shadow-none docked full-width top-0 sticky z-40">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp</span>
+</div>
+<!-- Desktop Nav -->
+<nav class="hidden md:flex items-center gap-md">
+<a class="text-on-surface-variant dark:text-outline-variant font-label-md text-label-md hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg" href="#">Home</a>
+<a class="text-on-surface-variant dark:text-outline-variant font-label-md text-label-md hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg" href="#">Find Care</a>
+<a class="text-on-surface-variant dark:text-outline-variant font-label-md text-label-md hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg" href="#">Chat</a>
+<a class="text-primary dark:text-primary-fixed-dim font-bold font-label-md text-label-md hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg" href="#">Profile</a>
+</nav>
+<div class="flex items-center gap-md">
+<button class="text-on-surface-variant hover:bg-surface-container-low rounded-full p-2 transition-colors">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border border-outline-variant/30">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A close-up portrait of a professional looking individual smiling warmly, acting as a user profile picture placeholder. Soft, natural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3qUaqNL7ZGHYjTwtf-vjhwqJxlW8pb3de50Mbm8oIzUKXKwyKqySHEdWhO4dxiuJ2tQZbLZ98OxGcQ4F1XOIEvim7BxG4gQOHoASTX9sf4QjVx7s5LwHqa31Nzg7HsqiP8ZOD1JeQaer6ZvrVhQeaTI4GldB613_SjL1WlYY-tp8mFmuujzkrjYkvMjWIO6RHpbfFy-MREGQ3y_idDOrWRAH1exbiZbVP0i9ZGFA7mXoZvye6_cRT2gpPjAUEBQFD5O8fzAigIHMH">
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-gutter py-lg pb-[100px] md:pb-lg">
+<!-- Header Section -->
+<div class="mb-lg text-center md:text-left">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background mb-sm">How can we help?</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">Our support team is ready to assist you with any questions or concerns regarding your MedApp experience.</p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md">
+<!-- Left Column: Contact Methods -->
+<div class="md:col-span-5 flex flex-col gap-md">
+<!-- Live Chat Card (Highlighted) -->
+<div class="bg-primary-container rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] relative overflow-hidden group hover:shadow-[0px_10px_30px_rgba(71,85,105,0.1)] transition-shadow">
+<!-- Decorative subtle circle -->
+<div class="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+<div class="flex items-start gap-md relative z-10">
+<div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-container text-2xl" data-icon="chat" style="font-variation-settings: 'FILL' 1;">chat</span>
+</div>
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h2 class="font-headline-md text-headline-md text-on-primary-container text-lg">Live Chat</h2>
+<span class="bg-white/20 text-on-primary-container text-xs font-semibold px-2 py-0.5 rounded-full font-label-sm uppercase tracking-wider">Fastest</span>
+</div>
+<p class="font-body-md text-body-md text-on-primary-container/90 mb-4 text-sm">Typical response time: under 2 minutes.</p>
+<button class="bg-on-primary-container text-primary-container font-label-md text-label-md px-6 py-2.5 rounded-lg hover:bg-white transition-colors flex items-center gap-2">
+                                Start Chat
+                                <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Call Support Card -->
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/20 hover:shadow-[0px_10px_30px_rgba(71,85,105,0.1)] transition-shadow">
+<div class="flex items-start gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="call">call</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface text-lg mb-1">Call Us</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">Available Mon-Fri, 8am-8pm EST.</p>
+<a class="font-label-md text-label-md text-tertiary-container hover:text-tertiary transition-colors flex items-center gap-1" href="tel:18005550199">
+                                1-800-555-0199
+                            </a>
+</div>
+</div>
+</div>
+<!-- Email Support Card -->
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/20 hover:shadow-[0px_10px_30px_rgba(71,85,105,0.1)] transition-shadow">
+<div class="flex items-start gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="mail">mail</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface text-lg mb-1">Email Support</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm mb-2">For general, non-urgent inquiries.</p>
+<a class="font-label-md text-label-md text-tertiary-container hover:text-tertiary transition-colors flex items-center gap-1" href="mailto:support@medapp.com">
+                                support@medapp.com
+                            </a>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Send Message Form -->
+<div class="md:col-span-7">
+<div class="bg-surface rounded-xl p-lg shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/20 h-full">
+<div class="mb-md">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Send a Message</h2>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Fill out the form below and we'll get back to you within 24 hours.</p>
+</div>
+<form class="space-y-md">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="firstName">First Name</label>
+<input class="bg-surface-bright border border-outline-variant/50 text-on-surface rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all font-body-md" id="firstName" placeholder="Jane" type="text">
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="lastName">Last Name</label>
+<input class="bg-surface-bright border border-outline-variant/50 text-on-surface rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all font-body-md" id="lastName" placeholder="Doe" type="text">
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="topic">Topic</label>
+<select class="bg-surface-bright border border-outline-variant/50 text-on-surface rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all font-body-md appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236d7a77%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center]" id="topic">
+<option disabled="" selected="" value="">Select an inquiry topic...</option>
+<option value="account">Account Management</option>
+<option value="billing">Billing &amp; Insurance</option>
+<option value="technical">Technical Support</option>
+<option value="other">Other</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm text-on-surface-variant" for="message">Message</label>
+<textarea class="bg-surface-bright border border-outline-variant/50 text-on-surface rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all font-body-md resize-none" id="message" placeholder="Please describe how we can help you today..." rows="4"></textarea>
+</div>
+<div class="pt-2">
+<button class="w-full md:w-auto bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-lg shadow-sm hover:bg-surface-tint hover:shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2" type="button">
+                                Send Message
+                                <span class="material-symbols-outlined text-sm" data-icon="send">send</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface dark:bg-inverse-surface border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-4 pt-2 z-50 rounded-t-xl"><a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined mb-1" data-icon="home">home</span>
+    <span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined mb-1" data-icon="grid_view">grid_view</span>
+    <span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined mb-1" data-icon="mail">mail</span>
+    <span class="font-label-sm text-label-sm">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined mb-1" data-icon="group">group</span>
+    <span class="font-label-sm text-label-sm">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined mb-1" data-icon="auto_awesome">auto_awesome</span>
+    <span class="font-label-sm text-label-sm">Lifestyle</span>
+</a></nav>
+
+
+
+
+</body></html>

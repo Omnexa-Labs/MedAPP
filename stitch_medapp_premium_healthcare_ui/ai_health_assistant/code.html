@@ -1,0 +1,320 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MedApp - AI Assistant</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#6d7a77",
+                        "error-container": "#ffdad6",
+                        "on-tertiary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "background": "#f5faf8",
+                        "surface-container-high": "#e4e9e7",
+                        "primary-container": "#008378",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-primary-container": "#f4fffc",
+                        "on-background": "#171d1c",
+                        "surface-bright": "#f5faf8",
+                        "primary": "#00685f",
+                        "surface-variant": "#dee4e1",
+                        "surface-container-low": "#f0f5f2",
+                        "surface-tint": "#006a61",
+                        "inverse-surface": "#2c3130",
+                        "surface-container-highest": "#dee4e1",
+                        "secondary": "#515f74",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed": "#d5e3fc",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "tertiary-fixed": "#d8e2ff",
+                        "outline-variant": "#bcc9c6",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-surface-variant": "#3d4947",
+                        "inverse-on-surface": "#edf2f0",
+                        "tertiary-container": "#2170e4",
+                        "secondary-container": "#d5e3fc",
+                        "primary-fixed": "#89f5e7",
+                        "on-error": "#ffffff",
+                        "surface-container": "#eaefed",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#171d1c",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface": "#f5faf8",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-tertiary-container": "#fefcff",
+                        "inverse-primary": "#6bd8cb",
+                        "tertiary": "#0058be",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-container": "#57657a",
+                        "on-primary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "md": "24px",
+                        "xl": "80px",
+                        "lg": "48px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Manrope"],
+                        "headline-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* Hide scrollbar for clean UI but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="bg-surface/80 backdrop-blur-md text-primary font-headline-md text-headline-md docked full-width top-0 sticky shadow-sm z-40">
+<div class="flex justify-between items-center w-full px-gutter h-16 max-w-container-max mx-auto">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant bg-surface-container-high flex-shrink-0 hover:bg-surface-variant/50 transition-colors cursor-pointer">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A close up portrait of a young professional woman with a soft, warm smile. The lighting is bright and even, creating a clean, modern aesthetic. The background is a soft, out-of-focus studio gray. The image feels trustworthy, calm, and approachable, perfectly suited for a premium healthcare application avatar." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC319cU4Q8p7tB5-nJPUL3cuQiHCYq3DlR3MrStRvrqTClur01Zo4gu3VbPCVgfBSpQWIyi-T-_YsiLemUscKuclQtAG8_xOcbRpBxZRm-kx95fB_dlZ4hM7gVFVf1fThArdG1ucHGvFhkgw7l4xB5cYn4RwwpZ6qjsVsuSRn9s2GWcheK3QyTFQFb4b4VJJPTqimZw_YCXPByAz5Enu6R15yds-zdamX7wmmg-JF3X8kvjQjkQCzMXa35mE-wTJQExc0MqIaTmnVgc">
+</div>
+</div>
+<div class="font-headline-md text-headline-md font-bold text-primary">
+                MedApp
+            </div>
+<button class="text-on-surface-variant hover:bg-surface-variant/50 transition-colors p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col w-full max-w-container-max mx-auto px-4 md:px-gutter pb-32 pt-4 relative">
+<!-- AI Insight Card (Pinned/Flow) -->
+<div class="w-full bg-surface-container-low rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-4 mb-md flex items-start gap-4">
+<div class="bg-primary-container text-on-primary-container p-2 rounded-full flex-shrink-0 mt-1">
+<span class="material-symbols-outlined text-xl" data-icon="health_and_safety">health_and_safety</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-primary mb-1">AI Health Insight</h3>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Based on your recent lab reports uploaded yesterday, your Vitamin D levels are slightly below optimal. Consider a brief sun exposure or consulting Dr. Smith about a supplement.</p>
+</div>
+</div>
+<!-- Chat History -->
+<div class="flex-grow flex flex-col gap-sm overflow-y-auto no-scrollbar pb-md">
+<!-- Timestamp -->
+<div class="text-center font-label-sm text-label-sm text-outline mb-sm mt-2">
+                Today, 10:24 AM
+            </div>
+<!-- User Message -->
+<div class="flex justify-end w-full mb-xs">
+<div class="max-w-[85%] md:max-w-[70%] bg-surface-container-high text-on-background rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-outline-variant/20">
+<p class="font-body-md text-body-md">Hi, I've been having a mild headache since yesterday evening. It's mostly around my temples.</p>
+</div>
+</div>
+<!-- AI Message -->
+<div class="flex justify-start w-full mb-xs gap-2">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1 border border-primary/20">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="smart_toy">smart_toy</span>
+</div>
+<div class="max-w-[85%] md:max-w-[70%] bg-surface text-on-background rounded-2xl rounded-tl-sm px-4 py-3 shadow-[0px_2px_10px_rgba(71,85,105,0.03)] border-l-2 border-l-primary border-y border-r border-outline-variant/20">
+<p class="font-body-md text-body-md mb-2">I understand you're experiencing a headache around your temples since last evening. I can help you evaluate this.</p>
+<p class="font-body-md text-body-md mb-2">To give you the best guidance, could you tell me:</p>
+<ul class="list-disc list-inside font-body-md text-body-md text-on-surface-variant space-y-1 ml-1">
+<li class="">How severe is the pain on a scale of 1-10?</li>
+<li class="">Have you taken any medication for it yet?</li>
+<li class="">Are you experiencing any other symptoms like nausea or sensitivity to light?</li>
+</ul>
+</div>
+</div>
+<!-- User Message -->
+<div class="flex justify-end w-full mb-xs mt-2">
+<div class="max-w-[85%] md:max-w-[70%] bg-surface-container-high text-on-background rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm border border-outline-variant/20">
+<p class="font-body-md text-body-md">It's about a 4 out of 10. I haven't taken anything yet. No nausea, but screen light is a bit bothersome.</p>
+</div>
+</div>
+<!-- AI Message with Actionable content -->
+<div class="flex justify-start w-full mb-xs gap-2 mt-2">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1 border border-primary/20">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="smart_toy">smart_toy</span>
+</div>
+<div class="max-w-[85%] md:max-w-[70%] bg-surface text-on-background rounded-2xl rounded-tl-sm px-4 py-3 shadow-[0px_2px_10px_rgba(71,85,105,0.03)] border-l-2 border-l-primary border-y border-r border-outline-variant/20">
+<p class="font-body-md text-body-md mb-3">Thank you for those details. A mild tension headache with mild light sensitivity is quite common, especially if you've had prolonged screen time.</p>
+<div class="bg-secondary-fixed/30 rounded-lg p-3 mb-2 border border-secondary-fixed-dim">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="info">info</span>
+<span class="font-label-md text-label-md text-on-secondary-container">Suggestions:</span>
+</div>
+<ul class="list-none font-body-md text-body-md text-on-surface-variant text-sm space-y-1">
+<li class="flex items-start gap-2"><span class="text-primary">•</span> Rest in a dimly lit room for 20-30 minutes.</li>
+<li class="flex items-start gap-2"><span class="text-primary">•</span> Ensure you are adequately hydrated.</li>
+<li class="flex items-start gap-2"><span class="text-primary">•</span> An over-the-counter pain reliever like Ibuprofen can help (if you have no contraindications).</li>
+</ul>
+</div>
+<div class="mt-4 mb-4 p-4 rounded-xl bg-primary-container/10 border border-primary-container/20">
+    <p class="font-label-md text-label-md text-primary mb-3">Need more specialized advice? Our medical team is online.</p>
+    <div class="flex flex-col gap-2">
+        <button class="w-full py-2.5 bg-primary text-on-primary rounded-full font-label-md text-label-md shadow-sm hover:bg-surface-tint transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-sm">chat_bubble</span>
+            Talk to a Professional
+        </button>
+        <button class="w-full py-2.5 border border-primary text-primary rounded-full font-label-md text-label-md hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
+            <span class="material-symbols-outlined text-sm">calendar_today</span>
+            Schedule a Consultation
+        </button>
+    </div>
+</div><p class="font-label-sm text-label-sm text-outline italic">If the pain worsens, or if you develop sudden severe pain, fever, or confusion, seek immediate medical attention.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Input & Navigation Area -->
+<div class="fixed bottom-0 left-0 w-full z-50 bg-gradient-to-t from-surface via-surface to-transparent pt-6 md:hidden">
+<!-- Input Area Container -->
+<div class="px-4 pb-20 pt-2 bg-surface">
+<!-- Quick Action Chips -->
+<div class="flex gap-2 overflow-x-auto no-scrollbar mb-3 pb-1">
+<button class="whitespace-nowrap font-label-sm text-label-sm px-3 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[16px]" data-icon="monitor_heart">monitor_heart</span>
+                    Check Vitals
+                </button>
+<button class="whitespace-nowrap font-label-sm text-label-sm px-3 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[16px]" data-icon="science">science</span>
+                    Analyze Lab Report
+                </button>
+<button class="whitespace-nowrap font-label-sm text-label-sm px-3 py-1.5 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest">
+<span class="material-symbols-outlined text-[16px]" data-icon="coronavirus">coronavirus</span>
+                    Symptom Checker
+                </button>
+</div>
+<!-- Multimodal Input Bar -->
+<div class="bg-surface-container-highest rounded-full flex items-center p-1 border border-outline-variant/30 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="attach_file">attach_file</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="photo_camera">photo_camera</span>
+</button>
+<input class="flex-grow bg-transparent border-none focus:ring-0 text-on-background font-body-md text-body-md placeholder-outline px-2 h-10 w-full outline-none" placeholder="Ask me about your symptoms..." type="text">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center mr-1">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</button>
+<button class="p-2 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-sm hover:bg-surface-tint transition-colors w-10 h-10 flex-shrink-0">
+<span class="material-symbols-outlined" data-icon="send">send</span>
+</button>
+</div>
+</div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="bg-surface text-primary font-label-sm text-label-sm font-headline-md text-headline-md font-bold docked full-width bottom-0 fixed rounded-t-xl shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] w-full flex justify-around items-center px-4 py-2 pb-safe border-t border-outline-variant/10"><a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1 transition-all duration-200 w-16 shadow-sm" href="#">
+    <span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">home</span>
+    <span class="font-label-sm text-[10px] font-bold">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all duration-200 w-16 py-1 rounded-xl group" href="#">
+    <span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform">grid_view</span>
+    <span class="font-label-sm text-[10px]">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all duration-200 w-16 py-1 rounded-xl group" href="#">
+    <span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform">mail</span>
+    <span class="font-label-sm text-[10px]">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all duration-200 w-16 py-1 rounded-xl group" href="#">
+    <span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform">group</span>
+    <span class="font-label-sm text-[10px]">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-secondary-container/30 transition-all duration-200 w-16 py-1 rounded-xl group" href="#">
+    <span class="material-symbols-outlined mb-1 group-hover:scale-110 transition-transform">auto_awesome</span>
+    <span class="font-label-sm text-[10px]">Lifestyle</span>
+</a></nav>
+</div>
+<!-- Desktop Side/Bottom Input Area (Hidden on mobile) -->
+<div class="hidden md:block fixed bottom-0 left-0 w-full z-30 bg-surface/90 backdrop-blur-sm border-t border-outline-variant/20 py-4 pb-8">
+<div class="max-w-3xl mx-auto px-4">
+<!-- Quick Action Chips -->
+<div class="flex gap-2 justify-center mb-3">
+<button class="whitespace-nowrap font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="monitor_heart">monitor_heart</span>
+                    Check Vitals
+                </button>
+<button class="whitespace-nowrap font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="science">science</span>
+                    Analyze Lab Report
+                </button>
+<button class="whitespace-nowrap font-label-sm text-label-sm px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant hover:bg-surface-variant/50 transition-colors flex items-center gap-1 bg-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-[18px]" data-icon="coronavirus">coronavirus</span>
+                    Symptom Checker
+                </button>
+</div>
+<!-- Multimodal Input Bar -->
+<div class="bg-surface-container-highest rounded-full flex items-center p-2 border border-outline-variant/30 shadow-md focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/50 transition-all">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center ml-1">
+<span class="material-symbols-outlined" data-icon="attach_file">attach_file</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="photo_camera">photo_camera</span>
+</button>
+<input class="flex-grow bg-transparent border-none focus:ring-0 text-on-background font-body-md text-body-md placeholder-outline px-4 h-12 w-full outline-none" placeholder="Ask me about your symptoms..." type="text">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full flex items-center justify-center mr-2">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</button>
+<button class="px-6 py-2 bg-primary text-on-primary rounded-full flex items-center justify-center shadow-sm hover:bg-surface-tint transition-colors h-12 flex-shrink-0 font-label-md text-label-md gap-2">
+                    Send
+                    <span class="material-symbols-outlined text-[18px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</div>
+
+
+
+
+</body></html>

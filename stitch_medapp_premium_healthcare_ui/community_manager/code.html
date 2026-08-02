@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Community Manager Dashboard | MedApp Specialist</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface-container": "#eaefed",
+                "secondary-container": "#d5e3fc",
+                "on-secondary-fixed": "#0d1c2e",
+                "error-container": "#ffdad6",
+                "outline": "#6d7a77",
+                "inverse-on-surface": "#edf2f0",
+                "on-tertiary-fixed": "#001a42",
+                "on-primary": "#ffffff",
+                "surface": "#f5faf8",
+                "surface-container-high": "#e4e9e7",
+                "surface-bright": "#f5faf8",
+                "surface-container-lowest": "#ffffff",
+                "outline-variant": "#bcc9c6",
+                "on-secondary": "#ffffff",
+                "on-surface": "#171d1c",
+                "tertiary-fixed": "#d8e2ff",
+                "on-tertiary": "#ffffff",
+                "surface-tint": "#006a61",
+                "on-tertiary-fixed-variant": "#004395",
+                "inverse-primary": "#6bd8cb",
+                "tertiary-container": "#2170e4",
+                "inverse-surface": "#2c3130",
+                "tertiary": "#0058be",
+                "on-surface-variant": "#3d4947",
+                "error": "#ba1a1a",
+                "primary-container": "#008378",
+                "clinical-error": "#ba1a1a",
+                "primary-fixed": "#89f5e7",
+                "surface-variant": "#dee4e1",
+                "secondary": "#515f74",
+                "on-primary-container": "#f4fffc",
+                "on-error": "#ffffff",
+                "surface-container-low": "#f0f5f2",
+                "secondary-fixed": "#d5e3fc",
+                "clinical-info": "#0058be",
+                "secondary-fixed-dim": "#b9c7df",
+                "on-background": "#171d1c",
+                "primary-fixed-dim": "#6bd8cb",
+                "on-error-container": "#93000a",
+                "surface-container-highest": "#dee4e1",
+                "on-primary-fixed-variant": "#005049",
+                "primary": "#00685f",
+                "on-secondary-fixed-variant": "#3a485b",
+                "on-tertiary-container": "#fefcff",
+                "surface-dim": "#d6dbd9",
+                "on-secondary-container": "#57657a",
+                "background": "#f5faf8",
+                "surface-bg": "#f5faf8",
+                "tertiary-fixed-dim": "#adc6ff",
+                "clinical-success": "#00685f",
+                "on-primary-fixed": "#00201d"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "md": "24px",
+                "lg": "48px",
+                "xs": "4px",
+                "xl": "80px",
+                "gutter": "24px",
+                "base": "8px",
+                "container-max": "1280px",
+                "sm": "12px"
+            },
+            "fontFamily": {
+                "headline-md": ["Manrope"],
+                "headline-xl": ["Manrope"],
+                "headline-lg": ["Manrope"],
+                "label-md": ["Inter"],
+                "body-md": ["Inter"],
+                "label-sm": ["Inter"],
+                "body-lg": ["Inter"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f5faf8; }
+        .glass-effect { backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-container/80 backdrop-blur-md shadow-sm border-b-[0.5px] border-outline-variant">
+<div class="flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container overflow-hidden">
+<img alt="Specialist Profile Avatar" class="w-full h-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSjqJSB0QslBt4Rk85XXZequ76IhFWCiAaGgo4rZbcYEk5SPSTvoSPOSFe3N6CvICeV7jMbII8nUDF3MhDF8qa-KEyrxExah316lSrxm_iAvtv5dpdiJ01_OJswl6UmkkeNBkOEzQVlUTpY50hYSUT8gh4UCHvL3fLNLAX9lRrF-8a4M_57ZYQJ4tucaddp00XZ2Z8vHcjwTyEmdQb2aYS9ibc-IaDyN2cUVDUE2ApUAZdHTxr_xOoWNnuTLe2ohwjUOVml4JPlqV_"/>
+</div>
+<h1 class="text-headline-md font-headline-md text-primary">MedApp Specialist</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-primary font-bold transition-colors" href="#">Groups</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors px-3 py-1 rounded-lg" href="#">Community</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors px-3 py-1 rounded-lg" href="#">Analytics</a>
+</nav>
+<div class="cursor-pointer active:scale-95 transition-transform text-primary">
+<span class="material-symbols-outlined">settings</span>
+</div>
+</div>
+</div>
+</header>
+<!-- NavigationDrawer (Desktop Only) -->
+<aside class="fixed left-0 top-0 h-full hidden lg:flex flex-col p-4 z-40 w-80 bg-surface-container-low shadow-lg mt-16">
+<div class="mb-8 p-4">
+<div class="flex items-center gap-4 mb-4">
+<div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+<img alt="Specialist Profile Image" class="w-10 h-10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpJSaHQxJ2Z7_7yEwrUiohAKych1FjJjAFIMWZhCqqZefMq12m8SV5EeK8qe9QLson-_wcCpTXrlAHjiKMievvTrc245_6xUfJzZkME7crlYezjv3ECF6CXC6Ei42hZgi8_dl1BDFrmo-S5PVxFGnI_FUTKuEDZlQtmmBnOiTgaeK3oBQ9I6K8mtKYBQKZDmbTAoQmJ4nezNesTUEM7rXYgxCmhgBpHNDbPYGnth_XSahTFyis1uQRKssF6KHCdmeL-4vM82RWU-Qb"/>
+</div>
+<div>
+<h3 class="text-label-md font-label-md text-on-surface">Dr. Sarah Chen</h3>
+<p class="text-body-md text-on-surface-variant">Cardiology Specialist</p>
+<span class="text-[10px] uppercase tracking-wider font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">Verified Provider</span>
+</div>
+</div>
+</div>
+<nav class="space-y-2">
+<a class="bg-secondary-container text-on-secondary-container rounded-full px-4 py-3 flex items-center gap-3 active:opacity-80 transition-all" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="font-label-md">Groups</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="font-label-md">Post Composer</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined">forum</span>
+<span class="font-label-md">Community</span>
+</a>
+<a class="text-on-surface-variant hover:bg-surface-variant rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="font-label-md">Analytics</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content -->
+<main class="pt-24 pb-20 px-gutter lg:ml-80 max-w-container-max mx-auto">
+<!-- Dashboard Header -->
+<header class="mb-lg">
+<h2 class="text-headline-lg font-headline-lg text-on-surface mb-2">Community Overview</h2>
+<p class="text-body-lg text-on-surface-variant">Monitor and manage your professional medical circles.</p>
+</header>
+<!-- Metrics Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-md mb-lg">
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-widest">Total Members</span>
+<span class="material-symbols-outlined text-primary">groups</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-xl font-headline-xl">12,482</span>
+<span class="text-clinical-success text-label-md flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span> 12%
+                    </span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-widest">New Requests</span>
+<span class="material-symbols-outlined text-clinical-info">person_add</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-xl font-headline-xl">154</span>
+<span class="bg-error-container text-on-error-container text-[10px] px-2 py-1 rounded-full font-bold">URGENT</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-outline-variant flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<span class="text-label-sm font-label-sm text-on-surface-variant uppercase tracking-widest">Engagement Rate</span>
+<span class="material-symbols-outlined text-tertiary">query_stats</span>
+</div>
+<div class="flex items-baseline gap-2">
+<span class="text-headline-xl font-headline-xl">64.2%</span>
+<span class="text-clinical-success text-label-md flex items-center">
+<span class="material-symbols-outlined text-sm">trending_up</span> 5.4%
+                    </span>
+</div>
+</div>
+</section>
+<!-- Bento Layout: Groups & Requests -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-md items-start">
+<!-- Groups Table Section (Left 2/3) -->
+<section class="xl:col-span-2 bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant overflow-hidden">
+<div class="p-gutter flex justify-between items-center border-b border-outline-variant bg-surface-container-low/50">
+<h3 class="text-headline-md font-headline-md">Your Groups</h3>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-lg flex items-center gap-2 font-label-md hover:opacity-90 transition-all active:scale-95">
+<span class="material-symbols-outlined">add</span> Create New Group
+                    </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant uppercase text-[10px] tracking-widest font-bold">
+<th class="px-gutter py-4">Group Name</th>
+<th class="px-gutter py-4">Members</th>
+<th class="px-gutter py-4">Status</th>
+<th class="px-gutter py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container transition-colors group">
+<td class="px-gutter py-5">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg overflow-hidden bg-secondary-container">
+<img class="w-full h-full object-cover" data-alt="A professional close-up of a modern cardiology diagnostic screen showing a beating heart in blue and teal tones, symbolizing a specialized medical community for cardiologists. The lighting is sterile and high-key, reflecting a clinical and trustworthy hospital environment with soft glassmorphism accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC88cmAWpn-g-LQKWZGZ1ZlMTUE9Z1wBy1VbF8GWBsJzLx0wh1DkScZPUF01FTCAQFa-fgLSFdim_Tf3SaxyTaSPo4yyH0ZSVGCHG5xEoNJ6b-UkOaC0UrgEoxqj72K1EvY8oMvKs7r5gLZzD1sypSjiYARIfb4ctFipXLUjBaJRGXwKpvDsTTc4qjC_NwYlMmu4OGt8V6bXUJBCaNqa1OKoy0QAPPQhdwGhc1ZejxtQzAHTv-4nMQT59cc6Y-cZ3M7gOsZ7WYq6M4f"/>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Cardiology Innovations</p>
+<p class="text-body-md text-on-surface-variant text-sm">Primary Circle</p>
+</div>
+</div>
+</td>
+<td class="px-gutter py-5 text-body-md font-medium">8,421</td>
+<td class="px-gutter py-5">
+<span class="bg-clinical-success/10 text-clinical-success text-[10px] px-2 py-1 rounded font-bold uppercase">Active</span>
+</td>
+<td class="px-gutter py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors" title="Manage Members">
+<span class="material-symbols-outlined">person_search</span>
+</button>
+<button class="p-2 hover:bg-clinical-info/10 text-clinical-info rounded-lg transition-colors" title="View Analytics">
+<span class="material-symbols-outlined">bar_chart_4_bars</span>
+</button>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors">
+<td class="px-gutter py-5">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg overflow-hidden bg-secondary-container text-on-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined">neurology</span>
+</div>
+<div>
+<p class="font-semibold text-on-surface">Neuro-Link Specialist Forum</p>
+<p class="text-body-md text-on-surface-variant text-sm">Private Research</p>
+</div>
+</div>
+</td>
+<td class="px-gutter py-5 text-body-md font-medium">2,105</td>
+<td class="px-gutter py-5">
+<span class="bg-clinical-success/10 text-clinical-success text-[10px] px-2 py-1 rounded font-bold uppercase">Active</span>
+</td>
+<td class="px-gutter py-5 text-right">
+<div class="flex justify-end gap-2">
+<button class="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors">
+<span class="material-symbols-outlined">person_search</span>
+</button>
+<button class="p-2 hover:bg-clinical-info/10 text-clinical-info rounded-lg transition-colors">
+<span class="material-symbols-outlined">bar_chart_4_bars</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- Pending Requests Section (Right 1/3) -->
+<section class="bg-surface-container-lowest rounded-xl shadow-md border border-outline-variant flex flex-col h-full overflow-hidden">
+<div class="p-gutter border-b border-outline-variant bg-surface-container-low/50">
+<h3 class="text-label-md font-label-md text-on-surface uppercase tracking-widest flex items-center gap-2">
+                        Member Requests <span class="bg-error text-white text-[10px] px-1.5 py-0.5 rounded-full">154</span>
+</h3>
+</div>
+<div class="p-gutter space-y-4 overflow-y-auto max-h-[600px] no-scrollbar">
+<!-- Request Item -->
+<div class="p-4 bg-surface-container rounded-xl border border-outline-variant hover:shadow-sm transition-all group">
+<div class="flex items-start gap-3 mb-4">
+<img alt="Applicant" class="w-10 h-10 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD5usZTzLpzZGFj1HYcsZtomXpNRq97EjLbQ0BNa9ox-IUIMt0pCObJlfu3R2mRS1b1-NSZ6t3mRYylz1zzq039jhgs8Tvui9rmcY1L0LSj4jWwFIeuVVj32RA3nrW2ddA7jckrub0C4KEFaGzsHBG2fJD5hTyyqLwjQ0proKW3qdNruZU_YSQqQ3ZOWej5yU77LpJdMqm72GMN1d-3aNN5bZjzU0WtAUMq3FRNsDD_hEncFjpeYAsTbI5KbOMv3U4BKFc-i1WpwbTa"/>
+<div class="flex-1">
+<p class="font-bold text-on-surface">Dr. Michael Thorne</p>
+<p class="text-body-md text-on-surface-variant text-xs">Internal Medicine • St. Jude Medical</p>
+</div>
+<span class="text-caption text-on-surface-variant">2m ago</span>
+</div>
+<p class="text-body-md text-sm text-on-surface-variant mb-4 italic">"Interested in joining the latest research discussion regarding automated ECG screening..."</p>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-label-md hover:bg-primary-container transition-all text-xs active:scale-95">Approve</button>
+<button class="flex-1 border border-outline-variant text-on-surface-variant py-2 rounded-lg font-label-md hover:bg-surface-variant transition-all text-xs">Decline</button>
+</div>
+</div>
+<!-- Request Item 2 -->
+<div class="p-4 bg-surface-container rounded-xl border border-outline-variant hover:shadow-sm transition-all group">
+<div class="flex items-start gap-3 mb-4">
+<img alt="Applicant" class="w-10 h-10 rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzF0yIP-5W4WLXlRFnfeC6ZkvKoKLynrNXaLHjuo7arJdW7_0iPn0H-IW5VLQr5OgYdAIN7cxuiE0kIlOksCAN56VEYjqry9BMfUE8dyPDTjTHsjZHceL1EQLUNqpOHVghNNBsX-FRQp8eEtEeCF9y90X8gveewse6hR8sWkq1-BX7XfIPC5KKyuGAYRGmD3L3vjx3HlN9v1pm3u2RBN7YLdvbg4VBLerRp91fucy8gLRsxw3o9-iILtMaR4XBT8gD9_TD9u8YOYdC"/>
+<div class="flex-1">
+<p class="font-bold text-on-surface">Elena Rodriguez, NP</p>
+<p class="text-body-md text-on-surface-variant text-xs">Cardiac Nurse Practitioner</p>
+</div>
+<span class="text-caption text-on-surface-variant">1h ago</span>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-on-primary py-2 rounded-lg font-label-md hover:bg-primary-container transition-all text-xs active:scale-95">Approve</button>
+<button class="flex-1 border border-outline-variant text-on-surface-variant py-2 rounded-lg font-label-md hover:bg-surface-variant transition-all text-xs">Decline</button>
+</div>
+</div>
+</div>
+<button class="p-4 w-full text-center text-primary font-bold text-label-md hover:bg-primary/5 border-t border-outline-variant transition-all">
+                    View All Requests
+                </button>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe h-16 bg-surface/80 backdrop-blur-md shadow-sm border-t-[0.5px] border-outline-variant">
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-4 py-1 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-label-sm font-label-sm">Groups</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 hover:bg-surface-variant/50 transition-colors" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="text-label-sm font-label-sm">Compose</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 hover:bg-surface-variant/50 transition-colors" href="#">
+<span class="material-symbols-outlined">public</span>
+<span class="text-label-sm font-label-sm">Social</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 hover:bg-surface-variant/50 transition-colors" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-label-sm font-label-sm">Profile</span>
+</a>
+</nav>
+<!-- Floating Action Button (FAB) - Contextual Context: Management/Creation -->
+<button class="fixed bottom-20 right-6 md:bottom-10 md:right-10 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-lg flex items-center justify-center active:scale-95 transition-all hover:shadow-xl z-30 group">
+<span class="material-symbols-outlined text-3xl">add</span>
+<span class="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-3 py-1.5 rounded-lg text-label-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap hidden md:block">New Thread</span>
+</button>
+<script>
+        // Micro-interaction for table rows
+        document.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('click', (e) => {
+                if(!e.target.closest('button')) {
+                    console.log('Row clicked');
+                }
+            });
+        });
+
+        // Atmospheric Micro-interaction for metrics
+        const metrics = document.querySelectorAll('.bg-surface-container-lowest');
+        metrics.forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(0, 106, 97, 0.05) 0%, rgba(245, 250, 248, 1) 70%)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.background = '#ffffff';
+            });
+        });
+    </script>
+</body></html>

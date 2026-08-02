@@ -64,6 +64,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
+    // "Add to Calendar" on the booking confirmation (expo-calendar, SDK 55).
+    // Declared here rather than in a raw AndroidManifest so the string lives in
+    // version control. READ is required alongside WRITE because the flow has to
+    // enumerate calendars to find a writable one — Android has no notion of a
+    // default calendar the way iOS does.
+    permissions: ["android.permission.READ_CALENDAR", "android.permission.WRITE_CALENDAR"],
   },
   web: {
     output: "static",
@@ -92,6 +98,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-local-authentication",
       {
         faceIDPermission: "Allow MedApp to use FaceID to sign you in.",
+      },
+    ],
+    // "Add to Calendar" on BookingConfirmedScreen. The plugin writes iOS's
+    // NSCalendarsUsageDescription (and, on the SDK 55 line, the write-only
+    // variant) from `calendarPermission`, so the copy is reviewable here rather
+    // than buried in a generated Info.plist. Reminders are NOT requested — the
+    // app writes events only, and asking for a scope you never use is how an
+    // App Review rejection happens.
+    [
+      "expo-calendar",
+      {
+        calendarPermission: "Allow MedApp to add your confirmed appointments to your calendar.",
       },
     ],
   ],

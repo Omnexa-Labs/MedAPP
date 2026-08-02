@@ -12,7 +12,11 @@
 //     expo-linear-gradient vertical fill (transparent → black).
 //   - line-clamp-2 → numberOfLines={2}.
 //   - hover:* / group-hover:scale / focus:ring → dropped.
-//   - shadows → Platform.select (ios/web/android).
+//   - shadows → DELETED (docs/BRAND.md §Elevation). Both the cards and the
+//     trending hero are content surfaces in the scroll flow, not one of the
+//     sanctioned floating roles (sheet, menu, dialog, toast, FAB), so neither
+//     keeps a shadow — not even a softened one. The card surfaces now go
+//     through the shared <Card />.
 //   - Interactions are LOCAL only (no backend): the search box is a
 //     controlled input, topic chips fill it, Follow / Join toggle local
 //     state. When the social backend lands, Follow here mutates the same
@@ -23,11 +27,10 @@
 // expo-* APIs here.
 
 import { useState } from "react";
-import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from "@expo/vector-icons";
-
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+import { Card, ChoiceChip, ChoiceChipRow, SearchField } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
 // Static seed content mirroring the comp. No backend in this design pass.
@@ -118,36 +121,36 @@ export function ExploreScreen() {
 
   return (
     <View>
-      {/* Search */}
-      <View className="mt-md flex-row items-center rounded-xl bg-surface-container-lowest px-md" style={cardShadow}>
-        <MaterialIcons name="search" size={22} color="#6d7a77" />
-        <TextInput
+      {/* Search — the shared SearchField (Figma 396:538), a composition over the
+          canonical Input. Deletes this screen's private <TextInput> row, which
+          was a borderless-with-shadow twin of CommunityHub's bordered-flat one:
+          two hand-rolls of ONE control living in the same feature. It also
+          carried a `cardShadow` (docs/BRAND.md §Elevation forbids it — and this
+          is not a sheet/menu/dialog/toast/FAB), a `bg-surface-container-lowest`
+          fill where 396:538 mandates the recessed `color/field-surface`, no
+          focus/error border, and `#6d7a77` / `#6d7a7799` frozen into the glyph,
+          placeholder and clear button. */}
+      <View className="mt-md">
+        <SearchField
           value={query}
           onChangeText={setQuery}
+          onClear={() => setQuery("")}
           placeholder="Search topics, doctors, or groups"
-          placeholderTextColor="#6d7a7799"
-          returnKeyType="search"
-          className="flex-1 py-md pl-sm font-body-md text-body-md text-on-surface"
           accessibilityLabel="Search Explore"
         />
-        {query.length > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            hitSlop={8}
-            onPress={() => setQuery("")}
-          >
-            <MaterialIcons name="close" size={20} color="#6d7a77" />
-          </Pressable>
-        ) : null}
       </View>
 
-      {/* Hero — Trending Now */}
+      {/* Hero — Trending Now.
+          The `heroShadow` (0 8px 16px black at 18%) is deleted. This is the
+          largest surface on the panel but it is still a content tile in the
+          scroll flow, not a sheet/menu/dialog/toast/FAB, so BRAND's floating
+          exception does not reach it — and it needs no edge treatment either:
+          a full-bleed photograph under a dark gradient already separates
+          itself from a `#F5FAF8` page far harder than any hairline would. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Trending: ${HERO.title}`}
         className="mt-lg h-64 overflow-hidden rounded-2xl active:opacity-95"
-        style={heroShadow}
       >
         <Image
           source={{ uri: HERO.imageUri }}
@@ -204,31 +207,31 @@ export function ExploreScreen() {
         <Text className="mb-sm font-headline-md text-on-surface" style={{ fontSize: 18 }}>
           Trending Topics
         </Text>
-        <View className="flex-row flex-wrap gap-sm">
-          {TRENDING_TOPICS.map((topic) => {
-            const isActive = query === topic;
-            return (
-              <Pressable
-                key={topic}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-                accessibilityLabel={`Search ${topic}`}
-                onPress={() => setQuery(topic)}
-                className={`rounded-full px-md py-sm active:scale-95 ${
-                  isActive ? "bg-primary" : "bg-surface-container-high"
-                }`}
-              >
-                <Text
-                  className={`font-label-md text-label-md ${
-                    isActive ? "text-on-primary" : "text-primary"
-                  }`}
-                >
-                  {topic}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        {/* The shared ChoiceChip (Figma 11:104), replacing another of the ten
+            private chips. It was already a wrapping row, so ChoiceChipRow's
+            default (wrap, 8px gap) is used rather than `scrollable`.
+
+            The unselected chip changes from `bg-surface-container-high` +
+            `text-primary` to the frame's no-fill + hairline + `text-on-surface`.
+            That is the point of the extraction: the same control was drawn with
+            three different unselected fills across three screens, and a
+            transparent chip is also the only one that reads correctly both on a
+            card and on the page (BRAND: "Never use a raw white/black fill on an
+            icon container or tab item").
+
+            `accessibilityLabel` is preserved verbatim — "Search #Biohacking"
+            says what the tap DOES, which the bare topic name would not. */}
+        <ChoiceChipRow>
+          {TRENDING_TOPICS.map((topic) => (
+            <ChoiceChip
+              key={topic}
+              label={topic}
+              accessibilityLabel={`Search ${topic}`}
+              selected={query === topic}
+              onPress={() => setQuery(topic)}
+            />
+          ))}
+        </ChoiceChipRow>
       </View>
 
       {/* Suggested Community */}
@@ -236,10 +239,13 @@ export function ExploreScreen() {
         <Text className="mb-sm font-headline-md text-on-surface" style={{ fontSize: 18 }}>
           Suggested Community
         </Text>
-        <View
-          className="overflow-hidden rounded-2xl border border-outline-variant/30 bg-surface-container-lowest"
-          style={cardShadow}
-        >
+        {/* FLAGGED for a later pass, NOT adopted onto the shared <Card />: the
+            cover image bleeds to the card's edge while <Card /> insets all of
+            its children by 24px, so adopting it means restructuring the card
+            into a media band + a padded body. Out of scope for a shadow sweep.
+            Shadow deleted; the hairline is now full-strength `outline-variant`
+            rather than `/30`, since it is the only separation left. */}
+        <View className="overflow-hidden rounded-2xl border border-outline-variant bg-card-surface">
           <Image
             source={{ uri: SUGGESTED_COMMUNITY.coverUri }}
             className="h-48 w-full"
@@ -325,10 +331,7 @@ function SpecialistCard({
   onToggleFollow: () => void;
 }) {
   return (
-    <View
-      className="w-64 rounded-2xl border border-outline-variant/30 bg-surface-container-lowest p-md"
-      style={cardShadow}
-    >
+    <Card className="w-64">
       <View className="mb-md flex-row items-center gap-sm">
         <Image
           source={{ uri: specialist.avatarUri }}
@@ -371,24 +374,6 @@ function SpecialistCard({
           <Text className="font-label-md text-label-md text-primary">Profile</Text>
         </Pressable>
       </View>
-    </View>
+    </Card>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Shadows — same Platform.select pattern as the other screens.
-// ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.05, shadowRadius: 20, shadowOffset: { width: 0, height: 4 } },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const heroShadow =
-  Platform.select({
-    ios: { shadowColor: "#000000", shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
-    web: { boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.18)" },
-    android: { elevation: 6 },
-  }) || {};

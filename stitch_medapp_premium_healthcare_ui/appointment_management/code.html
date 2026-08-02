@@ -1,0 +1,393 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Clinical Vitality - Appointments</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "surface": "#f5faf8",
+                  "outline": "#6d7a77",
+                  "surface-container-low": "#f0f5f2",
+                  "secondary-fixed-dim": "#b9c7df",
+                  "outline-variant": "#bcc9c6",
+                  "on-tertiary-container": "#fefcff",
+                  "on-background": "#171d1c",
+                  "on-surface-variant": "#3d4947",
+                  "on-primary-fixed": "#00201d",
+                  "tertiary": "#0058be",
+                  "tertiary-fixed-dim": "#adc6ff",
+                  "on-tertiary-fixed-variant": "#004395",
+                  "on-surface": "#171d1c",
+                  "on-secondary-fixed": "#0d1c2e",
+                  "on-error": "#ffffff",
+                  "on-primary-container": "#f4fffc",
+                  "tertiary-fixed": "#d8e2ff",
+                  "surface-bg": "#f5faf8",
+                  "background": "#f5faf8",
+                  "surface-container-highest": "#dee4e1",
+                  "tertiary-container": "#2170e4",
+                  "secondary-fixed": "#d5e3fc",
+                  "on-tertiary": "#ffffff",
+                  "clinical-success": "#00685f",
+                  "clinical-info": "#0058be",
+                  "on-primary": "#ffffff",
+                  "error": "#ba1a1a",
+                  "inverse-surface": "#2c3130",
+                  "secondary-container": "#d5e3fc",
+                  "primary-fixed-dim": "#6bd8cb",
+                  "surface-container-lowest": "#ffffff",
+                  "surface-tint": "#006a61",
+                  "on-secondary-fixed-variant": "#3a485b",
+                  "inverse-primary": "#6bd8cb",
+                  "on-primary-fixed-variant": "#005049",
+                  "surface-dim": "#d6dbd9",
+                  "surface-container": "#eaefed",
+                  "primary-fixed": "#89f5e7",
+                  "primary": "#00685f",
+                  "secondary": "#515f74",
+                  "on-tertiary-fixed": "#001a42",
+                  "error-container": "#ffdad6",
+                  "on-error-container": "#93000a",
+                  "primary-container": "#008378",
+                  "on-secondary-container": "#57657a",
+                  "inverse-on-surface": "#edf2f0",
+                  "surface-container-high": "#e4e9e7",
+                  "clinical-error": "#ba1a1a",
+                  "surface-variant": "#dee4e1",
+                  "surface-bright": "#f5faf8",
+                  "on-secondary": "#ffffff"
+          },
+          "borderRadius": {
+                  "DEFAULT": "8px",
+                  "lg": "12px",
+                  "xl": "16px",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "container-max": "1280px",
+                  "md": "24px",
+                  "lg": "48px",
+                  "xl": "80px",
+                  "gutter": "24px",
+                  "base": "8px",
+                  "sm": "12px",
+                  "xs": "4px"
+          },
+          "fontFamily": {
+                  "headline-lg": ["Manrope"],
+                  "headline-lg-mobile": ["Manrope"],
+                  "headline-md": ["Manrope"],
+                  "label-sm": ["Inter"],
+                  "headline-xl": ["Manrope"],
+                  "body-md": ["Inter"],
+                  "caption": ["Inter"],
+                  "body-lg": ["Inter"],
+                  "label-md": ["Inter"]
+          },
+          "fontSize": {
+                  "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                  "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                  "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                  "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                  "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                  "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                  "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                  "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                  "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      background-color: #f5faf8;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .glass-nav {
+      backdrop-filter: blur(12px);
+      background: rgba(245, 250, 248, 0.8);
+    }
+    .active-tab-indicator {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+  </style>
+</head>
+<body class="font-body-md text-on-surface">
+<!-- Top AppBar (from JSON guidance) -->
+<header class="docked full-width top-0 sticky z-50 bg-surface/80 backdrop-blur-md shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter py-md max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-primary-fixed-dim">
+<img alt="User Profile" class="w-full h-full object-cover" data-alt="A professional close-up portrait of a healthcare worker in clean medical scrubs against a soft-focus clinical background. The lighting is bright and high-key, conveying a sense of expertise and modern medical care. The color palette is dominated by professional teals and clean whites to match the Clinical Vitality brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcx0ThADlKYjT4GgKdm-SzY-_g9GX0FnwqKOT45pgcfQHyYx7Sp30OLllbNPsDzX8x3RcTcd-NTtXvK_k9QbpaBFBUKJbvadpysYhafS27a0hcImkPq9AM5GCs1y5gW48IooZb2ABnNNTTuC0Ru4itDA2Mk2H4zGJx7VXgUf3rS0Tfo6Wo1elieJdBciETaVnH1s6hb9uOeBzBXhfsclKyYOC29OpOKA5GNq0Cd-gb1rjbLM1k1KIZ81GrWZgVM1Ixn5OmWcBxbzyl">
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">MedApp</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter pb-32">
+<!-- Screen Header -->
+<section class="py-md">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-2">Appointments</h2>
+<p class="font-body-md text-on-surface-variant">Manage your clinical sessions and history.</p>
+</section>
+<!-- Tabs -->
+<div class="flex border-b border-outline-variant mb-6">
+<button class="flex-1 py-4 font-label-md text-label-md border-b-2 relative text-primary border-primary" id="tab-upcoming" onclick="switchTab('upcoming')">
+        Upcoming
+      </button>
+<button class="flex-1 py-4 font-label-md text-label-md border-b-2 text-on-surface-variant border-transparent" id="tab-past" onclick="switchTab('past')">
+        Past
+      </button>
+</div>
+<!-- Appointment Content Container -->
+<div class="space-y-4" id="appointments-container" style="opacity: 1;">
+            <div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-surface-container-high animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-primary-fixed flex items-center justify-center overflow-hidden">
+                      <img src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&amp;fit=crop&amp;q=80&amp;w=150" alt="Dr. Julian Sterling" class="w-full h-full object-cover">
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Julian Sterling</h3>
+                    <p class="font-caption text-primary uppercase tracking-wider mb-1">Senior Cardiologist</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">Mayo Clinic</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-clinical-success/10 text-clinical-success font-label-sm">Confirmed</span>
+              </div>
+              <div class="bg-surface-container-low p-3 rounded-lg flex items-center gap-3 mb-6">
+                <span class="material-symbols-outlined text-primary">calendar_today</span>
+                <div>
+                  <p class="font-label-md text-on-surface">Tuesday, Oct 24 • 10:30 AM</p>
+                  <p class="font-caption text-on-surface-variant uppercase">Standard Consultation</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button class="py-3 px-4 rounded-lg border border-primary text-primary font-label-md">Reschedule</button>
+                <button class="py-3 px-4 rounded-lg border border-error text-error font-label-md">Cancel</button>
+              </div>
+            </div>
+            <div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-surface-container-high animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-secondary-container flex items-center justify-center overflow-hidden">
+                      <img src="https://images.unsplash.com/photo-1559839734-2b71f1536783?auto=format&amp;fit=crop&amp;q=80&amp;w=150" alt="Dr. Sarah Chen" class="w-full h-full object-cover">
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Sarah Chen</h3>
+                    <p class="font-caption text-primary uppercase tracking-wider mb-1">Neurologist</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">City General Hospital</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-primary-container/10 text-primary-container font-label-sm">In Review</span>
+              </div>
+              <div class="bg-surface-container-low p-3 rounded-lg flex items-center gap-3 mb-6">
+                <span class="material-symbols-outlined text-primary">calendar_today</span>
+                <div>
+                  <p class="font-label-md text-on-surface">Thursday, Oct 26 • 02:15 PM</p>
+                  <p class="font-caption text-on-surface-variant uppercase">Follow-up Visit</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button class="py-3 px-4 rounded-lg border border-primary text-primary font-label-md">Reschedule</button>
+                <button class="py-3 px-4 rounded-lg border border-error text-error font-label-md">Cancel</button>
+              </div>
+            </div>
+          </div>
+</main>
+<!-- Bottom Navigation Bar (as requested, with style mapping from JSON) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-4 pt-2 bg-surface dark:bg-surface-dim shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] rounded-t-xl">
+<!-- Home -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary transition-all">
+<span class="material-symbols-outlined mb-1">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</button>
+<!-- Overview (Active Tab Logic: Overview chosen as closest match for 'Overview/Manage') -->
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-2 scale-90 duration-200">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</button>
+<!-- Inbox (Required for 5-item list, mapping to closest icon) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary transition-all">
+<span class="material-symbols-outlined mb-1">mail</span>
+<span class="font-label-sm text-label-sm">Inbox</span>
+</button>
+<!-- Community -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary transition-all">
+<span class="material-symbols-outlined mb-1">group</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</button>
+<!-- Lifestyle -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-primary transition-all">
+<span class="material-symbols-outlined mb-1">auto_awesome</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</button>
+</nav>
+<script>
+    function switchTab(tab) {
+      const upcomingBtn = document.getElementById('tab-upcoming');
+      const pastBtn = document.getElementById('tab-past');
+      const container = document.getElementById('appointments-container');
+
+      if (tab === 'upcoming') {
+        upcomingBtn.classList.add('text-primary', 'border-primary');
+        upcomingBtn.classList.remove('text-on-surface-variant', 'border-transparent');
+        pastBtn.classList.add('text-on-surface-variant', 'border-transparent');
+        pastBtn.classList.remove('text-primary', 'border-primary');
+        
+        // Dynamic content update (Mock)
+        container.style.opacity = '0';
+        setTimeout(() => {
+          container.innerHTML = `
+            <div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-surface-container-high animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-primary-fixed flex items-center justify-center overflow-hidden">
+                      <img src="https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=150" alt="Dr. Julian Sterling" class="w-full h-full object-cover">
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Julian Sterling</h3>
+                    <p class="font-caption text-primary uppercase tracking-wider mb-1">Senior Cardiologist</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">Mayo Clinic</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-clinical-success/10 text-clinical-success font-label-sm">Confirmed</span>
+              </div>
+              <div class="bg-surface-container-low p-3 rounded-lg flex items-center gap-3 mb-6">
+                <span class="material-symbols-outlined text-primary">calendar_today</span>
+                <div>
+                  <p class="font-label-md text-on-surface">Tuesday, Oct 24 • 10:30 AM</p>
+                  <p class="font-caption text-on-surface-variant uppercase">Standard Consultation</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button class="py-3 px-4 rounded-lg border border-primary text-primary font-label-md">Reschedule</button>
+                <button class="py-3 px-4 rounded-lg border border-error text-error font-label-md">Cancel</button>
+              </div>
+            </div>
+            <div class="bg-surface-container-lowest p-md rounded-xl shadow-sm border border-surface-container-high animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-secondary-container flex items-center justify-center overflow-hidden">
+                      <img src="https://images.unsplash.com/photo-1559839734-2b71f1536783?auto=format&fit=crop&q=80&w=150" alt="Dr. Sarah Chen" class="w-full h-full object-cover">
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Sarah Chen</h3>
+                    <p class="font-caption text-primary uppercase tracking-wider mb-1">Neurologist</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">City General Hospital</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-primary-container/10 text-primary-container font-label-sm">In Review</span>
+              </div>
+              <div class="bg-surface-container-low p-3 rounded-lg flex items-center gap-3 mb-6">
+                <span class="material-symbols-outlined text-primary">calendar_today</span>
+                <div>
+                  <p class="font-label-md text-on-surface">Thursday, Oct 26 • 02:15 PM</p>
+                  <p class="font-caption text-on-surface-variant uppercase">Follow-up Visit</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <button class="py-3 px-4 rounded-lg border border-primary text-primary font-label-md">Reschedule</button>
+                <button class="py-3 px-4 rounded-lg border border-error text-error font-label-md">Cancel</button>
+              </div>
+            </div>
+          `;
+          container.style.opacity = '1';
+        }, 150);
+      } else {
+        pastBtn.classList.add('text-primary', 'border-primary');
+        pastBtn.classList.remove('text-on-surface-variant', 'border-transparent');
+        upcomingBtn.classList.add('text-on-surface-variant', 'border-transparent');
+        upcomingBtn.classList.remove('text-primary', 'border-primary');
+        
+        container.style.opacity = '0';
+        setTimeout(() => {
+          container.innerHTML = `
+            <div class="bg-surface-container p-md rounded-xl border border-surface-container-highest opacity-70">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-surface-dim grayscale flex items-center justify-center">
+                    <span class="material-symbols-outlined text-outline">person</span>
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Aris Thorne</h3>
+                    <p class="font-caption text-outline uppercase tracking-wider mb-1">Physiotherapist</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">Wellness Hub</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-surface-variant text-on-surface-variant font-label-sm">Completed</span>
+              </div>
+              <p class="font-caption text-on-surface-variant">Completed on Monday, Sep 12 • 09:00 AM</p>
+              <button class="mt-4 w-full py-2 bg-surface-container-highest rounded-lg font-label-sm text-on-surface">View Summary</button>
+            </div>
+            <div class="bg-surface-container p-md rounded-xl border border-surface-container-highest opacity-70">
+              <div class="flex justify-between items-start mb-4">
+                <div class="flex gap-4">
+                  <div class="w-14 h-14 rounded-lg bg-surface-dim grayscale flex items-center justify-center">
+                    <span class="material-symbols-outlined text-outline">person</span>
+                  </div>
+                  <div>
+                    <h3 class="font-label-md text-on-surface">Dr. Emily Watts</h3>
+                    <p class="font-caption text-outline uppercase tracking-wider mb-1">General Practitioner</p>
+                    <div class="flex items-center gap-1 text-on-surface-variant">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span class="font-label-sm">Mayo Clinic</span>
+                    </div>
+                  </div>
+                </div>
+                <span class="px-3 py-1 rounded-full bg-surface-variant text-on-surface-variant font-label-sm">Completed</span>
+              </div>
+              <p class="font-caption text-on-surface-variant">Completed on Friday, Aug 28 • 11:30 AM</p>
+              <button class="mt-4 w-full py-2 bg-surface-container-highest rounded-lg font-label-sm text-on-surface">View Summary</button>
+            </div>
+          `;
+          container.style.opacity = '1';
+        }, 150);
+      }
+    }
+  </script>
+
+
+</body></html>

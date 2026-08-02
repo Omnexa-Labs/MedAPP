@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#89f5e7",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary-fixed": "#00201d",
+                    "surface-container": "#eaefed",
+                    "outline-variant": "#bcc9c6",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-error": "#ffffff",
+                    "on-secondary-container": "#57657a",
+                    "surface-container-highest": "#dee4e1",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-primary-container": "#f4fffc",
+                    "on-primary-fixed-variant": "#005049",
+                    "on-background": "#171d1c",
+                    "surface-tint": "#006a61",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "surface-variant": "#dee4e1",
+                    "background": "#f5faf8",
+                    "on-tertiary-container": "#fefcff",
+                    "surface": "#f5faf8",
+                    "inverse-primary": "#6bd8cb",
+                    "surface-bright": "#f5faf8",
+                    "on-surface-variant": "#3d4947",
+                    "tertiary-fixed": "#d8e2ff",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#0058be",
+                    "secondary-fixed": "#d5e3fc",
+                    "primary-container": "#008378",
+                    "primary": "#00685f",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#d6dbd9",
+                    "secondary": "#515f74",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "secondary-container": "#d5e3fc",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface-container-high": "#e4e9e7",
+                    "outline": "#6d7a77",
+                    "surface-container-low": "#f0f5f2",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-surface": "#171d1c",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#2c3130",
+                    "tertiary-container": "#2170e4"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "sm": "12px",
+                    "md": "24px",
+                    "gutter": "24px",
+                    "xs": "4px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .call-gradient-overlay {
+            background: linear-gradient(to bottom, rgba(23, 29, 28, 0.6) 0%, rgba(23, 29, 28, 0) 20%, rgba(23, 29, 28, 0) 80%, rgba(23, 29, 28, 0.7) 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background font-body-md text-on-background overflow-hidden h-screen w-full">
+<!-- Video Canvas Container -->
+<main class="relative h-full w-full bg-inverse-surface overflow-hidden">
+<!-- Doctor's Full Screen Video (Background) -->
+<div class="absolute inset-0 z-0">
+<img alt="Doctor in consultation" class="w-full h-full object-cover" data-alt="A professional male doctor in his late 40s wearing a clean white clinical coat and a stethoscope, sitting in a bright, modern medical office. He is looking directly into the camera with a reassuring and empathetic expression. The lighting is soft and natural, emphasizing a high-end healthcare environment with soft teal and white accents. The background features blurred medical equipment and a clean, organized bookshelf, evoking a sense of trust and clinical excellence." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5JyCjdhlDhB1rwbrI8IGTqpoQlgRzDrWiKRhI4h1O4TzBGTV1vYm7HR3Wxj-BuTpSK1zI8q8cffofIbGr89ycU_M2yu00KRHB6EFmUUm6XYVg5NaqmifTk9NmPLGSr52blEXT3-v1F288wpAl8aw2a2QdIIPcaZu-3Bh0XL5DLQbrpd_OE56w9Uq5GWi5QXhx-J1gnr6kkT0zRtbs4bLYhffL5o6OkbLTAUEKnHeAk5KHkZVrr9n40K-9vPcd6NwO9qGHtylIV4Tn"/>
+<!-- Overlay for legibility of top/bottom UI -->
+<div class="absolute inset-0 call-gradient-overlay z-10 pointer-events-none"></div>
+</div>
+<!-- Top App Bar - Clinical Context -->
+<header class="absolute top-0 left-0 right-0 z-20 px-gutter pt-lg pb-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="bg-primary/20 backdrop-blur-md px-base py-xs rounded-lg flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary-fixed text-[18px]">verified_user</span>
+<span class="font-label-md text-label-md text-on-primary-container">Secure HD</span>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<h1 class="font-headline-md text-headline-md text-surface-container-lowest drop-shadow-md">Dr. Julianne Smith</h1>
+<div class="flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span class="font-label-md text-label-md text-surface-container-low opacity-90">12:45</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Picture-in-Picture (Patient View) -->
+<div class="absolute top-[120px] right-gutter z-30 w-32 h-44 rounded-xl overflow-hidden border-2 border-surface-container-lowest/30 shadow-lg shadow-black/20">
+<img alt="Patient preview" class="w-full h-full object-cover" data-alt="A close-up portrait of a young woman appearing calm and attentive during a video call. She is in a softly lit domestic setting with warm ambient light. The image has a clean, high-resolution aesthetic that matches a modern premium healthcare application. The background is a soft-focus interior with neutral colors, ensuring the focus remains on her face." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBIePICaTM6PUUbFl-s2ZwB5BgGh36gfMJAYjBNuqcOtlNjagxZVOA5LYuvzR22oH7UEiBy6qApFU-xsaXa8Tk_-RP_3tiab2X75yEOiI_nCR1mBPqrKmy6PoALYwPWPW1MU2MVgnLPtUpR9r1p7Z3PMcxEPzwpIYM1IiEbgIaFTTbAB2AtP2bI_fMEzmYXPFn24q5OqWwTCvyvACmZF6UqEkGEOS47digHltNRtm_b-yq18bUa_wwoatV55jTbW7M3yzpKV44VXr0Q"/>
+<div class="absolute bottom-2 left-2 flex items-center gap-xs bg-black/40 backdrop-blur-sm px-xs py-[2px] rounded">
+<span class="material-symbols-outlined text-white text-[12px]">mic</span>
+<span class="text-[10px] text-white font-label-sm">You</span>
+</div>
+</div>
+<!-- Call Controls Bottom Bar -->
+<nav class="absolute bottom-0 left-0 right-0 z-40 px-gutter pb-xl pt-md">
+<div class="max-w-md mx-auto flex items-center justify-between bg-surface-container-highest/10 backdrop-blur-xl border border-white/10 rounded-[32px] p-sm">
+<!-- Mute Toggle -->
+<button class="w-14 h-14 flex items-center justify-center rounded-full bg-surface-container-lowest/10 hover:bg-surface-container-lowest/20 transition-colors active:scale-90">
+<span class="material-symbols-outlined text-surface-container-lowest text-[28px]" data-icon="mic">mic</span>
+</button>
+<!-- Camera Toggle -->
+<button class="w-14 h-14 flex items-center justify-center rounded-full bg-surface-container-lowest/10 hover:bg-surface-container-lowest/20 transition-colors active:scale-90">
+<span class="material-symbols-outlined text-surface-container-lowest text-[28px]" data-icon="videocam">videocam</span>
+</button>
+<!-- Chat Toggle -->
+<button class="w-14 h-14 flex items-center justify-center rounded-full bg-surface-container-lowest/10 hover:bg-surface-container-lowest/20 transition-colors active:scale-90">
+<span class="material-symbols-outlined text-surface-container-lowest text-[28px]" data-icon="chat_bubble">chat_bubble</span>
+</button>
+<!-- End Call Button -->
+<button class="w-16 h-16 flex items-center justify-center rounded-full bg-error text-white shadow-xl shadow-error/30 hover:bg-red-700 transition-all active:scale-95">
+<span class="material-symbols-outlined text-[32px]" data-icon="call_end" style="font-variation-settings: 'FILL' 1;">call_end</span>
+</button>
+</div>
+<!-- Connection Status -->
+<div class="mt-md text-center">
+<p class="font-label-sm text-label-sm text-surface-container-lowest/60 uppercase tracking-widest">End-to-End Encrypted</p>
+</div>
+</nav>
+<!-- Interaction Tooltip (Optional/Simulated) -->
+<div class="absolute left-gutter bottom-[140px] z-30">
+<div class="flex flex-col gap-sm">
+<div class="flex items-center gap-sm bg-surface-container-lowest/90 backdrop-blur-md p-sm rounded-xl border border-outline-variant/30 shadow-sm">
+<div class="w-8 h-8 rounded-full bg-tertiary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-container text-[18px]">info</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Stable Connection</p>
+<p class="text-[10px] text-on-surface-variant">Your latency is 15ms</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

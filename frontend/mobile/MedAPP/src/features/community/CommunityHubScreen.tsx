@@ -19,7 +19,13 @@
 //   - bento grid (grid-cols-1/2/3) → single-column stack on a phone.
 //   - line-clamp-2 → numberOfLines={2}.
 //   - hover:* / focus:ring / active:translate → dropped or active:scale.
-//   - shadows → Platform.select.
+//   - shadows → DELETED. Every surface on this panel is a card, a panel or a
+//     list row, and docs/BRAND.md §Elevation is binding: "A CARD casts NO
+//     shadow. Separation is surface tone + a 1px `outline-variant` hairline +
+//     `radius/24`." Nothing here is a sheet, menu, dialog, toast or FAB, so
+//     nothing here is allowed the sanctioned floating pair either. The card
+//     surfaces now go through the shared <Card /> instead, which is what stops
+//     the hand-roll growing a shadow back.
 //   - Interactions are LOCAL only (no backend): search filters the
 //     in-memory catalog; Join toggles the shared membership Set.
 //
@@ -27,9 +33,17 @@
 // expo-* APIs here.
 
 import { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { Card, ChoiceChip, ChoiceChipRow, SearchField } from "@/components/ui";
 import { formatMembers } from "@/features/community/CommunityScreen";
+
+/**
+ * CommunityScreen's scroll gutter (CommunityScreen.tsx:246) and BRAND's screen
+ * gutter. Named here only so the full-bleed pull on the category row below is
+ * self-documenting rather than a bare `-16`.
+ */
+const GUTTER = 16;
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
@@ -152,28 +166,25 @@ export function CommunityHubScreen({
         </Text>
       </View>
 
-      {/* Search */}
-      <View className="mt-md flex-row items-center rounded-xl border border-outline-variant bg-surface-container-low px-md">
-        <MaterialIcons name="search" size={22} color="#3d4947" />
-        <TextInput
+      {/* Search — the shared SearchField (Figma 396:538), a composition over the
+          canonical Input. Deletes a bare <TextInput> row that was this screen's
+          private field: fill `bg-surface-container-low` (so the field was barely
+          distinguishable from the card it sat in, where 396:538 mandates the
+          recessed `color/field-surface`), height emergent from `py-sm` instead of
+          52, no focus or error border at all, a 22px glyph off BRAND's 24/20
+          ramp, a ~36pt clear target (the frame names its node
+          "clear-button (44x44)"), and `#3d4947` frozen into the glyph, the
+          placeholder AND the clear button — the LIGHT value of
+          on-surface-variant, so in dark mode you typed against a dark field with
+          dark chrome. */}
+      <View className="mt-md">
+        <SearchField
           value={query}
           onChangeText={setQuery}
+          onClear={() => setQuery("")}
           placeholder="Search groups or topics"
-          placeholderTextColor="#3d4947"
-          returnKeyType="search"
-          className="flex-1 py-sm pl-sm font-body-md text-body-md text-on-surface"
           accessibilityLabel="Search groups"
         />
-        {query.length > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Clear search"
-            hitSlop={8}
-            onPress={() => setQuery("")}
-          >
-            <MaterialIcons name="close" size={20} color="#3d4947" />
-          </Pressable>
-        ) : null}
       </View>
 
       {/* My Groups */}
@@ -193,7 +204,7 @@ export function CommunityHubScreen({
             ))}
           </View>
         ) : (
-          <View className="items-center gap-xs rounded-xl border border-surface-variant bg-surface-container-lowest px-md py-lg" style={cardShadow}>
+          <Card className="items-center gap-xs">
             <MaterialIcons name="group-add" size={28} color="#00685f" />
             <Text className="font-label-md text-label-md text-on-surface">
               You haven't joined any groups yet
@@ -201,7 +212,7 @@ export function CommunityHubScreen({
             <Text className="text-center font-body-md text-on-surface-variant" style={{ fontSize: 14 }}>
               Join a group below to see it here.
             </Text>
-          </View>
+          </Card>
         )}
       </View>
 
@@ -211,35 +222,30 @@ export function CommunityHubScreen({
           Discover Groups
         </Text>
 
-        {/* Category filter row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 12, paddingBottom: 12 }}
-        >
-          {CATEGORIES.map((c) => {
-            const isActive = c === category;
-            return (
-              <Pressable
+        {/* Category filter row — the shared ChoiceChip (Figma 11:104), replacing
+            one of the ten private chips. `role="radio"` because category is
+            one-of-N (the old `button` role announced no group semantics).
+
+            `marginHorizontal: -GUTTER` deliberately breaks this row OUT of
+            CommunityScreen's 16px scroll gutter (CommunityScreen.tsx:246) so the
+            scrollable ChoiceChipRow can apply that gutter as its own CONTENT
+            inset. That is docs/BRAND.md §"Horizontal strips and carousels":
+            items scroll edge to edge with "a trailing inset matching the leading
+            gutter", instead of being clipped at a padded edge the way the old
+            row was. The derivation now lives in ChoiceChipRow, not here. */}
+        <View style={{ marginHorizontal: -GUTTER, marginBottom: 12 }}>
+          <ChoiceChipRow scrollable>
+            {CATEGORIES.map((c) => (
+              <ChoiceChip
                 key={c}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
+                label={c}
+                role="radio"
+                selected={c === category}
                 onPress={() => setCategory(c)}
-                className={`rounded-full px-md py-sm active:scale-95 ${
-                  isActive ? "bg-primary" : "border border-outline-variant"
-                }`}
-              >
-                <Text
-                  className={`font-label-md text-label-md ${
-                    isActive ? "text-on-primary" : "text-on-surface-variant"
-                  }`}
-                >
-                  {c}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+              />
+            ))}
+          </ChoiceChipRow>
+        </View>
 
         {discoverGroups.length > 0 ? (
           <View className="gap-md">
@@ -248,11 +254,11 @@ export function CommunityHubScreen({
             ))}
           </View>
         ) : (
-          <View className="items-center rounded-xl border border-surface-variant bg-surface-container-lowest px-md py-lg" style={cardShadow}>
+          <Card className="items-center">
             <Text className="text-center font-body-md text-on-surface-variant" style={{ fontSize: 14 }}>
               No groups match your search.
             </Text>
-          </View>
+          </Card>
         )}
       </View>
     </View>
@@ -263,13 +269,21 @@ export function CommunityHubScreen({
 // My Groups card (joined)
 // ---------------------------------------------------------------------------
 
+// FLAGGED for a later pass: this is a card but it is also the tap target, and
+// the shared <Card /> is a plain View with no press handling. Rather than nest a
+// Card inside a Pressable (two surfaces, two radii, a doubled hairline), it
+// stays hand-rolled — but it now carries the SAME treatment the primitive
+// applies: `rounded-card` + a full-strength `outline-variant` hairline +
+// `card-surface`, and no shadow. The `/30`-style faint hairline and the
+// `surface-container-lowest` fill both went: with the shadow gone the hairline
+// and the fill step are the entire separation, and `surface-container-lowest`
+// resolves DARKER than the page in dark mode, so the card receded.
 function MyGroupCard({ group }: { group: HubGroup }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open ${group.name}`}
-      className="gap-sm rounded-xl border border-surface-variant bg-surface-container-lowest p-md active:scale-[0.99]"
-      style={cardShadow}
+      className="gap-sm rounded-card border border-outline-variant bg-card-surface p-md active:scale-[0.99]"
     >
       <View className="flex-row items-start justify-between">
         <View className={`h-12 w-12 items-center justify-center rounded-lg ${group.tint.bg}`}>
@@ -316,10 +330,7 @@ function MyGroupCard({ group }: { group: HubGroup }) {
 
 function DiscoverGroupRow({ group, onJoin }: { group: HubGroup; onJoin: () => void }) {
   return (
-    <View
-      className="gap-md rounded-xl border border-surface-variant bg-surface-container-lowest p-md"
-      style={cardShadow}
-    >
+    <Card className="gap-md">
       <View className="flex-row items-start gap-md">
         <View className={`h-16 w-16 items-center justify-center rounded-xl ${group.tint.bg}`}>
           <MaterialIcons name={group.icon} size={32} color={group.tint.fg} />
@@ -346,17 +357,6 @@ function DiscoverGroupRow({ group, onJoin }: { group: HubGroup; onJoin: () => vo
       >
         <Text className="font-label-md text-label-md text-on-primary">Join Group</Text>
       </Pressable>
-    </View>
+    </Card>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Shadows — same Platform.select pattern as the other screens.
-// ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: { shadowColor: "#475569", shadowOpacity: 0.05, shadowRadius: 20, shadowOffset: { width: 0, height: 4 } },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};

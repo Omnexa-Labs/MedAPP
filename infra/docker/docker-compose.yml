@@ -2,8 +2,7 @@ name: medapp
 
 x-py-build: &py-build
   context: ../..
-  args:
-    BUILDKIT_INLINE_CACHE: 1
+  dockerfile: backend/Dockerfile
 
 x-svc-env: &svc-env
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317

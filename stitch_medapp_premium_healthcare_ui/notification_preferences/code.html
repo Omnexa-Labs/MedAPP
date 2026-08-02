@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Notification Preferences - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#dee4e1",
+                        "inverse-on-surface": "#edf2f0",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "inverse-primary": "#6bd8cb",
+                        "surface-container": "#eaefed",
+                        "primary": "#00685f",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "tertiary-container": "#2170e4",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#005049",
+                        "primary-container": "#008378",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f5faf8",
+                        "surface-container-high": "#e4e9e7",
+                        "on-surface-variant": "#3d4947",
+                        "surface-bright": "#f5faf8",
+                        "on-primary-fixed": "#00201d",
+                        "surface-tint": "#006a61",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#bcc9c6",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#fefcff",
+                        "on-primary": "#ffffff",
+                        "secondary": "#515f74",
+                        "primary-fixed": "#89f5e7",
+                        "on-background": "#171d1c",
+                        "on-secondary-container": "#57657a",
+                        "surface": "#f5faf8",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-surface": "#171d1c",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#0058be",
+                        "on-primary-container": "#f4fffc",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "secondary-fixed": "#d5e3fc",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "outline": "#6d7a77",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "secondary-container": "#d5e3fc",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#dee4e1",
+                        "inverse-surface": "#2c3130",
+                        "surface-container-low": "#f0f5f2"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "sm": "12px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "lg": "48px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Hide scrollbar for cleaner look on settings pages */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #dee4e1;
+            border-radius: 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen relative pb-32">
+<!-- Contextual Top Bar for Task-Focused View -->
+<header class="sticky top-0 z-40 bg-surface-bright/90 backdrop-blur-md w-full border-b border-surface-variant/50">
+<div class="max-w-[720px] mx-auto px-gutter py-sm flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<button class="w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-low transition-colors group">
+<span class="material-symbols-outlined text-[24px] group-hover:text-primary transition-colors">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-on-surface tracking-tight">Notifications</h1>
+</div>
+<!-- Empty div for flex balance if needed, or quick action -->
+<div class="w-10"></div>
+</div>
+</header>
+<!-- Main Settings Canvas -->
+<main class="max-w-[720px] mx-auto px-gutter py-md flex flex-col gap-lg mt-sm">
+<!-- Overview Section -->
+<section class="flex flex-col gap-sm">
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-[600px]">
+                Control how and when you receive alerts. We highly recommend keeping clinical notifications enabled to stay informed about your active treatments and appointments.
+            </p>
+</section>
+<!-- Delivery Methods Panel -->
+<section class="flex flex-col gap-md">
+<h2 class="font-label-md text-label-md text-primary uppercase tracking-widest pl-xs">Delivery Methods</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-sm">
+<!-- Push Notification Delivery -->
+<label class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] hover:shadow-[0px_10px_30px_rgba(71,85,105,0.05)] hover:border-primary/50 transition-all cursor-pointer flex flex-col gap-md relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-full -z-10 group-hover:bg-primary/10 transition-colors"></div>
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications_active</span>
+</div>
+<!-- Active Checkbox -->
+<div class="w-6 h-6 rounded border-2 border-primary bg-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-on-primary font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Push Notifications</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-xs">Device alerts</span>
+</div>
+</label>
+<!-- Email Delivery -->
+<label class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] hover:shadow-[0px_10px_30px_rgba(71,85,105,0.05)] hover:border-primary/50 transition-all cursor-pointer flex flex-col gap-md relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-surface-container/50 rounded-bl-full -z-10 group-hover:bg-primary/5 transition-colors"></div>
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">mail</span>
+</div>
+<!-- Active Checkbox -->
+<div class="w-6 h-6 rounded border-2 border-primary bg-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[16px] text-on-primary font-bold">check</span>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Email</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-xs">Detailed reports</span>
+</div>
+</label>
+<!-- SMS Delivery -->
+<label class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] hover:shadow-[0px_10px_30px_rgba(71,85,105,0.05)] hover:border-primary/50 transition-all cursor-pointer flex flex-col gap-md relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-surface-container/50 rounded-bl-full -z-10 group-hover:bg-primary/5 transition-colors"></div>
+<div class="flex items-center justify-between w-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">sms</span>
+</div>
+<!-- Inactive Checkbox -->
+<div class="w-6 h-6 rounded border-2 border-outline-variant bg-transparent flex items-center justify-center group-hover:border-primary/50 transition-colors">
+</div>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">SMS Text</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-xs">Quick reminders</span>
+</div>
+</label>
+</div>
+</section>
+<!-- Notification Categories List -->
+<section class="flex flex-col gap-md">
+<h2 class="font-label-md text-label-md text-primary uppercase tracking-widest pl-xs">Alert Categories</h2>
+<div class="flex flex-col gap-sm">
+<!-- Category: Appointments -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] border border-surface-variant/30 flex items-center justify-between gap-md group hover:border-outline-variant/60 transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">calendar_clock</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface">Appointments</span>
+<span class="font-body-md text-body-md text-on-surface-variant line-clamp-1">Reminders, changes, and follow-ups.</span>
+</div>
+</div>
+<!-- Active Toggle -->
+<div class="w-12 h-6 bg-primary rounded-full relative cursor-pointer shadow-inner shrink-0 flex items-center">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full absolute right-[2px] shadow-[0px_2px_4px_rgba(0,0,0,0.1)] transition-transform"></div>
+</div>
+</div>
+<!-- Category: Medical Records -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] border border-surface-variant/30 flex items-center justify-between gap-md group hover:border-outline-variant/60 transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">clinical_notes</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface">Medical Records</span>
+<span class="font-body-md text-body-md text-on-surface-variant line-clamp-1">New lab results and report availability.</span>
+</div>
+</div>
+<!-- Active Toggle -->
+<div class="w-12 h-6 bg-primary rounded-full relative cursor-pointer shadow-inner shrink-0 flex items-center">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full absolute right-[2px] shadow-[0px_2px_4px_rgba(0,0,0,0.1)] transition-transform"></div>
+</div>
+</div>
+<!-- Category: Medications -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] border border-surface-variant/30 flex items-center justify-between gap-md group hover:border-outline-variant/60 transition-colors">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">pill</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface">Medications</span>
+<span class="font-body-md text-body-md text-on-surface-variant line-clamp-1">Refill reminders and dosage alerts.</span>
+</div>
+</div>
+<!-- Active Toggle -->
+<div class="w-12 h-6 bg-primary rounded-full relative cursor-pointer shadow-inner shrink-0 flex items-center">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full absolute right-[2px] shadow-[0px_2px_4px_rgba(0,0,0,0.1)] transition-transform"></div>
+</div>
+</div>
+<!-- Category: General -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.02)] border border-surface-variant/30 flex items-center justify-between gap-md group hover:border-outline-variant/60 transition-colors opacity-80">
+<div class="flex items-center gap-md">
+<div class="w-12 h-12 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">campaign</span>
+</div>
+<div class="flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-on-surface">General &amp; News</span>
+<span class="font-body-md text-body-md text-on-surface-variant line-clamp-1">App updates, health tips, and clinic news.</span>
+</div>
+</div>
+<!-- Inactive Toggle -->
+<div class="w-12 h-6 bg-surface-container-high border border-outline-variant/30 rounded-full relative cursor-pointer shadow-inner shrink-0 flex items-center">
+<div class="w-5 h-5 bg-surface-container-lowest rounded-full absolute left-[2px] shadow-[0px_2px_4px_rgba(0,0,0,0.1)] transition-transform border border-outline-variant/20"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Sticky Bottom Action Bar -->
+<div class="fixed bottom-0 left-0 w-full z-50 bg-surface-container-lowest/90 backdrop-blur-md border-t border-surface-variant/50 shadow-[0px_-10px_30px_rgba(71,85,105,0.05)] pb-safe">
+<div class="max-w-[720px] mx-auto px-gutter py-md flex items-center justify-end">
+<button class="w-full sm:w-auto px-xl py-sm bg-primary hover:bg-primary-container text-on-primary hover:text-on-primary-container font-label-md text-label-md rounded-lg shadow-[0px_4px_12px_rgba(0,104,95,0.2)] transition-all active:scale-95 flex items-center justify-center gap-sm">
+<span class="material-symbols-outlined text-[20px]">save</span>
+                Save Preferences
+            </button>
+</div>
+</div>
+</body></html>

@@ -1,56 +1,303 @@
-// Review Appointment screen — translated from the Stitch "Review
-// Appointment" HTML.
+// Review Appointment — the last screen before anything is booked.
 //
-// Entry point: SelectTimeSlotScreen → "Book Now"
+// Figma page 144:107: 756:4213 (light), 756:4988 (dark), 756:4442 (submitting),
+// 756:4586 (confirm-failed), 756:4765 (discard), 756:4813 (no-data).
 //
-// Per the user spec this screen offers three affordances:
-//   - Confirm Booking → BookingConfirmedScreen
-//   - Cancel         → router.back() to SelectTimeSlot, no state changes
-//   - Edit           → router.back() so the user can adjust slot/type/reason
+// Entry: SelectTimeSlotScreen → "Book Now" (pushes practitioner + date/time/
+// mode/type/reason). Exit: Confirm → BookingConfirmedScreen (replace), Edit →
+// back to a REHYDRATED slot picker, discard → router.dismissAll().
 //
-// Translation rules:
-//   - backdrop-blur sticky header → opaque bg-surface/80 + border + shadow.
-//   - 2-col md:grid sections (Time & Schedule + Service Details) →
-//     stacked single column on mobile (we don't have md+ widths).
-//   - Map image + location chip → kept; tapping "Get Directions" stubs
-//     to a Linking.openURL once we have a real address. Currently a noop.
-//   - "Secure encrypted checkout" footer note preserved beneath CTA.
-//   - BottomNav suppressed (transactional journey, matches SelectTimeSlot).
-//   - history_edu → history (closest). calendar_today → calendar-today.
-//   - schedule → schedule.
+// ---------------------------------------------------------------------------
+// WHAT THIS PASS CHANGED, AND WHY (build spec §3, required items 1/3/5/6)
+// ---------------------------------------------------------------------------
 //
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
+// `FALLBACK` IS GONE. The file used to invent a whole appointment — a named
+// cardiologist, a real Rochester street address, a 45-minute duration and a
+// Google-CDN map tile — whenever a param was missing. On a medical booking
+// screen that is the most dangerous line in the file: a user who deep-links or
+// comes back to a dropped session was shown a plausible booking that nobody had
+// made, at an address they could have driven to. It is also what made the
+// no-data frame (756:4813) unreachable. Missing required params now render that
+// frame instead: an expired session, stated as one.
+//
+// The same rule applies per row, not just per screen. Duration (756:4356 carries
+// a "From provider" badge — a provenance claim), the clinic name and its address
+// are rendered ONLY when the params carry them. A provenance badge over a
+// hardcoded string is a lie with a certificate attached.
+//
+// CANCEL IS DELETED. `Edit` and `Cancel` were both `router.back()` — the same
+// function under two labels, one of which promised to abandon the booking and
+// did not. Abandon is now the app-bar back and Android's hardware back, both
+// routed through a discard dialog (756:4765) that ends in `router.dismissAll()`.
+// The hardware-back handler returns `true`: without it Android pops the screen
+// out from behind the dialog it just opened.
+//
+// THE MAP IS DELETED, AND WITH IT THE ONE SURVIVING SHADOW. The old file kept a
+// 30-line defence of the map pin's `0 2px 6px` floating shadow. The frames draw
+// no map — the location is a `KeyValueRow` with a real "Directions" action — so
+// the pin, `FLOATING_SHADOW`, `pinShadow` and the argument for them are all
+// moot. `Linking.openURL` with a platform-native maps URL and an https fallback
+// replaces a "Get Directions" chip that was decoration: it was never pressable.
+//
+// CONFIRM IS ASYNC. It was a synchronous `router.replace` — the screen could not
+// fail, so three designed frames (submitting, confirm-failed, and the reference
+// on screen 3) had nothing behind them. It is a mutation now, and the failure
+// copy is deliberate: a user who is told nothing after a failed booking books
+// twice, and a user who is not told "nothing has been charged" phones support.
+//
+// THE ENDPOINT WAS WRONG, AND THE SCREEN SHOULD NEVER HAVE HELD IT. The confirm
+// call posted to `/v1/appointments`, which the gateway does not route and no
+// service behind it defines — so every real Confirm 404'd and the confirmation
+// screen was unreachable. The call now lives in `./api.ts` against the real
+// `POST /v1/bookings`, and this file imports a typed function instead of a URL.
+//
+// With it went the two fields that were invented alongside the endpoint:
+// `booking_reference` and `join_url` exist nowhere in the backend, so nothing is
+// forwarded for them and the confirmation screen's reference/join rows simply do
+// not render — which is exactly what its `params.bookingReference ? ...` guard
+// was already written to do. What the server DOES return, the real start and end
+// instants, is forwarded, and that is what powers the calendar handoff.
+//
+// ---------------------------------------------------------------------------
+// THE PARAMS CONTRACT WITH SCREEN 1 — read this before adding a param
+// ---------------------------------------------------------------------------
+// This screen renders NOTHING it was not given (see `FALLBACK IS GONE` above),
+// so every optional row here is dead in production until `SelectTimeSlotScreen`
+// pushes the param behind it. The full contract, and who honours it today:
+//
+//   REQUIRED (absent -> 756:4813, the expired frame)
+//     practitionerId        forwarded    doctor_id on the wire; a UUID
+//     practitionerName      forwarded
+//     date                  forwarded    "YYYY-MM-DD", never a display string
+//     time                  forwarded    wall clock, "10:00 AM"
+//     type                  forwarded    consultation TYPE
+//     mode                  forwarded    "in-person" | "video" — the other axis
+//
+//   OPTIONAL, and each one gates a row
+//     practitionerSpecialty forwarded
+//     practitionerAvatar    forwarded
+//     reason                forwarded
+//     rating + reviewCount  NOT YET      the rating line (756:4213)
+//     tags                  NOT YET      the badge row (756:4213)
+//     endTime               NOT YET      "10:00 AM – 10:45 AM" instead of a start
+//     timezone              NOT YET      the zone badge beside Time
+//     duration              NOT YET      Duration + its "From provider" badge
+//     locationName/Address  NOT YET      the whole Location card and Directions
+//
+// The six NOT YETs are the live gap: their branches are exercised by
+// ReviewAppointmentScreen.test.tsx, but no user reaches them, because screen 1's
+// params-out is only the nine above. `renders exactly what screen 1 sends today`
+// in that suite pins that honestly rather than letting a green run imply the
+// rows are live. Logged in docs/PIPELINE.md §5.
+//
+// IDENTITY — the rating is answered ONCE, by the params, or not at all.
+// Screen 1 currently seeds a private `SEED_RATING = { 4.9, 1200 }` and this
+// screen showed no rating at all, so the same clinician had two ratings and one
+// of them was invented; 756:4213 draws a third ("4.8 (326 reviews)"). A number
+// beside a doctor's name is a claim about a real person, so this screen will not
+// mint one and will not default one: it renders the rating IT WAS HANDED, and
+// nothing when it was handed none. Both screens reading the same two params is
+// what makes them incapable of disagreeing — once screen 1 forwards the value it
+// is displaying, the two are the same value by construction. A malformed or
+// out-of-range value is treated as ABSENT, never clamped into a plausible one.
+//
+// APPEARANCE. Screen gutter 16 (was 24 — BRAND §Spacing always said 16), section
+// headings on the `headline-md` ramp OUTSIDE their cards (was an 11px uppercase
+// caption inside, under BRAND's 12sp floor), no blue anywhere (the file carried
+// `#0058be`, `#d5e3fc`, `rgba(33,112,228,0.12)` and `rgba(0,88,190,0.05)`, none
+// of which is a token or appears in a frame), and no hex literals at all — every
+// one of them froze light mode and broke 756:4988.
+//
+// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
+// This file uses none: `Linking`, `Modal` and `BackHandler` are react-native.
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Image,
+  BackHandler,
+  Linking,
+  Modal,
   Platform,
-  Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
+import { useMutation } from "@tanstack/react-query";
+import { DetailShell } from "@/components/shell";
+import {
+  Button,
+  Card,
+  DockedActionBar,
+  Icon,
+  IconTile,
+  InfoCallout,
+  KeyValueRow,
+  PractitionerSummaryRow,
+  SectionHeader,
+} from "@/components/ui";
+import { bookingApi } from "@/features/booking/api";
+import { useTokenColor, useTokenShadow } from "@/lib/tokens";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+/** Non-empty strings only; `null`, `""` and absent all collapse to `undefined`. */
+function text(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/**
+ * `"45 Minutes"` / `"1 hr 15 min"` -> 75. The duration param is a DISPLAY string
+ * from the provider; the wire wants an `ends_at`. Anything unparseable returns
+ * undefined rather than a number, so `api.ts` falls through to its own
+ * documented default instead of booking a window derived from a misread label.
+ */
+function parseDurationMinutes(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const hours = /(\d+)\s*(?:h|hr|hour)/i.exec(value);
+  const minutes = /(\d+)\s*(?:m|min|minute)/i.exec(value);
+  if (!hours && !minutes) return undefined;
+  const total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
+  return total > 0 ? total : undefined;
+}
+
+/**
+ * `"4.8"` + `"326"` -> `{ value: 4.8, count: 326 }`, or undefined.
+ *
+ * BOTH halves are required: `PractitionerSummaryRow` draws "4.8 (326 reviews)"
+ * as one line, and a value with no count renders "(NaN reviews)" beside a real
+ * doctor's name. Out of range is treated as absent rather than clamped — a 7.2
+ * that becomes a 5.0 is a fabricated rating with a rounding error's alibi. The
+ * count must be a whole non-negative number; "326.5 reviews" is not a thing.
+ */
+function parseRating(
+  value: string | undefined,
+  count: string | undefined,
+): { value: number; count: number } | undefined {
+  if (!value || !count) return undefined;
+  const parsedValue = Number(value.trim());
+  const parsedCount = Number(count.trim());
+  if (!Number.isFinite(parsedValue) || parsedValue < 0 || parsedValue > 5) return undefined;
+  if (!Number.isInteger(parsedCount) || parsedCount < 0) return undefined;
+  return { value: parsedValue, count: parsedCount };
+}
+
+/**
+ * `"Cardiology,Top Rated"` -> `["Cardiology", "Top Rated"]`. Route params are
+ * strings, so a list has to travel as one; comma is the separator because no tag
+ * in any frame contains one. Blanks and duplicates are dropped (a duplicate is a
+ * serialisation artefact, and `PractitionerSummaryRow` keys on the tag), and an
+ * empty result is `undefined` so the row takes its `Show tags = false` variant
+ * rather than rendering an empty badge strip.
+ */
+function parseTags(value: string | undefined): string[] | undefined {
+  if (!value) return undefined;
+  const tags = [...new Set(value.split(",").map((t) => t.trim()).filter(Boolean))];
+  return tags.length > 0 ? tags : undefined;
+}
 
 // ---------------------------------------------------------------------------
-// Defaults — used only when no params were passed by the previous screen.
+// Params
 // ---------------------------------------------------------------------------
 
-const FALLBACK = {
-  practitionerName: "Dr. Julian Sterling",
-  practitionerSpecialty: "Senior Cardiologist",
-  practitionerAvatar:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuAiCdPvTk5RydHAjrMHk72Eu7sJRi3EI57s2zitwSnJw6fR-Ha-75XWdA2MjoxR9CgW1wk4Y8yWmBM9J3gwdHmLwACfEvc95ECOnqZEK6DpOt3Oo7QykCYlrP8rJJWJufV5bAB3vX_s7TNJHzOGgSULtrFO6uXN_V3vctBselslwyizvCrqX9Nt3f-WdJe5uLMji_TUyIxJIg3P9U5o7jTAfkBlf9jQB3IC9HNo2nT-65KTN6CRo5NF1wubrcTf-0jyGZE5avuAlAfI",
-  facility: "Mayo Clinic",
-  address: "200 First St SW, Rochester, MN 55905",
-  mapUri:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuBCOTvYsWV2PFO0EtmEWCfHutvCkwuSh5d8aUo1P0HPth1GgB-5Wo3rQNnjqVyuY6lsIvYBM-t0uaYle-DYA6zc4o-b6RK1nTuOAhL_BwE4b0aeuUtAwI3znBb4wG5m9N-jiut88YG49JLwik87wzlxiJ1Ril6E6SL8KCfWig9-XBeDz0lpccIi1ksW5hMU7iPmwadTOpw7Bz2Xnvp2lUIrnrBT0FwLu0qRiLQOFFJuY6eScX-ADTfJILoi0_T8Ii5YNw7ODwaOakto",
-  duration: "45 Minutes",
-};
+export type ConsultationMode = "in-person" | "video";
+
+/**
+ * Consultation MODE is a separate axis from consultation TYPE — a "Follow-up
+ * Visit" can be either. The two were collapsed before, which is why the screen
+ * could not decide whether to show an address or a join link, and why the
+ * confirmation screen's checklist told video patients to arrive ten minutes
+ * early. Anything that is not one of the two designed values is treated as
+ * absent rather than guessed at.
+ */
+function readMode(value: string | undefined): ConsultationMode | undefined {
+  return value === "in-person" || value === "video" ? value : undefined;
+}
+
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/**
+ * "2025-05-13" → "Tuesday, 13 May 2025" (756:4213).
+ *
+ * Formatting lives at the LEAF: screen 1 sends an ISO date, because it also has
+ * to round-trip that value back into its own date strip when the user taps Edit,
+ * and `"Tue, May 13"` is not a key. Anything that is not an ISO date is passed
+ * through untouched rather than reformatted into something it is not — an
+ * unparseable date must never become a different date.
+ *
+ * Built from local Y/M/D parts, not `new Date(iso)`, which parses a bare date as
+ * UTC and lands on the previous day west of Greenwich.
+ */
+function formatLongDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return value;
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(date.getTime())) return value;
+  return `${WEEKDAYS[date.getDay()]}, ${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
+}
+
+/** Route params drop `undefined` rather than serialising the string "undefined". */
+function defined(params: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Copy
+// ---------------------------------------------------------------------------
+
+const POLICY =
+  "Free cancellation until 24 hours before the appointment. After that, a $10 processing fee may apply.";
+
+/** 756:4586. The "nothing has been charged" clause is load-bearing, not padding. */
+function failureCopy(status: number | undefined, time: string, practitioner: string) {
+  if (status === 409) {
+    return {
+      title: "That slot was just taken",
+      body: `Someone booked ${time} with ${practitioner} while you were reviewing. Nothing has been charged. Pick another time to continue.`,
+    };
+  }
+  return {
+    title: "We couldn't confirm this booking",
+    body: "Nothing has been booked and nothing has been charged. Check your connection and try again, or pick another time.",
+  };
+}
+
+/**
+ * A dialog IS one of docs/BRAND.md's sanctioned floating roles ("a bottom sheet,
+ * a menu, a dialog, a toast"), and it is the ONLY elevation in this flow. The
+ * `0 2px 6px` at 8% step, tinted with the `shadow` token — never grey, never the
+ * 24px-blur card signature BRAND removed.
+ */
+const DIALOG_SHADOW = { y: 2, blur: 6, opacity: 0.08 } as const;
+
+/** 756:4813 / 756:4586 — the error plate diameters. */
+const ERROR_PLATE_LARGE = 56;
+const ERROR_PLATE_SMALL = 40;
+/** Clears the `Buttons=Pair` bar (115) plus its footnote and a little air. */
+const DOCKED_CLEARANCE = 168;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -58,570 +305,463 @@ const FALLBACK = {
 
 export function ReviewAppointmentScreen() {
   const params = useLocalSearchParams<{
+    practitionerId?: string;
     practitionerName?: string;
     practitionerSpecialty?: string;
     practitionerAvatar?: string;
+    /** Two halves of one claim — see `parseRating`. */
+    rating?: string;
+    reviewCount?: string;
+    /** Comma-separated, e.g. `"Cardiology,Top Rated"` — see `parseTags`. */
+    tags?: string;
     date?: string;
     time?: string;
+    endTime?: string;
+    timezone?: string;
+    mode?: string;
     type?: string;
     reason?: string;
+    duration?: string;
+    locationName?: string;
+    locationAddress?: string;
   }>();
 
-  const appt = {
-    practitionerName: params.practitionerName ?? FALLBACK.practitionerName,
-    practitionerSpecialty:
-      params.practitionerSpecialty ?? FALLBACK.practitionerSpecialty,
-    practitionerAvatar: params.practitionerAvatar ?? FALLBACK.practitionerAvatar,
-    date: params.date ?? "Tuesday, Oct 24, 2023",
-    time: params.time ?? "10:30 AM",
-    type: params.type ?? "Standard Consultation",
-    reason: params.reason ?? "",
-  };
+  const practitionerName = text(params.practitionerName);
+  const practitionerSpecialty = text(params.practitionerSpecialty);
+  const date = text(params.date);
+  const time = text(params.time);
+  const endTime = text(params.endTime);
+  const timezone = text(params.timezone);
+  const type = text(params.type);
+  const reason = text(params.reason);
+  const duration = text(params.duration);
+  const locationName = text(params.locationName);
+  const locationAddress = text(params.locationAddress);
+  const mode = readMode(params.mode);
+  const rating = parseRating(text(params.rating), text(params.reviewCount));
+  const tags = parseTags(text(params.tags));
 
-  const confirm = () => {
-    router.replace({
-      // Route added this iteration — typedRoutes regenerates on dev server start.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pathname: "/(app)/booking-confirmed" as any,
-      params: {
-        practitionerName: appt.practitionerName,
-        practitionerSpecialty: appt.practitionerSpecialty,
-        practitionerAvatar: appt.practitionerAvatar,
-        date: appt.date,
-        time: appt.time,
-        type: appt.type,
-      },
+  const [discardOpen, setDiscardOpen] = useState(false);
+
+  const confirmMutation = useMutation({
+    mutationFn: bookingApi.createBooking,
+    onSuccess: (booking) => {
+      router.replace({
+        // Route added in an earlier iteration — typedRoutes regenerates on dev
+        // server start.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pathname: "/(app)/booking-confirmed" as any,
+        params: defined({
+          practitionerName,
+          practitionerSpecialty,
+          practitionerAvatar: text(params.practitionerAvatar),
+          // `rating` and `tags` are deliberately NOT forwarded: 780:5363 gives
+          // screen 3 the `Show rating = false` / `Show tags = false` variant and
+          // 756:5180 draws neither. Forwarding them would put a rating on a
+          // frame that has no place to draw it.
+          date,
+          time,
+          endTime,
+          timezone,
+          type,
+          mode,
+          locationName,
+          locationAddress,
+          // Server-owned. `BookingOut` echoes the two instants it stored, and
+          // those — not the local strings this screen displayed — are what the
+          // calendar event is written from.
+          //
+          // `bookingReference` and `joinUrl` are NOT here. The backend has no
+          // such fields (see ./api.ts), so nothing is forwarded and the
+          // confirmation screen's `params.bookingReference ? ...` /
+          // `params.joinUrl ? ...` guards keep those rows unrendered. Deriving
+          // a "reference" from `booking_id` would put a number on a medical
+          // confirmation that no clinic can look up. Logged in PIPELINE §5.
+          startsAtIso: booking.startsAtIso,
+          endsAtIso: booking.endsAtIso,
+        }),
+      });
+    },
+  });
+
+  const isPending = confirmMutation.isPending;
+
+  /**
+   * Abandon. A no-op while the mutation is in flight: `dismissAll()` mid-request
+   * orphans a booking the server may well be creating, and the user would have
+   * no screen left on which to be told about it.
+   */
+  const requestDiscard = useCallback(() => {
+    if (isPending) return;
+    setDiscardOpen(true);
+  }, [isPending]);
+
+  // Android hardware back MIRRORS the app-bar back — the whole point of the
+  // dialog is that the booking cannot be abandoned by accident, and a hardware
+  // gesture that bypasses it is the accident. `return true` consumes the event;
+  // without it Android pops this screen out from behind the dialog.
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      requestDiscard();
+      return true;
     });
-  };
+    return () => subscription.remove();
+  }, [requestDiscard]);
 
-  const edit = () => router.back();
-  const cancel = () => router.back();
+  const goEdit = useCallback(() => {
+    // Straight back to a REHYDRATED SelectTimeSlotScreen — it seeds its state
+    // from the params it pushed. That pairing is the point of both changes:
+    // without rehydration "Edit" wipes four choices the user already made.
+    router.back();
+  }, []);
 
-  return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* App bar */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
-        >
-          <View className="flex-1 flex-row items-center gap-sm">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => router.back()}
-              className="rounded-full p-xs active:scale-95"
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#00685f" />
-            </Pressable>
-            <Text
-              className="font-headline-md text-primary"
-              style={{ fontSize: 18, fontWeight: "700" }}
-              numberOfLines={1}
-            >
-              Review Appointment
-            </Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            hitSlop={8}
-            className="rounded-full p-sm active:scale-95"
-          >
-            <MaterialIcons name="notifications" size={24} color="#00685f" />
-          </Pressable>
-        </View>
+  const keepEditing = useCallback(() => setDiscardOpen(false), []);
 
+  const discardBooking = useCallback(() => {
+    setDiscardOpen(false);
+    router.dismissAll();
+  }, []);
+
+  const confirm = useCallback(() => {
+    const doctorId = text(params.practitionerId);
+    if (!doctorId || !date || !time) return;
+    // `mode` and `type` are displayed but not sent: `BookingCreate` has no field
+    // for either. See the note in ./api.ts — it is a real drop, flagged in §5,
+    // not something to fold into `notes`.
+    confirmMutation.mutate({
+      doctorId,
+      date,
+      time,
+      endTime,
+      durationMinutes: parseDurationMinutes(duration),
+      reason,
+    });
+  }, [confirmMutation, date, time, endTime, duration, params.practitionerId, reason]);
+
+  /**
+   * The maps handoff, for real. Native scheme first so the phone's own maps app
+   * takes it, https as the fallback for a device that has none — and the whole
+   * thing guarded, because `openURL` REJECTS when no handler claims the URL and
+   * an unhandled rejection here would take down the screen the user is trying
+   * to book on.
+   */
+  const openDirections = useCallback(async () => {
+    if (!locationAddress) return;
+    const query = encodeURIComponent(
+      locationName ? `${locationName}, ${locationAddress}` : locationAddress,
+    );
+    const nativeUrl = Platform.select({
+      ios: `maps://?daddr=${query}`,
+      android: `geo:0,0?q=${query}`,
+      default: "",
+    });
+    const webUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    try {
+      const canOpenNative = nativeUrl ? await Linking.canOpenURL(nativeUrl) : false;
+      await Linking.openURL(canOpenNative && nativeUrl ? nativeUrl : webUrl);
+    } catch {
+      try {
+        await Linking.openURL(webUrl);
+      } catch {
+        // Both handoffs refused. The address is on screen as text, which is the
+        // fallback that always works; a toast here would be noise.
+      }
+    }
+  }, [locationAddress, locationName]);
+
+  const failure = useMemo(() => {
+    const status = (confirmMutation.error as { status?: number } | null)?.status;
+    return failureCopy(status, time ?? "this slot", practitionerName ?? "another patient");
+  }, [confirmMutation.error, time, practitionerName]);
+
+  const errorPlate = useTokenColor("on-error-container");
+  const dialogShadow = useTokenShadow("shadow", DIALOG_SHADOW);
+
+  // -------------------------------------------------------------------------
+  // 756:4813 — the session we cannot reconstruct
+  // -------------------------------------------------------------------------
+  // A WHOLE-SCREEN replacement, not a banner: there is no appointment to review,
+  // so reviewing one is not an option the screen can offer. Hooks above run
+  // first, unconditionally.
+  //
+  // `practitionerId` joins the guard this pass. `BookingCreate.doctor_id` is a
+  // required UUID, so a session that lost the id cannot produce a booking at
+  // all — offering a Confirm button that can only ever fail is the same defect
+  // as the fabricated appointment this frame was introduced to replace.
+  if (!text(params.practitionerId) || !practitionerName || !date || !time || !type || !mode) {
+    return (
+      <DetailShell title="Review Appointment">
         <ScrollView
           contentContainerStyle={{
-            paddingHorizontal: 24,
+            paddingHorizontal: 16,
             paddingTop: 16,
             paddingBottom: 32,
+            flexGrow: 1,
+            justifyContent: "center",
           }}
           showsVerticalScrollIndicator={false}
         >
-          {/* ------------------------------------------------------------
-              Specialist card
-          ------------------------------------------------------------ */}
-          <View
-            className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-md"
-            style={cardShadow}
-          >
-            <View className="flex-row items-center gap-md">
-              <View className="relative">
-                <Image
-                  source={{ uri: appt.practitionerAvatar }}
-                  style={{
-                    width: 88,
-                    height: 88,
-                    borderRadius: 12,
-                    borderWidth: 2,
-                    borderColor: "rgba(0,104,95,0.15)",
-                  }}
-                  accessibilityLabel={appt.practitionerName}
-                />
-                <View
-                  className="absolute items-center justify-center rounded-full bg-primary"
-                  style={{
-                    bottom: -6,
-                    right: -6,
-                    padding: 3,
-                    borderWidth: 2,
-                    borderColor: "#ffffff",
-                  }}
-                >
-                  <MaterialIcons name="check-circle" size={16} color="#ffffff" />
-                </View>
-              </View>
-              <View className="flex-1">
-                <View className="mb-xs flex-row flex-wrap gap-xs">
-                  <TagPill label="Cardiology" tone="primary" />
-                  <TagPill label="Top Rated" tone="tertiary" />
-                </View>
-                <Text
-                  className="text-primary"
-                  style={{ fontSize: 19, fontWeight: "700" }}
-                  numberOfLines={1}
-                >
-                  {appt.practitionerName}
-                </Text>
-                <Text
-                  className="font-body-md text-on-surface-variant"
-                  numberOfLines={1}
-                  style={{ fontSize: 13 }}
-                >
-                  {appt.practitionerSpecialty} • Mayo Clinic
-                </Text>
-                <View className="mt-xs flex-row items-center gap-xs">
-                  <MaterialIcons name="star" size={16} color="#00685f" />
-                  <Text
-                    className="font-label-md text-on-surface"
-                    style={{ fontWeight: "700" }}
-                  >
-                    4.9
-                  </Text>
-                  <Text className="font-label-sm text-outline">(1,240 Reviews)</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* ------------------------------------------------------------
-              Time & Schedule
-          ------------------------------------------------------------ */}
-          <SectionCard title="Time & Schedule" className="mt-md">
-            <DetailRow
-              icon="calendar-today"
-              iconBg="rgba(0,131,120,0.12)"
-              iconColor="#00685f"
-              label="Date"
-              value={appt.date}
-            />
-            <DetailRow
-              icon="schedule"
-              iconBg="rgba(0,131,120,0.12)"
-              iconColor="#00685f"
-              label="Time"
-              value={`${appt.time} (Local time)`}
-            />
-          </SectionCard>
-
-          {/* ------------------------------------------------------------
-              Service details
-          ------------------------------------------------------------ */}
-          <SectionCard title="Service Details" className="mt-md">
-            <DetailRow
-              icon="medical-services"
-              iconBg="rgba(33,112,228,0.12)"
-              iconColor="#0058be"
-              label="Type"
-              value={appt.type}
-            />
-            <DetailRow
-              icon="history"
-              iconBg="rgba(33,112,228,0.12)"
-              iconColor="#0058be"
-              label="Duration"
-              value={FALLBACK.duration}
-            />
-            {appt.reason ? (
-              <DetailRow
-                icon="note"
-                iconBg="rgba(33,112,228,0.12)"
-                iconColor="#0058be"
-                label="Reason"
-                value={appt.reason}
-              />
-            ) : null}
-          </SectionCard>
-
-          {/* ------------------------------------------------------------
-              Location
-          ------------------------------------------------------------ */}
-          <View
-            className="mt-md overflow-hidden rounded-xl border border-outline-variant/30 bg-surface-container-lowest"
-            style={cardShadow}
-          >
-            <View className="p-md">
-              <Text
-                className="font-label-md text-outline mb-xs"
-                style={{
-                  textTransform: "uppercase",
-                  letterSpacing: 1.2,
-                  fontSize: 11,
-                }}
-              >
-                Location
-              </Text>
-              <Text
-                className="font-headline-md text-on-surface"
-                style={{ fontSize: 18, fontWeight: "700" }}
-              >
-                {FALLBACK.facility}
-              </Text>
-              <Text
-                className="font-body-md text-on-surface-variant mt-xs"
-                style={{ fontSize: 14 }}
-              >
-                {FALLBACK.address}
-              </Text>
-            </View>
-            <View style={{ position: "relative", height: 160, width: "100%" }}>
-              <Image
-                source={{ uri: FALLBACK.mapUri }}
-                style={{ width: "100%", height: "100%" }}
-                accessibilityLabel="Map of clinic"
-              />
-              <View
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <View
-                  style={[
-                    {
-                      backgroundColor: "#ffffff",
-                      padding: 10,
-                      borderRadius: 999,
-                      borderWidth: 2,
-                      borderColor: "#00685f",
-                    },
-                    pinShadow,
-                  ]}
-                >
-                  <MaterialIcons name="location-on" size={28} color="#00685f" />
-                </View>
-              </View>
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 12,
-                  right: 12,
-                  backgroundColor: "rgba(245, 250, 248, 0.92)",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.4)",
-                }}
-              >
-                <MaterialIcons name="directions" size={16} color="#00685f" />
-                <Text
-                  className="font-label-md text-on-surface"
-                  style={{ fontSize: 13, fontWeight: "600" }}
-                >
-                  Get Directions
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* ------------------------------------------------------------
-              Cancellation policy info
-          ------------------------------------------------------------ */}
-          <View
-            className="mt-md flex-row gap-sm rounded-xl border p-sm"
-            style={{
-              backgroundColor: "rgba(0,88,190,0.05)",
-              borderColor: "rgba(0,88,190,0.15)",
-            }}
-          >
-            <MaterialIcons name="info" size={20} color="#0058be" />
-            <Text
-              className="text-on-secondary-container flex-1"
-              style={{ fontSize: 13, lineHeight: 19 }}
+          <Card className="items-center">
+            <View
+              className="items-center justify-center rounded-full bg-error-container"
+              style={{ width: ERROR_PLATE_LARGE, height: ERROR_PLATE_LARGE }}
             >
-              Free cancellation until 24 hours before the appointment. After
-              that, a $10 processing fee may apply.
+              <Icon chrome="error-outline" size={28} color={errorPlate} />
+            </View>
+            <Text className="mt-4 text-center font-headline-md text-headline-md text-on-surface">
+              This booking session has expired
             </Text>
-          </View>
-
-          {/* ------------------------------------------------------------
-              Action buttons
-          ------------------------------------------------------------ */}
-          <View className="mt-md">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Confirm booking"
-              onPress={confirm}
-              style={({ pressed }) => [
-                {
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  paddingVertical: 16,
-                  borderRadius: 12,
-                  backgroundColor: pressed ? "#004d46" : "#00685f",
-                },
-                confirmShadow,
-              ]}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "700",
-                  color: "#ffffff",
-                  letterSpacing: 0.2,
-                }}
-              >
-                Confirm Booking
-              </Text>
-              <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />
-            </Pressable>
-
-            <View className="mt-sm flex-row gap-sm">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Edit appointment"
-                onPress={edit}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: "#00685f",
-                  backgroundColor: pressed
-                    ? "rgba(0,104,95,0.08)"
-                    : "transparent",
-                })}
-              >
-                <MaterialIcons name="edit" size={18} color="#00685f" />
-                <Text
-                  style={{ fontSize: 14, fontWeight: "600", color: "#00685f" }}
-                >
-                  Edit
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Cancel appointment"
-                onPress={cancel}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  borderWidth: 1.5,
-                  borderColor: "#ba1a1a",
-                  backgroundColor: pressed
-                    ? "rgba(186,26,26,0.08)"
-                    : "transparent",
-                })}
-              >
-                <MaterialIcons name="close" size={18} color="#ba1a1a" />
-                <Text
-                  style={{ fontSize: 14, fontWeight: "600", color: "#ba1a1a" }}
-                >
-                  Cancel
-                </Text>
-              </Pressable>
+            <Text className="mt-2 text-center font-body-md text-body-md text-on-surface-variant">
+              We no longer have the practitioner, date or time you chose. Nothing was booked. Start
+              again from the provider you were viewing.
+            </Text>
+            <View className="mt-6 w-full">
+              <Button
+                label="Start again"
+                size="docked"
+                pill={false}
+                fullWidth
+                onPress={() => router.dismissAll()}
+              />
             </View>
-
-            <View className="mt-md flex-row items-center justify-center gap-xs">
-              <MaterialIcons name="lock" size={14} color="#6d7a77" />
-              <Text className="font-label-sm text-on-surface-variant">
-                Secure encrypted checkout
-              </Text>
-            </View>
-          </View>
+          </Card>
         </ScrollView>
-      </SafeAreaView>
-    </View>
-  );
-}
+      </DetailShell>
+    );
+  }
 
-// ---------------------------------------------------------------------------
-// Local primitives
-// ---------------------------------------------------------------------------
+  const showTimezoneBadge = !!timezone;
+  const timeValue = endTime ? `${time} – ${endTime}` : time;
 
-function SectionCard({
-  title,
-  children,
-  className,
-}: {
-  title: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
   return (
-    <View
-      className={`rounded-xl border border-outline-variant/20 bg-surface-container-low p-md ${className ?? ""}`}
+    <DetailShell
+      title="Review Appointment"
+      onBack={requestDiscard}
+      // The app-bar action slot is EMPTY in 756:4213. It used to carry a
+      // notifications bell that did nothing on a checkout screen.
+      // The docked bar claims the bottom inset itself (its own SafeAreaView), so
+      // the shell must not claim it too or the padding doubles.
+      claimsBottomInset={false}
     >
-      <Text
-        className="font-label-md text-outline mb-md"
-        style={{
-          textTransform: "uppercase",
-          letterSpacing: 1.2,
-          fontSize: 11,
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: DOCKED_CLEARANCE,
         }}
+        showsVerticalScrollIndicator={false}
       >
-        {title}
-      </Text>
-      <View className="gap-md">{children}</View>
-    </View>
+        {/* -- Practitioner (756:4221) -------------------------------------
+            756:4213 draws a rating and two tags ("Cardiology", "Top Rated"),
+            and this screen now HAS slots for both — `rating`+`reviewCount` and
+            a comma-separated `tags`, added to the contract at the top of this
+            file so screen 1 and screen 2 answer the rating question from the
+            same two params instead of one inventing a number and the other
+            showing none.
+
+            Still FLAGGED, and it is a data gap now rather than a component one:
+            screen 1 does not yet forward them (it holds a private SEED_RATING),
+            and nothing behind it produces them — /v1/practitioners does not
+            exist. Until it does these two lines are absent, which is exactly
+            780:5363's `Show rating = false` / `Show tags = false`. What is NOT
+            done here is defaulting them: an invented "Top Rated" on a real
+            clinician is the same class of harm as the deleted FALLBACK. */}
+        <PractitionerSummaryRow
+          surface="card"
+          verified
+          name={practitionerName}
+          specialty={practitionerSpecialty ?? ""}
+          avatarUri={text(params.practitionerAvatar)}
+          rating={rating}
+          tags={tags}
+        />
+
+        {/* -- Time & Schedule (756:4282) ---------------------------------- */}
+        <View className="mt-6">
+          <SectionHeader title="Time & Schedule" />
+          <Card className="gap-4">
+            <View className="flex-row items-start gap-4">
+              <IconTile icon="calendar-today" />
+              <KeyValueRow label="Date" value={formatLongDate(date)} />
+            </View>
+            <View className="flex-row items-start gap-4">
+              <IconTile icon="schedule" />
+              {/* The timezone badge is a CLAIM about where and when this is —
+                  rendered only when the params carry one. */}
+              {showTimezoneBadge ? (
+                <KeyValueRow
+                  label="Time"
+                  value={timeValue}
+                  badge={{ label: timezone, tone: "success" }}
+                />
+              ) : (
+                <KeyValueRow label="Time" value={timeValue} />
+              )}
+            </View>
+          </Card>
+        </View>
+
+        {/* -- Service Details (756:4356) ---------------------------------- */}
+        <View className="mt-6">
+          <SectionHeader title="Service Details" />
+          <Card className="gap-4">
+            <View className="flex-row items-start gap-4">
+              <IconTile icon="stethoscope" />
+              <KeyValueRow label="Consultation type" value={type} />
+            </View>
+            {/* "From provider" is a provenance badge: the value must actually
+                come from the provider. It used to be a hardcoded "45 Minutes"
+                wearing that badge. */}
+            {duration ? (
+              <View className="flex-row items-start gap-4">
+                <IconTile icon="schedule" />
+                <KeyValueRow
+                  label="Duration"
+                  value={duration}
+                  badge={{ label: "From provider", tone: "success" }}
+                />
+              </View>
+            ) : null}
+            {reason ? (
+              <View className="flex-row items-start gap-4">
+                <IconTile icon="prescription" />
+                <KeyValueRow label="Reason for visit" value={reason} />
+              </View>
+            ) : null}
+          </Card>
+        </View>
+
+        {/* -- Location / Consultation — branches on MODE ------------------ */}
+        {mode === "video" ? (
+          // FLAGGED: screen 2 has no video frame. Derived from 757:4828, the one
+          // frame that draws the video treatment. Deliberately NO join link:
+          // nothing is booked yet, so no `joinUrl` exists to show.
+          <View className="mt-6">
+            <SectionHeader title="Consultation" />
+            <Card>
+              <View className="flex-row items-start gap-4">
+                <IconTile icon="videocam" />
+                <KeyValueRow
+                  label="Video consultation"
+                  value="Join link opens 10 minutes before the start"
+                />
+              </View>
+            </Card>
+          </View>
+        ) : locationAddress ? (
+          <View className="mt-6">
+            <SectionHeader title="Location" />
+            <Card>
+              <View className="flex-row items-start gap-4">
+                <IconTile icon="location-on" />
+                <KeyValueRow
+                  label={locationName ?? "Clinic address"}
+                  value={locationAddress}
+                  // Suppressed mid-flight (756:4442): the screen is committing,
+                  // and a maps handoff backgrounds the app under the request.
+                  action={
+                    isPending ? undefined : { label: "Directions", onPress: openDirections }
+                  }
+                />
+              </View>
+            </Card>
+          </View>
+        ) : null}
+
+        {/* -- Cancellation policy (756:4361) ------------------------------ */}
+        <View className="mt-6">
+          <InfoCallout>{POLICY}</InfoCallout>
+        </View>
+
+        {/* -- 756:4586 confirm-failed ------------------------------------- */}
+        {confirmMutation.isError ? (
+          <View className="mt-6 items-center" accessibilityLiveRegion="polite">
+            <View
+              className="items-center justify-center rounded-full bg-error-container"
+              style={{ width: ERROR_PLATE_SMALL, height: ERROR_PLATE_SMALL }}
+            >
+              <Icon chrome="error-outline" size={20} color={errorPlate} />
+            </View>
+            <Text className="mt-4 text-center font-body-md text-body-md text-on-surface">
+              {failure.title}
+            </Text>
+            <Text className="mt-2 text-center font-label-sm text-label-sm text-on-surface-variant">
+              {failure.body}
+            </Text>
+            <View className="mt-4 w-full">
+              <Button
+                label="Choose another time"
+                variant="outline"
+                size="docked"
+                pill={false}
+                fullWidth
+                onPress={() => router.back()}
+              />
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* -- Docked commit bar (781:2291 Pair + 781:2287 footnote) --------- */}
+      <DockedActionBar
+        secondary={{ label: "Edit", onPress: goEdit, disabled: isPending }}
+        primary={{
+          label: isPending
+            ? "Confirming…"
+            : confirmMutation.isError
+              ? "Try again"
+              : "Confirm Booking",
+          // `loading` already carries `disabled` and `accessibilityState.busy`.
+          loading: isPending,
+          onPress: confirm,
+        }}
+        footnote={{ label: "Secure encrypted checkout", icon: "lock" }}
+      />
+
+      {/* -- 756:4765 discard -------------------------------------------- */}
+      <Modal
+        visible={discardOpen}
+        transparent
+        animationType="fade"
+        // Hardware back inside the dialog dismisses the DIALOG, not the screen.
+        onRequestClose={keepEditing}
+      >
+        <View className="flex-1 items-center justify-center bg-scrim/40 px-4">
+          <View
+            accessibilityViewIsModal
+            className="w-full rounded-card bg-card-surface p-6"
+            style={[{ maxWidth: 313 }, dialogShadow]}
+          >
+            <Text
+              accessibilityRole="header"
+              className="font-headline-md text-headline-md text-on-surface"
+            >
+              Discard this booking?
+            </Text>
+            <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
+              Your date, time, consultation type and reason will be lost. Nothing has been booked
+              and nothing has been charged.
+            </Text>
+            <View className="mt-6 gap-3">
+              <Button
+                label="Keep editing"
+                size="docked"
+                pill={false}
+                fullWidth
+                onPress={keepEditing}
+              />
+              <Button
+                label="Discard booking"
+                variant="outline"
+                size="docked"
+                pill={false}
+                fullWidth
+                onPress={discardBooking}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </DetailShell>
   );
 }
-
-function DetailRow({
-  icon,
-  iconBg,
-  iconColor,
-  label,
-  value,
-}: {
-  icon: IconName;
-  iconBg: string;
-  iconColor: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <View className="flex-row items-center gap-md">
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 10,
-          backgroundColor: iconBg,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <MaterialIcons name={icon} size={22} color={iconColor} />
-      </View>
-      <View className="flex-1">
-        <Text className="font-label-sm text-on-surface-variant" style={{ fontSize: 12 }}>
-          {label}
-        </Text>
-        <Text
-          className="font-label-md text-on-surface mt-xs"
-          style={{ fontSize: 15, fontWeight: "600" }}
-        >
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function TagPill({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "primary" | "tertiary";
-}) {
-  const bg =
-    tone === "primary" ? "rgba(0,104,95,0.1)" : "rgba(0,88,190,0.1)";
-  const color = tone === "primary" ? "#00685f" : "#0058be";
-  return (
-    <View
-      style={{
-        backgroundColor: bg,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-        borderRadius: 999,
-      }}
-    >
-      <Text
-        style={{
-          color,
-          fontSize: 10,
-          fontWeight: "700",
-          textTransform: "uppercase",
-          letterSpacing: 0.6,
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Shadows
-// ---------------------------------------------------------------------------
-
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const cardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.05,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 3 },
-    },
-    web: { boxShadow: "0px 3px 12px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const confirmShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.3,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 5 },
-    },
-    web: { boxShadow: "0px 5px 12px rgba(0, 104, 95, 0.3)" },
-    android: { elevation: 5 },
-  }) || {};
-
-const pinShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
-    },
-    web: { boxShadow: "0px 3px 8px rgba(0, 0, 0, 0.15)" },
-    android: { elevation: 4 },
-  }) || {};

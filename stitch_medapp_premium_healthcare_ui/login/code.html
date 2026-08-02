@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedApp - Secure Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-on-surface": "#edf2f0",
+                      "on-primary": "#ffffff",
+                      "secondary-fixed": "#d5e3fc",
+                      "on-surface-variant": "#3d4947",
+                      "surface-container-low": "#f0f5f2",
+                      "primary-container": "#008378",
+                      "background": "#f5faf8",
+                      "inverse-surface": "#2c3130",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "error": "#ba1a1a",
+                      "on-primary-fixed": "#00201d",
+                      "secondary": "#515f74",
+                      "on-error-container": "#93000a",
+                      "outline-variant": "#bcc9c6",
+                      "tertiary-container": "#2170e4",
+                      "on-secondary-container": "#57657a",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "surface-container": "#eaefed",
+                      "surface-container-highest": "#dee4e1",
+                      "on-surface": "#171d1c",
+                      "outline": "#6d7a77",
+                      "on-tertiary-container": "#fefcff",
+                      "on-primary-container": "#f4fffc",
+                      "on-secondary": "#ffffff",
+                      "error-container": "#ffdad6",
+                      "on-primary-fixed-variant": "#005049",
+                      "surface-dim": "#d6dbd9",
+                      "primary-fixed": "#89f5e7",
+                      "secondary-container": "#d5e3fc",
+                      "tertiary-fixed": "#d8e2ff",
+                      "tertiary": "#0058be",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "surface": "#f5faf8",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "primary": "#00685f",
+                      "surface-bright": "#f5faf8",
+                      "inverse-primary": "#6bd8cb",
+                      "surface-container-high": "#e4e9e7",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-variant": "#dee4e1",
+                      "on-error": "#ffffff",
+                      "on-tertiary-fixed": "#001a42",
+                      "surface-tint": "#006a61",
+                      "on-background": "#171d1c"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "lg": "48px",
+                      "xl": "80px",
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "sm": "12px",
+                      "base": "8px",
+                      "container-max": "1280px",
+                      "md": "24px"
+              },
+              "fontFamily": {
+                      "label-md": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-xl": ["Manrope"],
+                      "headline-md": ["Manrope"],
+                      "headline-lg-mobile": ["Manrope"],
+                      "headline-lg": ["Manrope"],
+                      "body-md": ["Inter"],
+                      "body-lg": ["Inter"]
+              },
+              "fontSize": {
+                      "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                      "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col items-center justify-center p-gutter">
+<!-- Hero Background Image (Subtle Glassmorphism Overlay) -->
+<div class="fixed inset-0 z-0 overflow-hidden">
+<img class="w-full h-full object-cover opacity-10 filter blur-[2px]" data-alt="A clean, high-end medical facility interior with soft natural lighting and minimalist architectural lines. The scene is dominated by bright whites and subtle teal accents, evoking a sense of calm, precision, and modern healthcare excellence. The atmosphere is professional yet welcoming, with soft shadows creating depth and a premium clinical aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCw8WvP0jcxw96blklAjJFEI4ITKew5H54sLzylwIwV10KKjHsSGr5q7rUmCM_yTtDUS8TA4JPJZsKBF8xuhb1_heu7Kma8tB2TSTgtCKadhxxiqiWHR_u1zh2_ZiojEDpXtwY_duzvkWw3-ixBlpWBa3ETwDxf_tkcgdWLwUiMWP6ikq6h5yRj7krzE2LVSQJdOuMRAqbHpr0uAnnGl5pC2BBqrWxGJFZcyCSomM-Am85OLQUawccr5tACyS4-HnRJJ4RNbo91r0Jf"/>
+</div>
+<!-- Main Content Canvas -->
+<main class="relative z-10 w-full max-w-[440px]">
+<!-- Logo & Header Section -->
+<div class="text-center mb-xl">
+<div class="inline-flex items-center justify-center w-16 h-16 bg-primary-container rounded-xl shadow-lg mb-md active:scale-95 transition-transform duration-200 cursor-pointer">
+<span class="material-symbols-outlined text-on-primary-container text-[32px]" data-icon="medical_services">medical_services</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">MedApp</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-xs">Secure Healthcare Access</p>
+</div>
+<!-- Login Card -->
+<div class="bg-surface-container-lowest rounded-xl p-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 backdrop-blur-sm">
+<form class="space-y-md">
+<!-- Email Input -->
+<div class="space-y-xs">
+<label class="font-label-md text-label-md text-on-surface-variant ml-xs" for="email">Email Address</label>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+</div>
+<input class="w-full bg-surface border border-outline-variant rounded-lg py-sm pl-10 pr-md font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 placeholder:text-outline-variant" id="email" name="email" placeholder="name@example.com" type="email"/>
+</div>
+</div>
+<!-- Password Input -->
+<div class="space-y-xs">
+<div class="flex justify-between items-center ml-xs">
+<label class="font-label-md text-label-md text-on-surface-variant" for="password">Password</label>
+<a class="font-label-sm text-label-sm text-primary hover:text-primary-fixed-dim transition-colors" href="#">Forgot Password?</a>
+</div>
+<div class="relative group">
+<div class="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none text-outline">
+<span class="material-symbols-outlined" data-icon="lock">lock</span>
+</div>
+<input class="w-full bg-surface border border-outline-variant rounded-lg py-sm pl-10 pr-md font-body-md text-body-md text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 placeholder:text-outline-variant" id="password" name="password" placeholder="Enter your password" type="password"/>
+<div class="absolute inset-y-0 right-0 pr-sm flex items-center cursor-pointer text-outline hover:text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined" data-icon="visibility">visibility</span>
+</div>
+</div>
+</div>
+<!-- Remember Me & Biometrics Prompt -->
+<div class="flex items-center justify-between py-xs">
+<label class="flex items-center cursor-pointer group">
+<input class="w-4 h-4 rounded border-outline-variant text-primary focus:ring-primary cursor-pointer" type="checkbox"/>
+<span class="ml-base font-label-md text-label-md text-on-surface-variant group-hover:text-on-surface transition-colors">Remember me</span>
+</label>
+</div>
+<!-- Login Button -->
+<button class="w-full bg-primary text-on-primary font-label-md text-label-md py-md rounded-lg shadow-sm hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-base" type="submit">
+<span>Log In</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Divider -->
+<div class="flex items-center gap-sm py-sm">
+<div class="flex-1 h-[1px] bg-outline-variant/30"></div>
+<span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Or continue with</span>
+<div class="flex-1 h-[1px] bg-outline-variant/30"></div>
+</div>
+<!-- Biometric Options -->
+<div class="grid grid-cols-2 gap-sm">
+<button class="flex flex-col items-center justify-center p-sm bg-surface border border-outline-variant rounded-xl hover:bg-surface-container-low hover:border-primary/30 active:scale-95 transition-all duration-200 group" type="button">
+<span class="material-symbols-outlined text-primary mb-xs" data-icon="faceid">face</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">FaceID</span>
+</button>
+<button class="flex flex-col items-center justify-center p-sm bg-surface border border-outline-variant rounded-xl hover:bg-surface-container-low hover:border-primary/30 active:scale-95 transition-all duration-200 group" type="button">
+<span class="material-symbols-outlined text-primary mb-xs" data-icon="fingerprint">fingerprint</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Fingerprint</span>
+</button>
+</div>
+</form>
+</div>
+<!-- Footer Links -->
+<div class="mt-lg text-center">
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Don't have an account? 
+                <a class="font-label-md text-label-md text-primary hover:underline underline-offset-4 ml-xs" href="#">Sign Up</a>
+</p>
+<div class="mt-xl flex flex-col items-center gap-xs">
+<div class="flex items-center gap-xs text-outline font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="verified_user" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>HIPAA Compliant &amp; Secure</span>
+</div>
+<div class="flex gap-md text-outline font-label-sm text-label-sm mt-xs">
+<a class="hover:text-on-surface-variant transition-colors" href="#">Privacy Policy</a>
+<a class="hover:text-on-surface-variant transition-colors" href="#">Terms of Service</a>
+</div>
+</div>
+</div>
+</main>
+<!-- Decorative Corner Accents -->
+<div class="fixed top-0 right-0 w-64 h-64 bg-primary-fixed opacity-10 blur-[80px] -z-10 rounded-full"></div>
+<div class="fixed bottom-0 left-0 w-96 h-96 bg-tertiary-fixed opacity-5 blur-[100px] -z-10 rounded-full"></div>
+</body></html>

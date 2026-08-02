@@ -11,7 +11,6 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { useColorScheme } from "react-native";
 import { QueryClientProvider } from "@tanstack/react-query";
 import {
   Inter_400Regular,
@@ -26,13 +25,18 @@ import {
 } from "@expo-google-fonts/manrope";
 
 import { queryClient } from "@/lib/api/query-client";
+import { useAppearanceSync, useResolvedScheme } from "@/lib/theme";
 import { useAuthStore } from "@/store/auth-store";
 import { useWelcomeStore } from "@/store/welcome-store";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  // Loads the persisted Light/Dark/System preference and pushes it into
+  // NativeWind, which toggles the `.dark` class global.css keys its colour
+  // variables off. Must run before first paint to avoid a theme flash.
+  const { hydrated: appearanceHydrated } = useAppearanceSync();
+  const { scheme } = useResolvedScheme();
 
   const [fontsLoaded, fontsError] = useFonts({
     Inter_400Regular,
@@ -56,7 +60,7 @@ export default function RootLayout() {
 
   const fontsReady = fontsLoaded || !!fontsError;
   const storesReady = !isAuthHydrating && !isWelcomeHydrating;
-  const ready = fontsReady && storesReady;
+  const ready = fontsReady && storesReady && appearanceHydrated;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
@@ -66,7 +70,9 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+      {/* Resolved scheme, not the raw OS one — so an explicit Light/Dark
+          override also themes the navigation chrome, not just our own views. */}
+      <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(public)" />
           <Stack.Screen name="(app)" />

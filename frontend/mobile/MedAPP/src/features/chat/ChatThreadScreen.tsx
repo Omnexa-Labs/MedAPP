@@ -9,7 +9,8 @@
 //   - Back arrow is the return affordance.
 //
 // Translation calls (HTML → React Native):
-//   - backdrop-blur header → opaque bg-surface/80 + border + shadow.
+//   - backdrop-blur header → the shared DetailAppBar. (The original translation
+//     added a shadow; docs/BRAND.md §Elevation gives a bar none.)
 //   - outgoing bubble: bg-primary (#00685f), text-on-primary (#ffffff),
 //     rounded-2xl with rounded-br-none (tail on the right).
 //   - incoming bubble: bg-surface-container-highest (#dee4e1),
@@ -39,10 +40,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
+import { Icon, VitalStatCard, type VitalStatTrend } from "@/components/ui";
+import { useTokenColor, useTokenShadow } from "@/lib/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
@@ -153,10 +155,16 @@ const SEED_MESSAGES: ChatMessage[] = [
   },
 ];
 
-const TREND_ICONS: Record<"up" | "down" | "stable", IconName> = {
-  up: "trending-up",
-  down: "trending-down",
-  stable: "trending-flat",
+/**
+ * Was `TREND_ICONS`, a local MaterialIcons table. The glyphs now live in
+ * VitalStatCard's own `TREND_GLYPH` (one definition), so all this thread has to
+ * do is translate its own wire vocabulary into the shared `VitalStatTrend`
+ * union. Only "stable" differs from it — the shared name is "flat".
+ */
+const TREND_TO_TOKEN: Record<"up" | "down" | "stable", VitalStatTrend> = {
+  up: "up",
+  down: "down",
+  stable: "flat",
 };
 
 // Clinical share options shown in the FAB menu
@@ -199,6 +207,21 @@ export function ChatThreadScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
   const [draft, setDraft] = useState("");
   const [clinicalOpen, setClinicalOpen] = useState(false);
+  // The bar's two action glyphs, resolved by token name for the current mode.
+  // The hand-rolled bar froze them at `#00685f` and `#3d4947` — the LIGHT values
+  // of color/primary and color/on-surface-variant.
+  const primary = useTokenColor("primary");
+  const mutedGlyph = useTokenColor("on-surface-variant");
+  // The two GENUINELY floating surfaces on this screen — the clinical-actions
+  // menu and the FAB that opens it. Both keep a shadow because docs/BRAND.md
+  // §Elevation names those exact roles as the exception; both are retokenised
+  // onto the `shadow` token rather than the black-at-15% and teal-at-40%
+  // literals they carried.
+  const floatingShadow = useTokenShadow("shadow", FLOATING_SHADOW);
+  // `#ffffff` was frozen into the menu's fill, so it stayed white in dark mode.
+  // `card-surface` is the role that resolves to a surface which LIFTS off the
+  // page in both modes (#FFFFFF light, #242B2A dark).
+  const menuSurface = useTokenColor("card-surface");
   const scrollRef = useRef<ScrollView>(null);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -209,9 +232,7 @@ export function ChatThreadScreen() {
   }, []);
 
   const scrollToEnd = () => {
-    requestAnimationFrame(() =>
-      scrollRef.current?.scrollToEnd({ animated: true }),
-    );
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
   const send = (text: string) => {
@@ -259,348 +280,326 @@ export function ChatThreadScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* ----------------------------------------------------------------
-            App bar — back + contact info + actions
-        ---------------------------------------------------------------- */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
-        >
-          {/* Left: back + avatar + name/role */}
-          <View className="flex-1 flex-row items-center gap-sm">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => router.back()}
-              className="rounded-full p-xs active:scale-95"
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#00685f" />
-            </Pressable>
-
-            {/* Avatar + online dot */}
-            <View className="relative shrink-0">
-              {contact.avatarUri ? (
-                <Image
-                  source={{ uri: contact.avatarUri }}
-                  style={{ width: 40, height: 40, borderRadius: 20 }}
-                  accessibilityLabel={contact.name}
-                />
-              ) : (
-                <View
-                  className="items-center justify-center rounded-full bg-primary-container"
-                  style={{ width: 40, height: 40 }}
-                >
-                  <Text className="font-label-md text-on-primary-container">
-                    {contact.name[0]?.toUpperCase() ?? "?"}
-                  </Text>
-                </View>
-              )}
-              {contact.isOnline ? (
-                <View
-                  className="absolute bottom-0 right-0 rounded-full border-2 border-surface bg-primary"
-                  style={{ width: 12, height: 12 }}
-                />
-              ) : null}
-            </View>
-
-            {/* Name + role badge */}
-            <View className="flex-1 min-w-0">
-              <Text
-                className="font-headline-md text-on-surface"
-                style={{ fontSize: 17, fontWeight: "700" }}
-                numberOfLines={1}
-              >
-                {contact.name}
-              </Text>
-              <View className="flex-row items-center gap-xs">
-                <View
-                  className="rounded px-xs"
-                  style={{ backgroundColor: "rgba(0,131,120,0.15)", paddingVertical: 1 }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "700",
-                      color: "#00685f",
-                      textTransform: "uppercase",
-                      letterSpacing: 0.4,
-                    }}
-                  >
-                    Doctor
-                  </Text>
-                </View>
-                <Text
-                  className="font-label-sm text-on-surface-variant"
-                  style={{ fontSize: 11 }}
-                >
-                  {contact.role}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Right: video call + info */}
-          <View className="flex-row items-center gap-xs">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Video call"
-              hitSlop={8}
-              className="rounded-full p-sm active:scale-95"
-              onPress={() => {
-                // TODO: initiate video call once telehealth signalling service ships.
-              }}
-            >
-              <MaterialIcons name="videocam" size={24} color="#00685f" />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Conversation info"
-              hitSlop={8}
-              className="rounded-full p-sm active:scale-95"
-            >
-              <MaterialIcons name="info-outline" size={24} color="#3d4947" />
-            </Pressable>
-          </View>
-        </View>
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-          // Extra offset so the input bar clears the keyboard cleanly on iOS.
-          keyboardVerticalOffset={0}
-        >
-          {/* -----------------------------------------------------------
-              Chat canvas
-          ----------------------------------------------------------- */}
-          <ScrollView
-            ref={scrollRef}
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              paddingTop: 16,
-              paddingBottom: 24,
-            }}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            onContentSizeChange={scrollToEnd}
-          >
-            {/* Timeline divider */}
-            <TimelineDivider label="Today · Tap any message for details" />
-
-            {messages.map((m) =>
-              m.direction === "outgoing" ? (
-                <OutgoingBubble key={m.id} message={m} />
-              ) : (
-                <IncomingBubble key={m.id} message={m} contactName={contact.name} />
-              ),
-            )}
-          </ScrollView>
-
-          {/* -----------------------------------------------------------
-              Clinical Actions FAB + slide-up share menu
-          ----------------------------------------------------------- */}
-          {clinicalOpen ? (
-            <Pressable
-              onPress={() => setClinicalOpen(false)}
+    // ------------------------------------------------------------------
+    // DetailShell (safe area + DetailAppBar + body). Replaces this screen's
+    // hand-rolled `View > StatusBar style="dark" > SafeAreaView` wrapper —
+    // the frozen "dark" was one of eleven, and it left dark-mode users with
+    // dark glyphs on a near-black bar.
+    //
+    // `claimsBottomInset={false}`: the composer is pinned to the bottom
+    // under a KeyboardAvoidingView, so a static bottom pad from the shell
+    // would stay put when the keyboard opens and leave a ~34px gap between
+    // the composer and the keyboard. Same edge set the screen passed before
+    // (["top","left","right"]) — behaviour is unchanged.
+    //
+    // The KAV stays HERE, below the bar. A shell-level one would lift the
+    // app bar off the top of the screen when the keyboard opens.
+    //
+    // The bar itself is the shared detail bar (Figma 193:120). This is the
+    // screen its `leading` and `subtitle` slots were flagged into existence
+    // for: avatar + presence dot, name, and a presence line.
+    //
+    // FLAGGED (carried over, unchanged by this migration) — the hand-rolled
+    // bar drew the word "Doctor" as a filled ROLE PILL (a rounded 10px
+    // uppercase tag on a `rgba(0,131,120,0.15)` tint) beside the specialty
+    // at 11px. Both type sizes are BELOW docs/BRAND.md's 12sp floor, so the
+    // pill could not ship as drawn in any case; 193:120 has no
+    // leading-of-subtitle slot, and adding a `subtitleBadge` prop would
+    // re-admit per-screen chrome. The information is preserved by folding
+    // the role into the subtitle line, which renders at `label-sm` 12. If
+    // the pill treatment is wanted back, 193:120 needs a
+    // `Content=Title + Badge` variant.
+    // ------------------------------------------------------------------
+    <DetailShell
+      title={contact.name}
+      subtitle={`Doctor · ${contact.role}`}
+      claimsBottomInset={false}
+      leading={
+        <View className="relative shrink-0">
+          {contact.avatarUri ? (
+            <Image
+              source={{ uri: contact.avatarUri }}
               style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: 15,
+                width: DETAIL_APP_BAR_LEADING_SIZE,
+                height: DETAIL_APP_BAR_LEADING_SIZE,
+                borderRadius: DETAIL_APP_BAR_LEADING_SIZE / 2,
               }}
-              accessibilityRole="button"
-              accessibilityLabel="Close clinical menu"
+              accessibilityLabel={contact.name}
+            />
+          ) : (
+            <View
+              className="items-center justify-center rounded-full bg-primary-container"
+              style={{
+                width: DETAIL_APP_BAR_LEADING_SIZE,
+                height: DETAIL_APP_BAR_LEADING_SIZE,
+              }}
+            >
+              <Text className="font-label-md text-on-primary-container">
+                {contact.name[0]?.toUpperCase() ?? "?"}
+              </Text>
+            </View>
+          )}
+          {contact.isOnline ? (
+            <View
+              className="absolute bottom-0 right-0 rounded-full border-2 border-surface bg-primary"
+              style={{ width: 12, height: 12 }}
+              accessibilityLabel="Online"
             />
           ) : null}
+        </View>
+      }
+      actions={
+        <View className="flex-row items-center">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Video call"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+            onPress={() => {
+              // TODO: initiate video call once telehealth signalling service ships.
+            }}
+          >
+            <Icon chrome="videocam" size={24} color={primary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Conversation info"
+            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+          >
+            <Icon chrome="info-outline" size={24} color={mutedGlyph} />
+          </Pressable>
+        </View>
+      }
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1"
+        // Extra offset so the input bar clears the keyboard cleanly on iOS.
+        keyboardVerticalOffset={0}
+      >
+        {/* -----------------------------------------------------------
+              Chat canvas
+          ----------------------------------------------------------- */}
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 16,
+            paddingBottom: 24,
+          }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={scrollToEnd}
+        >
+          {/* Timeline divider */}
+          <TimelineDivider label="Today · Tap any message for details" />
 
-          {/* Share options sheet */}
-          {clinicalOpen ? (
-            <View
-              style={{
-                position: "absolute",
-                bottom: 96,
-                right: 72,
-                zIndex: 25,
-                backgroundColor: "#ffffff",
-                borderRadius: 16,
-                overflow: "hidden",
-                ...clinicalMenuShadow,
-              }}
-            >
-              {CLINICAL_ACTIONS.map((a, i) => (
-                <Pressable
-                  key={a.label}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Share ${a.label}`}
-                  onPress={() => sendClinicalItem(a.label)}
-                  style={({ pressed }) => ({
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                    paddingHorizontal: 16,
-                    paddingVertical: 14,
-                    backgroundColor: pressed
-                      ? "rgba(0,104,95,0.06)"
-                      : "transparent",
-                    borderTopWidth: i > 0 ? 1 : 0,
-                    borderTopColor: "rgba(0,0,0,0.06)",
-                  })}
-                >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      backgroundColor: "rgba(0,131,120,0.12)",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <MaterialIcons name={a.icon} size={18} color="#00685f" />
-                  </View>
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "600",
-                      color: "#171d1c",
-                      minWidth: 160,
-                    }}
-                  >
-                    {a.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+          {messages.map((m) =>
+            m.direction === "outgoing" ? (
+              <OutgoingBubble key={m.id} message={m} />
+            ) : (
+              <IncomingBubble key={m.id} message={m} contactName={contact.name} />
+            ),
+          )}
+        </ScrollView>
 
-          {/* FAB */}
+        {/* -----------------------------------------------------------
+              Clinical Actions FAB + slide-up share menu
+          ----------------------------------------------------------- */}
+        {clinicalOpen ? (
+          <Pressable
+            onPress={() => setClinicalOpen(false)}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 15,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Close clinical menu"
+          />
+        ) : null}
+
+        {/* Share options sheet — a MENU, which docs/BRAND.md §Elevation names
+              as one of the four roles that may genuinely float. Its shadow is
+              KEPT and retokenised: `shadow` at 8% over a 2/6 pair, replacing a
+              20px black at 15%. */}
+        {clinicalOpen ? (
           <View
             style={{
               position: "absolute",
               bottom: 96,
-              right: 16,
-              zIndex: 20,
+              right: 72,
+              zIndex: 25,
+              backgroundColor: menuSurface,
+              borderRadius: 16,
+              overflow: "hidden",
+              ...floatingShadow,
             }}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={clinicalOpen ? "Close clinical actions" : "Share clinical data"}
-              onPress={() => setClinicalOpen((v) => !v)}
-              style={({ pressed }) => [
-                {
-                  width: 52,
-                  height: 52,
-                  borderRadius: 16,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: clinicalOpen
-                    ? "#004d46"
-                    : pressed
-                      ? "#005049"
-                      : "#00685f",
-                },
-                fabShadow,
-              ]}
-            >
-              <MaterialIcons
-                name={clinicalOpen ? "close" : "medical-services"}
-                size={24}
-                color="#ffffff"
-              />
-            </Pressable>
-          </View>
-
-          {/* -----------------------------------------------------------
-              Input bar
-          ----------------------------------------------------------- */}
-          <View
-            className="border-t border-outline-variant/20 bg-surface px-md pb-sm pt-sm"
-            style={inputBarShadow}
-          >
-            <View className="flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-low px-sm py-xs">
-              {/* Clinical menu toggle (apps icon) */}
+            {CLINICAL_ACTIONS.map((a, i) => (
               <Pressable
+                key={a.label}
                 accessibilityRole="button"
-                accessibilityLabel="Clinical actions"
-                hitSlop={4}
-                onPress={() => setClinicalOpen((v) => !v)}
-                className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-              >
-                <MaterialIcons
-                  name={clinicalOpen ? "close" : "apps"}
-                  size={22}
-                  color={clinicalOpen ? "#00685f" : "#3d4947"}
-                />
-              </Pressable>
-
-              {/* Attach */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Attach file"
-                hitSlop={4}
-                className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-              >
-                <MaterialIcons name="attach-file" size={22} color="#3d4947" />
-              </Pressable>
-
-              {/* Text input */}
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                placeholder="Type a message…"
-                placeholderTextColor="#6d7a77"
-                onSubmitEditing={() => send(draft)}
-                returnKeyType="send"
-                multiline
-                style={{
-                  flex: 1,
-                  minHeight: 36,
-                  maxHeight: 96,
-                  paddingHorizontal: 4,
-                  color: "#171d1c",
-                  fontSize: 16,
-                  lineHeight: 22,
-                }}
-                accessibilityLabel="Message input"
-              />
-
-              {/* Mic */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Voice message"
-                hitSlop={4}
-                className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-              >
-                <MaterialIcons name="mic" size={22} color="#3d4947" />
-              </Pressable>
-
-              {/* Send */}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Send message"
-                onPress={() => send(draft)}
+                accessibilityLabel={`Share ${a.label}`}
+                onPress={() => sendClinicalItem(a.label)}
                 style={({ pressed }) => ({
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
+                  flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: draft.trim()
-                    ? pressed
-                      ? "#005049"
-                      : "#00685f"
-                    : "#bcc9c6",
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  backgroundColor: pressed ? "rgba(0,104,95,0.06)" : "transparent",
+                  borderTopWidth: i > 0 ? 1 : 0,
+                  borderTopColor: "rgba(0,0,0,0.06)",
                 })}
               >
-                <MaterialIcons name="send" size={18} color="#ffffff" />
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: "rgba(0,131,120,0.12)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <MaterialIcons name={a.icon} size={18} color="#00685f" />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "600",
+                    color: "#171d1c",
+                    minWidth: 160,
+                  }}
+                >
+                  {a.label}
+                </Text>
               </Pressable>
-            </View>
+            ))}
           </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+        ) : null}
+
+        {/* FAB — the other sanctioned floating role, same retokenised pair.
+              What it does NOT keep is the old 12px teal glow at 40% opacity. */}
+        <View
+          style={{
+            position: "absolute",
+            bottom: 96,
+            right: 16,
+            zIndex: 20,
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={clinicalOpen ? "Close clinical actions" : "Share clinical data"}
+            onPress={() => setClinicalOpen((v) => !v)}
+            style={({ pressed }) => [
+              {
+                width: 52,
+                height: 52,
+                borderRadius: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: clinicalOpen ? "#004d46" : pressed ? "#005049" : "#00685f",
+              },
+              floatingShadow,
+            ]}
+          >
+            <MaterialIcons
+              name={clinicalOpen ? "close" : "medical-services"}
+              size={24}
+              color="#ffffff"
+            />
+          </Pressable>
+        </View>
+
+        {/* -----------------------------------------------------------
+              Input bar
+          ----------------------------------------------------------- */}
+        {/* The input bar is a docked BAR, not a floating surface, so its
+              `inputBarShadow` (an upward 8px black wash) is deleted rather than
+              softened — docs/BRAND.md §Elevation gives a bar no shadow, same as
+              the app bar at the top. Its separation is the top hairline, now at
+              full-strength `outline-variant` instead of `/20`, because with the
+              blur gone the hairline is the only edge. */}
+        <View className="border-t border-outline-variant bg-surface px-md pb-sm pt-sm">
+          <View className="flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-low px-sm py-xs">
+            {/* Clinical menu toggle (apps icon) */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clinical actions"
+              hitSlop={4}
+              onPress={() => setClinicalOpen((v) => !v)}
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
+            >
+              <MaterialIcons
+                name={clinicalOpen ? "close" : "apps"}
+                size={22}
+                color={clinicalOpen ? "#00685f" : "#3d4947"}
+              />
+            </Pressable>
+
+            {/* Attach */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Attach file"
+              hitSlop={4}
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
+            >
+              <MaterialIcons name="attach-file" size={22} color="#3d4947" />
+            </Pressable>
+
+            {/* Text input */}
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Type a message…"
+              placeholderTextColor="#6d7a77"
+              onSubmitEditing={() => send(draft)}
+              returnKeyType="send"
+              multiline
+              style={{
+                flex: 1,
+                minHeight: 36,
+                maxHeight: 96,
+                paddingHorizontal: 4,
+                color: "#171d1c",
+                fontSize: 16,
+                lineHeight: 22,
+              }}
+              accessibilityLabel="Message input"
+            />
+
+            {/* Mic */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Voice message"
+              hitSlop={4}
+              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
+            >
+              <MaterialIcons name="mic" size={22} color="#3d4947" />
+            </Pressable>
+
+            {/* Send */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
+              onPress={() => send(draft)}
+              style={({ pressed }) => ({
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: draft.trim() ? (pressed ? "#005049" : "#00685f") : "#bcc9c6",
+              })}
+            >
+              <MaterialIcons name="send" size={18} color="#ffffff" />
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </DetailShell>
   );
 }
 
@@ -615,36 +614,28 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
         {/* Text portion (above attachment if present) */}
         {message.text ? (
           <View
-            style={[
-              {
-                backgroundColor: "#00685f",
-                borderRadius: 20,
-                borderBottomRightRadius: message.attachment ? 20 : 4,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                marginBottom: message.attachment ? 4 : 0,
-              },
-              outgoingBubbleShadow,
-            ]}
+            style={{
+              backgroundColor: "#00685f",
+              borderRadius: 20,
+              borderBottomRightRadius: message.attachment ? 20 : 4,
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              marginBottom: message.attachment ? 4 : 0,
+            }}
           >
-            <Text style={{ color: "#ffffff", fontSize: 15, lineHeight: 22 }}>
-              {message.text}
-            </Text>
+            <Text style={{ color: "#ffffff", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
           </View>
         ) : null}
 
         {/* Attachment card */}
         {message.kind === "attachment" && message.attachment ? (
           <View
-            style={[
-              {
-                backgroundColor: "#00685f",
-                borderRadius: 20,
-                borderBottomRightRadius: 4,
-                padding: 12,
-              },
-              outgoingBubbleShadow,
-            ]}
+            style={{
+              backgroundColor: "#00685f",
+              borderRadius: 20,
+              borderBottomRightRadius: 4,
+              padding: 12,
+            }}
           >
             <View
               style={{
@@ -668,11 +659,7 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
                   justifyContent: "center",
                 }}
               >
-                <MaterialIcons
-                  name={message.attachment.icon}
-                  size={22}
-                  color="#ffffff"
-                />
+                <MaterialIcons name={message.attachment.icon} size={22} color="#ffffff" />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
@@ -685,9 +672,7 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
                 >
                   {message.attachment.name}
                 </Text>
-                <Text
-                  style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}
-                >
+                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}>
                   {message.attachment.meta}
                 </Text>
               </View>
@@ -702,22 +687,14 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           style={{ paddingRight: 4 }}
         >
           <Text style={{ fontSize: 11, color: "#6d7a77" }}>{message.timestamp}</Text>
-          {message.delivered ? (
-            <MaterialIcons name="done-all" size={14} color="#00685f" />
-          ) : null}
+          {message.delivered ? <MaterialIcons name="done-all" size={14} color="#00685f" /> : null}
         </View>
       </View>
     </View>
   );
 }
 
-function IncomingBubble({
-  message,
-  contactName,
-}: {
-  message: ChatMessage;
-  contactName: string;
-}) {
+function IncomingBubble({ message, contactName }: { message: ChatMessage; contactName: string }) {
   if (message.kind === "vitals" && message.vitals) {
     return (
       <View className="mb-sm w-full items-start">
@@ -725,30 +702,23 @@ function IncomingBubble({
           {/* Intro text */}
           {message.text ? (
             <View
-              style={[
-                {
-                  backgroundColor: "#dee4e1",
-                  borderRadius: 20,
-                  borderBottomLeftRadius: 4,
-                  paddingHorizontal: 16,
-                  paddingVertical: 10,
-                  marginBottom: 6,
-                },
-                incomingBubbleShadow,
-              ]}
+              style={{
+                backgroundColor: "#dee4e1",
+                borderRadius: 20,
+                borderBottomLeftRadius: 4,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                marginBottom: 6,
+              }}
             >
-              <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>
-                {message.text}
-              </Text>
+              <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
             </View>
           ) : null}
 
           {/* Vitals card */}
           <VitalsCard vitals={message.vitals} />
 
-          <Text
-            style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}
-          >
+          <Text style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}>
             {message.timestamp} · {contactName}
           </Text>
         </View>
@@ -760,26 +730,19 @@ function IncomingBubble({
     <View className="mb-xs w-full items-start">
       <View style={{ maxWidth: "80%" }}>
         <View
-          style={[
-            {
-              backgroundColor: "#dee4e1",
-              borderRadius: 20,
-              borderBottomLeftRadius: 4,
-              paddingHorizontal: 16,
-              paddingVertical: 10,
-            },
-            incomingBubbleShadow,
-          ]}
+          style={{
+            backgroundColor: "#dee4e1",
+            borderRadius: 20,
+            borderBottomLeftRadius: 4,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+          }}
         >
           {message.text ? (
-            <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>
-              {message.text}
-            </Text>
+            <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
           ) : null}
         </View>
-        <Text
-          style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}
-        >
+        <Text style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}>
           {message.timestamp}
         </Text>
       </View>
@@ -791,99 +754,73 @@ function IncomingBubble({
 // Vitals card — rendered inside an incoming bubble
 // ---------------------------------------------------------------------------
 
-function VitalsCard({
-  vitals,
-}: {
-  vitals: NonNullable<ChatMessage["vitals"]>;
-}) {
+function VitalsCard({ vitals }: { vitals: NonNullable<ChatMessage["vitals"]> }) {
+  // RN has no currentColor, so the header glyph needs a real string — by TOKEN
+  // NAME, replacing `rgba(255,255,255,0.8)`, which stayed white-on-light-teal in
+  // dark mode where `on-primary` correctly becomes dark.
+  const onPrimary = useTokenColor("on-primary");
+
   return (
     <View
-      style={[
-        {
-          backgroundColor: "#00685f",
-          borderRadius: 20,
-          borderBottomLeftRadius: 4,
-          padding: 16,
-          gap: 12,
-        },
-        outgoingBubbleShadow,
-      ]}
+      // Was `backgroundColor: "#00685f"` — the LIGHT value of color/primary,
+      // frozen in JS, so the panel stayed dark teal in dark mode. `bg-primary`
+      // and the `text-on-primary` pairs below flip with the mode as BRAND
+      // requires ("Text on an accent must use its `on-*` pair").
+      // radius 20 -> 24, and the note box's 10 -> 12: BRAND's radius scale is
+      // 4/12/24/full and had neither 20 nor 10 on it.
+      className="rounded-card rounded-bl-xs bg-primary p-4"
+      style={{ gap: 12 }}
     >
-      {/* Header */}
+      {/* Header. Glyph was 18 (off BRAND's 24/20 ramp) at
+          `rgba(255,255,255,0.8)`; now 20 at `on-primary` with the opacity
+          carried by the token class so it inverts correctly. */}
       <View className="flex-row items-center gap-xs">
-        <MaterialIcons name="monitor-heart" size={18} color="rgba(255,255,255,0.8)" />
-        <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 12, fontWeight: "600" }}>
-          VITALS SUMMARY
+        <Icon name="heart-rate" size={20} color={onPrimary} />
+        <Text className="font-label-sm text-label-sm uppercase text-on-primary/80">
+          Vitals summary
         </Text>
       </View>
 
-      {/* 2-col stat grid */}
+      {/* 2-up stat grid — now the shared VitalStatCard (Figma 211:241).
+          Deletes the local `VitalStat`, which was one of the six private copies
+          the component was extracted to end: it drew the value at 18px/700 (the
+          ramp has no 18 step; 211:247 is `headline-lg` 24) and the label at
+          11px, BELOW BRAND's 12sp floor, and carried seven literals.
+
+          FLAGGED — the one thing the shared component cannot express here:
+          211:241 / VitalStatCard binds its fill to the `card-surface` ROLE and
+          exposes no `className`/`style`, deliberately, so a screen cannot
+          express a private variant of a clinical reading. The local copy was a
+          TRANSLUCENT WHITE tile ON an accent surface. So the two readings now
+          render as normal cards inside the teal panel instead of as
+          white-on-teal washes. That is a deliberate VISUAL CHANGE to this
+          message, and it needs a designer call: either 211:241 gains an
+          `OnAccent` tone, or this message stops being teal and becomes a normal
+          incoming bubble. It was NOT resolved with a one-off style prop, which
+          would re-admit the drift the extraction removed. */}
       <View className="flex-row gap-sm">
-        <VitalStat
-          label="Blood Pressure"
-          value={vitals.bp}
-          trend={vitals.bpTrend}
-          icon="favorite"
-        />
-        <VitalStat
-          label="Heart Rate"
-          value={vitals.hr}
-          trend={vitals.hrTrend}
-          icon="monitor-heart"
-        />
+        <View className="flex-1">
+          <VitalStatCard
+            label="Blood Pressure"
+            value={vitals.bp}
+            icon="blood-pressure"
+            trend={TREND_TO_TOKEN[vitals.bpTrend]}
+          />
+        </View>
+        <View className="flex-1">
+          <VitalStatCard
+            label="Heart Rate"
+            value={vitals.hr}
+            icon="heart-rate"
+            trend={TREND_TO_TOKEN[vitals.hrTrend]}
+          />
+        </View>
       </View>
 
       {/* Note */}
-      <View
-        style={{
-          backgroundColor: "rgba(255,255,255,0.12)",
-          borderRadius: 10,
-          padding: 10,
-          borderWidth: 1,
-          borderColor: "rgba(255,255,255,0.15)",
-        }}
-      >
-        <Text style={{ color: "rgba(255,255,255,0.9)", fontSize: 12, lineHeight: 18 }}>
-          {vitals.note}
-        </Text>
+      <View className="rounded-md border border-on-primary/15 bg-on-primary/10 p-3">
+        <Text className="font-label-sm text-label-sm text-on-primary/90">{vitals.note}</Text>
       </View>
-    </View>
-  );
-}
-
-function VitalStat({
-  label,
-  value,
-  trend,
-  icon,
-}: {
-  label: string;
-  value: string;
-  trend: "up" | "down" | "stable";
-  icon: IconName;
-}) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: "rgba(255,255,255,0.15)",
-        borderRadius: 12,
-        padding: 12,
-        gap: 6,
-      }}
-    >
-      <View className="flex-row items-center justify-between">
-        <MaterialIcons name={icon} size={16} color="rgba(255,255,255,0.7)" />
-        <MaterialIcons
-          name={TREND_ICONS[trend]}
-          size={14}
-          color="rgba(255,255,255,0.6)"
-        />
-      </View>
-      <Text style={{ color: "#ffffff", fontSize: 18, fontWeight: "700" }}>
-        {value}
-      </Text>
-      <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>{label}</Text>
     </View>
   );
 }
@@ -895,10 +832,7 @@ function VitalStat({
 function TimelineDivider({ label }: { label: string }) {
   return (
     <View className="my-sm flex-row items-center gap-sm">
-      <View
-        className="h-px flex-1 bg-surface-container-highest"
-        style={{ opacity: 0.7 }}
-      />
+      <View className="h-px flex-1 bg-surface-container-highest" style={{ opacity: 0.7 }} />
       <Text
         style={{
           fontSize: 11,
@@ -911,86 +845,39 @@ function TimelineDivider({ label }: { label: string }) {
       >
         {label}
       </Text>
-      <View
-        className="h-px flex-1 bg-surface-container-highest"
-        style={{ opacity: 0.7 }}
-      />
+      <View className="h-px flex-1 bg-surface-container-highest" style={{ opacity: 0.7 }} />
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Shadows — Platform.select pattern used across all screens.
+// Elevation
+//
+// Six `Platform.select` shadow tables used to live here. Five are GONE — not
+// softened — because docs/BRAND.md §Elevation only grants a shadow to a surface
+// that GENUINELY floats, and none of these did:
+//
+//   appBarShadow          deleted in an earlier pass with the hand-rolled bar;
+//                         DetailAppBar (Figma 193:120) has no effects.
+//   inputBarShadow        a docked BAR. Bars cast no shadow either. Separation
+//                         is its top hairline, now at full strength.
+//   outgoingBubbleShadow  message bubbles (x3 call sites, incl. the vitals
+//                         panel). A bubble is a content surface — the CARD role
+//                         — and a card casts no shadow.
+//   incomingBubbleShadow  same, x2. Its `#475569` grey was also off-palette
+//                         entirely: BRAND allows only the `shadow` token, "never
+//                         grey".
+//
+// What SURVIVES is `FLOATING_SHADOW` below, shared by the two surfaces that are
+// genuinely floating roles under BRAND — the clinical-actions MENU and the FAB.
+// It is a token spec, not a table of literals: the old pair were a 20px black at
+// 15% and a 12px teal at 40%, both far outside BRAND's "<=8%, tinted with the
+// `shadow` token" ceiling.
 // ---------------------------------------------------------------------------
 
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const inputBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: -2 },
-    },
-    web: { boxShadow: "0px -2px 8px rgba(0, 0, 0, 0.05)" },
-    android: { elevation: 4 },
-  }) || {};
-
-const outgoingBubbleShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.18,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 3 },
-    },
-    web: { boxShadow: "0px 3px 8px rgba(0, 104, 95, 0.18)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const incomingBubbleShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.06,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 6px rgba(71, 85, 105, 0.06)" },
-    android: { elevation: 1 },
-  }) || {};
-
-const fabShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.4,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 5 },
-    },
-    web: { boxShadow: "0px 5px 12px rgba(0, 104, 95, 0.4)" },
-    android: { elevation: 8 },
-  }) || {};
-
-const clinicalMenuShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.15,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 8 },
-    },
-    web: { boxShadow: "0px 8px 20px rgba(0, 0, 0, 0.15)" },
-    android: { elevation: 12 },
-  }) || {};
+/**
+ * BRAND's sanctioned `elevation/floating` spec — "a tight `0 1px 2px` /
+ * `0 2px 6px` pair at <=8%, tinted with the `shadow` token, never grey". RN
+ * takes a single shadow, so this is the outer half of the pair.
+ */
+const FLOATING_SHADOW = { y: 2, blur: 6, opacity: 0.08 } as const;
