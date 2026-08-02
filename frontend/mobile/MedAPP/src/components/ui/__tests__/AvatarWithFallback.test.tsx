@@ -8,7 +8,7 @@
 // this product's market — is a grey box.
 
 import { Image } from "react-native";
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { tokenColor } from "@/lib/tokens";
 
 const mockScheme = { value: "light" as "light" | "dark" };
@@ -61,5 +61,45 @@ describe("AvatarWithFallback — the `neutral` tone (780:5363)", () => {
     const dark = screen.UNSAFE_getAllByType(Icon)[0].props.color;
     expect(dark).toBe(tokenColor("on-surface-variant", "dark"));
     expect(dark).not.toBe(tokenColor("on-surface-variant", "light"));
+  });
+});
+
+describe("AvatarWithFallback — a URI that exists but does not load", () => {
+  // The gap this closes: the component branched on `uri` being truthy, so a
+  // URL that merely EXISTS beat the fallback chain. A dead link therefore
+  // rendered an empty circle — precisely the "broken image, not a placeholder"
+  // outcome BRAND names — and it is the COMMON path here, because doctor
+  // profiles routinely carry a photo_url pointing at a host that never
+  // resolves. Caught by putting real seeded data on the appointments screen and
+  // looking at it: two clinicians, two blank holes.
+  it("falls through to initials once the image reports an error", () => {
+    render(
+      <AvatarWithFallback
+        uri="https://images.medapp.dev/doctors/does-not-resolve.jpg"
+        initials="KO"
+        label="Dr. Kwabena Osei"
+        size={56}
+      />,
+    );
+
+    expect(screen.queryByText("KO")).toBeNull();
+    fireEvent(screen.UNSAFE_getByType(Image), "error");
+    expect(screen.getByText("KO")).toBeTruthy();
+  });
+
+  it("retries for a new person rather than inheriting the last one's failure", () => {
+    // List rows recycle. Without the reset, one broken photo would suppress
+    // every subsequent avatar in the same slot.
+    const { rerender } = render(
+      <AvatarWithFallback uri="https://bad.test/a.jpg" initials="AA" label="A" size={56} />,
+    );
+    fireEvent(screen.UNSAFE_getByType(Image), "error");
+    expect(screen.getByText("AA")).toBeTruthy();
+
+    rerender(
+      <AvatarWithFallback uri="https://good.test/b.jpg" initials="BB" label="B" size={56} />,
+    );
+    expect(screen.queryByText("BB")).toBeNull();
+    expect(screen.UNSAFE_getByType(Image)).toBeTruthy();
   });
 });

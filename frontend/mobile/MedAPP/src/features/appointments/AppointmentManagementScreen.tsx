@@ -47,21 +47,46 @@
 //
 // Translation rules:
 //   - tabs (Upcoming | Past) → segmented control with bottom underline.
-//   - status pills (Confirmed / In Review / Completed) → inline-coloured pills.
+//   - status pills → inline-coloured pills.
 //   - Past tab uses muted/grayscale cards with "View Summary" CTA.
 //   - location_on → location-on. calendar_today → calendar-today.
-//   - Seed data with two upcoming + two past appointments. Replace with
-//     useQuery(["appointments"]) once GET /v1/appointments ships.
+//
+// ============================================================================
+// LIVE DATA (2026-08-02)
+// ============================================================================
+// This screen rendered two hardcoded arrays and issued no network request at
+// all, under a note promising `useQuery(["appointments"])` "once
+// GET /v1/appointments ships". **That endpoint does not exist and is not
+// coming.** The gateway routes `/v1/bookings` to booking_service, which is
+// where a booking made in this app actually lands — so a patient could finish
+// the booking flow, get a 201, come here, and see two invented appointments
+// with someone else's name on them.
+//
+// It now reads `GET /v1/bookings` through `features/appointments/api.ts`.
+// Three things the wire cannot give us, all handled by showing less rather
+// than inventing more, and all logged in docs/PIPELINE.md §5:
+//
+//   - **"In Review" is gone.** `BookingStatus` is `booked | cancelled`; no
+//     pending state exists to map onto. Completed is derived from the clock.
+//   - **Facility is hidden.** `BookingOut` has no facility and the doctor
+//     profile has no practice address.
+//   - **Consultation type is whatever `reason` holds.** The mode and type the
+//     user picks are dropped by `BookingCreate`, so the server does not know
+//     what kind of appointment this was.
+//
+// Cancelled bookings appear under Past, labelled as cancelled — not silently
+// dropped, and never relabelled "Completed", which on a medical record would
+// assert attendance that did not happen.
 
 import { useState } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
+import { appointmentsApi, type Appointment } from "@/features/appointments/api";
 import { DetailShell } from "@/components/shell";
-import { Button, Icon } from "@/components/ui";
+import { AvatarWithFallback, Button, Icon } from "@/components/ui";
 import { blendTokens, useTokenColor } from "@/lib/tokens";
 import { useResolvedScheme } from "@/lib/theme";
-
-type AppointmentStatus = "confirmed" | "in_review" | "completed";
 
 interface UpcomingAppointment {
   id: string;
@@ -69,7 +94,7 @@ interface UpcomingAppointment {
   specialty: string;
   facility: string;
   avatarUri: string;
-  status: Exclude<AppointmentStatus, "completed">;
+  status: "confirmed";
   dateLabel: string; // "Tuesday, Oct 24 • 10:30 AM"
   consultationType: string;
 }
@@ -83,50 +108,74 @@ interface PastAppointment {
 }
 
 // ---------------------------------------------------------------------------
-// Seed data
+// Wire -> card
 // ---------------------------------------------------------------------------
 
-const UPCOMING_APPOINTMENTS: UpcomingAppointment[] = [
-  {
-    id: "u1",
-    doctorName: "Dr. Julian Sterling",
-    specialty: "Senior Cardiologist",
-    facility: "Mayo Clinic",
-    avatarUri:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAiCdPvTk5RydHAjrMHk72Eu7sJRi3EI57s2zitwSnJw6fR-Ha-75XWdA2MjoxR9CgW1wk4Y8yWmBM9J3gwdHmLwACfEvc95ECOnqZEK6DpOt3Oo7QykCYlrP8rJJWJufV5bAB3vX_s7TNJHzOGgSULtrFO6uXN_V3vctBselslwyizvCrqX9Nt3f-WdJe5uLMji_TUyIxJIg3P9U5o7jTAfkBlf9jQB3IC9HNo2nT-65KTN6CRo5NF1wubrcTf-0jyGZE5avuAlAfI",
-    status: "confirmed",
-    dateLabel: "Tuesday, Oct 24 • 10:30 AM",
-    consultationType: "Standard Consultation",
-  },
-  {
-    id: "u2",
-    doctorName: "Dr. Sarah Chen",
-    specialty: "Neurologist",
-    facility: "City General Hospital",
-    avatarUri:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDl7Ao6Zlxrvg6hZCBJTCl40sfWi4jza2v_8V2IvenJxJRKcNiS5oSwi_3sak71g9LTAwWORqC63YbXcdPYebOLPq7sqLDZ3gK1ge88lmh8urol79cqtLcvqFW2FQgsaVKt3XZVUdomuZCytDil2ZqoQVZ1cY5BIkgZlao0j2WEiUZ42sDIx2QIJ6DWDYMaJG6IN22BOtX0PgVgM2tMFIe3uJHq2nh9Maeqz2xK3p5gtus1s64KG66RTL6zJ_k4rxovmczrWcxNaiqo",
-    status: "in_review",
-    dateLabel: "Thursday, Oct 26 • 02:15 PM",
-    consultationType: "Follow-up Visit",
-  },
-];
+/**
+ * `Tuesday, Oct 24 • 10:30 AM`, in the device's own locale and zone.
+ *
+ * The server stores an instant; a patient reads a wall clock. Formatting on
+ * the device is the only way "10:30 AM" means the time they will turn up.
+ */
+function formatWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const day = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day} • ${time}`;
+}
 
-const PAST_APPOINTMENTS: PastAppointment[] = [
-  {
-    id: "p1",
-    doctorName: "Dr. Aris Thorne",
-    specialty: "Physiotherapist",
-    facility: "Wellness Hub",
-    completedLabel: "Completed on Monday, Sep 12 • 09:00 AM",
-  },
-  {
-    id: "p2",
-    doctorName: "Dr. Emily Watts",
-    specialty: "General Practitioner",
-    facility: "Mayo Clinic",
-    completedLabel: "Completed on Friday, Aug 28 • 11:30 AM",
-  },
-];
+/**
+ * The clinician's name, or an honest stand-in.
+ *
+ * `hydrate` leaves `doctor` null when doctor_service could not resolve the id.
+ * "Unknown clinician" is deliberate: an appointment the patient genuinely has
+ * should still be visible with its time intact, and a blank name is more
+ * truthful than borrowing one from somewhere else.
+ */
+function doctorName(a: Appointment): string {
+  return a.doctor?.name ?? "Unknown clinician";
+}
+
+/**
+ * "Dr. Kwabena Osei" -> "KO". The honorific is dropped so every clinician does
+ * not initial as "D".
+ */
+function initialsOf(name: string): string {
+  const words = name.replace(/^Dr\.?\s+/i, "").split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
+
+function toUpcoming(a: Appointment): UpcomingAppointment {
+  return {
+    id: a.id,
+    doctorName: doctorName(a),
+    specialty: a.doctor?.specialty ?? "",
+    // BookingOut carries no facility, and doctor_service has no practice
+    // address on the profile. The row is hidden rather than filled with the
+    // clinic name the mock used to assert. Logged in PIPELINE §5.
+    facility: "",
+    avatarUri: a.doctor?.avatarUri ?? "",
+    status: "confirmed",
+    dateLabel: formatWhen(a.startsAtIso),
+    // The mode/type the user picked are dropped by `BookingCreate`, so the
+    // server cannot tell us what this consultation was. `reason` is the only
+    // free text that survives the round trip.
+    consultationType: a.reason ?? "",
+  };
+}
+
+function toPast(a: Appointment): PastAppointment {
+  const when = formatWhen(a.startsAtIso);
+  return {
+    id: a.id,
+    doctorName: doctorName(a),
+    specialty: a.doctor?.specialty ?? "",
+    facility: "",
+    completedLabel:
+      a.status === "cancelled" ? `Cancelled — was ${when}` : `Completed on ${when}`,
+  };
+}
 
 /**
  * Status chip tones, taken from the design system's own status vocabulary
@@ -164,11 +213,12 @@ const STATUS_STYLES: Record<
     text: "text-primary",
     label: "Confirmed",
   },
-  in_review: {
-    bg: "bg-tertiary/10",
-    text: "text-tertiary",
-    label: "In Review",
-  },
+  // "In Review" is gone, not restyled. `BookingStatus` is `booked | cancelled`;
+  // nothing in booking_service can produce a pending state, so the pill could
+  // only ever have been decoration. Keeping it would have meant picking some
+  // client-side proxy for "under review" and presenting a guess as a fact about
+  // the patient's care. The gap is logged in docs/PIPELINE.md §5 — if the
+  // backend adds the state, the tone that was here is `tertiary`.
 };
 
 // ---------------------------------------------------------------------------
@@ -177,6 +227,23 @@ const STATUS_STYLES: Record<
 
 export function AppointmentManagementScreen() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
+
+  // `GET /v1/bookings`, scoped to the bearer token. This screen rendered two
+  // hardcoded arrays until now, so a booking made in the app was invisible the
+  // moment the user landed here.
+  const { data, isPending, isError, error, refetch, isRefetching } = useQuery({
+    queryKey: ["appointments"],
+    queryFn: () => appointmentsApi.listAppointments(),
+  });
+
+  const upcoming = (data?.upcoming ?? []).map(toUpcoming);
+  const past = (data?.past ?? []).map(toPast);
+  const rows = tab === "upcoming" ? upcoming : past;
+
+  // Resolved in JS because RN has no `currentColor` for a glyph or a spinner.
+  const spinner = useTokenColor("primary");
+  const dangerGlyph = useTokenColor("error");
+  const mutedGlyph = useTokenColor("on-surface-variant");
 
   return (
     /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
@@ -292,15 +359,86 @@ export function AppointmentManagementScreen() {
           />
         </View>
 
-        {/* List */}
+        {/* List.
+
+            The three async states are inline rather than shared components:
+            `EmptyState 517:1773` and `ErrorPanel 517:2111` are approved in
+            Figma and have no code counterpart yet. Building both here would
+            make this screen their unreviewed first draft. Logged in
+            docs/PIPELINE.md §5; when they land, these three blocks collapse
+            into instances. */}
         <View className="gap-md">
-          {tab === "upcoming"
-            ? UPCOMING_APPOINTMENTS.map((a) => (
-                <UpcomingCard key={a.id} appointment={a} />
-              ))
-            : PAST_APPOINTMENTS.map((a) => (
-                <PastCard key={a.id} appointment={a} />
-              ))}
+          {isPending ? (
+            <View
+              accessibilityRole="progressbar"
+              accessibilityLabel="Loading your appointments"
+              className="items-center gap-sm py-2xl"
+            >
+              <ActivityIndicator color={spinner} />
+              <Text className="text-on-surface-variant" style={{ fontSize: 14 }}>
+                Loading your appointments…
+              </Text>
+            </View>
+          ) : isError ? (
+            <View className="items-center gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
+              <Icon chrome="error-outline" size={24} color={dangerGlyph} />
+              <Text
+                className="text-center text-on-surface"
+                style={{ fontSize: 15, fontWeight: "600" }}
+              >
+                We couldn&rsquo;t load your appointments
+              </Text>
+              {/* The message, not just "something went wrong": a patient who
+                  can tell an offline phone from a server fault knows whether
+                  retrying is worth anything. */}
+              <Text
+                className="text-center text-on-surface-variant"
+                style={{ fontSize: 13 }}
+              >
+                {error instanceof Error && error.message
+                  ? error.message
+                  : "Check your connection and try again."}
+              </Text>
+              <Button
+                label={isRefetching ? "Retrying…" : "Try again"}
+                variant="secondary"
+                onPress={() => void refetch()}
+                disabled={isRefetching}
+                accessibilityLabel="Retry loading appointments"
+              />
+            </View>
+          ) : rows.length === 0 ? (
+            <View className="items-center gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
+              <Icon chrome="calendar-today" size={24} color={mutedGlyph} />
+              <Text
+                className="text-center text-on-surface"
+                style={{ fontSize: 15, fontWeight: "600" }}
+              >
+                {tab === "upcoming" ? "No upcoming appointments" : "No past appointments"}
+              </Text>
+              <Text
+                className="text-center text-on-surface-variant"
+                style={{ fontSize: 13 }}
+              >
+                {tab === "upcoming"
+                  ? "When you book with a clinician, it will appear here."
+                  : "Appointments you have attended will be listed here."}
+              </Text>
+              {/* Only on Upcoming: offering "Book" under the history tab
+                  answers a question the user did not ask. */}
+              {tab === "upcoming" ? (
+                <Button
+                  label="Find a clinician"
+                  variant="primary"
+                  onPress={() => router.push("/(app)/find-care" as never)}
+                />
+              ) : null}
+            </View>
+          ) : tab === "upcoming" ? (
+            upcoming.map((a) => <UpcomingCard key={a.id} appointment={a} />)
+          ) : (
+            past.map((a) => <PastCard key={a.id} appointment={a} />)
+          )}
         </View>
       </ScrollView>
       {/* No bottom nav — DetailShell has no prop for one, structurally, and
@@ -399,10 +537,17 @@ function UpcomingCard({
       {/* Header row */}
       <View className="mb-md flex-row items-start justify-between gap-sm">
         <View className="flex-1 flex-row items-center gap-md">
-          <Image
-            source={{ uri: appointment.avatarUri }}
-            style={{ width: 56, height: 56, borderRadius: 12 }}
-            accessibilityLabel={appointment.doctorName}
+          {/* `AvatarWithFallback`, not a raw `<Image>`. The photo_url on a
+              doctor profile routinely does not resolve — the seeded ones point
+              at a host that does not exist — and a dead <Image> renders as a
+              56px hole with the name floating beside it, which reads as a
+              broken screen rather than a doctor with no photo. The fallback
+              chain (image -> initials -> silhouette) is exactly this case. */}
+          <AvatarWithFallback
+            uri={appointment.avatarUri || null}
+            initials={initialsOf(appointment.doctorName)}
+            label={appointment.doctorName}
+            size={56}
           />
           <View className="flex-1">
             <Text
@@ -412,29 +557,37 @@ function UpcomingCard({
             >
               {appointment.doctorName}
             </Text>
-            <Text
-              className="text-primary mt-xs"
-              style={{
-                fontSize: 10,
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: 0.6,
-              }}
-              numberOfLines={1}
-            >
-              {appointment.specialty}
-            </Text>
-            <View className="mt-xs flex-row items-center gap-xs">
-              {/* Decorative — the facility name is right beside it. */}
-              <Icon chrome="location-on" size={14} color={mutedGlyph} />
+            {appointment.specialty ? (
               <Text
-                className="text-on-surface-variant"
-                style={{ fontSize: 12 }}
+                className="text-primary mt-xs"
+                style={{
+                  fontSize: 10,
+                  fontWeight: "700",
+                  textTransform: "uppercase",
+                  letterSpacing: 0.6,
+                }}
                 numberOfLines={1}
               >
-                {appointment.facility}
+                {appointment.specialty}
               </Text>
-            </View>
+            ) : null}
+            {/* Hidden when unknown. `BookingOut` has no facility and the doctor
+                profile has no practice address, so this row is empty for every
+                real appointment today — and a location pin with nothing beside
+                it reads as a failed load rather than an absent fact. */}
+            {appointment.facility ? (
+              <View className="mt-xs flex-row items-center gap-xs">
+                {/* Decorative — the facility name is right beside it. */}
+                <Icon chrome="location-on" size={14} color={mutedGlyph} />
+                <Text
+                  className="text-on-surface-variant"
+                  style={{ fontSize: 12 }}
+                  numberOfLines={1}
+                >
+                  {appointment.facility}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 

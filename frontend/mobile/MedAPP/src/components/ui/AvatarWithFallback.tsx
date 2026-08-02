@@ -21,6 +21,7 @@
 //     Icons has no generic person glyph (see the registry), and a clinical glyph
 //     like `health-worker` would assert a role this component can't know.
 
+import { useEffect, useState } from "react";
 import { Image, Text, View, type ViewProps } from "react-native";
 import { cn } from "@/lib/cn";
 import { useResolvedScheme } from "@/lib/theme";
@@ -96,10 +97,15 @@ export function AvatarWithFallback({
   // Resolved before the `uri` branch returns: hooks can't sit after an early
   // return, and the scheme is needed by both fallbacks.
   const { scheme } = useResolvedScheme();
+  // Reset on a new `uri` so a recycled row (a list re-render with a different
+  // person) does not inherit the previous one's failure and skip a photo that
+  // would have loaded.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [uri]);
   const fg = tokenColor(t.fg, scheme);
   const dimension = { height: size, width: size, borderRadius: size / 2 };
 
-  if (uri) {
+  if (uri && !failed) {
     return (
       <View
         className={cn("overflow-hidden", className)}
@@ -108,7 +114,18 @@ export function AvatarWithFallback({
         accessibilityLabel={label}
         {...rest}
       >
-        <Image source={{ uri }} className="h-full w-full" resizeMode="cover" />
+        {/* `onError` is what makes this component's name true. Branching on
+            `uri` alone meant a URL that merely EXISTS won the fallback chain,
+            so a dead link rendered a blank hole with the name floating beside
+            it — a broken screen rather than a person with no photo. Doctor
+            profiles routinely carry a photo_url that does not resolve, so this
+            is the common path, not the edge. */}
+        <Image
+          source={{ uri }}
+          className="h-full w-full"
+          resizeMode="cover"
+          onError={() => setFailed(true)}
+        />
       </View>
     );
   }

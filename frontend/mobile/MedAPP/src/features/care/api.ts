@@ -303,4 +303,38 @@ export const careApi = {
     const wire = await client.get<PaginatedWire<PharmacistWire>>(`/v1/pharmacists${qs}`);
     return wire.items.map(adaptPharmacist);
   },
+
+  /**
+   * One doctor by id — `GET /v1/doctors/{doctor_id}` -> `DoctorProfileOut`.
+   *
+   * The list endpoints above return only `is_listable` doctors, so they are the
+   * wrong way to resolve a doctor you already hold an id for: a clinician can
+   * be unlisted (retired, on leave, private) and still be the one a patient has
+   * an existing booking with. Anything hydrating a stored `doctor_id` — the
+   * appointments list, a booking receipt — must come through here.
+   */
+  async getDoctor(doctorId: string): Promise<DoctorSummary> {
+    const d = await client.get<DoctorWire>(`/v1/doctors/${doctorId}`);
+    return {
+      doctorId: d.doctor_id,
+      // The wire has no title; "Dr." is the app's own presentation, applied in
+      // exactly one place so it cannot drift between screens.
+      name: `Dr. ${d.first_name} ${d.last_name}`.trim(),
+      specialty: d.specialty ? titleCase(d.specialty) : null,
+      avatarUri: d.photo_url ?? PLACEHOLDER_AVATAR,
+    };
+  },
 };
+
+/**
+ * The subset of a doctor other features need to render a reference to one.
+ * Deliberately not `PersonEntry`: that type carries directory-only concerns
+ * (badges, distance, availability tone) which mean nothing on an appointment
+ * card and would invite a screen to render a stale "Available now".
+ */
+export interface DoctorSummary {
+  doctorId: string;
+  name: string;
+  specialty: string | null;
+  avatarUri: string;
+}
