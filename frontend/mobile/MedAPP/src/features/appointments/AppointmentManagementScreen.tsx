@@ -209,8 +209,18 @@ const STATUS_STYLES: Record<
   { bg: string; text: string; label: string }
 > = {
   confirmed: {
-    bg: "bg-primary/10",
-    text: "text-primary",
+    // Figma 550:2613 fills this badge with `success-container`. The frame pairs
+    // it with `on-surface-variant`; the code uses `on-success-container`, which
+    // is that container's OWN content pair and the rule this codebase applies
+    // everywhere else — a container's label must be its `on-` token or the two
+    // stop flipping together. Visually identical (dark green on pale green),
+    // and noted in PIPELINE §5 so the frame can be corrected rather than the
+    // deviation forgotten.
+    //
+    // It was `primary/10` + `primary`, which read as brand accent rather than
+    // "this is confirmed" — the same teal as every other affordance on the card.
+    bg: "bg-success-container",
+    text: "text-on-success-container",
     label: "Confirmed",
   },
   // "In Review" is gone, not restyled. `BookingStatus` is `booked | cancelled`;
@@ -514,6 +524,7 @@ function UpcomingCard({
   // (src/lib/tokens.ts) instead of carrying a hex.
   const mutedGlyph = useTokenColor("on-surface-variant");
   const accent = useTokenColor("primary");
+  const neutralLabel = useTokenColor("on-surface");
   const danger = useTokenColor("error");
   // The pressed wash is the same accent at the same 8% the literals used, so
   // the press feels identical — it just composites over whichever card surface
@@ -533,9 +544,9 @@ function UpcomingCard({
     // list — half-migrating them would trade one inconsistency for a worse,
     // more local one. Both should move to `Card` together, along with this
     // screen's ~30 literal hexes, as one job.
-    <View className="rounded-xl border border-outline-variant bg-surface-container-lowest p-md">
+    <View className="rounded-xl border border-outline-variant bg-card-surface p-md">
       {/* Header row */}
-      <View className="mb-md flex-row items-start justify-between gap-sm">
+      <View className="mb-md flex-row items-start gap-sm">
         <View className="flex-1 flex-row items-center gap-md">
           {/* `AvatarWithFallback`, not a raw `<Image>`. The photo_url on a
               doctor profile routinely does not resolve — the seeded ones point
@@ -548,11 +559,12 @@ function UpcomingCard({
             initials={initialsOf(appointment.doctorName)}
             label={appointment.doctorName}
             size={56}
+            tone="tint"
           />
           <View className="flex-1">
             <Text
               className="text-on-surface"
-              style={{ fontSize: 15, fontWeight: "600" }}
+              style={{ fontSize: 20, fontWeight: "600" }}
               numberOfLines={1}
             >
               {appointment.doctorName}
@@ -560,12 +572,11 @@ function UpcomingCard({
             {appointment.specialty ? (
               <Text
                 className="text-primary mt-xs"
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.6,
-                }}
+                // 14px title case, per the frame. It was 10px uppercase with
+                // letterspacing — an eyebrow treatment, which made a clinician's
+                // specialty shout ("GENERAL PRACTICE") where the design reads it
+                // as a quiet subtitle. 10px also sat under BRAND's 12sp floor.
+                style={{ fontSize: 14, fontWeight: "600" }}
                 numberOfLines={1}
               >
                 {appointment.specialty}
@@ -591,8 +602,15 @@ function UpcomingCard({
           </View>
         </View>
 
-        {/* Status pill — tone table above; both halves are classes now, so the
-            tint and its label flip together instead of one of them freezing. */}
+      </View>
+
+      {/* Status row.
+
+          The pill used to share the identity row, which capped the name's
+          width — at the frame's 20px a real clinician's name truncated to
+          "Dr. Kwaben…". Figma 550:2613 puts it on its own row for exactly that
+          reason, so the name gets the full card width. */}
+      <View className="mb-md flex-row items-center gap-xs">
         <View
           className={statusStyle.bg}
           style={{
@@ -604,13 +622,20 @@ function UpcomingCard({
           <Text
             className={statusStyle.text}
             style={{
-              fontSize: 11,
-              fontWeight: "700",
+              // 12, the ramp's floor. It was 11 — under BRAND's minimum, on the
+              // one label that states whether the appointment is happening.
+              fontSize: 12,
+              fontWeight: "600",
             }}
           >
             {statusStyle.label}
           </Text>
         </View>
+        {/* The frame also carries a modality badge here ("In person" / "Video
+            call"). It is NOT built: `BookingCreate` drops the mode the user
+            picks, so the server cannot say which this is, and a badge that
+            guesses would be worse than none. Logged in PIPELINE §5 as a backend
+            request. */}
       </View>
 
       {/* Date/Time strip */}
@@ -629,7 +654,7 @@ function UpcomingCard({
           <Text
             className="text-on-surface-variant mt-xs"
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: "700",
               textTransform: "uppercase",
               letterSpacing: 0.6,
@@ -668,7 +693,11 @@ function UpcomingCard({
             alignItems: "center",
           })}
         >
-          <Text style={{ color: accent, fontSize: 14, fontWeight: "600" }}>
+          {/* `on-surface`, not the accent. The frame gives Reschedule a
+              neutral label inside an `outline-variant` border: it is the
+              secondary of the two actions, and painting it brand-teal made it
+              compete with Cancel's error red for the eye. */}
+          <Text style={{ color: neutralLabel, fontSize: 14, fontWeight: "600" }}>
             Reschedule
           </Text>
         </Pressable>

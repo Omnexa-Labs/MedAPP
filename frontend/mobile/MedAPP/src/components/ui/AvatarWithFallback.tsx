@@ -28,7 +28,7 @@ import { useResolvedScheme } from "@/lib/theme";
 import { tokenColor, type ColorToken } from "@/lib/tokens";
 import { Icon } from "./icons/Icon";
 
-export type AvatarTone = "primary" | "secondary" | "tertiary" | "neutral";
+export type AvatarTone = "primary" | "secondary" | "tertiary" | "neutral" | "tint";
 
 interface Props extends ViewProps {
   uri?: string | null;
@@ -81,6 +81,17 @@ const TONE: Record<AvatarTone, { bg: string; fg: ColorToken }> = {
    * the plate still flip together per mode.
    */
   neutral: { bg: "bg-surface-container-high", fg: "on-surface-variant" },
+  /**
+   * The appointment card's avatar (Figma `550:2613`): a `primary-tint` plate
+   * with `on-surface-variant` initials.
+   *
+   * Distinct from `neutral` because the plate is deliberately tinted toward the
+   * brand rather than grey, and distinct from `primary` because `primary` is a
+   * SOLID accent fill — using it here painted a dark teal disc where the frame
+   * draws a pale mint one, which is what made the built screen and its frame
+   * look like different designs.
+   */
+  tint: { bg: "bg-primary-tint", fg: "on-surface-variant" },
 };
 
 export function AvatarWithFallback({
