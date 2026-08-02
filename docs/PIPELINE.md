@@ -682,6 +682,202 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   moment navigation changes, so re-derive it rather than patching it. **For the code side, items 1–3
   above are the real backlog** and item 1 should not wait for a design round.
 
+- 2026-08-02 — Claude — **`patient_home_active_care_focus` `93:102` caught up to the shipped
+  booking-funnel fix.** The Quick Services strip is now **two rows of three**, with a sixth tile
+  **Find Care** routing to `/(app)/find-care`. Nodes: new `Quick Services Grid` `915:9769`
+  (VERTICAL, gap → `spacing/24`) wrapping `Quick Services Row 1` `93:153` (renamed) and new
+  `Quick Services Row 2` `915:9770` (gap → `spacing/8`); new tile `Quick Service Tile - Find Care`
+  `915:9762`, a clone of the Appointments tile so plate, glyph size, tone and label treatment are
+  the same nodes, not a redraw. All six tiles are `FILL`. New shared glyph
+  **`icon/person-search` `915:9737`** appended to `Icons 24 — shared` `517:2096` on the Design
+  System page — 24×24, two 2px round-cap outline vectors, strokes bound to
+  `color/on-surface-variant`, same description contract as its four neighbours. There was no
+  `person-search` in the set; this is the only node created outside the Patient Home page.
+  Frame grew 1926 → 2029; everything below the strip reflowed on the existing auto-layout.
+  `93:102` has **no state gallery and no dark proof** — the two galleries on that page belong to
+  `patient_dashboard` and `patient_profile_overview`, and the page holds exactly one Quick
+  Services strip — so nothing was left stale.
+
+  **Where the code and the design disagree — three items, none of them silently diverged from:**
+
+  1. **Tile width is 109.67, not 104, and that is the frame's fault, not the code's.** The brief
+     specifies a 104 tile, which is correct arithmetic for the *code's* 16dp content inset at
+     360dp: `(360 − 32 − 16) / 3 = 104`. But `93:102`'s `ScrollContent` `93:134` has a **24px**
+     horizontal inset, not 16, so its content column is 345 and three FILL tiles measure 109.67.
+     The tiles are FILL (not fixed 104) precisely because the code is `flex-1` — pinning 104 in a
+     345 column would have left 17px of dead slack and would have been a *worse* match to the
+     shipped behaviour than the "wrong" number. **The real defect is the inset mismatch: this
+     frame says 24, `HomeScreen` says 16, and they have disagreed since before this pass.** One
+     of them is wrong for every section on the screen, not just this strip. Not fixed here —
+     changing the page gutter is a whole-screen decision and needs an owner.
+  2. **Tile order: the code puts Find Care FIRST; the design brief listed it last.** The frame now
+     reads `Find Care · Appts · Pharmacy / Labs · Vitals · Records`, matching
+     `HomeScreen.tsx` exactly, on the standing rule that shipped behaviour is the input. **I think
+     the code is wrong here and the brief's instinct was right.** Appts is the tile a returning
+     patient reaches for daily; Find Care is a first-visit, low-frequency destination that was
+     added to unblock a funnel, and putting it in the first slot demotes the most-used tile on the
+     screen to second place to solve a discoverability problem that row 1 already solves at any
+     position. Recommend moving Find Care to slot 6 (`Appts · Pharmacy · Labs / Vitals · Records ·
+     Find Care`) in **both** sides, at which point the frame and the code agree again. Flagged, not
+     acted on.
+  3. **The "View all" affordance is still dead, and it is now dead next to a live tile.** Section
+     Header `517:1947` on this frame renders `Show action = true` / "View all", and `HomeScreen`'s
+     `<Section title="Quick Services" actionLabel="View All">` still passes **no `onAction`** — the
+     same dead control §5's Navigation Map entry named as the cheapest place to put the booking
+     entry point. That entry point now exists as a tile instead, which makes the empty "View all"
+     harder to justify, not easier: there is no "all quick services" screen to go to. Either wire
+     it or set `Show action = false`. Also a copy mismatch, pre-existing: the frame says "View all",
+     the code says "View All".
+
+  — **No action for Codex on `93:102` itself.** Items 1–3 are cross-cutting (page gutter, tile
+  order, a dead control) and each needs one owner deciding for both sides at once.
+
+- 2026-08-02 — Claude — **`appointment_management` `550:1826` caught up to the shipped
+  booking-funnel fix.** A primary **"Book new appointment"** CTA now sits **above** the segmented
+  control, in the content flow (this is a `Detail AppBar` screen; nothing docks), in **all five**
+  frames on page `548:616`:
+
+  | Frame | Node | CTA instance |
+  |---|---|---|
+  | `appointment_management` | `550:1826` (body `550:1843`) | `915:9845` |
+  | `… / tab=Past` | `550:2974` (body `550:2976`) | `915:9849` |
+  | `… / state=loading` | `550:3901` (body `550:3903`) | `915:9853` |
+  | `… / state=empty` | `550:4057` (body `550:4059`) | `915:9857` |
+  | `… / state=error` | `550:4182` (body `550:4184`) | `915:9861` |
+
+  Every instance is child index 1 of `Body / Scroll Content` — after `Intro Copy`, before
+  `Tab Bar / Upcoming · Past` — width `FILL` (361 at 393, 328 at 360), height 56, inheriting the
+  body's existing `24` gap. No shadow. Verified at 360 by screenshot, not by arithmetic.
+
+  **Every state got it, on purpose.** The CTA is not a property of a tab or of the list's async
+  branch — in code it is static markup outside both, so a frame that showed it only when populated
+  would be describing a screen that does not exist. Empty needs it most; error needs it too (it is
+  the only working control when the list fails); loading shows it because booking does not depend
+  on the list having arrived. **No state was left out.** The screen has no dark proof frame and
+  never had one — I did not add one, but I pinned `550:4057` to Dark, screenshotted, and reverted:
+  the CTA flips fill and label together, so nothing on it is a raw hex.
+
+  **NEW LOCAL COMPONENTS, in `Local Components — appointment_management` `550:1909`:**
+  - `Button / CTA + Leading Icon` — `915:9805`
+  - `icon/chrome-add` — `915:9803`
+
+  **Why this is not an instance of `Button 1:89`, with the property I read rather than the
+  conclusion I drew.** `1:89`'s `componentPropertyDefinitions` is `{Variant: [Primary, Secondary,
+  Disabled, Loading]}` — nothing else. `Variant=Primary` `1:83` has exactly two children, in this
+  order: `Label` `1:84`, then `icon/chrome-arrow-right` `1:85`. The icon is a plain `FRAME`, not an
+  `INSTANCE`, so there is no `INSTANCE_SWAP` to point at a plus. And the order cannot be changed on
+  an instance: `inst.insertChild(0, inst.children[1])` throws
+  `in insertChild: Cannot move node. New parent is an instance or is inside of an instance`, and so
+  does appending a new child. I ran both against a throwaway instance and deleted it. **A leading
+  glyph is therefore not expressible as an override of `1:89`.** Per §5c the sanctioned move is a
+  page-local component plus a promotion proposal, which is this. It is not a redraw by taste: it
+  reuses `1:89`'s own bindings — fill `VariableID:1:3` (primary), label `VariableID:1:5`
+  (on-primary), all four radii `VariableID:1:24` (`radius/12`), Inter Semi Bold 14 / 130 %, gap 8,
+  height 56 — and `icon/chrome-add` copies `1:85`'s geometry exactly (20 × 20 slot, 1.667 stroke,
+  `ROUND` caps, stroke bound to on-primary), so the plus and the chevron are the same hand.
+
+  — **PROPOSED PROMOTION, for whoever next owns the Design System page:** add an
+  `Icon = None | Leading | Trailing` axis to `Button 1:89` (default `Trailing`, so the 26 existing
+  instances do not move) and an `Icon` `INSTANCE_SWAP` slot, then delete `915:9805` / `915:9803` and
+  re-point the five instances. Promotion is a deliberate act with its own review, not a side effect
+  of this screen — I did not touch `0:1` or `26:84`.
+
+  **DELIBERATE CHANGE FROM THE PREVIOUS FRAME, flagged because it removes an affordance:**
+  `EmptyState / no upcoming appointments` `550:4165` went `Action=Yes` → **`Action=No`**. Its action
+  was a second `Button 1:89` pill labelled "Find care", going to the same destination as the new CTA
+  and sitting ~130 px below it on a 518-tall screen. Two full-width teal pills to one place is worse
+  than one. The screen-level CTA is higher, always present, and names the outcome ("Book new
+  appointment") rather than the intermediate screen ("Find care"). The error card's own action is
+  **kept** — "Try again" is a different job. If a reviewer prefers the affordance adjacent to the
+  message, the alternative is to restore `Action=Yes` and demote it to `Variant=Secondary`; I would
+  still not ship both as primaries.
+
+  **WHERE THE CODE AND THE DESIGN DISAGREE — required work for the code round:**
+  1. **The CTA is a pill in code and a `radius/12` rectangle in Figma.**
+     `AppointmentManagementScreen.tsx` passes no `pill` prop, and `Button`'s default is
+     `pill = true` → `rounded-full`. `Button 1:89`'s four radii are bound to `radius/12`, and so is
+     `915:9805`. Every other CTA in this file is 12. Figma is source of truth for appearance:
+     **pass `pill={false}`.** (This is a pre-existing mismatch on *every* `Button` call site that
+     omits the prop, not one this screen introduced — but this screen is where it now shows.)
+  2. **Height 56 vs ~50.** The frame draws 56, matching `1:89`. `size="cta"` is `py-4`, which
+     measures ~50. `size="docked"` is the 56 floor and is the honest match, but it is documented as
+     the *docked* size, and this CTA is inline. Cleanest fix is on the code side's terms: keep
+     `size="cta"` and give it the same `DOCKED_MIN_HEIGHT`-style floor of 56, or add the floor to
+     `cta`. Do not hardcode `height: 56` — that is what clips at a large font scale.
+  3. **Gutter: the frame pads 16, the code pads 24.** `Body / Scroll Content` has had
+     `paddingHorizontal 16` since it was drawn; the `ScrollView` uses 24. So the frame's CTA is 361
+     wide and the built one is 345. Pre-existing and it affects the whole screen, not just the CTA,
+     so I did not "fix" it by moving the frame — **one owner should pick a number for both sides.**
+     Same class of defect as the `93:102` page-gutter item above.
+  4. **Vertical rhythm: the frame's 24 vs the code's `mb-md` (16).** The body's gap has been a
+     uniform 24 since it was drawn and I did not break it for one child. Code should drop the
+     button's `className="mb-md"` and let the container's spacing govern.
+
+  **OBSERVED, NOT MINE TO FIX — a real dark-mode defect in a shared component.** In the Dark proof
+  the `EmptyState` icon plate renders as a flat disc with no glyph. Properties read:
+  `IconPlate` fill is bound to `VariableID:324:201`; the swapped glyph inside
+  (`icon/calendar-add` `215:290`) has both its vectors' strokes bound to **`VariableID:1:5`
+  (on-primary)**. `on-primary` is dark in Dark mode and the plate is a dark container there, so the
+  glyph disappears. Every component in `Icons 24` `215:286` carries the same binding, so this hits
+  every `EmptyState`, not just this one. The correct token is the plate's own content pair. The
+  icons live on `74:102` (Patient Home) and `EmptyState` on `26:84` — **both outside this claim, so
+  I did not touch them.** Whoever owns the DS page next should take it.
+
+- 2026-08-02 — Claude — **`find_care` `144:108` caught up to the shipped funnel; `ProviderCard`
+  `407:529` gained a `Kind=Person|Facility` axis.** — Page `144:107`. Nodes: set `915:9875`
+  (`ProviderCard`, was the bare component `407:529`, now `Kind=Person`) + new `Kind=Facility`
+  `915:9809`; local glyphs `915:9745/9749/9753/9757/9761` in `915:9740`; frame additions
+  `916:2349` (Section Header) and `916:2359` (FacilityRail, cards `916:2360`/`916:2386`); chip
+  `144:293` relabelled Departments → **Pharmacists** to match `MAIN_CHIPS`; gallery `147:148`
+  gained the Kind affordance matrix `918:2403` and the 360dp proof `918:9923`. `SpecialistCard`
+  `413:677` documented + wrap-fixed. — *Nothing needed from code for the card structure; the four
+  items below are genuine code/design disagreements.*
+
+  1. **The Message button outranks the funnel entry, and it is a no-op.** In
+     `FindCareScreen.tsx` `PersonCard`, "View Profile" is *outlined* (`border-primary`,
+     `text-primary`) and the Message button is *filled* (`bg-primary`) — while Message's
+     `onPress` is an empty `// TODO: open chat thread`. So the loudest control on the card does
+     nothing, and the one control that opens the booking funnel is the quiet one. Figma
+     `407:549` has it the other way round and I kept it that way: filled = View Profile,
+     outlined 44x44 = Message. **Code should swap the two treatments.** This is the emphasis
+     only — no route changes.
+
+  2. **The facility CTA should not be a button.** The shipped `FacilityCard` renders a
+     full-width filled `tertiary` CTA whose `onPress` is a documented no-op, under labels
+     ("View Staff", "View Store") that promise a destination that does not exist. A filled
+     full-width button is the strongest affordance on the card; spending it on nothing is worse
+     than the dead link the funnel audit set out to remove. `Kind=Facility` therefore ships
+     **Directions (tonal) + Call (44x44 outlined)** instead — two things that need no new route
+     and no backend, only `Linking` to maps and `tel:`. Filled primary is now reserved on this
+     surface for "enters the booking funnel", which is what makes a pharmacy legible as a
+     different class of thing at a glance rather than a clinician with a greyed-out day.
+     **Code should replace the no-op CTA with these two.** The `hospital-detail` /
+     `pharmacy-detail` route stays correctly out of scope.
+
+  3. **`color/primary-container` is not a container.** Its Light value is `#008378` with
+     `on-primary-container` = `#ffffff` — i.e. a second *filled* teal, not M3's low-emphasis
+     container. I built the tonal Directions button on `color/primary-tint`
+     (`#dff1ee` / `#003731`) with a `color/primary` label, which is the pairing `IconTile`
+     `Tone=Tint` already uses and the only one in the file that behaves like a tonal container.
+     Worth a BRAND decision: either rename `primary-container` to what it is, or give the ramp a
+     real low-emphasis step. Until then, do not reach for `primary-container` expecting M3
+     semantics.
+
+  4. **The frame groups by kind; the code renders one flat list.** `144:108` has three
+     header + carousel sections (Doctors / Caregivers / Hospitals & pharmacies);
+     `FindCareScreen` maps `filteredEntries` into a single vertical `gap-md` column with no
+     headers. This predates the funnel work and I did not resolve it unilaterally — the
+     carousels are the better directory, but the flat list is what ships, and interleaving is
+     arguably the more honest arrangement precisely because it puts a pharmacy card next to a
+     doctor card. **One side has to move; whoever takes it owns both.** Related and smaller:
+     `SpecialistCard` `413:677` keeps Follow filled and View Profile outlined, the inverse of
+     `ProviderCard`. Defensible on a discovery surface, but if View Profile is the funnel entry
+     there too, the two cards should agree.
+
+  **Not done, flagged:** `find_care` has no dark proof frame, unlike `select_time_slot`,
+  `review_appointment` and `booking_confirmed`. Every colour on the new nodes is variable-bound
+  and audits clean, so a proof would pass — but it does not exist yet and I did not add one.
+
 ---
 
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect

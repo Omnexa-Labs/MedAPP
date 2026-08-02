@@ -11,6 +11,17 @@ x-svc-env: &svc-env
   GW_CORS_ORIGIN_REGEX: "http://(localhost|127\\.0\\.0\\.1):\\d+"
   # Shared secret for development across all services.
   JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  # doctor_service and booking_service use `shared.auth.get_current_principal`
+  # as-is instead of overriding it in their own `app/deps.py` (unlike the
+  # twelve services that do). That shared dependency reads its secret from
+  # MEDAPP_DEFAULT_JWT_SECRET and returns 503 "auth not configured" when it
+  # is unset — which is what every authenticated /v1/doctors and
+  # /v1/bookings call was doing. Set it here so the dev stack works;
+  # the real fix is for those two services to own their JWT config the
+  # way the others do.
+  MEDAPP_DEFAULT_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  MEDAPP_DEFAULT_JWT_AUDIENCE: "medapp.platform"
+  MEDAPP_DEFAULT_JWT_ISSUER: "medapp"
   GW_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   USER_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   DOCTOR_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
