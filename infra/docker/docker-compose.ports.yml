@@ -1,0 +1,50 @@
+# Host-port overrides, so MedApp can run alongside other projects on this machine.
+#
+# Why this file exists: MedApp's compose publishes 5432, 6379, 8000 and 8001, and
+# on a developer box those are the four most contended ports there are. On the
+# machine this was written for, another project's containers already held all
+# four — so `docker compose up` failed with "Bind for 0.0.0.0:5432 failed: port
+# is already allocated" and MedApp simply could not start. Stopping someone
+# else's running work to free a port is not an acceptable fix.
+#
+# Nothing INSIDE the compose network changes: services still reach each other on
+# their own names and original ports, so no service URL, env var or migration
+# needs touching. Only the host-side mapping moves.
+#
+# Usage — pass BOTH files, base first:
+#
+#   docker compose -f infra/docker/docker-compose.yml \
+#                  -f infra/docker/docker-compose.ports.yml up -d <services>
+#
+# or export it once so every compose call picks it up:
+#
+#   COMPOSE_FILE=infra/docker/docker-compose.yml:infra/docker/docker-compose.ports.yml
+#
+# The mobile app then needs API_BASE_URL pointed at the gateway's new port:
+#
+#   emulator          http://10.0.2.2:8010
+#   physical device   http://<your-lan-ip>:8010
+#
+# Ports are offset by +10 rather than picked at random, so the mapping stays
+# guessable: 8000 -> 8010, 5432 -> 5442, 6379 -> 6389, 8001 -> 8011.
+#
+# `!override` is load-bearing. Compose MERGES list fields across files rather
+# than replacing them, so a plain `ports:` here appended a second mapping and
+# left the original in place — the bind failed on exactly the port this file
+# exists to vacate. Requires Compose 2.24+.
+
+services:
+  postgres:
+    ports: !override ["5442:5432"]
+
+  redis:
+    ports: !override ["6389:6379"]
+
+  # The only one the mobile app actually talks to.
+  api_gateway:
+    ports: !override ["8010:8000"]
+
+  # Published only for direct debugging; the app always goes through the
+  # gateway. Moved because another project holds 8001.
+  user_service:
+    ports: !override ["8011:8001"]
