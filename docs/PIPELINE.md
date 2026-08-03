@@ -462,6 +462,33 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   `practitioner-telehealth-profile`, `waiting-room`, `telemedicine-consultation`. Expected 20
   frames. The claim remains open through BuildReview; no Design System or `558:615` writes.
 
+- 2026-08-03 — Claude — **`find-care` wears the wrong chrome, and it is the ruling already made
+  for `appointment_management`.** Reported from the device: "the logo is off and it has the bottom
+  nav with Home tab active... a bit confusing." Both halves confirmed in the capture.
+
+  `FindCareScreen` renders `PatientShell activeTab="home"`. It is NOT one of the five patient tabs,
+  so the bar can only render a lie — Home selected while the user is demonstrably not on Home —
+  and `Patient BottomTabBar 740:1015` deliberately ships exactly five values with no way to fake a
+  sixth. The logo is the same fault seen from the other side: `Detail AppBar 193:120`'s own
+  description says *"No logo — the logo belongs only on tab-root screens."*
+
+  The consequence is worse than cosmetic: with a tab-root bar there is **no back button**, so the
+  only way out of Find Care is a tab, which navigates somewhere unrelated. That is verbatim the
+  "GAINED a real way out" argument recorded when `appointment_management` was migrated
+  (see its file header, PO ruling 2026-08-01).
+
+  **Fix: `find-care` becomes a `DetailShell` screen** — reached by push from Home's Find Care tile
+  and from Appointments' "Book new appointment", so `router.back()` is always correct. Same applies
+  to `patient-profile-overview` and `patient-dashboard`, which also render `PatientShell` with
+  `activeTab="home"` while not being tab roots. Not yet done; queued.
+
+  **Harness lesson, recorded because it nearly cost an analysis.** A light/dark capture pass driven
+  through `/zptour?theme=&to=` produced 52 files in which at least one route was **mislabelled** —
+  `light-05-find-care.png` is actually Home, because the `to=` indirection did not take while the
+  theme param did. Direct deep links (`exp://…/--/find-care`) land correctly. A capture is not
+  evidence until the frame is confirmed to be the route it is named after; size-based readiness
+  checks catch a blank screen but not a wrong screen.
+
 - 2026-08-02 — Claude — **CODEX IS OUT UNTIL 8 AUGUST (usage limit). Single-agent mode.**
   Its telemedicine delivery landed before the cutoff: page `818:609` holds **20 frames + a
   `Local Components — telemedicine` section `820:609`** — Provider profile ×5, Waiting room ×8,
