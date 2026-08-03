@@ -3,10 +3,11 @@
 // flips isAuthenticated and the root layout swaps into the (app) group; the
 // draft is reset so a re-entry starts clean.
 
-import { useEffect, useState } from "react";
-import { router } from "expo-router";
+import { useState } from "react";
+import { Redirect, router } from "expo-router";
 import { SignUpStep3Screen } from "@/features/auth/SignUpStep3Screen";
 import { useSignUpDraft } from "@/features/auth/hooks/use-signup-draft";
+import { goBackOr } from "@/features/auth/signup-nav";
 import { useSignUp } from "@/features/auth/hooks/use-signup";
 import { ApiError } from "@/types/api";
 import type { SignUpStep3Values } from "@/features/auth/schema";
@@ -25,14 +26,15 @@ export default function SignUpStep3Route() {
   const signUp = useSignUp();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Deep-link / restart guard: bounce back to whichever step is missing.
-  useEffect(() => {
-    if (!draft.step1) router.replace("/(public)/sign-up");
-    else if (!draft.verification) router.replace("/(public)/sign-up-verify");
-    else if (!draft.step2) router.replace("/(public)/sign-up-step-2");
-  }, [draft.step1, draft.verification, draft.step2]);
-
-  if (!draft.step1 || !draft.verification || !draft.step2) return null;
+  // Deep-link / restart guard: bounce to whichever step is missing, earliest
+  // first. Declarative `<Redirect>` rather than a `useEffect` + `replace`, so
+  // the guarded screen never paints before bouncing — and so the guard can
+  // never dispatch GO_BACK on a stack that has nothing to pop (a cold start via
+  // Expo Go's replayed URL is exactly that stack). See
+  // src/features/auth/signup-nav.ts.
+  if (!draft.step1) return <Redirect href="/(public)/sign-up" />;
+  if (!draft.verification) return <Redirect href="/(public)/sign-up-verify" />;
+  if (!draft.step2) return <Redirect href="/(public)/sign-up-step-2" />;
 
   const completeSetup = async (step3: SignUpStep3Values) => {
     setErrorMessage(null);
@@ -85,7 +87,9 @@ export default function SignUpStep3Route() {
     <SignUpStep3Screen
       isSubmitting={signUp.isPending}
       errorMessage={errorMessage}
-      onBack={() => router.back()}
+      // Every guard above has passed, so Step 2 is a legal destination even
+      // when this screen was deep-linked and there is no stack to pop.
+      onBack={() => goBackOr("/(public)/sign-up-step-2")}
       onSubmit={completeSetup}
       onSkip={() => completeSetup(SKIP_DEFAULTS)}
     />
