@@ -53,8 +53,16 @@ type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 // Pass ?name=&role=&avatar= params from the caller to override.
 // ---------------------------------------------------------------------------
 
+// The seeded cardiologist (scripts/seed_dev_data.py), not the invented "Dr.
+// Sarah Miller" the comp shipped. Find Care lists the seeded doctors, so a
+// thread with a doctor who is not in that list reads as a bug — and this thread
+// is Adjoa Boateng's: the conversation is an ECG review with vitals, and her
+// seed bio is hypertension management and heart-failure follow-up.
+//
+// InboxScreen's first conversation is the SAME person and the same avatar URI,
+// and it must stay in step: it is what pushes `?name=` into this screen.
 const SEED_CONTACT = {
-  name: "Dr. Sarah Miller",
+  name: "Dr. Adjoa Boateng",
   role: "Cardiologist",
   avatarUri:
     "https://lh3.googleusercontent.com/aida-public/AB6AXuDeJpe2eyE7VBbPwXD7m2u2so2Q3OUNPtsrGrSFmYPgs-ebEdihstJSB8oCR4b47ByY3B_O0tXJvybxrQFcMdbXyy9xqS7U_kZ8nFPNvIRhmjvEdFwtFcHJV0XGrYK9jh0GeoJZ1vPacpmlGzjtsCd5RCBzska_0hXM0ZEU9ysDTcXuwGisPFsqxaJkEiaMkAZ9kics4W18HE6lSAYeAoyEI8J_niTdEBQuVwViQn55GrLPUW-D2piEuATB6NuuoRLh-IK3SrUgmo-b",

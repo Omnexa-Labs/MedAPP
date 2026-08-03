@@ -72,6 +72,62 @@ const FEED_TABS = ["For You", "Following", "Explore", "Community"] as const;
 type FeedTab = (typeof FEED_TABS)[number];
 
 // ---------------------------------------------------------------------------
+// SUGGESTED GROUPS STRIP — 360dp DEVICE FIX (2026-08-03)
+//
+// On an Itel S25 Ultra at 360dp the strip cut its SECOND card vertically: a
+// 200dp card, a 16dp gap and no inset of its own, laid out inside the screen's
+// 16dp gutter, so at rest the card boundaries were
+//
+//   card 1   x  16 -> 216      (fully visible)
+//   card 2   x 232 -> 432      visible = 328 - 216 = **112 of 200 = 56%**
+//
+// i.e. sliced through its middle, with the glyph plate and half the group name
+// showing and the Join button chopped. docs/BRAND.md §"Horizontal strips and
+// carousels" forbids that outright: "Nothing is half-sliced in the resting
+// state ... either every item fits the content width, or the strip scrolls with
+// a deliberate partial peek (roughly a third to a half of the next item)".
+//
+// Fitting is not an option here — this is a browse carousel over a list that
+// grows from the group catalogue, so there is no N to fit — which leaves the
+// peek, and a peek is a WIDTH CALCULATION, not a hope. Unlike the chip rows in
+// FindCareScreen these items are a FIXED width, so the resting boundary is fully
+// determined and can be put where BRAND wants it.
+//
+// The strip goes full-bleed (`marginHorizontal: -SCREEN_GUTTER`) and re-applies
+// the gutter as its own content inset, which is also what gives it the trailing
+// inset BRAND requires ("a trailing inset matching the leading gutter") — inside
+// the parent's padding the last card previously ended flush at the padding edge
+// with nothing after it. At 360dp:
+//
+//   screen                    360
+//   leading inset              16   (= the screen gutter, so card 1 still lines
+//                                     up with "Suggested Groups" above it)
+//   card                      240
+//   gap                        16
+//   card 1                x  16 -> 256      fully visible
+//   card 2                x 272 -> 512      visible = 360 - 272 = 88dp
+//   peek                   88 / 240 = **36.7%**   -> inside BRAND's 1/3..1/2
+//   trailing inset             16   (at the end of the scroll)
+//
+// Sanity at the 393dp design width: peek = 393 - 272 = 121 / 240 = 50.4%, i.e.
+// the top of BRAND's range rather than the 72.5% near-whole card 200dp gave
+// there. One width is correct at both, so there is no per-width branch.
+//
+// The card also gets WIDER, not narrower, which is the counter-intuitive half of
+// the fix: 240 - 2x24 (Card's `p-md` inset) = 192dp of content, up from 152, so
+// "Mental Wellness" and "12.5k Members" have more room than before, not less.
+// ---------------------------------------------------------------------------
+
+/** BRAND §"Spacing, radius, layout": the screen gutter is 16. */
+const SCREEN_GUTTER = 16;
+
+/** Derived above. Do not tune this without redoing the peek arithmetic. */
+const GROUP_CARD_WIDTH = 240;
+
+/** BRAND spacing scale. */
+const GROUP_CARD_GAP = 16;
+
+// ---------------------------------------------------------------------------
 // Static seed content mirroring the comp. No backend in this design pass.
 // ---------------------------------------------------------------------------
 
@@ -336,10 +392,23 @@ export function CommunityScreen() {
                   <Text className="font-label-md text-label-md text-primary">View All</Text>
                 </Pressable>
               </View>
+              {/* Full-bleed out of the screen gutter, then the gutter re-applied
+                  as the content inset — see the arithmetic block at the top of
+                  this file. The negative margin is the whole reason the trailing
+                  inset can exist. */}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: 16, paddingBottom: 8 }}
+                // The seam CommunityScreen.layout.test.tsx asserts the peek
+                // arithmetic through — see that file for why it asserts props
+                // rather than pixels.
+                testID="suggested-groups-strip"
+                style={{ marginHorizontal: -SCREEN_GUTTER }}
+                contentContainerStyle={{
+                  gap: GROUP_CARD_GAP,
+                  paddingHorizontal: SCREEN_GUTTER,
+                  paddingBottom: 8,
+                }}
               >
                 {SUGGESTED_GROUPS.map((g) => (
                   <GroupCard
@@ -396,7 +465,17 @@ function GroupCard({
   // Joining bumps the displayed count by one (the user themselves).
   const memberLabel = formatMembers(group.memberBase + (joined ? 1 : 0));
   return (
-    <Card className="w-[200px] overflow-hidden">
+    // Width through `style`, not a `w-[240px]` arbitrary class: when one
+    // arbitrary NativeWind value fails to compile the WHOLE className is dropped
+    // for that element (the failure mode documented in FindCareScreen's CTA), and
+    // a card that silently loses its width is precisely the defect being fixed.
+    // It is also the value the peek arithmetic depends on, so it reads as a
+    // derivation rather than a magic number in a string.
+    <Card
+      className="overflow-hidden"
+      style={{ width: GROUP_CARD_WIDTH }}
+      testID={`group-card-${group.id}`}
+    >
       {/* Corner gradient wash (bg-gradient-to-br ... opacity-20). */}
       <LinearGradient
         colors={group.wash}

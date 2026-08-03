@@ -81,7 +81,12 @@ export function ActiveScriptViewScreen() {
   const drug = params.drug ?? "Lisinopril 10mg";
   const patient = params.patient ?? "Alex Rivers";
   const scriptId = params.scriptId ?? "#8829-X";
-  const prescriber = params.prescriber ?? "Dr. Sarah Jenkins";
+  // The seeded cardiologist (scripts/seed_dev_data.py), not the invented
+  // "Dr. Sarah Jenkins" this screen used to fall back to. Find Care lists the
+  // seeded doctors, so any other name reads as a bug to a tester. Adjoa Boateng
+  // is the right one of the six: this script is Lisinopril for hypertension
+  // management, and her seed bio is hypertension and heart-failure follow-up.
+  const prescriber = params.prescriber ?? "Dr. Adjoa Boateng";
   const issuedDate = params.issuedDate ?? "Oct 12, 2023";
   const rxNumber = params.rxNumber ?? "#RX-992-Rivers";
   const dob = params.dob ?? "12/05/1988";

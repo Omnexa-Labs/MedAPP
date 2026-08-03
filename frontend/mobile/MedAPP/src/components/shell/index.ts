@@ -26,7 +26,19 @@ export {
 // The wrapper a detail screen actually reaches for: safe area + DetailAppBar +
 // body, with no bottom nav and no way to ask for one.
 export { DetailShell, DETAIL_SHELL_EDGES } from "./DetailShell";
-export { PatientAppBar } from "./PatientAppBar";
+export { PatientAppBar, PATIENT_APP_BAR_HEIGHT } from "./PatientAppBar";
+// What the patient app bar's AVATAR opens — Profile, Appearance, Sign out.
+// `PatientShell` mounts it by default, so a screen normally never names it; it is
+// exported for tests and for a future practitioner equivalent. Reaching for it
+// directly from a screen re-creates the per-screen-chrome problem the shell
+// exists to end.
+export {
+  AccountMenu,
+  accountMenuWidth,
+  ACCOUNT_MENU_PROFILE_HREF,
+  SIGN_OUT_HREF,
+  type AccountMenuProps,
+} from "./AccountMenu";
 // PATIENT_TAB_HREFS is the single source of truth for where the five patient
 // tabs go. Exported so a test (or a future `<Tabs>` layout) can assert against
 // the map rather than re-typing the route strings.

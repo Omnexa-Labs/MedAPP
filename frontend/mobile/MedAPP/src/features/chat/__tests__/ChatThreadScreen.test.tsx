@@ -67,9 +67,9 @@ describe("ChatThreadScreen — renders through DetailShell", () => {
   it("keeps the bar's title, subtitle, avatar, presence dot and both actions", () => {
     render(<ChatThreadScreen />);
 
-    expect(screen.getByText("Dr. Sarah Miller")).toBeTruthy();
+    expect(screen.getByText("Dr. Adjoa Boateng")).toBeTruthy();
     expect(screen.getByText("Doctor · Cardiologist")).toBeTruthy();
-    expect(screen.getByLabelText("Dr. Sarah Miller")).toBeTruthy(); // avatar
+    expect(screen.getByLabelText("Dr. Adjoa Boateng")).toBeTruthy(); // avatar
     expect(screen.getByLabelText("Online")).toBeTruthy();
     expect(screen.getByLabelText("Video call")).toBeTruthy();
     expect(screen.getByLabelText("Conversation info")).toBeTruthy();

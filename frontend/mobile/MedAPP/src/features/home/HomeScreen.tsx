@@ -103,6 +103,35 @@ import { useTokenColor, type ColorToken } from "@/lib/tokens";
 // with the import; `ChromeIconName` is the same union, re-exported by the gate
 // precisely so screens can type a forwarded glyph without importing the library.
 
+// ============================================================================
+// The Upcoming Appointments card's provider — ONE object, not three literals
+// ============================================================================
+// This card used to disagree with itself. The face and the name line said
+// "Dr. Sarah Chen"; the Join Call handler pushed `providerName: "Dr. Julian
+// Sterling"` and `providerId: "julian-sterling"` into the waiting room. So the
+// patient tapped a call with Sarah Chen and landed in a waiting room for Julian
+// Sterling — two invented clinicians, one card, and a visible identity swap
+// mid-journey.
+//
+// Neither name exists. scripts/seed_dev_data.py creates the doctors a tester
+// actually sees in Find Care, and this is the "Virtual · Cardiologist" slot, so
+// it is Dr. Adjoa Boateng — the seeded cardiologist whose bio is hypertension
+// management and heart-failure follow-up, i.e. the one who runs a remote review
+// clinic. `providerId` is her seed slug so the waiting room can resolve her once
+// that screen reads real providers.
+//
+// Hoisted to a constant because the bug was structural: the card had no single
+// source for the provider, so the two halves could drift without anything
+// failing. They now cannot differ.
+const NEXT_APPOINTMENT = {
+  id: "appointment-next",
+  providerId: "adjoa-boateng",
+  providerName: "Dr. Adjoa Boateng",
+  providerSpecialty: "Cardiologist",
+  /** Derived by hand rather than sliced, so the honorific never becomes a letter. */
+  initials: "AB",
+} as const;
+
 export function HomeScreen() {
   const user = useAuthStore((s) => s.user);
   const firstName = user?.displayName?.trim().split(/\s+/)[0] || "there";
@@ -370,13 +399,17 @@ export function HomeScreen() {
           <Card className="gap-sm">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-sm">
-                <AvatarWithFallback size={44} initials="SC" label="Dr. Sarah Chen" />
+                <AvatarWithFallback
+                  size={44}
+                  initials={NEXT_APPOINTMENT.initials}
+                  label={NEXT_APPOINTMENT.providerName}
+                />
                 <View>
                   <Text className="font-headline-md text-on-surface" style={{ fontSize: 15 }}>
-                    Dr. Sarah Chen
+                    {NEXT_APPOINTMENT.providerName}
                   </Text>
                   <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 13 }}>
-                    Cardiologist
+                    {NEXT_APPOINTMENT.providerSpecialty}
                   </Text>
                 </View>
               </View>
@@ -403,12 +436,12 @@ export function HomeScreen() {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   pathname: "/(app)/waiting-room" as any,
                   params: {
-                    sessionId: "appointment-next",
+                    sessionId: NEXT_APPOINTMENT.id,
                     viewerRole: "patient",
-                    providerId: "julian-sterling",
-                    providerName: "Dr. Julian Sterling",
-                    providerSpecialty: "Cardiologist",
-                    appointmentId: "appointment-next",
+                    providerId: NEXT_APPOINTMENT.providerId,
+                    providerName: NEXT_APPOINTMENT.providerName,
+                    providerSpecialty: NEXT_APPOINTMENT.providerSpecialty,
+                    appointmentId: NEXT_APPOINTMENT.id,
                   },
                 })
               }

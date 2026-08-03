@@ -2,7 +2,7 @@
 // canonical patient bar and the canonical patient tab set, and cannot end up with
 // the practitioner layout (centred logo, back button, Schedule/Patients/Profile).
 
-import { screen, fireEvent } from "@testing-library/react-native";
+import { screen, fireEvent, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { renderWithSafeArea as render } from "@/test/safe-area";
 
@@ -11,6 +11,10 @@ const mockReplace = jest.fn();
 // `push` is mocked ONLY so the "must not push" assertion can be made. Nothing
 // in the shell is allowed to call it.
 const mockPush = jest.fn();
+// The account menu's Profile item uses `navigate` (it dedupes when the profile
+// screen is already in history). Mocked here so pressing it doesn't blow up on a
+// missing router method.
+const mockNavigate = jest.fn();
 const mockNav = { canGoBack: true };
 
 jest.mock("expo-router", () => ({
@@ -18,8 +22,19 @@ jest.mock("expo-router", () => ({
     back: () => mockBack(),
     push: (...args: unknown[]) => mockPush(...args),
     replace: (...args: unknown[]) => mockReplace(...args),
+    navigate: (...args: unknown[]) => mockNavigate(...args),
     canGoBack: () => mockNav.canGoBack,
   },
+}));
+
+// The shell now mounts <AccountMenu />, which reaches the auth store by DYNAMIC
+// import at press time precisely so this suite (and ~9 others that render the
+// shell) do NOT have to mock `@/lib/config`. The store is still mocked here so
+// the sign-out assertion below observes a real call instead of a real
+// SecureStore write.
+const mockSignOut = jest.fn().mockResolvedValue(undefined);
+jest.mock("@/store/auth-store", () => ({
+  useAuthStore: { getState: () => ({ signOut: mockSignOut }) },
 }));
 
 import { PatientShell, PATIENT_TAB_HREFS } from "../PatientShell";
@@ -38,6 +53,8 @@ describe("PatientShell", () => {
     mockBack.mockClear();
     mockReplace.mockClear();
     mockPush.mockClear();
+    mockNavigate.mockClear();
+    mockSignOut.mockClear();
     mockNav.canGoBack = true;
   });
 
@@ -244,5 +261,112 @@ describe("PatientShell", () => {
     );
     expect(screen.getByLabelText("Go back")).toBeTruthy();
     expect(screen.queryByLabelText("Overview")).toBeNull();
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE ACCOUNT MENU — in the SHELL, on purpose
+  //
+  // Same reasoning as the tab map above, and the same evidence: `onAvatarPress`
+  // was plumbed shell -> bar and NO screen passed it, so the avatar was a dead
+  // 44pt control on all 12 patient screens, `signOut()` was unreachable from
+  // anywhere in the app, and two more things (the profile route, the appearance
+  // control) had no entry point either. Per-screen wiring is how the Inbox tab
+  // went missing from three roots. These cases lock the default in place so a
+  // screen cannot omit it and so nobody "tidies" it back out into the screens.
+  // ---------------------------------------------------------------------------
+
+  it("opens the account menu from the avatar with no screen wiring at all", () => {
+    render(
+      <PatientShell>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    expect(screen.queryByLabelText("Sign out")).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    expect(screen.getByLabelText("Profile")).toBeTruthy();
+    expect(screen.getByLabelText("Appearance")).toBeTruthy();
+    expect(screen.getByLabelText("Sign out")).toBeTruthy();
+  });
+
+  it("makes signing out reachable — two taps, from a tab root", async () => {
+    render(
+      <PatientShell>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    fireEvent.press(screen.getByLabelText("Sign out")); // menu row -> confirm
+    expect(mockSignOut).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText("Sign out")); // confirm button
+    expect(mockReplace).toHaveBeenCalledWith("/(public)/sign-in");
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+  });
+
+  it("un-orphans the profile route from the avatar", () => {
+    render(
+      <PatientShell>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    fireEvent.press(screen.getByLabelText("Profile"));
+    expect(mockNavigate).toHaveBeenCalledWith("/(app)/patient-profile-overview");
+  });
+
+  it("announces the avatar as a disclosure, and tracks its state", () => {
+    render(
+      <PatientShell>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    const avatar = screen.getByRole("button", { name: "Your profile" });
+    expect(avatar.props.accessibilityState).toMatchObject({ expanded: false });
+    expect(avatar.props.accessibilityHint).toBe("Opens your account menu");
+    fireEvent.press(avatar);
+    expect(
+      screen.getByRole("button", { name: "Your profile" }).props.accessibilityState,
+    ).toMatchObject({ expanded: true });
+  });
+
+  it("carries the account name into the menu so sign-out names a session", () => {
+    render(
+      <PatientShell avatarLabel="Melchizedek Narh">
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Melchizedek Narh" }));
+    expect(screen.getByText("Melchizedek Narh")).toBeTruthy();
+  });
+
+  it("yields the avatar to a screen that really does override it — and then claims no disclosure", () => {
+    // The escape hatch stays open (a screen may have a genuine reason), but when
+    // it is used the shell must not mount the menu OR announce an `expanded`
+    // state for a control that opens nothing.
+    const onAvatarPress = jest.fn();
+    render(
+      <PatientShell onAvatarPress={onAvatarPress}>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    const avatar = screen.getByRole("button", { name: "Your profile" });
+    // `expanded` specifically — Pressable always normalises accessibilityState
+    // into a five-key object, so the object itself is never undefined.
+    expect(avatar.props.accessibilityState.expanded).toBeUndefined();
+    expect(avatar.props.accessibilityHint).toBeUndefined();
+    fireEvent.press(avatar);
+    expect(onAvatarPress).toHaveBeenCalled();
+    expect(screen.queryByLabelText("Sign out")).toBeNull();
+  });
+
+  it("keeps the menu available on a detail screen that has no bottom nav", () => {
+    // A pushed screen loses the tab bar, not its account. Patient Profile
+    // Overview is exactly this shape.
+    render(
+      <PatientShell showBottomNav={false} hideBack={false}>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    expect(screen.getByLabelText("Sign out")).toBeTruthy();
   });
 });

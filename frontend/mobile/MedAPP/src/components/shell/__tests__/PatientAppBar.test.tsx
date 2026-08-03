@@ -125,6 +125,44 @@ describe("PatientAppBar", () => {
     expect(onAvatarPress).toHaveBeenCalled();
   });
 
+  it("publishes the avatar's name ONCE when it is a button", () => {
+    // Pressable(label) wrapping AvatarWithFallback(same label) published the name
+    // twice, so TalkBack walked both: "Me, button. Me, image." Latent while
+    // nothing passed `onAvatarPress`; live on 12 screens the moment PatientShell
+    // started supplying the account menu by default.
+    render(<PatientAppBar avatarLabel="Me" onAvatarPress={jest.fn()} />);
+    expect(screen.getAllByLabelText("Me")).toHaveLength(1);
+    expect(screen.getByLabelText("Me").props.accessibilityRole).toBe("button");
+  });
+
+  it("still shows the initials when the avatar is a button", () => {
+    // The inner node is demoted by clearing its role/label, NOT by hiding the
+    // subtree — hiding it would also swallow the initials, i.e. the evidence that
+    // the fallback chain picked initials over the silhouette.
+    render(<PatientAppBar avatarInitials="MN" avatarLabel="Me" onAvatarPress={jest.fn()} />);
+    expect(screen.getByText("MN")).toBeTruthy();
+  });
+
+  it("claims a disclosure only when the avatar actually opens one", () => {
+    const { unmount } = render(<PatientAppBar avatarLabel="Me" onAvatarPress={jest.fn()} />);
+    // No `avatarExpanded` — the caller wired the avatar to something that is not
+    // a menu, so promising "opens your account menu" would be false.
+    //
+    // `expanded` specifically, not the whole object: Pressable always normalises
+    // accessibilityState into `{busy, checked, disabled, expanded, selected}`, so
+    // the object is never undefined even when nothing was passed.
+    expect(
+      screen.getByRole("button", { name: "Me" }).props.accessibilityState.expanded,
+    ).toBeUndefined();
+    expect(screen.getByRole("button", { name: "Me" }).props.accessibilityHint).toBeUndefined();
+    unmount();
+
+    render(<PatientAppBar avatarLabel="Me" onAvatarPress={jest.fn()} avatarExpanded={false} />);
+    const disclosure = screen.getByRole("button", { name: "Me" });
+    expect(disclosure.props.accessibilityState).toMatchObject({ expanded: false });
+    expect(disclosure.props.accessibilityHint).toBe("Opens your account menu");
+  });
+
   it("shows no unread badge when no count is supplied", () => {
     render(<PatientAppBar />);
     expect(screen.getByLabelText("Notifications")).toBeTruthy();

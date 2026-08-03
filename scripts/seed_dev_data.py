@@ -137,6 +137,27 @@ DOCTORS: list[dict[str, Any]] = [
         "consultation_fee_cents": 28000,
         "photo_url": "https://images.medapp.dev/doctors/nii-tetteh.jpg",
     },
+    # Added for the mobile app's Provider Profile screen
+    # (PractitionerSocialProfileScreen), which is a nutrition practice end to
+    # end — bio, services and reviews all talk about nutrition plans and gut
+    # health. That screen previously invented "Dr. Sarah Jenkins", a name a
+    # tester never sees in Find Care. The rule is the other way round: a screen
+    # that needs a clinician the seed lacks gets the clinician ADDED here, so
+    # Find Care and the mock screens keep agreeing.
+    {
+        "email": "abena.owusu@medapp.dev",
+        "phone": "+233241000106",
+        "first_name": "Abena",
+        "last_name": "Owusu",
+        "specialty": "Nutrition & Dietetics",
+        "bio": (
+            "Clinical nutritionist working on weight management, diabetes and gut health. "
+            "Builds eating plans around Ghanaian staples rather than imported substitutes."
+        ),
+        "languages": ["English", "Twi"],
+        "consultation_fee_cents": 15000,
+        "photo_url": "https://images.medapp.dev/doctors/abena-owusu.jpg",
+    },
 ]
 
 

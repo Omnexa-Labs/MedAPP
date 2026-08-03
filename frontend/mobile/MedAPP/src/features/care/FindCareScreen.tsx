@@ -158,8 +158,12 @@ const MAIN_CHIPS: { value: DirectoryChip; label: string; icon?: IconName }[] = [
 const SUB_FACETS: string[] = ["Available Now", "Home Service", "Nearest"];
 
 /**
- * This screen's scroll gutter and BRAND's screen gutter. Named so the full-bleed
- * pulls on the two chip rows read as intent rather than bare `-16`s.
+ * This screen's scroll gutter and BRAND's screen gutter.
+ *
+ * At 360dp — the width the defect below was found at, not the 393dp the frames
+ * are drawn at — this is what the two chip rows have to fit inside:
+ *
+ *   content column = 360 - 2x16 = **328dp**
  */
 const GUTTER = 16;
 
@@ -244,7 +248,7 @@ export function FindCareScreen() {
       isTabRoot={false}
     >
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -294,11 +298,62 @@ export function FindCareScreen() {
             so selection is still not colour-only — the reason this screen had
             added it in the first place.
 
-            `marginHorizontal: -GUTTER` breaks the row out of the 16px scroll
-            gutter so the scrollable ChoiceChipRow can apply that gutter as its
-            own CONTENT inset, per BRAND §"Horizontal strips and carousels". */}
-        <View style={{ marginHorizontal: -GUTTER, marginTop: 16 }}>
-          <ChoiceChipRow scrollable>
+            ====================================================================
+            360dp DEVICE FIX (2026-08-03) — this row WRAPS; it no longer scrolls
+            ====================================================================
+            On an Itel S25 Ultra at 360dp this row shipped as a full-bleed
+            horizontal scroller and cut the fourth chip through its LABEL: the
+            row read `All  Doctors  Nurses  Ho`, with "Hospitals" sliced
+            mid-word and Pharmacies/Pharmacists entirely off-screen behind no
+            affordance at all. docs/BRAND.md §"Horizontal strips and carousels"
+            forbids exactly that — "Nothing is half-sliced in the resting
+            state" — and its remedy order is explicit: "Prefer fitting."
+
+            Measured on device (Inter SemiBold 14, 16px inset each side, 1px
+            border, 20px glyph + 4px gap, +24 for the selected check):
+
+              All (selected)  70    Hospitals    109
+              Doctors        101    Pharmacies   123
+              Nurses          95    Pharmacists  127
+
+            Six chips + five 8px gaps = 665 + 40 = 705dp of content for a 328dp
+            column. Fitting the row on one line is arithmetically impossible at
+            360 — 328 does not even hold three of the six — and BRAND's other
+            two escapes both fail here as well:
+
+              * A DELIBERATE PEEK cannot be engineered. A peek has to land
+                between a third and a half of the next item, and a hug chip's
+                width is its label's width, so where the right edge falls is
+                whatever `activeChip` and the OS font scale happen to make it.
+                Today it lands two letters into "Hospitals".
+              * SHORTENING A LABEL buys nothing. Even stripping every glyph and
+                every plural, the six labels still measure past 328.
+
+            So the row wraps, which is `ChoiceChipRow`'s DEFAULT mode and the
+            one that degrades gracefully — it re-flows at any width and any font
+            scale instead of clipping. Packing at 328dp with the 8px row gap:
+
+              line 1  70 + 8 + 101 + 8 + 95            = 282   (+109 -> 399 X)
+              line 2  109 + 8 + 123                    = 240   (+127 -> 375 X)
+              line 3  127
+              height  3x44 + 2x8                       = 148dp
+
+            That costs 104dp against the 44dp scroller it replaces, and it buys
+            all six categories legible at rest rather than three and a fragment.
+            On a directory screen that is the right trade, but it IS a trade and
+            it is the reason this comment states the numbers.
+
+            The full-bleed `marginHorizontal: -GUTTER` goes with the scroller: a
+            wrapping row adds no padding of its own and simply sits inside the
+            screen's 16px gutter, which is where BRAND wants body sections
+            anyway ("Body sections must share the same left/right inset as the
+            app bar above them"). */}
+        <View style={{ marginTop: 16 }}>
+          {/* testID is the seam FindCareScreen.layout.test.tsx asserts on — a
+              wrapping row is a View with no `horizontal`, a scroller is a
+              ScrollView with `horizontal` set, so the decision above is locked
+              against being quietly reverted. */}
+          <ChoiceChipRow testID="find-care-type-chips">
             {MAIN_CHIPS.map((c) => (
               <ChoiceChip
                 key={c.value}
@@ -325,9 +380,39 @@ export function FindCareScreen() {
             trigger primitive or a `trailing` property added to 11:104 — a
             design-system decision. Until then it keeps a local component,
             renamed from `FacetChip` to `PickerTrigger` so nobody mistakes it for
-            a second chip, and narrowed to the one job it actually does. */}
-        <View style={{ marginHorizontal: -GUTTER, marginTop: 8 }}>
-          <ChoiceChipRow scrollable>
+            a second chip, and narrowed to the one job it actually does.
+
+            WRAPS TOO, and for the same reason as the row above — this row was
+            the worse of the two at 360dp. Four items, measured on device:
+
+              Specialty (trigger, 20px chevron + 4px gap)  107
+              Available Now                                111
+              Home Service                                 108
+              Nearest                                       76
+
+            402 + 3x8 = 426dp into a 328dp column. At rest "Home Service" ended
+            at x=360 — its right hairline exactly ON the screen edge, so the chip
+            read as whole while being clipped, which is the second failure BRAND
+            names ("never a near-complete item that reads as whole") — and
+            "Nearest" was not on screen at all. Wrapped at 328:
+
+              line 1  107 + 8 + 111  = 226   (+108 -> 342 X)
+              line 2  108 + 8 + 76   = 192
+              height  2x44 + 8        = 96dp
+
+            ON THE COPY: shortening "Home Service" was considered and rejected,
+            because the arithmetic says it buys nothing. The row is four items
+            over by 98dp; the longest sensible abbreviation ("Home visits",
+            ~98dp) saves 10. Even "Available Now" -> "Available" (-29) only moves
+            the split from 2+2 to 3+1 — still two lines, still 96dp tall. And the
+            label is not free to change: `filteredEntries` matches these strings
+            against the provider BADGES (`badgeText.includes(f)`, and
+            features/care/api.ts emits the badge as the literal "Home Service"),
+            so a rename means decoupling value from label to buy zero pixels and
+            desynchronise the filter chip from the badge it filters on. Left
+            verbatim, deliberately. */}
+        <View style={{ marginTop: 8 }}>
+          <ChoiceChipRow testID="find-care-facet-chips">
             <PickerTrigger
               label="Specialty"
               onPress={() => {

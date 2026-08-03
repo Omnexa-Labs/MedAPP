@@ -60,6 +60,7 @@ patient logo being left-aligned:
 | ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PatientAppBar`         | component set `741:887` (`Back=Hidden\|Shown`, default Hidden) | `LeadingGroup` (optional back 44×44, 8px gap, `<Logo />` h 42) + `RightGroup` (avatar 40 in a 44 target, 12px gap, bell 44×44) with unread badge. `AvatarWithFallback`, so photo → initials → silhouette. No fill on the bell, no shadow. |
 | `PatientShell`          | `741:887` + `740:1015`  | `PatientAppBar` → `flex-1` body → `BottomNav`; owns `StatusBar` and the top/left/right safe area. `showBottomNav={false}` + `hideBack={false}` for detail/transactional screens — the two halves of BRAND's one sentence. Forwards every bar and nav prop. |
+| `AccountMenu`           | **none — needs a designed frame** (docs/PIPELINE.md §5) | What the patient avatar opens: identity row, **Profile** → `/(app)/patient-profile-overview`, **Appearance** (`<AppearanceSelector />`), **Sign out**. Anchored under `PatientAppBar` (`PATIENT_APP_BAR_HEIGHT` + 4), right-aligned to the bar's `px-4`. `PatientShell` mounts it by DEFAULT; screens don't. |
 | `PractitionerAppBar`    | component set `656:850` (`Back=Shown\|Hidden`) | back (44×44) + centred `<Logo />` + bell (44×44) with unread badge. No `theme` prop — the Figma Theme variant only swaps the logo raster, which `<Logo variant="auto" />` already does.           |
 | `PractitionerBottomNav` | component set `381:628` | five tabs, `flex-1` each (≈75×48), Health Icons glyph + `label-sm`; active `primary`, inactive `on-surface-variant`. Adds the bottom safe-area inset the 393×1283 Figma canvas can't express.     |
 | `PractitionerShell`     | frame `72:117` layout   | composes both around a `flex-1` body; owns `StatusBar` and the top/left/right safe area.                                                                                                          |
@@ -69,6 +70,35 @@ The patient bottom nav stays at `src/features/home/components/BottomNav.tsx`
 because 12 screens already import it from there; `PatientTab` is re-exported from
 this barrel so a screen can type `activeTab` without reaching into the features
 tree. Moving the file is a separate, mechanical change.
+
+### The avatar is a real control now (`AccountMenu`)
+
+`PatientAppBar` has always had `onAvatarPress`, `PatientShell` has always
+forwarded it, and **no screen ever passed it** — so the avatar was a dead 44pt
+target on all 12 patient screens. Three things had no entry point as a result:
+`useAuthStore.signOut()` (implemented, called from nowhere — there was **no way
+to sign out of the app**), `/(app)/patient-profile-overview` (built, verified
+against frame `261:387`, linked from nothing), and `<AppearanceSelector />` (the
+three-way light/dark/system preference, referenced only by its own barrel).
+
+The default lives in the **shell**, not in the screens, for the same reason
+`PATIENT_TAB_HREFS` does: five tab roots render this bar, and the last time this
+kind of behaviour was left to each screen, three of them silently dropped the
+Inbox tab. A screen may still pass `onAvatarPress` to override; when it does, the
+menu is not mounted and `avatarExpanded` stays `undefined`, so the bar does not
+announce a disclosure that isn't there.
+
+Sign out is guarded **twice**, deliberately: it is the last row, below a hairline,
+after the whole Appearance block, and the only `error`-toned item (that answers
+"I meant to open my profile"), *and* it takes a confirmation (that answers "I did
+tap it" — `signOut()` calls `secureStorage.clearAll()`, so the recovery is
+re-authenticating, not an undo). The confirmation is a **state of the same
+`<Modal>`**, not a second one: stacked RN modals on Android are unreliable.
+
+After confirming, `AccountMenu` navigates **itself** — `router.replace(
+"/(public)/sign-in")` — then clears the session. `(app)/_layout`'s
+`<Redirect>` would also catch it, but only after a frame of authenticated UI has
+painted. The guard is a backstop, not the mechanism.
 
 ### Layout contract for `PatientShell`
 

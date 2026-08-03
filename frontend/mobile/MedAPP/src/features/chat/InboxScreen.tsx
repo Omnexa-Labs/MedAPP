@@ -89,6 +89,12 @@ interface Conversation {
 // ---------------------------------------------------------------------------
 // Seed data — mirrors the Stitch comp. Replace with an API call once the
 // messaging service exposes GET /v1/threads.
+//
+// Every clinician here is a doctor scripts/seed_dev_data.py actually creates,
+// because those are the names a tester sees in Find Care. The comp shipped three
+// that exist nowhere — "Sarah Miller", "Dr. James Carter", and a "Dr. Aris"
+// quoted inside the Cardiology Dept. preview — which made the app look like it
+// had a different roster on every screen.
 // ---------------------------------------------------------------------------
 
 const SEED_CONVERSATIONS: Conversation[] = [
@@ -97,7 +103,14 @@ const SEED_CONVERSATIONS: Conversation[] = [
     kind: "person",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuDeJpe2eyE7VBbPwXD7m2u2so2Q3OUNPtsrGrSFmYPgs-ebEdihstJSB8oCR4b47ByY3B_O0tXJvybxrQFcMdbXyy9xqS7U_kZ8nFPNvIRhmjvEdFwtFcHJV0XGrYK9jh0GeoJZ1vPacpmlGzjtsCd5RCBzska_0hXM0ZEU9ysDTcXuwGisPFsqxaJkEiaMkAZ9kics4W18HE6lSAYeAoyEI8J_niTdEBQuVwViQn55GrLPUW-D2piEuATB6NuuoRLh-IK3SrUgmo-b",
-    name: "Sarah Miller",
+    // Dr. Adjoa Boateng, the seeded cardiologist. This is the SAME thread and
+    // the same avatar URI as ChatThreadScreen's SEED_CONTACT, which renders
+    // "Doctor · Cardiologist" in its bar — so the row now carries the Doctor
+    // badge it was missing. Without it the `doctors` filter hid the app's only
+    // doctor thread while `private` (kind === "person" && !badge) listed her as
+    // a personal contact: a filter bug the rename made impossible to leave.
+    name: "Dr. Adjoa Boateng",
+    badge: { label: "Doctor", tint: "primary" },
     isOnline: true,
     unreadCount: 2,
     lastMessage: "I've attached the new lab results for review.",
@@ -111,7 +124,7 @@ const SEED_CONVERSATIONS: Conversation[] = [
     avatarFgColor: "#fefcff",
     name: "Cardiology Dept.",
     badge: { label: "Group", tint: "tertiary" },
-    lastMessage: "Dr. Aris: Patient #402 is ready for discharge.",
+    lastMessage: "Dr. Boateng: Patient #402 is ready for discharge.",
     timestamp: "11:20 AM",
   },
   {
@@ -130,7 +143,9 @@ const SEED_CONVERSATIONS: Conversation[] = [
     kind: "person",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuBUTvo_vK-LY786nB9Qm8QiGjqsasFuR2oU7WApcRWvQ0on_UAABBqqsQFdzCINcrdvD58_y1rz0hZ8cwUUbsPKcOA8-Abv6QQ34Sv5Ge7dlq443hA1m6pD16C7g6e7HbIOTqKzNTgjRceQTwRpV_dlXc_d7CF2aHF6eF0LwCMXN1v7csE-m-WyZwzlBqWiTUb3AVMWogTUFh5hZKKDh7HbJKqZ3OSRYbsucTW2N2niIkZK0l0qLP9G2r-tYdezp3iR4TioNqVV2J4h",
-    name: "Dr. James Carter",
+    // The seeded GP. A follow-up booking is primary-care work, and his seed bio
+    // is routine check-ups, chronic disease reviews and first-line referrals.
+    name: "Dr. Kwabena Osei",
     badge: { label: "Doctor", tint: "primary" },
     lastMessage: "Let's schedule a follow-up for next Tuesday.",
     timestamp: "Yesterday",

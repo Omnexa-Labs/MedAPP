@@ -969,6 +969,73 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   needed, and they should describe a **room you enter**, not a link that opens. The pending state
   needs copy too.
 
+- 2026-08-03 — Claude — **There was no way to sign out of MedApp, and the fix un-orphaned two
+  more things.** From the 360dp device session on the Itel S25 Ultra. —
+  `frontend/mobile/MedAPP/src/components/shell/AccountMenu.tsx` (new),
+  `PatientShell.tsx`, `PatientAppBar.tsx`, `shell/index.ts`, `shell/README.md`,
+  `shell/__tests__/{AccountMenu,PatientShell,PatientAppBar}.test.tsx`.
+
+  Sign-out was not hidden, it was **absent**. `useAuthStore.signOut()` had been implemented since
+  the auth store landed and was called from **nowhere in the app**. The reason was one prop:
+  `PatientAppBar.onAvatarPress` was plumbed through `PatientShell` and **no screen passed it**, so
+  the avatar was a dead 44pt control on all 12 patient screens. Two more things were unreachable
+  for the same reason: `/(app)/patient-profile-overview` — a built screen verified against frame
+  `261:387` that **nothing in the app linked to** — and `<AppearanceSelector />`, the three-way
+  light/dark/system preference, whose only reference in the tree was the barrel that exported it.
+  One default in the shell fixes all four.
+
+  The menu lives in the **shell**, not in the screens, for the same reason `PATIENT_TAB_HREFS`
+  does: five tab roots render that bar, and the last time this class of behaviour was left to
+  per-screen wiring, three roots silently dropped the Inbox tab and it took a route audit to find.
+  Sign-out is guarded twice on purpose — separated (last row, below a hairline, after the whole
+  Appearance block, the only `error`-toned item) **and** confirmed (`signOut()` calls
+  `secureStorage.clearAll()`, so the recovery is re-authenticating, not an undo). It then
+  navigates itself with `router.replace("/(public)/sign-in")` rather than letting `(app)`'s
+  `<Redirect>` sweep up after it, which would leave a frame of authenticated UI on screen.
+
+  — **FOR THE DESIGNER, TWO THINGS. (1) This menu has NO FRAME and needs one.** It was built from
+  existing design-system pieces and kept deliberately plain; it is an interim, not a spec. **(2)
+  It is the wrong shape at 360dp and the arithmetic says so, which is a design decision, not a
+  build one.** `AppearanceSelector` is three `flex-1` cells and each needs
+  `px-sm`×2 (24) + icon 18 + `gap-xs` 4 + "System" at `label-md` ≈ 50 = **96dp**, so
+  3 × 96 + its own `p-xs`×2 (8) + border×2 (2) = **298dp of content, intrinsically**. With 16dp
+  margins a 360dp screen allows a 328dp panel at most, so the panel is 320 and its padding had to
+  drop to 4 (at 12 it would need a 322dp panel — 304 of content, 18dp short, and "System" wraps or
+  clips on the device). A 280 panel, which is what a menu normally wants, gives 272 and is **26dp
+  short**. The consequence: at 393 a 320 panel leaves 57dp of scrim on its left and reads as a
+  **menu**; at 360 it leaves 24dp and reads as a **sheet**. Same component, two affordances, purely
+  because the selector's intrinsic width is fixed while the screen is not. The call is yours —
+  either `AppearanceSelector` gets a compact variant (stacked rows, or icon-only cells with the
+  label under them) and the menu can be 280 everywhere, or this becomes a real bottom sheet and
+  stops pretending to hang off the avatar.
+
+  — **For whoever next touches `src/components/ui/`** (this batch did not own it): the confirm
+  dialog in `AccountMenu` is the **second** copy of "centred scrim + card + `outline` cancel +
+  `error`-filled confirm" in the tree; `features/telehealth/components/LeaveCallDialog.tsx` is the
+  first. Extract a shared `ConfirmDialog` and retire both.
+
+  — **Two landmines this hit, both worth fixing properly and neither owned here.** (1)
+  `AccountMenu` reaches `@/store/auth-store` by a **lazy `require`**, not a static import, because
+  a static import pulls in `@/lib/config`, whose `readExtra()` throws at require time under Jest;
+  a static import in a SHELL file would force a `jest.mock` into ~10 suites across four parallel
+  batches. (`await import()` does not work either — jest-expo's CJS VM rejects it with
+  "--experimental-vm-modules", which means `auth-store.hydrate()`'s own dynamic import is
+  untestable.) The real fix is for `@/lib/config` not to throw at module scope. (2) `AccountMenu`
+  reads the top inset via `useContext(SafeAreaInsetsContext)`, not `useSafeAreaInsets()` — the
+  latter **throws** with no `<SafeAreaProvider>`, and since the shell mounts this on every patient
+  screen, the first cut took out six `FindCareScreen.routing` cases in another agent's batch. Most
+  screen suites render raw; anything mounted unconditionally by a shell has to tolerate that.
+  Covered now by a regression case in `AccountMenu.test.tsx`.
+
+  — **One real a11y defect fixed on the way past, in `PatientAppBar`.** Its pressable-avatar
+  branch wrapped `AvatarWithFallback` — which carries its own `accessibilityRole="image"` + label —
+  in a `Pressable` with the SAME label, so the name was published twice and TalkBack walked both
+  ("Melchizedek Narh, button. Melchizedek Narh, image."). Latent for the bar's whole life because
+  nothing ever passed `onAvatarPress`; live on 12 screens the moment the shell started supplying
+  the menu. The inner node is now demoted to decoration by clearing its role/label rather than by
+  hiding the subtree — hiding would also swallow the initials `<Text>`, i.e. the evidence that the
+  fallback chain picked initials over the silhouette.
+
 ---
 
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect

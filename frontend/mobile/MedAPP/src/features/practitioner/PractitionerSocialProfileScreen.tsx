@@ -58,7 +58,20 @@ const SCROLL_RESERVE = 40;
 // ---------------------------------------------------------------------------
 // Seed data — mirrors the Stitch comp. Replace with an API call once the
 // practitioner service exposes GET /v1/practitioners/:id.
+//
+// The practitioner is Dr. Abena Owusu, Nutrition & Dietetics, and she is a real
+// row in scripts/seed_dev_data.py — added there for this screen rather than
+// invented here. The comp shipped with "Dr. Sarah Jenkins", who exists nowhere
+// in the seed, so a tester who had just scrolled Find Care (Efua Asante, Adjoa
+// Boateng, Yaw Darko, Kwabena Osei, Nii Tetteh) met a sixth clinician who could
+// not be booked. This screen is a nutrition practice end to end — bio, services,
+// and both reviews talk about nutrition plans and gut health — so it needed a
+// nutritionist, not a re-label onto one of the existing five.
 // ---------------------------------------------------------------------------
+
+const PRACTITIONER_NAME = "Dr. Abena Owusu";
+/** Surname alone, for review copy that addresses her directly. */
+const PRACTITIONER_SURNAME = "Dr. Owusu";
 
 interface Review {
   id: string;
@@ -79,7 +92,7 @@ const SEED_REVIEWS: Review[] = [
     name: "James S.",
     rating: 5,
     timeAgo: "2 days ago",
-    body: "Dr. Jenkins is incredibly knowledgeable and patient. She took the time to understand my lifestyle and helped me create a realistic nutrition plan that I can actually stick to.",
+    body: `${PRACTITIONER_SURNAME} is incredibly knowledgeable and patient. She took the time to understand my lifestyle and helped me create a realistic nutrition plan that I can actually stick to.`,
     helpfulCount: 12,
   },
   {
@@ -192,7 +205,7 @@ export function PractitionerSocialProfileScreen() {
                   <Image
                     source={{ uri: AVATAR_URI }}
                     className="h-full w-full"
-                    accessibilityLabel="Dr. Sarah Jenkins"
+                    accessibilityLabel={PRACTITIONER_NAME}
                   />
                 </View>
                 <View className="absolute bottom-1 right-1 rounded-full bg-surface-container-lowest p-xs">
@@ -226,7 +239,7 @@ export function PractitionerSocialProfileScreen() {
             <View className="flex-row items-start justify-between mb-sm">
               <View className="flex-1 mr-sm">
                 <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
-                  Dr. Sarah Jenkins
+                  {PRACTITIONER_NAME}
                 </Text>
                 <Text className="font-label-md text-label-md text-primary mt-xs">
                   Clinical Nutritionist, RDN
@@ -254,7 +267,7 @@ export function PractitionerSocialProfileScreen() {
             <View className="flex-row gap-sm">
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Follow Dr. Sarah Jenkins"
+                accessibilityLabel={`Follow ${PRACTITIONER_NAME}`}
                 className="flex-1 flex-row items-center justify-center gap-xs rounded-lg bg-primary py-sm active:scale-[0.98]"
               >
                 <MaterialIcons name="person-add" size={18} color="#ffffff" />

@@ -73,7 +73,15 @@ import { router, type Href } from "expo-router";
 import { AvatarWithFallback, Icon, Logo } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 
-const BAR_HEIGHT = 64;
+/**
+ * The bar's own height, 64 per Figma 741:887.
+ *
+ * EXPORTED (mirroring `DETAIL_APP_BAR_HEIGHT`) because `AccountMenu` anchors
+ * itself directly under this bar and must not re-declare the number. A second
+ * copy is how the menu ends up overlapping the bell it hangs off.
+ */
+export const PATIENT_APP_BAR_HEIGHT = 64;
+const BAR_HEIGHT = PATIENT_APP_BAR_HEIGHT;
 /** The frame's own touch target — already >= the 44pt floor in docs/MOBILE_UX.md. */
 const TARGET = 44;
 /**
@@ -126,10 +134,25 @@ interface Props {
   avatarLabel?: string;
   /**
    * Optional. With no handler the avatar is a non-interactive image rather than
-   * a button that does nothing — there is no patient-settings destination the
-   * shell can assume.
+   * a button that does nothing.
+   *
+   * The comment that used to sit here read "there is no patient-settings
+   * destination the shell can assume", and that was the reason NOTHING passed
+   * this prop for the bar's whole life — the avatar was inert on all 12 callers.
+   * It is now stale: `PatientShell` supplies `AccountMenu` as the default
+   * destination, so every patient screen gets a working avatar without asking.
    */
   onAvatarPress?: () => void;
+  /**
+   * Present ONLY when the avatar opens a disclosure (i.e. `AccountMenu`), and
+   * then it is that menu's open state.
+   *
+   * `undefined` — a caller wired `onAvatarPress` to something that is not a
+   * menu — leaves both the `expanded` state and the hint off, because announcing
+   * "opens your account menu" for a plain navigation would be a lie. This is the
+   * only reason the prop is tri-state rather than a boolean with a default.
+   */
+  avatarExpanded?: boolean;
   /**
    * Unread notification count. The badge renders only for a positive number.
    *
@@ -157,6 +180,7 @@ export function PatientAppBar({
   avatarInitials,
   avatarLabel = "Your profile",
   onAvatarPress,
+  avatarExpanded,
   unreadCount,
   onNotificationsPress,
 }: Props) {
@@ -192,14 +216,28 @@ export function PatientAppBar({
   const showBadge = typeof unreadCount === "number" && unreadCount > 0;
   const badgeText = showBadge ? (unreadCount > 99 ? "99+" : String(unreadCount)) : "";
 
-  // AvatarWithFallback carries its own accessibilityRole="image" + label, so the
-  // wrapper only ever adds the 44pt target (and the button role, when pressable).
-  const avatar = (
+  // AvatarWithFallback carries its own accessibilityRole="image" + label. That is
+  // right when the wrapper is a plain View — the image IS the accessible thing.
+  //
+  // It was WRONG the moment the wrapper became a button, and that path is no
+  // longer hypothetical: PatientShell now supplies an account menu by default, so
+  // every patient screen takes it. Pressable(label) wrapping Image(same label)
+  // publishes the name TWICE, and TalkBack walks both — "Melchizedek Narh,
+  // button. Melchizedek Narh, image." on 12 screens. So when the avatar is a
+  // button the inner node is demoted to decoration.
+  //
+  // AvatarWithFallback spreads `...rest` AFTER its own a11y props, so passing
+  // these as `undefined` genuinely clears them. Note it is done this way rather
+  // than with `accessibilityElementsHidden` / `no-hide-descendants`: hiding the
+  // SUBTREE would also hide the initials <Text> inside it, and the initials are
+  // how "did the fallback chain pick initials or the silhouette?" is observable.
+  const avatarNode = (decorative: boolean) => (
     <AvatarWithFallback
       size={VISUAL}
       uri={avatarUri}
       initials={avatarInitials}
       label={avatarLabel}
+      {...(decorative ? { accessibilityRole: undefined, accessibilityLabel: undefined } : null)}
     />
   );
 
@@ -243,15 +281,22 @@ export function PatientAppBar({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={avatarLabel}
+            // Only when this button IS a disclosure — see the prop's doc. A
+            // caller that wired the avatar to a plain push gets neither, because
+            // neither would be true of it.
+            accessibilityState={
+              avatarExpanded === undefined ? undefined : { expanded: avatarExpanded }
+            }
+            accessibilityHint={avatarExpanded === undefined ? undefined : "Opens your account menu"}
             onPress={onAvatarPress}
             className="items-center justify-center rounded-full active:opacity-70"
             style={{ width: TARGET, height: TARGET }}
           >
-            {avatar}
+            {avatarNode(true)}
           </Pressable>
         ) : (
           <View className="items-center justify-center" style={{ width: TARGET, height: TARGET }}>
-            {avatar}
+            {avatarNode(false)}
           </View>
         )}
 

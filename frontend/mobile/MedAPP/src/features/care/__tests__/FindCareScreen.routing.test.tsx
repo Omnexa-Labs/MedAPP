@@ -14,7 +14,14 @@
 // decides bookability); hospitals and pharmacies are buildings and must never be
 // pushed at a practitioner profile.
 
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, screen } from "@testing-library/react-native";
+// Not RNTL's bare `render`: the screen mounts PatientShell, whose AccountMenu
+// calls `useSafeAreaInsets()`, and that throws "No safe area value available"
+// without a provider. `renderWithSafeArea` is the project's helper for exactly
+// that (FindCareScreen.nav.test.tsx and CommunityScreen.nav.test.tsx already use
+// it) and it supplies synchronous metrics, which is what the library documents
+// for tests.
+import { renderWithSafeArea as render } from "@/test/safe-area";
 import type { DirectoryEntry, FacilityEntry, PersonEntry } from "../types";
 
 let mockEntries: DirectoryEntry[] = [];

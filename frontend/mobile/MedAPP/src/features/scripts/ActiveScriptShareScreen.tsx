@@ -127,7 +127,10 @@ export function ActiveScriptShareScreen() {
   const drug = params.drug ?? "Lisinopril 10mg";
   const patient = params.patient ?? "Alex Rivers";
   const scriptId = params.scriptId ?? "#8829-X";
-  const prescriber = params.prescriber ?? "Dr. Sarah Jenkins";
+  // Same seeded cardiologist the view screen falls back to — these two are a
+  // pair and the view screen forwards `prescriber` here, so the defaults must
+  // not disagree. See ActiveScriptViewScreen for the reasoning.
+  const prescriber = params.prescriber ?? "Dr. Adjoa Boateng";
   const issuedDate = params.issuedDate ?? "Oct 12, 2023";
 
   // Which pharmacy card is mid-send (shows a spinner). null = none.

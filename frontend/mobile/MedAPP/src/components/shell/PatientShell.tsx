@@ -36,6 +36,7 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API
 // here. Only expo-status-bar is used.
 
+import { useState } from "react";
 import { View, type ViewProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -43,6 +44,7 @@ import { router, type Href } from "expo-router";
 import { useResolvedScheme } from "@/lib/theme";
 import { BottomNav, type PatientTab } from "@/features/home/components/BottomNav";
 import { PatientAppBar } from "./PatientAppBar";
+import { AccountMenu } from "./AccountMenu";
 
 // ---------------------------------------------------------------------------
 // THE TAB MAP — one copy, here, and nowhere else
@@ -125,6 +127,19 @@ interface Props extends Pick<ViewProps, "testID"> {
   avatarUri?: string | null;
   avatarInitials?: string | null;
   avatarLabel?: string;
+  /**
+   * Override what the avatar does. Like `onTabPress`, almost nothing should.
+   *
+   * THE DEFAULT IS THE ACCOUNT MENU (`AccountMenu`), and it lives here rather
+   * than in the screens for the same reason the tab map does: five tab roots
+   * render this bar, and the last time shell behaviour was left to per-screen
+   * wiring, three of them silently dropped the Inbox tab. Before this, EVERY
+   * caller omitted `onAvatarPress` — so the avatar was a dead 44pt control on all
+   * 12 patient screens, `signOut()` was unreachable from anywhere in the app,
+   * `/(app)/patient-profile-overview` was an orphaned route, and
+   * `<AppearanceSelector />` was an orphaned component. One default fixes all
+   * four, and no screen can forget it.
+   */
   onAvatarPress?: () => void;
   unreadCount?: number;
   onNotificationsPress?: () => void;
@@ -149,6 +164,13 @@ export function PatientShell({
   testID,
 }: Props) {
   const { scheme } = useResolvedScheme();
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
+  // The shared default for the avatar. A screen's own `onAvatarPress` wins, and
+  // when one is supplied the menu is not mounted at all — `avatarExpanded` stays
+  // `undefined` so the bar does not announce a disclosure that isn't there.
+  const usesAccountMenu = !onAvatarPress;
+  const handleAvatarPress = onAvatarPress ?? (() => setAccountMenuOpen(true));
 
   // The shared default. `onTabPress` wins if a screen supplies one.
   const handleTabPress =
@@ -176,12 +198,33 @@ export function PatientShell({
           avatarUri={avatarUri}
           avatarInitials={avatarInitials}
           avatarLabel={avatarLabel}
-          onAvatarPress={onAvatarPress}
+          onAvatarPress={handleAvatarPress}
+          avatarExpanded={usesAccountMenu ? accountMenuOpen : undefined}
           unreadCount={unreadCount}
           onNotificationsPress={onNotificationsPress}
         />
         <View className="flex-1">{children}</View>
         {showBottomNav ? <BottomNav active={activeTab} onTabPress={handleTabPress} /> : null}
+        {/* Mounted only when the shell owns the avatar. Inside the SafeAreaView
+            is fine — a <Modal> renders into its own window and is not clipped by
+            an ancestor — and it keeps the menu adjacent to the bar it belongs to.
+            It is rendered AFTER BottomNav so that, in the one case where RN falls
+            back to in-tree rendering (Fabric web), the menu still paints on top
+            of the absolutely-positioned nav rather than under it. */}
+        {usesAccountMenu ? (
+          <AccountMenu
+            visible={accountMenuOpen}
+            onClose={() => setAccountMenuOpen(false)}
+            // The same three values the bar's avatar uses, so the panel's
+            // identity row and the avatar the user tapped cannot disagree about
+            // the photo or the initials. The two components fall back to
+            // DIFFERENT defaults on purpose when a screen supplies no name:
+            // "Your profile" names a control, "Your account" names a session.
+            accountName={avatarLabel}
+            avatarUri={avatarUri}
+            avatarInitials={avatarInitials}
+          />
+        ) : null}
       </SafeAreaView>
     </View>
   );

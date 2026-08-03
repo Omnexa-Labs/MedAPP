@@ -25,9 +25,10 @@ describe("ActiveMedicationsScreen", () => {
     render(<ActiveMedicationsScreen />);
 
     expect(screen.getByText("Your current medications")).toBeTruthy();
-    expect(screen.getByText("Metformin extended-release")).toBeTruthy();
+    expect(screen.getByText("Metformin")).toBeTruthy();
+    expect(screen.getByText("Take 1 tablet with breakfast and dinner.")).toBeTruthy();
 
-    fireEvent.press(screen.getByLabelText("Request refill for Metformin extended-release"));
+    fireEvent.press(screen.getByLabelText("Request refill for Metformin"));
     expect(screen.getByText("Request sent")).toBeTruthy();
     expect(screen.getByText("We'll notify you once it's ready.")).toBeTruthy();
     expect(screen.getByText("Cancel before the pharmacy starts processing.")).toBeTruthy();
@@ -62,7 +63,7 @@ describe("ActiveMedicationsScreen", () => {
     expect(screen.getByText("Offline · Updated 12 Jul at 09:42")).toBeTruthy();
     expect(screen.getAllByText("Unavailable offline").length).toBeGreaterThan(0);
     expect(screen.getByText("Reconnect to request a refill or update this list.")).toBeTruthy();
-    expect(screen.queryByLabelText("Request refill for Metformin extended-release")).toBeNull();
+    expect(screen.queryByLabelText("Request refill for Metformin")).toBeNull();
   });
 
   it("shows a labelled loading state", () => {
@@ -71,10 +72,14 @@ describe("ActiveMedicationsScreen", () => {
     expect(screen.getByLabelText("Loading medications")).toBeTruthy();
   });
 
-  it("supports long medication names and opens the details placeholder", () => {
+  // The two-line clamp is a property of the card, not of any one drug name, so
+  // it is still asserted after "Metformin extended-release" became plain
+  // "Metformin" — the clamp is what keeps a genuinely long name from pushing the
+  // action row off a 360dp screen.
+  it("clamps medication names to two lines and opens the details placeholder", () => {
     render(<ActiveMedicationsScreen />);
-    expect(screen.getByText("Metformin extended-release").props.numberOfLines).toBe(2);
-    fireEvent.press(screen.getByLabelText("View details for Metformin extended-release"));
+    expect(screen.getByText("Metformin").props.numberOfLines).toBe(2);
+    fireEvent.press(screen.getByLabelText("View details for Metformin"));
     expect(router.push).toHaveBeenCalledWith({ pathname: "/(app)/medication-details", params: { id: "metformin-500" } });
   });
 
