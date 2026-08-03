@@ -54,7 +54,23 @@ const UPCOMING = {
   startsAtIso: FUTURE,
   endsAtIso: FUTURE,
   status: "confirmed" as const,
+  mode: "in-person" as const,
 };
+
+/** A video visit whose room the telemedicine service DID provision. */
+const UPCOMING_VIDEO = {
+  ...UPCOMING,
+  id: "b3",
+  mode: "video" as const,
+  roomId: "27db4d6b-2533-4afa-b807-2c14a4a621cd",
+};
+
+/**
+ * A video visit with NO room — `provision_room` never raises, so the booking
+ * service returns 201 with `room_id: null` when telemedicine is unreachable.
+ * There is a row in exactly this state in the seeded database.
+ */
+const UPCOMING_VIDEO_NO_ROOM = { ...UPCOMING, id: "b4", mode: "video" as const };
 const COMPLETED = {
   id: "b2",
   doctorId: "d-2",
@@ -88,10 +104,23 @@ afterEach(() => {
   activeClient = null;
 });
 
-/** Settle the query so assertions run against the loaded list, not the spinner. */
+/**
+ * Settle the query so assertions run against the loaded list, not the spinner.
+ *
+ * The explicit budgets are not padding for a slow assertion — every one of these
+ * renders is ~1s of react-test-renderer work on this screen, and Jest's default
+ * 5s combined with `waitFor`'s default 1s left the suite failing intermittently
+ * under `--maxWorkers` contention while passing in isolation. A flaky suite is
+ * worse than a slow one: it teaches the reader to re-run instead of to look.
+ */
+jest.setTimeout(30_000);
+
 const renderLoaded = async () => {
   const out = renderScreen();
-  await waitFor(() => expect(screen.queryByLabelText("Loading your appointments")).toBeNull());
+  await waitFor(
+    () => expect(screen.queryByLabelText("Loading your appointments")).toBeNull(),
+    { timeout: 15_000 },
+  );
   return out;
 };
 
@@ -250,5 +279,88 @@ describe("reads GET /v1/bookings", () => {
     await renderLoaded();
 
     expect(screen.getByText("Unknown clinician")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Modality — the badge and the join affordance (Figma 550:1826 / 550:2613)
+// ---------------------------------------------------------------------------
+//
+// The card had neither, because `BookingCreate` used to discard the In person /
+// Video choice the patient made and the server therefore could not say which a
+// booking was. `mode` and `room_id` are stored now, so both are buildable — and
+// the third state is the one that matters: a video booking with `room_id: null`
+// is a REAL response (`provision_room` never raises), and it must not produce a
+// button that goes nowhere.
+describe("consultation modality", () => {
+  it("badges an in-person booking as In person, with no join affordance", async () => {
+    await renderLoaded();
+
+    expect(screen.getByText("In person")).toBeTruthy();
+    expect(screen.queryByText("Video call")).toBeNull();
+    expect(screen.queryByText("Join video call")).toBeNull();
+    expect(screen.queryByText("Video link pending")).toBeNull();
+  });
+
+  it("badges a video booking as Video call and offers the join", async () => {
+    listAppointments.mockResolvedValue({ upcoming: [UPCOMING_VIDEO], past: [] });
+    await renderLoaded();
+
+    expect(screen.getByText("Video call")).toBeTruthy();
+    expect(screen.queryByText("In person")).toBeNull();
+    expect(
+      screen.getByLabelText("Join video call with Dr. Julian Sterling"),
+    ).toBeTruthy();
+    expect(screen.queryByText("Video link pending")).toBeNull();
+  });
+
+  it("routes Join through the WAITING ROOM, carrying the room_id as sessionId", async () => {
+    listAppointments.mockResolvedValue({ upcoming: [UPCOMING_VIDEO], past: [] });
+    await renderLoaded();
+
+    fireEvent.press(screen.getByLabelText("Join video call with Dr. Julian Sterling"));
+
+    // The waiting room, NOT the consultation: it is where the mic/camera check
+    // and the mute controls live, and it `replace()`s into the call itself once
+    // both sides are ready. Straight to the call would drop the patient into
+    // live video with an unconfigured camera.
+    expect(router.push).toHaveBeenCalledTimes(1);
+    const arg = (router.push as jest.Mock).mock.calls[0][0];
+    expect(arg.pathname).toBe("/(app)/waiting-room");
+    // The handle, not a URL — there is no `join_url` in this system.
+    expect(arg.params.sessionId).toBe(UPCOMING_VIDEO.roomId);
+    expect(arg.params.appointmentId).toBe(UPCOMING_VIDEO.id);
+    expect(arg.params.providerId).toBe(UPCOMING_VIDEO.doctorId);
+    expect(arg.params.providerName).toBe("Dr. Julian Sterling");
+    expect(arg.params.viewerRole).toBe("patient");
+    expect(arg.params).not.toHaveProperty("joinUrl");
+  });
+
+  it("renders PENDING, not a dead button, when a video booking has no room yet", async () => {
+    listAppointments.mockResolvedValue({ upcoming: [UPCOMING_VIDEO_NO_ROOM], past: [] });
+    await renderLoaded();
+
+    // Still a video visit — the missing room does not make it in person.
+    expect(screen.getByText("Video call")).toBeTruthy();
+    expect(screen.getByText("Video link pending")).toBeTruthy();
+    // No control at all, disabled or otherwise. A greyed "Join video call" tells
+    // the patient they are doing something wrong; the room is simply not ready.
+    expect(screen.queryByText("Join video call")).toBeNull();
+    expect(
+      screen.queryByLabelText("Join video call with Dr. Julian Sterling"),
+    ).toBeNull();
+  });
+
+  it("survives a mode it does not recognise instead of blanking the list", async () => {
+    // A badge must never be able to cost a patient sight of when they are due.
+    listAppointments.mockResolvedValue({
+      upcoming: [{ ...UPCOMING, mode: "telehealth" as unknown as "video" }],
+      past: [],
+    });
+    await renderLoaded();
+
+    expect(screen.getByText("Dr. Julian Sterling")).toBeTruthy();
+    expect(screen.getByText("In person")).toBeTruthy();
+    expect(screen.queryByText("Join video call")).toBeNull();
   });
 });

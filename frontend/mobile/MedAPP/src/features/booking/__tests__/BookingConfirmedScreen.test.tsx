@@ -100,7 +100,10 @@ const IN_PERSON_CHECKLIST = [
 ];
 const VIDEO_CHECKLIST = [
   "Test your microphone and camera",
-  "Join the link 10 minutes before the start",
+  // Was "Join the link 10 minutes before the start", which is the frame's copy
+  // and false twice over: `telemedicine_service` issues no link (a room is
+  // joined in-app from `room_id`) and gates joining on no time window at all.
+  "Join from My Appointments when it is time",
   "Find a quiet spot with a stable connection",
 ];
 
@@ -264,7 +267,7 @@ describe("consultation mode", () => {
     expect(screen.getByText("Video")).toBeTruthy();
     expect(
       screen.getByText(
-        "Your video consultation is confirmed. The join link opens 10 minutes before the start.",
+        "Your video consultation is confirmed. You'll join it from My Appointments.",
       ),
     ).toBeTruthy();
   });

@@ -8,6 +8,7 @@ from .booking_service import (
 )
 from .rate_limit import BookingRateLimiter
 from .root_service import get_service_status
+from .telemedicine import provision_room
 
 __all__ = [
     "BookingError",
@@ -18,4 +19,5 @@ __all__ = [
     "get_booking_summary",
     "get_service_status",
     "list_bookings",
+    "provision_room",
 ]

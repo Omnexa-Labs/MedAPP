@@ -878,6 +878,97 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   `review_appointment` and `booking_confirmed`. Every colour on the new nodes is variable-bound
   and audits clean, so a proof would pass — but it does not exist yet and I did not add one.
 
+- 2026-08-03 — Claude (backend) — **`booking_service` now persists the consultation mode, and
+  provisions a telemedicine room when it is video.** This closes item 2 of the 2026-08-02
+  backend list ("No `join_url`, and no way to even ask for one"). Items 1, 3, 4, 5 and 6 on that
+  list are untouched and still open.
+
+  **The field is `mode` + `room_id`. There is no `join_url`, and there will not be one.**
+  `telemedicine_service` has no URL concept anywhere in it: `RoomOut` is
+  `{room_id, booking_id, room_name, status, scheduled_for, ended_at, recording_enabled,
+  created_by_user_id}`, and a client joins by calling `GET /v1/rooms/{room_id}/token` and then
+  `POST /v1/rooms/{room_id}/join` with that token in an `X-Room-Token` header. A `join_url`
+  could only be synthesised from a public base URL that does not exist in this system — the
+  exact "invent the field" move that produced `POST /v1/appointments`. `room_id` is the real
+  handle; the app builds its own in-app route from it.
+
+  **The new contract for the client — `BookingCreate` / `BookingOut`:**
+
+  | Field | On | Type | Notes |
+  |---|---|---|---|
+  | `mode` | `BookingCreate`, `BookingOut` | `"in_person"` \| `"video"` | Defaults to `in_person` when omitted, so pre-existing callers keep working. An unknown string is a **422**, not a coercion to the default. |
+  | `room_id` | `BookingOut` | UUID \| **null** | The telemedicine room. Null is legal, including on a video booking. |
+
+  **`room_id: null` on a `mode: "video"` booking is a REPRESENTABLE, DOCUMENTED STATE, not a
+  bug and not an accident.** It means "no room yet". Provisioning is attempted once, at
+  creation, and it is deliberately **not** part of the booking's success condition: a patient who
+  picked a slot and pressed Confirm has made a commitment, and losing it because a secondary
+  service was down is strictly the worse outcome — the slot may be gone by the time they retry,
+  and the clinician's calendar is the scarce resource. So the booking is created, the room is
+  attempted, and on any failure `room_id` stays null and the failure is logged
+  (`room_provision_upstream_error` / `room_provision_network_error` /
+  `room_provision_bad_response`). **Clients must render "video link pending" for this state, never
+  a dead "Join video call" button.** `appointment_management` `550:1826` therefore needs three
+  states on its appointment card, not two: In person (badge, no join control), Video with a
+  `room_id` (badge + live Join), Video with `room_id: null` (badge + pending, disabled). The third
+  is not hypothetical — it happened for real during this round's verification, and that row is
+  still in the dev database (`bb958b18-9a88-450b-944c-b25055d3cc7f`).
+
+  **Migration `20260803_0002` on `bookings`, run against `medapp_pgdata` with two real rows in
+  it.** `mode` is `VARCHAR(16) NOT NULL` with `server_default 'in_person'` (kept, not dropped —
+  a writer that predates the model change should still insert a legal row rather than trip a NOT
+  NULL violation), plus `ix_bookings_mode`. `room_id` is a nullable UUID with **no** FK: the room
+  is a row in telemedicine_service's own database. String + a Pydantic `StrEnum` at the boundary
+  rather than a PG ENUM, matching `status` in the same table and every other service here, so a
+  third modality can ship as one deploy instead of an `ALTER TYPE ... ADD VALUE` that cannot run
+  inside a migration transaction. Both steps are inspector-guarded; I proved re-runnability by
+  stamping the revision back and running `upgrade head` a second time over columns that already
+  existed.
+
+  **What the backfill asserts, said out loud:** every booking created before this column existed
+  was in person. It is safe because the client had no field in which to express a mode and the
+  server never provisioned a room, so no pre-existing row can have a session behind it. And the
+  two possible errors are not symmetric — labelling a video booking "in person" sends a patient
+  travelling, which they discover and can fix with a phone call; labelling an in-person booking
+  "video" tells them to stay home waiting for a link that will never arrive, and they miss the
+  appointment. `in_person` is also the value that renders no video affordance, so a backfilled
+  row cannot produce a dead Join button.
+
+  — **A real, pre-existing outage found and fixed on the way: `POST /v1/rooms` could never
+  succeed.** `shared.db.TimestampMixin` declares `created_at`/`updated_at` with
+  `server_default=func.now()`, but telemedicine's initial revision `20260518_0001` created all
+  three tables `NOT NULL` with **no** server_default, so every INSERT died on
+  `NotNullViolationError: null value in column "created_at" of relation "rooms"`. Not one room,
+  participant or message could ever be created in a migrated database — since May.
+  `telemedicine_service/alembic/versions/20260803_0002_timestamp_server_defaults.py` restores the
+  defaults on all three tables. Two things worth keeping from this:
+  **(1) the graceful-failure design is what made it visible** — the first video booking returned
+  201 with `room_id: null` and one log line, instead of 500-ing and burying the cause;
+  **(2) telemedicine's own 6 tests pass and always did**, because its conftest builds the schema
+  with `Base.metadata.create_all` from the model, which carries the server_default the migration
+  omitted. A suite that builds its schema from the models cannot tell you the migration disagrees
+  with them. That is the same shape as "a test that mocks the boundary cannot tell you the
+  boundary is wrong", one layer down.
+
+  **Verified over HTTP through the gateway on :8010** as the seeded patient, not in a test
+  harness: in-person 201 → `mode: "in_person"`, `room_id: null`, zero calls to telemedicine;
+  video 201 → `mode: "video"`, `room_id: "27db4d6b-2533-4afa-b807-2c14a4a621cd"`, and
+  `GET /v1/rooms/27db4d6b-…` returns 200 with `booking_id` matching the booking — the stored
+  handle actually resolves. `mode: "telehealth"` → 422. `GET /v1/bookings` returns all five rows
+  including the two pre-migration ones, correctly backfilled `in_person`. 21 tests in
+  `booking_service` (9 new), 6 in `telemedicine_service`.
+
+  — **For the client side (mobile), in priority order:** (1) send `mode` from the booking flow —
+  it is currently dropped at the boundary; (2) `booking_confirmed` may now say "in-person"
+  truthfully, because the server stores it; (3) build the `appointment_management` badge and Join
+  control off `mode` + `room_id`, with the three-state rule above; (4) the join itself is
+  `token` then `join`, not a URL navigation. — **For the designer:** the 2026-08-02 note
+  "STILL UNTRUE COPY" is now half-resolved. A video booking has a real room, so "join" copy can
+  exist — but "The join link opens 10 minutes before the start" is still wrong twice over: there
+  is no link, and nothing in `telemedicine_service` gates joining on a time window. New words
+  needed, and they should describe a **room you enter**, not a link that opens. The pending state
+  needs copy too.
+
 ---
 
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect

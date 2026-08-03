@@ -18,9 +18,12 @@
 //     router = APIRouter(prefix="/v1/bookings")   @router.post("") -> 201
 //   backend/services/booking_service/app/schemas/booking.py
 //     BookingCreate { doctor_id: UUID, starts_at, ends_at,
-//                     reason?: str(<=255), notes?: str }
+//                     reason?: str(<=255), notes?: str,
+//                     mode: BookingMode = in_person }
 //     BookingOut    = BookingCreate + { booking_id, user_id, status,
-//                                       cancelled_at?, cancellation_reason? }
+//                                       cancelled_at?, cancellation_reason?,
+//                                       mode, room_id?: UUID|None }
+//     BookingMode(StrEnum) = in_person | video   (migration 20260803_0002)
 //   backend/services/booking_service/app/services/booking_service.py
 //     starts_at < ends_at; BOTH must be timezone-aware (naive is rejected with
 //     "starts_at must be timezone-aware"); starts_at must be in the future;
@@ -29,6 +32,13 @@
 //
 // THERE IS NO `booking_reference` AND NO `join_url` ANYWHERE IN THE BACKEND.
 // Both were invented by the previous pass and are gone from the wire type here.
+// `room_id` is NOT a rehabilitation of `join_url`: `telemedicine_service` has no
+// URL concept at all — its `RoomOut` is `{room_id, booking_id, room_name,
+// status, scheduled_for, ended_at, recording_enabled, created_by_user_id}` and a
+// client joins by calling `GET /v1/rooms/{room_id}/token` then
+// `POST /v1/rooms/{room_id}/join`. A `join_url` could only be synthesised from a
+// public base URL that does not exist in this system. `room_id` is the real
+// handle; the app builds its own in-app route from it.
 // Nothing in this file synthesises a human-readable reference out of
 // `booking_id` — a fabricated reference on a medical confirmation is a number
 // the patient reads out to a clinic that has never seen it. If the product
@@ -46,6 +56,17 @@ import { ApiError } from "@/types/api";
 
 // ---- Wire shapes (exactly what the service sends/receives) ----------------
 
+/**
+ * `BookingMode(StrEnum) = in_person | video` — the service's own spelling,
+ * SNAKE, and the only two values it will accept (`mode: "telehealth"` is a 422
+ * reading "Input should be 'in_person' or 'video'"). The app talks in
+ * `"in-person" | "video"` because that is what `SelectTimeSlotScreen` pushes and
+ * what four screens already type; translating between the two is this module's
+ * job, exactly like the datetime composition below, and no screen ever sees the
+ * underscore.
+ */
+type BookingModeWire = "in_person" | "video";
+
 interface BookingCreateWire {
   doctor_id: string;
   /** RFC 3339 WITH an offset. A naive datetime is rejected by the service. */
@@ -53,6 +74,7 @@ interface BookingCreateWire {
   ends_at: string;
   reason?: string;
   notes?: string;
+  mode?: BookingModeWire;
 }
 
 interface BookingOutWire {
@@ -66,6 +88,23 @@ interface BookingOutWire {
   notes?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  /**
+   * NOT NULL with `server_default 'in_person'` on the table, so a well-formed
+   * response always carries it. Optional here only to survive an older
+   * deployment behind the gateway — see `adaptMode`.
+   */
+  mode?: BookingModeWire;
+  /**
+   * The telemedicine room, when the service provisioned one. NULL is a REAL
+   * state on a `video` booking, not an error: `provision_room` never raises, so
+   * a room the telemedicine service could not create leaves this null and the
+   * booking still 201s. Clients must render "pending", never a dead join
+   * control. There is no `join_url` — `telemedicine_service` has no URL
+   * concept; joining is `GET /v1/rooms/{id}/token` then
+   * `POST /v1/rooms/{id}/join`, so `room_id` is the handle and the app builds
+   * its own in-app route from it.
+   */
+  room_id?: string | null;
 }
 
 // ---- App-facing types -----------------------------------------------------
@@ -76,6 +115,13 @@ interface BookingOutWire {
  * the service wants two offset-bearing instants. The conversion is this
  * module's job, not a screen's.
  */
+/**
+ * How the consultation happens — a separate axis from consultation TYPE (a
+ * "Follow-up Visit" can be either). Hyphenated because that is the union the
+ * booking screens already carry and push as a route param.
+ */
+export type BookingMode = "in-person" | "video";
+
 export interface CreateBookingPayload {
   /**
    * REQUIRED — `BookingCreate.doctor_id` is a non-optional UUID. There is no
@@ -94,13 +140,22 @@ export interface CreateBookingPayload {
   /** Patient's reason for the visit. Service caps this at 255 characters. */
   reason?: string;
   notes?: string;
+  /**
+   * In person or video. OMITTED rather than defaulted here when the caller has
+   * none: `BookingCreate.mode` is `= IN_PERSON`, so the *server* owns the
+   * default, and letting the client also decide it means two places to change
+   * if that default ever moves.
+   */
+  mode?: BookingMode;
 }
 
 /**
  * The booking, as the app talks about it. Every field here is one the server
  * actually returned. There is deliberately no `bookingReference` and no
  * `joinUrl` — the backend has neither, and an optional field that can never be
- * populated is just an invitation to invent one later.
+ * populated is just an invitation to invent one later. `roomId` is NOT the
+ * exception to that rule: it is a real column the service populates, and it is
+ * a handle, not a URL.
  */
 export interface Booking {
   bookingId: string;
@@ -114,6 +169,18 @@ export interface Booking {
   notes?: string;
   cancelledAtIso?: string;
   cancellationReason?: string;
+  /**
+   * STORED, not echoed from a route param — this is what the confirmation screen
+   * must render, because it is what the clinic will see.
+   */
+  mode: BookingMode;
+  /**
+   * The telemedicine room handle, when there is one. Absent on every in-person
+   * booking (nothing is provisioned) AND on a video booking whose room could not
+   * be created — the two cases are distinguished by `mode`, never by this field
+   * alone.
+   */
+  roomId?: string;
 }
 
 // ---- Helpers --------------------------------------------------------------
@@ -276,6 +343,25 @@ const REASON_MAX = 255;
 
 // ---- Adapter --------------------------------------------------------------
 
+/** `"in-person" | "video"` -> the service's `in_person | video`. */
+function modeToWire(mode: BookingMode): BookingModeWire {
+  return mode === "video" ? "video" : "in_person";
+}
+
+/**
+ * The service's spelling -> the app's.
+ *
+ * An ABSENT or unrecognised `mode` reads as in person, and the asymmetry is the
+ * reason: "in person" on a video booking sends someone travelling, which they
+ * discover and fix with a phone call; "video" on an in-person booking tells them
+ * to stay home waiting for a session that does not exist, and they miss the
+ * appointment. In-person also renders no video affordance, so a fallback can
+ * never produce a join control with nothing behind it.
+ */
+function adaptMode(mode: string | null | undefined): BookingMode {
+  return mode === "video" ? "video" : "in-person";
+}
+
 function adaptBooking(b: BookingOutWire): Booking {
   return {
     bookingId: b.booking_id,
@@ -288,6 +374,8 @@ function adaptBooking(b: BookingOutWire): Booking {
     notes: text(b.notes),
     cancelledAtIso: text(b.cancelled_at),
     cancellationReason: text(b.cancellation_reason),
+    mode: adaptMode(b.mode),
+    roomId: text(b.room_id),
   };
 }
 
@@ -330,13 +418,18 @@ export const bookingApi = {
       if (notes) body.notes = notes;
     }
 
-    // NOTE — consultation MODE ("video" / "in-person") and TYPE ("Standard
-    // Consultation") are NOT sent. `BookingCreate` has no field for either, and
-    // they are not smuggled into `notes`, where nothing reads them and they
-    // would pollute a clinician-facing free-text field. This is a real drop,
-    // not a rounding: to the booking service a video consultation and an
-    // in-person one are the same row, which is also why no `join_url` comes
-    // back. Logged in docs/PIPELINE.md §5.
+    // MODE IS SENT NOW. `BookingCreate` gained `mode: BookingMode = IN_PERSON`
+    // (migration 20260803_0002), so the choice the patient makes on
+    // `select-time-slot` is stored on the row instead of being displayed twice
+    // and persisted never. Only set when the caller actually has one — the
+    // field is defaulted server-side, and posting `"in_person"` for "the flow
+    // did not say" would turn an absence into an assertion.
+    //
+    // Consultation TYPE ("Standard Consultation") is STILL NOT SENT. There is
+    // no column for it, and it is not smuggled into `notes`, where nothing
+    // reads it and it would pollute a clinician-facing free-text field. That
+    // one remains a real drop, logged in docs/PIPELINE.md §5.
+    if (payload.mode) body.mode = modeToWire(payload.mode);
 
     const wire = await client.post<BookingOutWire>(BOOKINGS_PATH, body);
     return adaptBooking(wire);
@@ -360,4 +453,11 @@ export const bookingApi = {
 };
 
 /** Exported for the tests that pin the composition rules. */
-export const __testables = { composeLocal, toOffsetIso, resolveEnd, DEFAULT_SLOT_MINUTES };
+export const __testables = {
+  composeLocal,
+  toOffsetIso,
+  resolveEnd,
+  DEFAULT_SLOT_MINUTES,
+  modeToWire,
+  adaptMode,
+};

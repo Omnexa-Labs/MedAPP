@@ -12,6 +12,19 @@ class BookingStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class BookingMode(StrEnum):
+    """The consultation modality the patient chose.
+
+    Two values today. An unknown string is a 422, not a silent coercion to
+    the default — a client that sends `"telehealth"` has a bug, and answering
+    201 with `mode="in_person"` would hide it until a patient travelled to a
+    clinic for a video appointment.
+    """
+
+    IN_PERSON = "in_person"
+    VIDEO = "video"
+
+
 class BookingBase(BaseModel):
     doctor_id: UUID
     starts_at: datetime
@@ -21,7 +34,10 @@ class BookingBase(BaseModel):
 
 
 class BookingCreate(BookingBase):
-    pass
+    # Defaulted rather than required so the four existing callers of
+    # POST /v1/bookings that predate the field keep working; the mobile
+    # booking flow always sends it explicitly.
+    mode: BookingMode = BookingMode.IN_PERSON
 
 
 class BookingCancel(BaseModel):
@@ -34,6 +50,17 @@ class BookingOut(BookingBase):
     booking_id: UUID
     user_id: UUID
     status: BookingStatus
+    mode: BookingMode
+    # The telemedicine room handle, or null. NOT a URL: telemedicine_service
+    # has no URL concept — a client joins with
+    # `GET /v1/rooms/{room_id}/token` then `POST /v1/rooms/{room_id}/join`,
+    # and builds its own in-app route from the id. Synthesising a `join_url`
+    # would require a public base URL that does not exist in this system.
+    #
+    # Null is legal on a video booking and means "no room yet" — either
+    # provisioning failed or has not been attempted. Clients render
+    # "video link pending", never a dead join button.
+    room_id: UUID | None = None
     cancelled_at: datetime | None = None
     cancellation_reason: str | None = None
 

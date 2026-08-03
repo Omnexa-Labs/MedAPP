@@ -70,9 +70,16 @@
 //     pending state exists to map onto. Completed is derived from the clock.
 //   - **Facility is hidden.** `BookingOut` has no facility and the doctor
 //     profile has no practice address.
-//   - **Consultation type is whatever `reason` holds.** The mode and type the
-//     user picks are dropped by `BookingCreate`, so the server does not know
-//     what kind of appointment this was.
+//   - **Consultation type is whatever `reason` holds.** `BookingCreate` still has
+//     no column for the TYPE the user picks, so the server does not know what
+//     kind of appointment this was.
+//
+// The MODE is no longer on that list. `mode` and `room_id` ship on `bookings`
+// (migration 20260803_0002), so the two things 550:1826 draws and this file used
+// to refuse to build are now facts the server reports: the modality badge
+// (550:2613) and, on a video visit, a join control. See `ModalityBadge` and the
+// join block in `UpcomingCard` — including the third state the frame does not
+// draw, a video booking whose room could not be provisioned.
 //
 // Cancelled bookings appear under Past, labelled as cancelled — not silently
 // dropped, and never relabelled "Completed", which on a medical record would
@@ -82,7 +89,11 @@ import { useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { appointmentsApi, type Appointment } from "@/features/appointments/api";
+import {
+  appointmentsApi,
+  type Appointment,
+  type AppointmentMode,
+} from "@/features/appointments/api";
 import { DetailShell } from "@/components/shell";
 import { AvatarWithFallback, Button, Icon } from "@/components/ui";
 import { blendTokens, useTokenColor } from "@/lib/tokens";
@@ -90,6 +101,12 @@ import { useResolvedScheme } from "@/lib/theme";
 
 interface UpcomingAppointment {
   id: string;
+  /**
+   * Carried for the telehealth handoff only. `WaitingRoomScreen` falls back to a
+   * hardcoded "Dr. Julian Sterling" when it is given no `providerId`, and a real
+   * appointment must not land on that stub.
+   */
+  doctorId: string;
   doctorName: string;
   specialty: string;
   facility: string;
@@ -97,6 +114,16 @@ interface UpcomingAppointment {
   status: "confirmed";
   dateLabel: string; // "Tuesday, Oct 24 • 10:30 AM"
   consultationType: string;
+  /** Drives the modality badge AND the presence of a join control. */
+  mode: AppointmentMode;
+  /**
+   * The telemedicine room, when the service provisioned one. `mode === "video"`
+   * with no `roomId` is a real backend state, and it renders as pending — see
+   * `ModalityBadge` / the join block in `UpcomingCard`.
+   */
+  roomId?: string;
+  /** Carried into the waiting room so it can name the clinician. */
+  startsAtIso: string;
 }
 
 interface PastAppointment {
@@ -149,6 +176,7 @@ function initialsOf(name: string): string {
 function toUpcoming(a: Appointment): UpcomingAppointment {
   return {
     id: a.id,
+    doctorId: a.doctorId,
     doctorName: doctorName(a),
     specialty: a.doctor?.specialty ?? "",
     // BookingOut carries no facility, and doctor_service has no practice
@@ -158,10 +186,13 @@ function toUpcoming(a: Appointment): UpcomingAppointment {
     avatarUri: a.doctor?.avatarUri ?? "",
     status: "confirmed",
     dateLabel: formatWhen(a.startsAtIso),
-    // The mode/type the user picked are dropped by `BookingCreate`, so the
-    // server cannot tell us what this consultation was. `reason` is the only
-    // free text that survives the round trip.
+    // TYPE is still dropped by `BookingCreate` — there is no column for it — so
+    // `reason` remains the only free text that survives the round trip. MODE is
+    // no longer in that category: it is stored, and it arrives below.
     consultationType: a.reason ?? "",
+    mode: a.mode,
+    roomId: a.roomId,
+    startsAtIso: a.startsAtIso,
   };
 }
 
@@ -510,6 +541,74 @@ function TabButton({
 }
 
 // ---------------------------------------------------------------------------
+// Modality badge (Figma 550:2613)
+// ---------------------------------------------------------------------------
+
+/**
+ * "In person" / "Video call", beside the Confirmed pill.
+ *
+ * WHY IT IS AN OUTLINED PILL AND NOT A SECOND FILLED ONE. It sits immediately
+ * next to the status pill, and status is the higher-stakes signal — whether the
+ * appointment is happening at all. Two filled containers in one row read as two
+ * statuses and make the eye choose; the frame's `outline-variant` hairline on the
+ * card's own surface puts the modality one level down, which is the hierarchy
+ * 550:2613 draws. It also means the badge carries no status tone it has not
+ * earned: a video visit is neither good news nor a warning.
+ *
+ * COLOUR IS NOT THE SIGNAL, and here it could not be even in principle — both
+ * variants are the same neutral pair. The GLYPH plus the WORDS carry the
+ * difference (docs/BRAND.md §Colour rules), so this reads identically to someone
+ * who cannot distinguish the two glyph shapes.
+ *
+ * The glyphs are `chrome`, matching `location-on` two rows above in this same
+ * card and the `videocam` the confirmation screen's checklist already uses:
+ * neither modality is a clinical concept with a Health Icon, and `hospital`
+ * (a building) would be wrong for "you are attending in person".
+ */
+const MODALITY: Record<AppointmentMode, { icon: "location-on" | "videocam"; label: string }> = {
+  "in-person": { icon: "location-on", label: "In person" },
+  video: { icon: "videocam", label: "Video call" },
+};
+
+function ModalityBadge({ mode }: { mode: AppointmentMode }) {
+  const label = useTokenColor("on-surface-variant");
+  // The `?? "in-person"` is not dead code the type system makes unreachable:
+  // `mode` crosses a network boundary, and an unindexed value here would throw
+  // INSIDE the card and take the whole appointments list down with it — a badge
+  // must never be able to cost a patient sight of when they are due. Same
+  // direction as the adapter's fallback, for the same asymmetry.
+  const m = MODALITY[mode] ?? MODALITY["in-person"];
+
+  return (
+    <View
+      // Not `accessibilityRole="text"`: grouping the glyph and the words under
+      // one label is what stops a screen reader announcing an icon name beside
+      // the word it already said.
+      accessible
+      accessibilityLabel={m.label}
+      className="flex-row items-center border border-outline-variant"
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 999,
+        gap: 4,
+      }}
+    >
+      {/* Decorative — `accessible` above already speaks the label. */}
+      <Icon chrome={m.icon} size={14} color={label} />
+      <Text
+        className="text-on-surface-variant"
+        // 12, the ramp's floor, matched to the Confirmed pill beside it so the
+        // two pills share a baseline and a cap height.
+        style={{ fontSize: 12, fontWeight: "600" }}
+      >
+        {m.label}
+      </Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Upcoming card
 // ---------------------------------------------------------------------------
 
@@ -631,11 +730,10 @@ function UpcomingCard({
             {statusStyle.label}
           </Text>
         </View>
-        {/* The frame also carries a modality badge here ("In person" / "Video
-            call"). It is NOT built: `BookingCreate` drops the mode the user
-            picks, so the server cannot say which this is, and a badge that
-            guesses would be worse than none. Logged in PIPELINE §5 as a backend
-            request. */}
+        {/* The modality badge, now buildable — the mode is stored on the row
+            (migration 20260803_0002) instead of being discarded at the boundary,
+            so this states a fact rather than guessing at one. */}
+        <ModalityBadge mode={appointment.mode} />
       </View>
 
       {/* Date/Time strip */}
@@ -664,6 +762,102 @@ function UpcomingCard({
           </Text>
         </View>
       </View>
+
+      {/* ==================================================================
+          "Join video call" (Figma 550:1826) — video bookings ONLY, and only
+          once there is a room to join.
+          ==================================================================
+          THREE STATES, not two, because the backend really has three:
+
+            in-person              nothing here at all
+            video + room_id        the join button
+            video + room_id null   a pending note, NOT a disabled button
+
+          The third is not a defensive hypothetical. `provision_room` never
+          raises: when `telemedicine_service` cannot create the room, the booking
+          still returns 201 with `room_id: null` and one server-side log line.
+          There is a real row in the seeded database in exactly that state. A
+          button rendered over it would either be dead (a control that looks live
+          and does nothing — the same defect as the confirmation screen's old
+          share icon) or would have to invent a room id, which is the mistake
+          that cost this project a round.
+
+          WHY THE WAITING ROOM AND NOT THE CALL. `/(app)/telemedicine-consultation`
+          is the call itself; `/(app)/waiting-room` is the screen that checks the
+          microphone, the camera and the connection, lets the patient mute or
+          turn the camera off BEFORE anyone sees them, and then
+          `router.replace()`s into the consultation once the other side is ready.
+          Routing straight to the consultation would skip the hardware check and
+          drop a patient into a live video call with a camera they had no chance
+          to configure — and it would strand them there, since the waiting room is
+          also where the "provider hasn't joined yet" state is drawn. The
+          consultation screen is reached THROUGH the waiting room, exactly as
+          `WaitingRoomScreen.join` already does it.
+
+          The room id travels as `sessionId`, which is the field
+          `TelehealthSessionParams` already reserves for it — not a new param and
+          not a URL. There is no `join_url` in this system: joining is
+          `GET /v1/rooms/{id}/token` then `POST /v1/rooms/{id}/join`, so the
+          handle is all the app needs and the route is built in-app from it. */}
+      {appointment.mode === "video" ? (
+        appointment.roomId ? (
+          <Button
+            label="Join video call"
+            variant="primary"
+            size="cta"
+            leadingIcon="videocam"
+            // Nothing on this screen floats (see the closing note), so the
+            // primary variant's `elevation/cta` blur is opted out of here as it
+            // is on "Book new appointment".
+            shadow={false}
+            className="mb-sm"
+            accessibilityLabel={`Join video call with ${appointment.doctorName}`}
+            onPress={() =>
+              router.push({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                pathname: "/(app)/waiting-room" as any,
+                params: {
+                  // The room handle, under the name the telehealth session type
+                  // already gives it.
+                  sessionId: appointment.roomId,
+                  appointmentId: appointment.id,
+                  providerId: appointment.doctorId,
+                  providerName: appointment.doctorName,
+                  providerSpecialty: appointment.specialty,
+                  providerAvatar: appointment.avatarUri,
+                  startAt: appointment.startsAtIso,
+                  // The patient's own view. `parseViewerRole` defaults to this
+                  // anyway; stating it means a future practitioner entry point
+                  // cannot inherit the wrong one by omission.
+                  viewerRole: "patient",
+                },
+              })
+            }
+          />
+        ) : (
+          /* Pending, stated in words. Not a disabled "Join video call" — a
+             greyed control tells the patient they are doing something wrong,
+             when in fact the room is not ready and there is nothing for them to
+             do. `InfoCallout` is not used: it is a page-level tint and this is
+             inside a card, which the component's own header rules out. */
+          <View
+            className="mb-sm flex-row items-start gap-sm rounded-lg border border-outline-variant p-sm"
+            accessible
+            accessibilityLabel="Video link pending. We'll add the join button to this appointment as soon as the room is ready."
+          >
+            {/* Decorative — the sentence beside it says the same thing. */}
+            <Icon chrome="schedule" size={20} color={mutedGlyph} />
+            <View className="flex-1">
+              <Text className="text-on-surface" style={{ fontSize: 14, fontWeight: "600" }}>
+                Video link pending
+              </Text>
+              <Text className="text-on-surface-variant mt-xs" style={{ fontSize: 12 }}>
+                We&rsquo;ll add the join button here as soon as the room is ready.
+              </Text>
+            </View>
+          </View>
+        )
+      ) : null}
 
       {/* Action buttons */}
       <View className="flex-row gap-sm">

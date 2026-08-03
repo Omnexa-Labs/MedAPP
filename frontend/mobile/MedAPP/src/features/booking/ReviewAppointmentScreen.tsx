@@ -364,7 +364,20 @@ export function ReviewAppointmentScreen() {
           endTime,
           timezone,
           type,
-          mode,
+          // THE SERVER'S mode, not the route param this screen was handed.
+          // They agree today — `confirm` posts the param — but they are not the
+          // same fact: one is what the user tapped, the other is what the clinic
+          // will see, and the confirmation screen says "your in-person
+          // appointment is confirmed" about the row that now exists. If the
+          // service ever coerces or defaults a mode, the confirmation must
+          // follow the row rather than repeat the request.
+          mode: booking.mode,
+          // `room_id` is deliberately NOT forwarded, even though the response
+          // now carries it. The confirmation screen has no join affordance —
+          // 550:1826 puts that on the appointment card, which reads the room off
+          // `GET /v1/bookings` itself — and a param no screen consumes is
+          // exactly the sort of spare handle that later gets rendered into a
+          // fabricated link. It stays where it is read.
           locationName,
           locationAddress,
           // Server-owned. `BookingOut` echoes the two instants it stored, and
@@ -425,9 +438,15 @@ export function ReviewAppointmentScreen() {
   const confirm = useCallback(() => {
     const doctorId = text(params.practitionerId);
     if (!doctorId || !date || !time) return;
-    // `mode` and `type` are displayed but not sent: `BookingCreate` has no field
-    // for either. See the note in ./api.ts — it is a real drop, flagged in §5,
-    // not something to fold into `notes`.
+    // `mode` IS SENT NOW — `BookingCreate.mode` exists (migration
+    // 20260803_0002), so the In person / Video choice the user made on screen 1
+    // is persisted rather than displayed here and thrown away at the boundary.
+    // `readMode` has already narrowed it to the designed union or `undefined`,
+    // and `undefined` is passed through as an omission so the SERVER's default
+    // applies — this screen refuses to render at all without a mode (see the
+    // required-params guard below), so in practice it is always one of the two.
+    //
+    // `type` is still not sent: no column for it. See ./api.ts and §5.
     confirmMutation.mutate({
       doctorId,
       date,
@@ -435,8 +454,9 @@ export function ReviewAppointmentScreen() {
       endTime,
       durationMinutes: parseDurationMinutes(duration),
       reason,
+      mode,
     });
-  }, [confirmMutation, date, time, endTime, duration, params.practitionerId, reason]);
+  }, [confirmMutation, date, time, endTime, duration, params.practitionerId, reason, mode]);
 
   /**
    * The maps handoff, for real. Native scheme first so the phone's own maps app

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal, get_current_principal
@@ -20,6 +20,10 @@ async def create(
     principal: Principal = Depends(get_current_principal),
     db: AsyncSession = DbSession,
     limiter: BookingRateLimiter = RateLimiterDep,
+    # Forwarded verbatim to telemedicine_service when mode=video. Read here
+    # rather than reconstructed, because there is no service account in this
+    # system and the patient is genuinely the room's creator.
+    authorization: str | None = Header(default=None),
 ) -> BookingOut:
     # Audit finding B-22: gate creation BEFORE the conflict-check query
     # so an attacker can't hot-loop expensive DB work for free. Admins
@@ -28,7 +32,7 @@ async def create(
     if principal.role != "admin":
         await limiter.check(principal.subject)
     try:
-        booking = await create_booking(db, principal, payload)
+        booking = await create_booking(db, principal, payload, authorization=authorization)
     except BookingError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return BookingOut.model_validate(booking)

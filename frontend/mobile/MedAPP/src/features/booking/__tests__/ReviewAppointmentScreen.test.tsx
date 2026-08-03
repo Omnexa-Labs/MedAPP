@@ -188,8 +188,12 @@ describe("consultation mode is its own axis", () => {
     expect(screen.getByText("Video consultation")).toBeTruthy();
   });
 
-  it("forwards mode to the confirmation screen", async () => {
-    post.mockResolvedValue({});
+  it("forwards THE SERVER'S mode to the confirmation screen", async () => {
+    // The response's `mode`, not the route param this screen was handed. They
+    // agree here — `confirm` posts the param — but the confirmation screen says
+    // "your video consultation is confirmed" about the row that now exists, so it
+    // must read the row.
+    post.mockResolvedValue({ mode: "video" });
     withParams({ mode: "video" });
     renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
@@ -315,10 +319,46 @@ describe("confirming", () => {
     // Offset-bearing, not naive: the service rejects naive datetimes outright.
     expect(body.starts_at).toMatch(/^2025-05-13T10:00:00[+-]\d{2}:\d{2}$/);
     expect(body.ends_at).toMatch(/^2025-05-13T10:45:00[+-]\d{2}:\d{2}$/);
-    // Fields the backend has no column for are dropped, not smuggled.
-    expect(body.mode).toBeUndefined();
+    // MODE IS SENT NOW — `BookingCreate.mode` exists, and the default fixture is
+    // an in-person booking. It used to be dropped here with `type`.
+    expect(body.mode).toBe("in_person");
+    // TYPE still has no column, and is still not smuggled into `notes`.
     expect(body.consultation_type).toBeUndefined();
+    expect(body.type).toBeUndefined();
     expect(body.notes).toBeUndefined();
+  });
+
+  it("posts the VIDEO mode when that is what the user picked on screen 1", async () => {
+    // The whole point of the change: the choice made on `select-time-slot`
+    // reaches the row instead of being displayed twice and stored never.
+    withParams({ mode: "video" });
+    post.mockResolvedValue({
+      booking_id: "b-2",
+      user_id: "u-1",
+      status: "booked",
+      doctor_id: "prac-1",
+      starts_at: "2025-05-13T10:00:00-04:00",
+      ends_at: "2025-05-13T10:45:00-04:00",
+      mode: "video",
+      room_id: "27db4d6b-2533-4afa-b807-2c14a4a621cd",
+    });
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+    await waitFor(() => expect(post).toHaveBeenCalled());
+
+    expect(post.mock.calls[0][1].mode).toBe("video");
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    const arg = (router.replace as unknown as jest.Mock).mock.calls[0][0];
+    expect(arg.params.mode).toBe("video");
+    // The room handle is NOT carried onto the confirmation screen: that screen
+    // has no join affordance (550:1826 puts it on the appointment card, which
+    // reads the room itself), and a spare handle on a screen that cannot use it
+    // is what later becomes a fabricated link. And no `joinUrl` is synthesised
+    // from it either — `telemedicine_service` has no URL concept.
+    expect(arg.params).not.toHaveProperty("roomId");
+    expect(arg.params).not.toHaveProperty("joinUrl");
   });
 
   it("forwards the SERVER's instants and invents no reference or join link", async () => {

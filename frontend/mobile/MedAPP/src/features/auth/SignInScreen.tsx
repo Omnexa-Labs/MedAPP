@@ -91,7 +91,16 @@ import { StatusBar } from "expo-status-bar";
 import { Link } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Card, ConsentRow, Icon, Input, Logo } from "@/components/ui";
+import {
+  Button,
+  Card,
+  ConsentRow,
+  Icon,
+  InfoCallout,
+  Input,
+  Logo,
+  type InfoCalloutTone,
+} from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { useTokenColor } from "@/lib/tokens";
 import { ApiError } from "@/types/api";
@@ -124,7 +133,33 @@ export function SignInScreen({ onSuccess }: Props) {
   const biometric = useBiometricLogin();
   const biometricCapability = useBiometricCapability();
   const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * The form-level message, WITH ITS REGISTER.
+   *
+   * It used to be a bare string rendered unconditionally in `error-container` /
+   * `on-error-container`, which meant one of the four things that could land in
+   * it was mis-typed: "Sign in with your password first to enable biometric." is
+   * GUIDANCE about a feature the user has not used yet — nothing has failed, no
+   * credential was rejected, and there is nothing to correct. Painting it as an
+   * error on the first screen every user meets reports a fault that does not
+   * exist, and it devalues the register for the message that follows it, which
+   * genuinely is one ("Email or password is incorrect").
+   *
+   * WHY A TONE RATHER THAN SUPPRESSING IT. The alternative was to show it only
+   * after a biometric attempt — but it ALREADY is only shown then: `onBiometric`
+   * is the sole writer of the `no_credentials` branch, and the tiles that call it
+   * are gated on device capability. So "show it later" would change nothing. What
+   * is actually wrong is the styling of a message that has to appear at exactly
+   * the moment it appears: the user just tapped Fingerprint and is owed an
+   * explanation of why nothing happened. It stays, in the informational register.
+   */
+  const [formMessage, setFormMessage] = useState<{
+    text: string;
+    tone: InfoCalloutTone;
+  } | null>(null);
+  const setFormError = (text: string) => setFormMessage({ text, tone: "error" });
+  const setFormNotice = (text: string) => setFormMessage({ text, tone: "info" });
+  const clearFormMessage = () => setFormMessage(null);
   const { scheme } = useResolvedScheme();
   // Icon colours can't be Tailwind classes (react-native-svg / MaterialIcons
   // take a colour string), so they're resolved by token name for the mode.
@@ -135,7 +170,7 @@ export function SignInScreen({ onSuccess }: Props) {
   // their mind); refresh_failed clears the stale token and tells the
   // user to use password; biometric_failed shows a non-fatal hint.
   const onBiometric = async (kind: "face" | "fingerprint") => {
-    setFormError(null);
+    clearFormMessage();
     try {
       await biometric.mutateAsync(kind);
       onSuccess?.();
@@ -143,7 +178,10 @@ export function SignInScreen({ onSuccess }: Props) {
       if (e instanceof BiometricLoginAbort) {
         if (e.kind === "user_cancel") return; // silent
         if (e.kind === "no_credentials")
-          setFormError("Sign in with your password first to enable biometric.");
+          // INFORMATIONAL. There is no stored credential to unlock yet, which is
+          // simply where a new device starts. The sentence tells the user what to
+          // do next; it is not reporting a failure.
+          setFormNotice("Sign in with your password first to enable biometric.");
         else if (e.kind === "biometric_failed")
           setFormError("Biometric not recognised. Try again or use your password.");
         else if (e.kind === "refresh_failed")
@@ -165,7 +203,7 @@ export function SignInScreen({ onSuccess }: Props) {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
+    clearFormMessage();
     try {
       await login.mutateAsync({ email: values.email, password: values.password });
       onSuccess?.();
@@ -355,16 +393,20 @@ export function SignInScreen({ onSuccess }: Props) {
                   )}
                 />
 
-                {/* Form-level error — not in the frame (FLAGGED), kept because
-                    the screen has to surface a failed sign-in. */}
-                {formError && (
-                  <View className="w-full rounded-md bg-error-container px-4 py-3">
-                    <Text
-                      className="font-label-sm text-label-sm text-on-error-container"
-                      accessibilityLiveRegion="polite"
-                    >
-                      {formError}
-                    </Text>
+                {/* Form-level message — not in the frame (FLAGGED), kept because
+                    the screen has to surface a failed sign-in.
+
+                    Now the shared `InfoCallout` rather than a sixth private
+                    tinted box: it owns both registers (`info` = `primary-tint`
+                    with a `primary` glyph, `error` = `error-container` with its
+                    own `on-` pair), and it always draws a glyph, so the tone is
+                    never carried by fill colour alone (docs/BRAND.md §Colour
+                    rules, WCAG 1.4.1). The live region moves onto the wrapper so
+                    a screen reader still announces the message the moment it
+                    appears — the callout renders a plain <Text> otherwise. */}
+                {formMessage && (
+                  <View className="w-full" accessibilityLiveRegion="polite">
+                    <InfoCallout tone={formMessage.tone}>{formMessage.text}</InfoCallout>
                   </View>
                 )}
 

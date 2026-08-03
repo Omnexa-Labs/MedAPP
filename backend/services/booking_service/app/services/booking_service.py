@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal
 
 from ..models import Booking
-from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus, BookingSummaryOut
+from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingMode, BookingOut, BookingStatus, BookingSummaryOut
+from .telemedicine import provision_room
 
 
 class BookingError(ValueError):
@@ -50,7 +51,13 @@ def _can_manage_booking(principal: Principal, booking: Booking | None = None) ->
     raise HTTPException(status.HTTP_403_FORBIDDEN, "you can only manage your own booking")
 
 
-async def create_booking(db: AsyncSession, principal: Principal, payload: BookingCreate) -> Booking:
+async def create_booking(
+    db: AsyncSession,
+    principal: Principal,
+    payload: BookingCreate,
+    *,
+    authorization: str | None = None,
+) -> Booking:
     user_id = _principal_uuid(principal)
     if payload.starts_at >= payload.ends_at:
         raise BookingError("starts_at must be before ends_at")
@@ -74,11 +81,22 @@ async def create_booking(db: AsyncSession, principal: Principal, payload: Bookin
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         status=BookingStatus.BOOKED.value,
+        mode=payload.mode.value,
         reason=_normalize_text(payload.reason),
         notes=_normalize_text(payload.notes),
     )
     db.add(booking)
     await db.flush()
+
+    # Video provisioning happens AFTER the flush (the booking needs its id to
+    # be the room's `booking_id`) and is deliberately not part of the booking's
+    # success condition: `provision_room` never raises, and a None result
+    # leaves `room_id` NULL. An in-person booking never touches
+    # telemedicine_service at all.
+    if booking.mode == BookingMode.VIDEO.value:
+        booking.room_id = await provision_room(booking, authorization=authorization)
+        await db.flush()
+
     await db.refresh(booking)
     return booking
 

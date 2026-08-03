@@ -180,11 +180,73 @@ describe("the BookingOut adapter", () => {
       notes: undefined,
       cancelledAtIso: undefined,
       cancellationReason: undefined,
+      // Stored fields, not invented ones: `mode` is NOT NULL on the table with
+      // `server_default 'in_person'`, and `room_id` is null unless a room was
+      // provisioned.
+      mode: "in-person",
+      roomId: undefined,
     });
     // The two fields the previous pass invented are not on the type and are not
-    // synthesised from booking_id.
+    // synthesised from booking_id. `roomId` is not a rehabilitation of
+    // `joinUrl` — it is a handle the service actually returns, and nothing here
+    // turns it into a URL.
     expect("bookingReference" in booking).toBe(false);
     expect("joinUrl" in booking).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // mode + room_id — the choice that used to be discarded at this boundary
+  // -------------------------------------------------------------------------
+
+  it("SENDS the mode the user picked, in the service's own spelling", async () => {
+    await bookingApi.createBooking({ ...BASE, mode: "video" });
+    // Hyphen in the app, UNDERSCORE on the wire — `mode: "in-person"` is a 422
+    // reading "Input should be 'in_person' or 'video'".
+    await bookingApi.createBooking({ ...BASE, mode: "in-person" });
+
+    expect(post.mock.calls[0][1]).toMatchObject({ mode: "video" });
+    expect(post.mock.calls[1][1]).toMatchObject({ mode: "in_person" });
+  });
+
+  it("OMITS mode when the caller has none, leaving the server's default", async () => {
+    // `BookingCreate.mode` is `= IN_PERSON`. Posting "in_person" for "the flow
+    // did not say" would turn an absence into an assertion and put the default
+    // in two places.
+    await bookingApi.createBooking(BASE);
+    expect("mode" in body()).toBe(false);
+  });
+
+  it("reads mode and room_id back off the response", async () => {
+    post.mockResolvedValue({
+      ...OK,
+      mode: "video",
+      room_id: "27db4d6b-2533-4afa-b807-2c14a4a621cd",
+    });
+    const booking = await bookingApi.createBooking({ ...BASE, mode: "video" });
+    expect(booking.mode).toBe("video");
+    expect(booking.roomId).toBe("27db4d6b-2533-4afa-b807-2c14a4a621cd");
+  });
+
+  it("keeps a video booking VIDEO when the room could not be provisioned", async () => {
+    // A real state, not a contrivance: `provision_room` never raises, so the
+    // booking 201s with `room_id: null` when telemedicine is unreachable. The
+    // client must not read the missing room as "in person" — that would hide the
+    // visit's modality entirely.
+    post.mockResolvedValue({ ...OK, mode: "video", room_id: null });
+    const booking = await bookingApi.createBooking({ ...BASE, mode: "video" });
+    expect(booking.mode).toBe("video");
+    expect(booking.roomId).toBeUndefined();
+  });
+
+  it("falls back to in person on an absent or unknown mode, never to video", async () => {
+    // The errors are not symmetric. "In person" on a video booking sends someone
+    // travelling, which a phone call fixes; "video" on an in-person booking tells
+    // them to stay home waiting for a session that does not exist.
+    post.mockResolvedValue({ ...OK, mode: undefined });
+    expect((await bookingApi.createBooking(BASE)).mode).toBe("in-person");
+
+    post.mockResolvedValue({ ...OK, mode: "telehealth" });
+    expect((await bookingApi.createBooking(BASE)).mode).toBe("in-person");
   });
 
   it("collapses null free-text to undefined", async () => {

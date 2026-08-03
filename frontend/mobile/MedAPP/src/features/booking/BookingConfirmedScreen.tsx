@@ -47,10 +47,23 @@
 // "Remote" pill — so 757:4828 had no code behind it. `mode` now branches the
 // supporting copy, the consultation-type badge, the calendar event's
 // location/notes and the whole preparation checklist. (It does NOT branch a
-// join row any more; see above.) `mode` is a session param, not a server field:
-// `BookingCreate` has no place for it, so the booking service cannot tell a
-// video appointment from an in-person one at all — §5, item 2, and the reason
-// there is no join URL to return.
+// join row any more; see above.)
+//
+// AND `mode` IS NOW A SERVER FIELD. It used to be session state only — the
+// booking service could not tell a video appointment from an in-person one, so
+// this screen asserted "your in-person appointment is confirmed" about something
+// nobody had stored. `BookingCreate`/`BookingOut` carry `mode` as of migration
+// 20260803_0002, and Review forwards `booking.mode` — the value the service
+// echoed back off the row it wrote — rather than the param it was handed. The
+// sentence is now a report, not a repetition of the request.
+//
+// There is still NO JOIN LINK, and that is not an omission: `telemedicine_service`
+// has no URL concept. `room_id` is a handle, and the affordance built from it
+// lives on the appointment card (`AppointmentManagementScreen`), which is where
+// 550:1826 draws it. The designer's "The join link opens 10 minutes before the
+// start" copy is wrong twice over — there is no link, and nothing in
+// `telemedicine_service` gates joining on a time window — so the video copy here
+// says what is true instead of quoting the frame (PIPELINE §5).
 //
 // HARDWARE BACK MIRRORS CLOSE (required item 3). Close has always been a
 // `router.replace("/(app)")` so Review cannot be re-confirmed; Android's back
@@ -198,16 +211,28 @@ const CHECKLIST: Record<ConsultationMode, { icon: AnyIconName; text: string }[]>
   ],
   video: [
     { icon: "videocam", text: "Test your microphone and camera" },
-    { icon: "schedule", text: "Join the link 10 minutes before the start" },
+    // Was "Join the link 10 minutes before the start", which is the frame's copy
+    // and wrong twice over: there is no link (a room is joined in-app, via
+    // `room_id`), and nothing in `telemedicine_service` gates joining on a time
+    // window, so "10 minutes before" is a rule no code enforces. This says where
+    // the join control actually is.
+    { icon: "schedule", text: "Join from My Appointments when it is time" },
     { icon: "wifi", text: "Find a quiet spot with a stable connection" },
   ],
 };
 
+/**
+ * Both sentences now describe a row that exists — `mode` arrives from
+ * `BookingOut.mode`, echoed by the service off the record it wrote, not from the
+ * choice this flow was carrying. Before the column existed, "your in-person
+ * appointment is confirmed" was an assertion about a fact the server had never
+ * been told.
+ */
 const SUPPORTING_COPY: Record<ConsultationMode, string> = {
   "in-person":
     "Your in-person appointment is confirmed. We've saved it to My Appointments.",
   video:
-    "Your video consultation is confirmed. The join link opens 10 minutes before the start.",
+    "Your video consultation is confirmed. You'll join it from My Appointments.",
 };
 
 /**
@@ -273,10 +298,12 @@ export function BookingConfirmedScreen() {
     locationAddress?: string;
   }>();
 
-  // The one derived value, and it is a branch rather than a fabrication: the
-  // frames draw exactly two modes and 756:4742 (the default frame) is the
-  // in-person one, so an absent `mode` renders the conservative treatment —
-  // no join link, no "Video" badge, no "test your camera".
+  // The one derived value, and it is a branch rather than a fabrication. The
+  // param is now the SERVER's `BookingOut.mode` (Review forwards `booking.mode`),
+  // so this is a report of the stored row. An absent `mode` — a deep link, or a
+  // response from a deployment predating the column — renders the conservative
+  // treatment: no "Video" badge, no "test your camera". In person is the safe
+  // fallback because it promises no session that might not exist.
   const mode: ConsultationMode = params.mode === "video" ? "video" : "in-person";
   const checklist = CHECKLIST[mode];
 

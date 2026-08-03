@@ -13,10 +13,12 @@
 //
 //   BookingOut  { booking_id, user_id, doctor_id, starts_at, ends_at,
 //                 status: "booked" | "cancelled", reason?, notes?,
-//                 cancelled_at?, cancellation_reason? }
+//                 cancelled_at?, cancellation_reason?,
+//                 mode: "in_person" | "video", room_id?: UUID | null }
 //
 //   the card    doctor name, specialty, avatar, facility, a human date line,
-//               and a status pill reading Confirmed / In Review / Completed
+//               a status pill reading Confirmed / In Review / Completed, a
+//               modality badge and — on a video visit — a join control
 //
 // `BookingOut` carries a `doctor_id` and nothing else about the clinician, so
 // every row needs hydrating from doctor_service. See `hydrate` below for why
@@ -38,6 +40,23 @@ interface BookingOutWire {
   notes?: string | null;
   cancelled_at?: string | null;
   cancellation_reason?: string | null;
+  /**
+   * `BookingMode(StrEnum) = in_person | video`, NOT NULL on the table with
+   * `server_default 'in_person'`. Optional here only so a response from a
+   * deployment predating migration 20260803_0002 still adapts.
+   */
+  mode?: "in_person" | "video";
+  /**
+   * The telemedicine room handle. `null` on every in-person booking AND on a
+   * video booking whose room could not be provisioned — `provision_room` never
+   * raises, so the booking still 201s with `room_id: null`. That is a documented
+   * live state, not a bug, and the card must render it as pending rather than as
+   * a join control with nothing behind it.
+   *
+   * There is no `join_url` to read. `telemedicine_service` has no URL concept —
+   * joining is `GET /v1/rooms/{id}/token` then `POST /v1/rooms/{id}/join`.
+   */
+  room_id?: string | null;
 }
 
 interface BookingListWire {
@@ -61,6 +80,13 @@ interface BookingListWire {
  */
 export type AppointmentStatus = "confirmed" | "completed" | "cancelled";
 
+/**
+ * How the consultation happens. Hyphenated to match the union the booking flow
+ * already carries (`features/booking/api.ts`); the underscored `in_person` is a
+ * wire spelling and stops at this module's edge.
+ */
+export type AppointmentMode = "in-person" | "video";
+
 export interface Appointment {
   id: string;
   doctorId: string;
@@ -71,6 +97,19 @@ export interface Appointment {
   status: AppointmentStatus;
   reason?: string;
   cancellationReason?: string;
+  /**
+   * Stored on the booking. This is what the modality badge on 550:2613 renders,
+   * and it is a fact now rather than a guess — the card used to have no way to
+   * know, so the badge was left unbuilt.
+   */
+  mode: AppointmentMode;
+  /**
+   * Present only when a room was provisioned. `mode === "video" && !roomId` is
+   * the third state 550:1826 needs: a video visit whose room is not ready yet.
+   * The two must be read together — the absence of a room does not mean the
+   * visit is in person.
+   */
+  roomId?: string;
 }
 
 export interface AppointmentBuckets {
@@ -94,6 +133,26 @@ function resolveStatus(w: BookingOutWire, now: number): AppointmentStatus {
   return Date.parse(w.ends_at) <= now ? "completed" : "confirmed";
 }
 
+/**
+ * The wire spelling -> the app's, with in person as the fallback for absent or
+ * unrecognised values.
+ *
+ * The errors are not symmetric, which is the whole reason for the direction:
+ * "in person" on a video booking sends someone travelling, which they discover
+ * and fix with a phone call; "video" on an in-person booking tells them to stay
+ * home waiting for a session that does not exist. In person also renders no join
+ * affordance, so a fallback can never produce a dead button.
+ */
+function resolveMode(mode: string | null | undefined): AppointmentMode {
+  return mode === "video" ? "video" : "in-person";
+}
+
+/** `null`, `""` and absent all collapse to `undefined`. */
+function id(value: string | null | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function adapt(w: BookingOutWire, now: number): Appointment {
   return {
     id: w.booking_id,
@@ -104,6 +163,8 @@ function adapt(w: BookingOutWire, now: number): Appointment {
     status: resolveStatus(w, now),
     reason: w.reason ?? undefined,
     cancellationReason: w.cancellation_reason ?? undefined,
+    mode: resolveMode(w.mode),
+    roomId: id(w.room_id),
   };
 }
 
@@ -166,4 +227,4 @@ export const appointmentsApi = {
   },
 };
 
-export const __testables = { adapt, resolveStatus, hydrate };
+export const __testables = { adapt, resolveStatus, resolveMode, hydrate };

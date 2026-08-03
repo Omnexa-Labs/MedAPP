@@ -20,5 +20,15 @@ class Settings(BaseSettings):
     create_rate_max: int = 10
     create_rate_window_seconds: int = 60
 
+    # Video provisioning. The base URL is config, named the way the gateway
+    # names the same target (`telemedicine_service_url`), so a hostname is
+    # never compiled into a call site. Override with
+    # BOOKING_TELEMEDICINE_SERVICE_URL.
+    telemedicine_service_url: str = "http://telemedicine_service:8007"
+    # Tight on purpose: the patient is blocked on the 201 for their booking.
+    # A slow room is worse than a null room they can retry into, because the
+    # booking is the thing they must not lose.
+    telemedicine_http_timeout_seconds: float = 5.0
+
 
 settings = Settings()
