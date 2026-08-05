@@ -262,7 +262,12 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   `PractitionerAppBar.tsx:128` instead renders a 44×44 spacer and keeps it centred at 141.5. One of
   the two must change.
 
-  **FLAG 4 — PRODUCT DECISION: practitioners have no account route at all.** `AccountMenu` is mounted
+  **FLAG 4 — ~~PRODUCT DECISION~~ DECIDED 2026-08-05 by the PO: the account menu goes ON
+  practitioner-profile**, not behind a new avatar in the practitioner app bar. So
+  `PractitionerAppBar` keeps no avatar slot, and mounting the menu is part of BUILDING
+  practitioner-profile — it is not a shell edit. **Until that screen ships, a clinician still cannot
+  sign out or change appearance**; the dimmed tabs make the gap visible but do not close it.
+  Original finding follows.** `AccountMenu` is mounted
   only by `PatientShell.tsx:226` behind the patient avatar; `PractitionerShell` never mounts it and
   `PractitionerAppBar` has no avatar — so **appearance and sign-out are unreachable for a clinician
   today**. Placed on practitioner-profile (`1022:16587` proves reachability). Confirm that versus
@@ -468,9 +473,11 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   lifestyle-to-lifestyle_manage-undeliverable. The first three were closed by PatientShell's single
   tab map replacing six hand-written switches, three of which had omitted Inbox entirely.
 
-  — **NOW UNBLOCKED, not done:** `find_care`'s ten local chips can finally become `ChoiceChip`
-  instances, since the icon and check slots exist. That was the stated blocker. It is a layout change
-  (the wrapping row will re-pack) so it is a separate, verifiable step.
+  — ~~**NOW UNBLOCKED, not done:**~~ **DONE the same day** — see the entry above: nine of the ten
+  chips are `ChoiceChip` instances (`1012:2759`…`1012:2793`), widths moved ≤2px and the packing did
+  not change. "Specialty" stayed local on purpose: it is a picker trigger, not a chip. Annotated here
+  rather than only above, because a reader who lands on this line would otherwise plan against a
+  blocker that is gone — the same mistake as the gate retraction filed below the entry it corrected.
 
 - 2026-08-05 — Claude — **`find_care`'s chip rows WRAP now, and the chips are on the radius token.**
   Closes leftover (2) from the chrome entry below.
