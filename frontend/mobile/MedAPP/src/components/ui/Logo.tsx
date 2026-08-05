@@ -1,14 +1,40 @@
 // Logo — shared brand mark for headers/app bars.
 //
-// Renders the real exported PNGs from assets/branding/ rather than letting
-// each screen redraw the mark inline. Three variants:
-//   - "wordmark" (default): full lockup, assets/branding/logo.png — teal mark
-//     + teal type, for light surfaces. Fits a 64px header bar.
-//   - "reversed": assets/branding/logo-reversed.png — white mark + white type,
-//     for teal/dark surfaces and photography. Per docs/BRAND.md, never put the
-//     primary teal wordmark on a dark background; use this instead.
+// ONE lockup asset, tinted per mode:
+//   - "wordmark" (default) / "reversed": both render assets/branding/logo.png.
+//     The difference is the TINT, not the file.
 //   - "icon": mark-only, assets/branding/app-icon.png — for compact spaces
 //     (e.g. a small badge) where the full wordmark would be too wide.
+//
+// ---------------------------------------------------------------------------
+// WHY THE REVERSED PNG IS GONE (2026-08-03)
+// ---------------------------------------------------------------------------
+// Reported from the device: "the logo in dark mode is not right". It is not a
+// layout or token fault — `assets/branding/logo-reversed.png` is CORRUPT. Opened
+// directly it is a near-empty image: the letter counters (the enclosed holes in
+// e/d/p) survive as faint grey and the strokes of both the mark and the type are
+// gone. That is why dark mode showed a wordmark whose letters read dimmer than
+// its M.
+//
+// The literal request was "use the same logo as light mode", and taken literally
+// that swaps a broken mark for an invisible one: logo.png is `primary` teal
+// (0,104,95) and the dark page is (14,21,20) — about 1.9:1.
+//
+// The lockup is MONOCHROME, though — mark and type are one teal — so a tint is
+// lossless. One asset with `tintColor` bound to the mode's own `primary` (mint
+// 107,216,203 in dark) is the same logo in both modes AND legible in both, and it
+// drops the corrupt file from the build instead of shipping a second raster that
+// can rot independently.
+//
+// Knock-on, stated because it is a real change in behaviour: the logo now follows
+// the token, so a palette change moves it too. Re-exported artwork can still
+// replace this — nothing depends on the tint beyond the block below — but until a
+// designer supplies a correct reversed export, this is the honest version.
+//
+// `reversed` is KEPT as a variant name rather than deleted: callers pass it for a
+// logo sitting on an always-teal hero card that does not follow the theme, where
+// it must stay light in either mode. It now means "tint for a dark surface"
+// rather than "load the white file".
 //
 // `height` scales the image proportionally (resizeMode="contain") since the
 // source PNGs' native aspect ratios differ between the wordmark and icon.
@@ -38,6 +64,7 @@
 import { Image, View, type ImageSourcePropType, type ViewProps } from "react-native";
 import { cn } from "@/lib/cn";
 import { useResolvedScheme } from "@/lib/theme";
+import { tokenColor } from "@/lib/tokens";
 
 /**
  * "auto" (the default) picks wordmark in light mode and reversed in dark mode,
@@ -58,8 +85,13 @@ interface Props extends ViewProps {
 type ResolvedVariant = Exclude<LogoVariant, "auto">;
 
 const SOURCE: Record<ResolvedVariant, ImageSourcePropType> = {
+  // wordmark and reversed are the SAME file. See the header note: the separate
+  // reversed export was corrupt, and one monochrome lockup plus a tint cannot
+  // drift between two rasters.
   wordmark: require("../../../assets/branding/logo.png"),
-  reversed: require("../../../assets/branding/logo-reversed.png"),
+  reversed: require("../../../assets/branding/logo.png"),
+  // NOT tinted — the app icon is a rounded teal tile with the mark knocked out of
+  // it, i.e. multi-colour, so a tint would flatten it to a solid block.
   icon: require("../../../assets/branding/app-icon.png"),
 };
 
@@ -83,12 +115,27 @@ export function Logo({ variant = "auto", height = 32, className, style, ...rest 
   // asset's intrinsic width on react-native-web.
   const width = height * ASPECT[resolved];
 
+  /**
+   * The mark's colour.
+   *
+   * `wordmark` takes the CURRENT mode's `primary`, so it is teal on a light page
+   * and mint on a dark one — the same relationship every other accent has.
+   * `reversed` means "this sits on a dark surface regardless of mode", so it always
+   * takes the DARK mode's `primary`: a caller putting the logo on an always-teal
+   * hero card needs it light even while the app is in light mode.
+   */
+  const tintColor =
+    resolved === "icon"
+      ? undefined
+      : tokenColor("primary", resolved === "reversed" ? "dark" : scheme);
+
   return (
     <View className={cn("items-center justify-center", className)} style={style} {...rest}>
       <Image
         source={SOURCE[resolved]}
         style={{ height, width }}
         resizeMode="contain"
+        tintColor={tintColor}
         accessibilityIgnoresInvertColors
         accessibilityRole="image"
         accessibilityLabel="MedApp"

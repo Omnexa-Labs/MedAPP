@@ -133,7 +133,7 @@ Never render the logo as text or a redrawn mark.
 
 **Designed** — Sign Up (`1:34`, `11:38`, `38:93`, `447:455`), Onboarding & Auth (`50:105`
 Splash, `57:102` Login, `72:117` onboarding_status), Patient Home (`82:105`, `93:102`,
-`110:244`, `261:387`), Find Care & Booking (`144:108`, `158:148`, `164:195`).
+`110:244`, `261:387`, `949:10550` overview), Find Care & Booking (`144:108`, `158:148`, `164:195`).
 
 **Stubs, unfinished** — `152:148` Explore, `175:190` specialist_profile.
 
@@ -141,7 +141,7 @@ Splash, `57:102` Login, `72:117` onboarding_status), Patient Home (`82:105`, `93
 `chat_thread` `552:1376`, `ai_assistant` `550:2700` plus its three state frames. Appointments
 page `548:616`.
 
-**Still undesigned** — `overview`, `booking-confirmed`, `review-appointment`,
+**Still undesigned** — `booking-confirmed`, `review-appointment`,
 `select-time-slot`, `lifestyle`, `lifestyle-manage`, `active-script-share`,
 `active-script-view`, `telemedicine-consultation`, `waiting-room`,
 `practitioner-telehealth-profile`, `forgot-password`, `privacy`, `terms`.
@@ -1040,6 +1040,206 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   dialog in `AccountMenu` is the **second** copy of "centred scrim + card + `outline` cancel +
   `error`-filled confirm" in the tree; `features/telehealth/components/LeaveCallDialog.tsx` is the
   first. Extract a shared `ConfirmDialog` and retire both.
+
+- 2026-08-03 — Claude — CLAIM page `945:5796` "Account Menu" for the account-menu flow:
+  `account_menu` (menu) + its sign-out confirmation. Expected 8 frames. **Claim stays OPEN** — the
+  design gate is stages 1–4 and §5c is explicit that a claim released there leaves work nobody owns.
+  Codex is offline until 8 August, so no page is contended.
+
+- 2026-08-03 — Claude — CLAIM page `74:102` "Patient Home" for `overview` (`OverviewScreen`), the
+  Health Hub tab root, which shipped on device with **no Figma frame at all**. Expected 3 frames.
+  **Claim stays OPEN** through Build + BuildReview per §5c.
+
+  Delivered, all 393 wide, placed at y=5400 clear of the existing frames:
+  `overview` **949:10550** (populated) · `overview — Trend range = 1Y` **949:12762** ·
+  `overview — Dark proof (pinned Colors/Dark)` **949:13208**.
+  Local components frame `Local Components — overview` **949:1181**.
+
+  Anatomy → shared component: `Patient AppBar` `101:142` (`Back=Hidden`, tab root, no back) ·
+  `Patient BottomTabBar` `740:863` (`Active=Overview`, absolute, `vertical:MAX`) ·
+  `Section Header 517:689` ×5 · `Tab Strip 517:1522` (the trend-range switch) ·
+  `VitalStatCard 211:241` ×4 · `Button 1:83`/`1:87` (Report / Export) ·
+  `IconTile 517:1435` (insight glyph) + `517:1415` (milestone glyphs) ·
+  `KeyValueRow 517:1718` ×4 (devices + doses) · glyphs `550:831`, `530:809`, `528:853`, `528:820`.
+
+  Built locally, with why: `Sparkline / 7-bar` **949:1190** (VitalStatCard has no chart, by design —
+  charting must stay out of the primitive) · `MilestoneRow / Overview` **949:10363** (nothing in §3
+  draws a timeline rail) · `ScriptRow / Overview` **949:10374** (`KeyValueRow` ships **one** trailing
+  action; a script needs two peers) · `icon/sleep` **949:1196** and `icon/hydration` **949:1199**
+  (14px, stroked to the file's icon convention — neither glyph existed).
+
+  **Shared component extended (own page, default-off, existing instances verified unchanged by
+  screenshot of `213:471`):** `VitalStatCard 723:625` gains `Show sparkline` (BOOLEAN, default
+  **false**) + `Sparkline` (INSTANCE_SWAP) on the two `layout=Card` variants only — the Figma
+  counterpart of the code's `footer` slot, which is Card-only in code too.
+
+  **The range switch is a Tab Strip, not a ChoiceChip.** `useState<TrendRange>` is
+  exactly-one-of-four and can never be empty or multiple; `ChoiceChip`'s
+  `State=Default|Selected|Unavailable` is a per-chip toggle whose contract permits both. And no item
+  leaves the collection when the range changes — the whole trends region is re-read against a
+  different series. That is a tab. In the frame it is promoted out of the card-header corner to a
+  full-width strip under the Section Header. 360 arithmetic: 360 − 2×16 gutter = 328 card, − 2×24
+  inset = 280 content, − 3×8 gaps = 256 ÷ 4 = **64 per tab** (72.25 at 393). Nothing slices, nothing
+  truncates — verified on a 360 clone that was deleted in the same script.
+
+  **Proposals, not done here** (§5c forbids editing the Design System page mid-claim):
+  `KeyValueRow` needs a `Badge tone = Success | Neutral` axis — the pending-dose badge is a
+  per-instance token override today. `VitalStatCard` wants a `Show trend` BOOLEAN — the code gates
+  `TrendRow` structurally and the frame can only hide it per instance. `Sparkline / 7-bar`,
+  `icon/sleep` and `icon/hydration` are promotion candidates.
+
+  — **Required work for the Build round** (§5c step 7; every item is a place the code is wrong and
+  the frame is now right):
+  1. `prescriber: "Dr. Sarah Jenkins"` / `"Dr. Mark Chen"` and `patient: "Alex Rivers"` exist
+     nowhere in `scripts/seed_dev_data.py`. The frame uses the seeded clinicians —
+     **Dr. Adjoa Boateng (Cardiology)** and **Dr. Kwabena Osei (General Practice)**; the seeded
+     patient is **Ama Mensah**. `SCRIPTS[].patient` is not rendered on this screen but is pushed
+     into `active-script-share` / `active-script-view` as a param, so the invented patient name
+     escapes this file — fix it at the source. Milestone body copy loses "Dr. Jenkins" the same way.
+  2. Raw hexes to delete: `MILESTONES[].tint` `#00685f` and **`#0058be`** (a blue in no token),
+     the timeline rail `#e4e9e7`, `DEVICES[].swatch` `#000000` / `#1e293b`, the dose left-border
+     `#00685f` / `#dee4e1`, and the `#00685f` / `#ffffff` / `#171d1c` / `rgba(0,104,95,0.08)` /
+     `rgba(0,104,95,0.4)` literals on the insight card, buttons, section icons and `ScriptAction`.
+  3. `rounded-2xl` (16) on the insight card and `rounded-xl` (12→ok) mix: the frame is `radius/24`
+     for every card, `radius/12` for the script row. `MiniChart`'s `borderRadius: 1` is off every
+     scale — the frame is `radius/4`, top corners only.
+  4. Card inset: the frame uses BRAND's **24**, not the code's `p-md` (which is also 24 — no change)
+     but the *cards* are the shared `Card` role `card-surface`, not `surface-container-lowest`.
+  5. The dose "not taken" state is `opacity: 0.6` on the whole row plus a colour-only 4px left
+     border. That dims body text under 4.5:1 and is colour-as-only-signal (BRAND, WCAG 1.4.1). The
+     frame replaces both with **words in a badge** — "Taken" / "Due tonight" — at full opacity.
+  6. Page heading "Health Hub" was `headline-md` (20) in `text-primary`. The frame sets
+     `headline-xl` (28) `on-surface`: BRAND assigns `headline-xl` to screen titles, and teal is
+     scoped to CTAs, active states and the logo — a static heading is none of the three.
+  7. Section headings were five hand-typeset `<Text>` at an inline `fontSize: 20`. All five are
+     `Section Header 517:689` in the frame; "Medication Adherence" carries its "View all" through
+     the component's own action slot instead of a bespoke `Pressable`.
+  8. `ScriptAction` is a `label-sm` (12) text link with `hitSlop={6}` — under the 44pt floor. The
+     frame's Share / View Rx are `label-md` in 44-high targets.
+  9. **The range switch is inert.** `TREND_METRICS[].bars` is static, so `setRange` changes nothing
+     but which pill is teal. Frame `949:12762` shows what 1Y must actually look like (re-scoped
+     values *and* series). Either wire the range to a query or remove the control.
+  10. Dropped from the code deliberately: the 64px `auto-awesome` watermark bleeding off the insight
+      card (decoration carrying an untokenised `rgba`), the `cloud-done` glyph at 40% opacity in the
+      Data Integrity header (decoration), the device brand swatches (they carried the two raw
+      hexes), the leading `download` / `share` glyphs on the two buttons (**no such glyph exists in
+      this Figma file** — add `icon/download` and `icon/share` and they come back), and the italic
+      on the quoted milestone body (there is no italic in the brand type ramp).
+  11. `paddingBottom: 140` → an **80** bottom safe area (48+32, on scale) which still clears the
+      64dp absolute tab bar with 16 to spare.
+  12. Registry gap now closed on the Figma side only: `icons/registry.ts` still has no `hydration`
+      entry (`OverviewScreen` flags it) and no `sleep`/`trend-*`/`alert`. Figma now has
+      `icon/hydration` and `icon/sleep`.
+
+  — **States NOT framed, with the reason.** `OverviewScreen` has **no async surface at all**: every
+  section reads a module-level `const` (`TREND_METRICS`, `MILESTONES`, `DEVICES`, `MED_DOSES`,
+  `SCRIPTS`), there is no fetch, no store read and no query, so there is no loading, empty, error or
+  offline branch to frame — drawing one would be inventing a branch, which §5c step 1 forbids. The
+  only state the code can produce is the trend range, and that is frame `949:12762`. The file's own
+  comment says the screen is destined for `ehr_service` / `wearable_sync_service`; **at that wiring
+  the async states become required**, and `SkeletonCard 517:2291` already ships a
+  `Shape=Vital stat card` variant sized for exactly these tiles.
+
+- 2026-08-03 — Claude — DESIGN LANDED. `src/components/shell/AccountMenu.tsx` shipped with no frame
+  at all; page `945:5796` closes that. Frames, all 393 wide except the deliberate 360 proof:
+
+  | Frame | Node | What it is |
+  |---|---|---|
+  | `account_menu — menu · Appearance = System` | `949:10931` | populated, default |
+  | `account_menu — menu · Appearance = Light` | `949:11028` | control position 2 |
+  | `account_menu — menu · Appearance = Dark` | `949:11139` | control position 3 (light frame — the control's position, not the theme) |
+  | `account_menu — menu · no display name` | `949:11490` | `accountName.trim() \|\| "Your account"` + silhouette avatar tier |
+  | `account_menu — confirm sign out` | `949:11590` | the second view of the same modal |
+  | `account_menu — menu · DARK proof` | `949:11872` | pinned Dark via `setExplicitVariableModeForCollection` |
+  | `account_menu — confirm sign out · DARK proof` | `949:11969` | pinned Dark; drawn because `error`/`on-error` is the pairing this project has shipped wrong three times |
+  | `account_menu — menu @ 360dp (width proof)` | `949:12043` | 360×800 |
+  | `Account Menu — decisions & arithmetic` | `949:13114` | the reasoning, on canvas |
+
+  **Anatomy → shared component.** App bar `Patient AppBar 741:887` (`Back=Hidden`, `101:142`),
+  bottom nav `Patient BottomTabBar 740:1015` (`Active=Home`, `101:143`), identity avatar
+  `Avatar 550:1964` (`Size=40, Fallback=Initials`, and `Fallback=Silhouette` on `949:11490`),
+  dialog cancel `Button 1:89` (`Variant=Secondary`), type through the six shared text styles,
+  floating shadow through the `elevation/floating` effect style. Nothing was hand-drawn that §3
+  already had.
+
+  **Built LOCAL, in `Local Components — Account Menu` `949:609` — PROPOSE PROMOTION, do not promote
+  as a side effect.** Nothing existing covered any of these:
+  - `Account Menu` `949:10651` — component **set**, `View=Menu | Confirm sign out`. One set, not two
+    components, so the file records that in code it is one `<Modal>` swapping content (stacked RN
+    Modals on Android are unreliable). `View=Menu` `949:10512` (304×283), `View=Confirm sign out`
+    `949:10626` (361×364).
+  - `AppearanceSelector` `949:10250` — `Selected=System | Light | Dark`. The orphaned three-way
+    control had no Figma representation at all.
+  - `Button / Destructive` `949:10313` — `Button 1:89` has `Primary | Secondary | Disabled | Loading`
+    and no destructive tone. Geometry is copied from `1:89` (345×56, `radius/12`) so it stacks with
+    `Variant=Secondary`. **Proposed promotion is a `Tone=Brand | Destructive` axis on `1:89`, not a
+    second button component.**
+  - Six glyphs — `icon/chrome-person` `949:612`, `icon/chrome-chevron-right` `949:615`,
+    `icon/chrome-logout` `949:617`, `icon/chrome-theme-auto` `949:620`,
+    `icon/chrome-light-mode` `949:623`, `icon/chrome-dark-mode` `949:626`. The file had **no**
+    chevron, person, logout, sun or moon; `search_design_system` and a full sweep of the Design
+    System page confirm it. Drawn on the 24 grid with `SCALE` constraints so they instance at 20.
+  - One **variable**: `color/scrim` `VariableID:945:5797` (Light `#0D1A17`, Dark `#000000`, matching
+    `global.css --color-scrim`). Additive — no existing node references it. The file had no scrim
+    token, which is why a modal frame could not previously have been tokenised at all.
+
+  **States NOT framed.** No loading/empty/error/skeleton: the component takes no async data, it is
+  prop-driven off `PatientShell` and renders synchronously — there is no branch, and a `SkeletonCard`
+  here would picture a state the code cannot enter. No pressed frame: `active:opacity-70` and the
+  confirm button's `0.78` are opacity multipliers on the resting design, not token changes. No
+  `visible={false}` frame: the Modal renders nothing. The avatar's photo/initials tiers are
+  `Avatar 550:1964`'s own variants, not menu states.
+
+  — **REQUIRED WORK for the build round. Nine places the code is wrong and the frame is now right.**
+  1. **Three hairlines become one.** The code draws a rule after the identity row, after Profile, and
+     above Sign out. The third is a *guard*; the first two are decoration, and they make the guard
+     read as the third of three identical lines. Keep only the one above Sign out (8dp above, 8dp
+     below) and separate the benign boundaries with the spacing scale — docs/MOBILE_UX.md: "prefer
+     removing a divider over adding one".
+  2. **The confirmation's stacked button order is inverted.** The code stacks *Stay signed in* above
+     *Sign out*, copying `LeaveCallDialog`'s "cancel FIRST" — correct for a horizontal pair
+     (cancel-left), wrong when stacked, because it puts the destructive button nearest the thumb.
+     Frame order is **Sign out, then Stay signed in**.
+  3. **The confirmation must carry the identity block.** Avatar + name + "Signed in", same anatomy as
+     the menu. The identity row exists so "Sign out" names an account instead of being an anonymous
+     red row; the code drops it in the one state where that matters.
+  4. **`MENU_MAX_WIDTH` 320 → 304, `PANEL_PAD` 4 → 8.** This is the answer to the 360dp question the
+     file's own header flags, and it is neither a compact selector nor a bottom sheet: at 360,
+     `360 − 16 − 304 = 40dp` of scrim on the left, so it still reads as a menu. The 320/4 shipped
+     version leaves 24dp, which is where it starts reading as a sheet. Room comes out of the
+     selector's cell padding, not its labels: 288 track − 8 padding = 280 over three `flex-1` cells =
+     93.3 each, against a widest content of 20 + 4 + ~50 = 74. Row `px-3` → `px-2` (8), so text still
+     sits 16 from the panel edge (8 + 8) while the selector keeps the full inner width.
+  5. **`AppearanceSelector`'s `rounded-lg` is 8px — off the radius scale.** BRAND is 4/12/24/full.
+     Frame uses `radius/full` on the container **and** the cells: a segmented control is a set of
+     pills, which is the one role BRAND scopes `full` to, and it concentrically nests where 12-in-12
+     does not.
+  6. **`AppearanceSelector`'s `border-outline-variant/40` is deleted, not retokenised.** BRAND
+     Elevation: separation comes from surface tone. `bg-surface-container` already does it, and a
+     40%-alpha hairline inside a panel that has a full-strength one is a second, weaker rule.
+  7. **The dialog buttons are `rounded-full`; they must be `radius/12` and 56 tall.** `Button 1:89`
+     is 345×56 at radius 12, BRAND scopes `full` to pills and avatars, and the frame instances the
+     real component rather than a hand-rolled 48-high pill.
+  8. **The `system` glyph must stop being a sun.** The code maps `system` → `brightness-auto`, which
+     is a **sun with an A**, sitting immediately beside `light` → `light-mode`, which is a **sun**.
+     Two suns in a three-cell control, and "auto brightness" is a device display setting, not "follow
+     the device theme". The frame draws a half-filled disc (`icon/chrome-theme-auto` `949:620`);
+     MaterialIcons `contrast` is the closest shipped equivalent for `Icon.tsx`'s registry.
+  9. **Glyph sizes go on the BRAND ladder.** `GLYPH = 22` and the selector's `size={18}` are on no
+     step. Frame: **24** in the menu rows, **20** in the selector cells ("24px default, 20px in dense
+     rows").
+
+  Behaviour is preserved everywhere else, deliberately and including the parts that look odd: the
+  lazy `require` of `@/store/auth-store`, `useContext(SafeAreaInsetsContext)` over
+  `useSafeAreaInsets()`, `statusBarTranslucent`, `router.replace` before `signOut()`,
+  `router.navigate` (not `push`) to the profile, the empty `onPress` responder-claim, and reopening
+  on `View=Menu`. The frame's right edge at `393 − 16 = 377` is exactly where the bell's 44pt target
+  ends, so the existing anchoring maths is correct and stays.
+
+  — **Not a defect, checked so nobody re-files it:** the wordmark looks washed out in the two dark
+  proofs. `101:105` opacity is bound to `logo/opacity-primary` (Light 100 / Dark 0) and `451:680` to
+  `logo/opacity-reversed` (Light 0 / Dark 100), so the swap is wired correctly; the dimming is the
+  40% scrim sitting over the app bar, which is what the code does too.
 
   — **Two landmines this hit, both worth fixing properly and neither owned here.** (1)
   `AccountMenu` reaches `@/store/auth-store` by a **lazy `require`**, not a static import, because

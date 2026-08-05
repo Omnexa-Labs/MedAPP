@@ -24,6 +24,7 @@ jest.mock("nativewind", () => ({
 }));
 
 import { Logo } from "../Logo";
+import { tokenColor } from "@/lib/tokens";
 
 /** The wordmark PNGs are 584x224; the app icon is square. */
 const WORDMARK_RATIO = 584 / 224;
@@ -71,15 +72,40 @@ describe("Logo", () => {
     expect(imageStyle().width).toBeCloseTo(128 * WORDMARK_RATIO, 5);
   });
 
-  it("resolves the reversed raster in dark mode, at the same box", () => {
+  // This test used to assert the OPPOSITE — that dark mode swapped in a second
+  // raster. That premise is what changed: `logo-reversed.png` was corrupt (a
+  // near-empty image; only the letter counters survived), and the lockup is
+  // monochrome, so one asset plus a tint is both the same logo in either mode and
+  // legible in either. Two rasters could also drift; one cannot.
+  it("uses ONE raster in both modes, and re-tints it instead of swapping files", () => {
     render(<Logo height={42} />);
-    const light = screen.UNSAFE_getAllByType(Image)[0].props.source;
+    const lightImg = screen.UNSAFE_getAllByType(Image)[0].props;
 
     mockScheme.value = "dark";
     render(<Logo height={42} />);
-    const dark = screen.UNSAFE_getAllByType(Image)[0].props.source;
+    const darkImg = screen.UNSAFE_getAllByType(Image)[0].props;
 
-    expect(dark).not.toEqual(light);
+    expect(darkImg.source).toEqual(lightImg.source);
+    expect(darkImg.tintColor).toBe(tokenColor("primary", "dark"));
+    expect(lightImg.tintColor).toBe(tokenColor("primary", "light"));
+    // The teal-on-near-black pair the literal "use the light logo" request would
+    // have produced. The tint is the thing that stops it.
+    expect(darkImg.tintColor).not.toBe(tokenColor("primary", "light"));
     expect(imageStyle().width).toBeCloseTo(42 * WORDMARK_RATIO, 5);
+  });
+
+  it("keeps `reversed` light in LIGHT mode — it means 'on a dark surface'", () => {
+    // Callers pass it for an always-teal hero card, which does not follow the
+    // theme, so the mark must stay light even while the app is light.
+    mockScheme.value = "light";
+    render(<Logo variant="reversed" height={42} />);
+    expect(screen.UNSAFE_getAllByType(Image)[0].props.tintColor).toBe(
+      tokenColor("primary", "dark"),
+    );
+  });
+
+  it("never tints the app icon — it is multi-colour artwork", () => {
+    render(<Logo variant="icon" height={64} />);
+    expect(screen.UNSAFE_getAllByType(Image)[0].props.tintColor).toBeUndefined();
   });
 });
