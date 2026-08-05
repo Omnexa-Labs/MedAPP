@@ -182,6 +182,51 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **`find_care`'s chip rows WRAP now, and the chips are on the radius token.**
+  Closes leftover (2) from the chrome entry below.
+
+  Both rows were `HORIZONTAL` / `NO_WRAP` / `clipsContent: true` at 393 wide with their own 16px
+  padding — i.e. clipped scrollers, which is what the code stopped being on 2026-08-03 after the
+  360dp device pass found "Hospitals" sliced mid-word. Now `layoutWrap: WRAP`,
+  `counterAxisSpacing: 8`, `counterAxisSizingMode: AUTO`, `clipsContent: false`, and the rows sit at
+  x=16 / w=361 with **no padding of their own** — the screen's gutter defines the inset once, which
+  is the code's arrangement verbatim ("a wrapping row adds no padding of its own").
+
+  Figma computed the packing; both rows land on 2 lines at 96px:
+
+  | Row | Line 1 | Line 2 |
+  |---|---|---|
+  | type | All · Doctors · Nurses · Hospitals (359 of 361) | Pharmacies · Pharmacists |
+  | facet | Specialty · Available Now | Home Service · Nearest |
+
+  **Note this is NOT the code's packing, and both are correct.** The code comment records 3 lines for
+  the type row and 2 for the facet row — that is the packing at **328dp** (a 360dp device), while the
+  frame is drawn at **393**, so it fits one more chip per line. A wrapping row is defined by its rule,
+  not by a line count; the frame showing a different break at a different width is the mechanism
+  working. Nobody should "fix" either to match the other.
+
+  Reflow: rows 44 → 96 each, so everything from the first Section Header down moved +100, and the
+  frame is 1176 → 1276. Gaps taken from the code rather than the frame's previous values — 16 from the
+  search field, **8 between the two rows** (the frame had 12, which was drift), 16 to the first
+  section.
+
+  **The chips' `cornerRadius: 999` is gone — bound to `radius/12` (`VariableID:1:24`), read off the
+  canonical `ChoiceChip 11:104` rather than typed as a literal.** All ten. A pill radius is what
+  BRAND scopes to pills and avatars, not chips, and it is the same defect the code fixed when
+  `MainChip` was retired for the shared component.
+
+  **FLAGGED — the local chips are NOT instances of `ChoiceChip 11:104`, and they cannot be yet.**
+  §5c step 2 wants one definition, so this looks like it should be a swap. It is not: `11:104`'s six
+  variants (`Layout=Hug|Fill` × `State=Default|Selected|Unavailable`) are **text-only — no icon slot
+  and no selected-check slot**. The built screen renders a leading glyph on five of the six type chips
+  AND a check on the selected one (`showSelectedCheck` defaults on), and that check is what keeps
+  selection from being colour-only, which BRAND requires. Instancing `11:104` today would therefore
+  DELETE two things the code deliberately has, so **the component is behind the code here, not the
+  frame**.
+  What it needs: `Icon = None | Leading` and a `Show check` boolean on `11:104`, after which the ten
+  hand-drawn frames become instances. That is the same missing-axis request already open for
+  `Button 1:89` (lifestyle item 14) — worth doing both in one Design System pass rather than twice.
+
 - 2026-08-05 — Claude — **The stale chrome is out of the frames too — and it was THREE frames, not
   two.** Closes the design-side item left open by the DetailShell migration below.
 
