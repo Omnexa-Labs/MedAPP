@@ -109,3 +109,100 @@ async def test_create_order_persists_doctor_context(doctor_client, principal_pat
     assert order["patient_id"] == principal_patient.subject
     assert order["status"] == "ordered"
     assert order["test_name"] == "Urinalysis"
+
+@pytest.mark.asyncio
+async def test_ordering_doctor_can_read_the_result_they_ordered(
+    doctor_client, patient_client, principal_patient, result_time
+):
+    """The legitimate clinician path, and the one a naive fix breaks.
+
+    An earlier version of this check reached for `result.order`, a relationship
+    that does not exist on `LabResult` (it has only a nullable `lab_order_id`
+    FK). That version 403'd the ordering doctor on every request — safe, but
+    broken. This test is what distinguishes "locked down" from "bricked".
+    """
+    order_id = (
+        await doctor_client.post(
+            "/v1/lab/orders",
+            json={"patient_id": principal_patient.subject, "test_name": "HbA1c"},
+        )
+    ).json()["order_id"]
+    result_id = (
+        await patient_client.post(
+            "/v1/lab/results/upload",
+            json={
+                "lab_order_id": order_id,
+                "title": "HbA1c",
+                "resulted_at": result_time.isoformat(),
+                "parsed_values": {"hba1c": "5.4 %"},
+            },
+        )
+    ).json()["result_id"]
+
+    allowed = await doctor_client.get(f"/v1/lab/results/{result_id}")
+    assert allowed.status_code == 200
+    assert allowed.json()["result_id"] == result_id
+
+
+@pytest.mark.asyncio
+async def test_unrelated_doctor_cannot_read_another_patients_result(
+    doctor_client, patient_client, other_doctor_client, principal_patient, result_time
+):
+    """THE REGRESSION TEST. This was the vulnerability, not a hypothetical.
+
+    `_can_access_result` used to return early on `role == "doctor"` with no
+    ordering relationship, no consent and no care team — so any account holding
+    the doctor role could read every patient's `raw_text`, `parsed_values`,
+    `summary` and `external_url`. It chained with public signup accepting a
+    client-supplied role, making it reachable without any account at all.
+    """
+    order_id = (
+        await doctor_client.post(
+            "/v1/lab/orders",
+            json={"patient_id": principal_patient.subject, "test_name": "CBC"},
+        )
+    ).json()["order_id"]
+    result_id = (
+        await patient_client.post(
+            "/v1/lab/results/upload",
+            json={
+                "lab_order_id": order_id,
+                "title": "CBC",
+                "resulted_at": result_time.isoformat(),
+                "parsed_values": {"wbc": "6.1"},
+            },
+        )
+    ).json()["result_id"]
+
+    forbidden = await other_doctor_client.get(f"/v1/lab/results/{result_id}")
+    assert forbidden.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_result_with_no_order_denies_every_clinician(
+    doctor_client, patient_client, principal_patient, result_time
+):
+    """No relationship recorded means no clinician can claim one.
+
+    `lab_order_id` is nullable, so a result can exist with no order behind it.
+    Absence of a relationship must read as DENY, never as "unrestricted" — the
+    failure mode that turns a missing foreign key into an open door.
+    """
+    result_id = (
+        await patient_client.post(
+            "/v1/lab/results/upload",
+            json={
+                # `patient_id` and NO `lab_order_id`. LabResultUpload requires one
+                # or the other (schemas/lab.py:48), so this is how an order-less
+                # result legitimately comes to exist: a patient uploading their
+                # own outside result, with no clinician behind it.
+                "patient_id": principal_patient.subject,
+                "title": "Self-uploaded scan",
+                "resulted_at": result_time.isoformat(),
+                "parsed_values": {"note": "external"},
+            },
+        )
+    ).json()["result_id"]
+
+    forbidden = await doctor_client.get(f"/v1/lab/results/{result_id}")
+    assert forbidden.status_code == 403

@@ -91,6 +91,22 @@ async def patient_client(sessionmaker, principal_patient):
         yield client
 
 
+# A SECOND clinician, with no relationship to anything. Before 2026-08-05
+# `_can_access_result` returned early for any `role == "doctor"`, so this
+# principal could read every patient's results in the system. The fixture exists
+# to keep that hole closed.
+@pytest.fixture
+def principal_other_doctor() -> Principal:
+    return Principal(subject="44444444-4444-4444-4444-444444444444", role="doctor")
+
+
+@pytest_asyncio.fixture
+async def other_doctor_client(sessionmaker, principal_other_doctor):
+    application = create_app()
+    async for client in _make_client(application, sessionmaker, principal_other_doctor):
+        yield client
+
+
 @pytest_asyncio.fixture
 async def doctor_client(sessionmaker, principal_doctor):
     application = create_app()
