@@ -89,6 +89,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-font",
     "expo-secure-store",
+    // Voice input in the AI assistant / chat composer. The permission STRING is
+    // the point of registering the plugin: iOS refuses to prompt for the mic
+    // without NSMicrophoneUsageDescription, and a health app asking for a
+    // microphone with no stated reason is the kind of prompt users decline.
+    // Android's RECORD_AUDIO is merged in by the package itself.
+    [
+      "expo-audio",
+      {
+        microphonePermission:
+          "MedApp uses the microphone only while you hold the mic button to dictate a message.",
+      },
+    ],
+    // Sharing and saving records (prescriptions, medication lists, reports).
+    "expo-sharing",
     // Biometric sign-in. iOS requires NSFaceIDUsageDescription before
     // FaceID can be prompted; the config plugin sets it so the string
     // lives in version control rather than in raw Info.plist. Android

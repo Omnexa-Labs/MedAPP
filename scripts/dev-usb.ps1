@@ -30,6 +30,10 @@
   Start every backend service instead of the six the app actually needs. Slower
   and heavier; you almost never want this.
 
+.PARAMETER ClearCache
+  Pass --clear to Metro. Needed after a dependency change; otherwise the bundler
+  serves a stale graph and you debug a bug that is not in your code.
+
 .EXAMPLE
   .\scripts\dev-usb.ps1
   The normal run. Takes ~2 min cold, ~30s warm.
@@ -44,7 +48,8 @@ param(
   [switch]$SkipDocker,
   [switch]$SkipSeed,
   [switch]$NoMetro,
-  [switch]$Full
+  [switch]$Full,
+  [switch]$ClearCache
 )
 
 # DELIBERATELY "Continue", NOT "Stop" - this cost a run, so it is worth the note.
@@ -282,4 +287,12 @@ Write-Ok "Press 'a' to open on the phone, or scan the QR with Expo Go"
 Write-Ok "IMPORTANT: run this from $MobileDir - `npx expo` in the wrong folder offers to INSTALL a different Expo. Say no."
 
 Set-Location $MobileDir
-& npx expo start
+# --localhost is NOT optional here. `expo start` defaults to --host lan, which
+# advertises exp://<lan-ip>:8081 and encodes that into the QR code - an address
+# the phone CANNOT reach, because this network isolates wireless clients. The
+# symptom is Expo Go sitting on a loading screen indefinitely with no error.
+# --localhost advertises exp://127.0.0.1:8081, which the adb reverse tunnel
+# opened above forwards down the cable.
+$expoArgs = @('expo', 'start', '--localhost')
+if ($ClearCache) { $expoArgs += '--clear' }
+& npx @expoArgs
