@@ -182,6 +182,52 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **THE INERT-CONTROL AUDIT: 16 dead controls, split into what can be built
+  today and what cannot.** Asked for "all tooltip calls functional". Enumerated rather than
+  estimated, because half of them cannot be made functional honestly and quietly stubbing those would
+  put controls in a user's hand that look alive and do nothing.
+
+  **BUILDABLE — device APIs only, no backend. In progress (three agents, 2026-08-05):**
+
+  | Control | Where | Mechanism |
+  |---|---|---|
+  | Attach file | `AiAssistantScreen`, `ChatThreadScreen` — `IconButton` with **no `onPress` at all** | `expo-document-picker` |
+  | Voice input | `AiAssistantScreen` — same, no handler | `expo-audio` (NOT `expo-av`, which is superseded) |
+  | Share medication list | `ActiveMedicationsScreen:47` — currently an `Alert` reading "will be available" | RN `Share` / `expo-sharing` |
+  | Share (post, clinical data, appointment) | `CommunityScreen:632`, `ChatThreadScreen:450/502`, `BookingConfirmedScreen:479` | same |
+  | Download PDF | `ActiveScriptViewScreen:384` — `showDownloadToast`, a stub | `expo-file-system` + `expo-sharing` |
+  | Download report | `OverviewScreen:334` | same |
+
+  Dependencies were installed **centrally** rather than per agent — three concurrent `expo install`
+  runs would have collided on the lockfile.
+
+  **Download has an honest-scope problem that was handed to the agent as a decision, not a fudge:**
+  there is no PDF generator installed (`expo-print` is absent and was deliberately not added) and no
+  endpoint returns a PDF. So either the button stops saying "PDF" and produces a real text/HTML file,
+  or it becomes explicitly unavailable. What it must not do is keep the label and produce something
+  else. **A control that lies is worse than one that is disabled.**
+
+  **NOT BUILDABLE — blocked on backend. FLAGGED, deliberately left inert:**
+
+  * **Video call** — `ChatThreadScreen:366`. Telehealth signalling does not ship yet.
+  * **Message a provider** — `FindCareScreen:689`. `/v1/social` is not exposed.
+  * **Specialty picker** — `FindCareScreen:453`. `/v1/doctors/specialties` does not exist. (This is
+    also why `PickerTrigger` is still a local component and why the Figma chip was not converted.)
+  * **New conversation** — `InboxScreen:331`. No messaging endpoints.
+  * **Google / Apple sign-in** — `SignUpStep1Screen:416/423`. OAuth unwired since the first pass.
+  * **Cancel appointment** — `AppointmentManagementScreen:912`. No `DELETE` route; note the comment
+    there still names `/v1/appointments`, **an endpoint that does not exist and is not coming** — the
+    same invented path that once shipped past 595 mocked tests. The real collection is `/v1/bookings`.
+  * **Consultation summary** — `AppointmentManagementScreen:1033`. The destination screen does not
+    exist.
+
+  Each of these is a real product gap, not laziness, and each needs a backend or a design before it
+  can be wired. The rule applied: **flag, do not fake.**
+
+  — Found in passing and folded into the composer work: `AiAssistantScreen` imports `MaterialIcons`
+  **directly** (a BRAND violation — `Icon.tsx` is the only file permitted to) and passes a raw
+  `#ffffff` to the send glyph, which in dark mode is white on `primary` at roughly **1.9:1**.
+
 - 2026-08-05 — Claude — **`find_care`'s chips are `ChoiceChip` instances, and the Helpful Resources
   glyphs are canonical.** Closes the item the Design System pass unblocked.
 
