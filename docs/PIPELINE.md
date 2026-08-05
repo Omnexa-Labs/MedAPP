@@ -182,6 +182,54 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **The stale chrome is out of the frames too — and it was THREE frames, not
+  two.** Closes the design-side item left open by the DetailShell migration below.
+
+  | Frame | Was | Now |
+  |---|---|---|
+  | `find_care` `144:108` | `Patient AppBar Back=Hidden` `144:109` + `BottomTabBar` `145:320` + a 28px body "Find Care" | `Detail AppBar` instance **989:2570**, title "Find Care" |
+  | `Patient Dashboard` `110:244` | `Patient AppBar Back=Hidden` `110:245` + `BottomTabBar` `110:258` | `Detail AppBar` instance **990:1929**, title "Dashboard" |
+  | `Patient Profile Overview` `261:387` | `Patient AppBar` **`Back=Shown`** `261:388` | `Detail AppBar` instance **990:1935**, title "Profile" |
+
+  **`261:387` was the one I had written off.** The migration entry below says it "needs nothing — it
+  was already correct", and that was true of its NAV (it never had a tab-bar instance, which is what
+  the ruling turned on) but not of its BAR: it carried `Patient AppBar Back=Shown`, so it had a back
+  button and still the tab-root lockup with the logo. Checking all three rather than trusting that
+  note is what caught it.
+
+  On each instance the **Action Button is hidden**, because none of the three screens passes `actions`
+  to `DetailShell`. A visible share glyph wired to nothing is the dead-bell defect that got removed
+  from `appointment_management`.
+
+  `find_care` also lost its **duplicated body heading** and was reflowed: the 28px "Find Care" sat at
+  y=88 while the bar now carries the name, so it went and the nine elements below moved up 60 (the
+  SearchField lands at 64+16=80, matching the code's `paddingTop: 16`). Frame height 1304 → 1176:
+  content bottom plus the 32 bottom padding that replaced the 140 which had been clearing the tab bar.
+  `110:244`'s height is deliberately unchanged — its ScrollContent already ran past the frame before
+  this, so it is a tall scroll mock rather than a viewport, and resizing it would be a judgement about
+  the mock, not about chrome.
+
+  **File-wide audit, because the same defect could sit on frames nobody named:** all `740:1015`
+  instances enumerated via `variant.instances` — **29 remain and every one is legitimate**, on a real
+  tab root (`patient_home`, `overview`, `inbox`, `community`, `lifestyle`), on a sanctioned dark or
+  360dp proof of one, on an account-menu frame (which overlays a tab root, so the bar belongs), or on
+  the Figma-only Explore stub. No delivered screen wears a tab bar it should not.
+
+  **Two leftovers found by that audit, NOT fixed:**
+
+  1. **`Prototype — App Flow` holds `find_care — copy 2026-08-02`, still with the old chrome.** The
+     prototype page is a set of clones, so it is stale the moment a source screen changes — it also
+     still holds `patient_home`, `inbox` copies from the same date. The fix is re-cloning the
+     prototype and re-running `setReactionsAsync` / `flowStartingPoints`, not patching the clone,
+     because a patched clone diverges from its source silently. Same re-clone that was already needed
+     after the nav change.
+  2. **`find_care` `144:108` is still stale on its CHIP ROWS.** Both are drawn as horizontal
+     scrollers — the frame names literally say "horizontal scroll (chips may extend past the frame
+     edge)" — but the code was changed on 2026-08-03 to **WRAP** them, because at 360dp the type row
+     needs 705dp against a 328dp column and was slicing "Hospitals" mid-word. The code is right and
+     the frame is wrong here. Redrawing two wrapping rows is a layout change rather than a chrome
+     swap, so it is logged rather than bundled into this one.
+
 - 2026-08-05 — Claude — **`Patient BottomTabBar 740:1015` no longer overflows 360dp. Figma-only —
   DO NOT "fix" the code.** All 25 tab items (5 variants × 5 tabs) go from `FIXED 75` to **`FILL`**.
 
