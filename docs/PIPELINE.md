@@ -182,6 +182,39 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **`Patient BottomTabBar 740:1015` no longer overflows 360dp. Figma-only —
+  DO NOT "fix" the code.** All 25 tab items (5 variants × 5 tabs) go from `FIXED 75` to **`FILL`**.
+
+  The defect as measured: five `FIXED 75` items = 375, plus `paddingLeft 8` + `paddingRight 8` =
+  **391 required**. At 393 that fits with 2px spare; at 360 it overflowed by 31 and clipped the
+  Lifestyle label — on **every patient tab root**, not one screen. `FILL` rather than a
+  hand-computed `FIXED 68.8`, because a fixed width only moves the breakpoint: it would fit 360 and
+  fail 320, and be wrong again the next time a tab is added.
+
+  **The RN code was already correct and is deliberately unchanged.** `BottomNav.tsx` renders each tab
+  `className="flex-1 …"` inside a bar with `px-base`, and `base` is **8px** (tailwind.config.js:55),
+  so the code already gets (360−16)/5 = **68.8dp** per tab. This entry says so explicitly because the
+  finding as originally written ("affects every patient tab root") reads like an app bug, and the
+  obvious next move — hunting for a fixed width in the code — would find nothing. The component was
+  the thing that disagreed with the code, not the reverse.
+
+  Verified on throwaway 360 and 320 clones of `Active=Community` (the widest label lit), measured
+  then deleted — zero TEMP nodes remain:
+
+  | width | per tab | widest label | result |
+  |---|---|---|---|
+  | 393 | 75.4 | Community 66 | fits (was 75 — visually unchanged) |
+  | 360 | 68.8 | Community 66 | **fits**, all five labels whole, confirmed by screenshot |
+  | 320 | 60.8 | Community 66 | **label overflows** — see the limit below |
+
+  **MEASURED LIMIT, recorded rather than glossed:** labels are typeset Inter Medium 12 and
+  "Community" is the widest at **66px**. Each tab gets (W−16)/5, so the label stops fitting below
+  **~346dp**. 360 and 393 are both clear, so nothing shipping today is affected. Below 346 the code
+  ellipsizes rather than clips (`numberOfLines={1}`), so it degrades legibly — but a narrower device
+  needs **shorter labels**, not a smaller font: BRAND's floor is 12sp and the ramp has nothing below
+  it. The same reasoning and the same numbers are now in the component's own `description` in Figma,
+  so they travel with it.
+
 - 2026-08-05 — Claude — **"Akosua Mensah" is gone from the Account Menu — and it was in the
   COMPONENT DEFAULTS, not the instances.** The gate found it on frame `949:10931`; the cause was one
   level deeper than the report. `scripts/seed_dev_data.py` seeds `first_name: "Ama"`,
