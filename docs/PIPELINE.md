@@ -182,6 +182,95 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **DESIGN SYSTEM PASS: `ChoiceChip` and `Button` have icon axes, and the
+  prototype is re-cloned.** Closes both remaining leftovers.
+
+  **`ChoiceChip 11:104`** — the three gaps its RN counterpart had flagged in a file comment, now
+  closed, in the order that file asked for:
+  * `Show icon` (BOOLEAN, default **false**) + `Icon` (INSTANCE_SWAP) — a 20px leading glyph, BRAND's
+    dense-row size. Four live call sites draw one.
+  * A trailing **Check on `State=Selected`**, and **deliberately not a boolean.** The request read
+    "11:104 should gain the check to State=Selected", and structural is the stronger contract:
+    selection then always carries a non-colour signal (docs/MOBILE_UX.md) and cannot be switched off
+    per instance. The node lives in all six variants with `visible` following the State axis, so
+    toggling State in an instance brings the check with it. Verified on a probe.
+  * Gap bound to `spacing/4`.
+
+  **`Button 1:89`** — `Show leading icon` / `Leading icon` and `Show trailing icon` / `Trailing icon`,
+  both booleans defaulting **false**, which is what the code does: `leadingIcon`/`trailingIcon` are
+  optional and the app passes `trailingIcon` on **8 of 59** call sites, all auth/onboarding CTAs.
+
+  What was actually wrong there: the arrow was **hand-drawn and unconditionally visible** in Primary,
+  Disabled and Loading, and **absent from Secondary** — so switching Variant changed the anatomy, and
+  ~90 instances inherited an arrow nobody chose, including "Close", "Revoke", "Try again" and
+  "Export". All four variants now carry both slots, and the **20 auth/onboarding CTA instances have
+  the arrow explicitly re-enabled**, so nothing regressed. Loading instances are deliberately left
+  off — the code hides icons behind the spinner (`trailingIcon && !loading`).
+
+  New component **`icon/chrome-arrow-right` 1002:890**, extracted because the arrow had three
+  hand-drawn copies and no single definition.
+
+  **Also canonicalised: the splash CTA.** `51:114 "Get Started Button"` was a hand-drawn frame, not a
+  Button instance — which is why splash never appeared in the trailing-icon candidate list. It was
+  h49 / **radius 999** against the component's h56 / `radius/12`. Now a `Variant=Primary` instance
+  with the arrow on. One less private button.
+
+  **TWO MECHANISMS worth keeping, both cost a cycle:**
+  1. **Non-variant component properties must be added to the SET, not a variant.**
+     `variant.addComponentProperty(...)` throws *"Can only set component property definitions on a
+     product component"*.
+  2. **`findAll()` does NOT traverse into a node whose `visible` is false**, and `instance.children`
+     omits invisible children too. A hidden slot therefore receives **no bindings silently** and
+     keeps the source component's colour — which only becomes visible the moment a caller turns the
+     slot on. The first tint pass bound an invisible root fill and left every glyph on
+     `on-surface-variant`. Unhide, bind, restore.
+
+  Related: these glyphs are **stroke-drawn** (`fills: []` plus a 2px stroke), so a tint that only
+  walks `fills` is a no-op on them.
+
+  **KNOWN LIMITATION, documented on both components:** swapping a glyph via INSTANCE_SWAP **loses the
+  token binding** — the replacement arrives with its own source colour (verified: swapping to
+  `icon/person-search` gave `on-surface-variant` where the slot was `on-surface`). Figma has no
+  `currentColor`, so re-bind after a swap. There is no way to make it automatic today.
+
+  ---
+
+  **PROTOTYPE `906:609` re-cloned — TARGETED, and that was the right call.** Six frames replaced:
+  `splash` and `find_care` (their sources changed today), plus `overview`, `community`, `lifestyle`
+  and `lifestyle_manage`, which were dashed **"NO FIGMA FRAME"** placeholders until those designs
+  landed. The other 18 frames were left alone: their sources have not changed, and a blanket re-clone
+  would have meant recreating **37 working connections** by hand for no gain, with every one
+  recreated a chance to wire it wrong. The provenance card now says which were re-taken and which
+  were not.
+
+  **55 connections, 0 dangling, 0 orphans, 5 entry points** — each number checked, not asserted.
+
+  Wiring changes worth naming:
+  * **All five patient tab roots are now interconnected — 20 edges.** This was impossible before,
+    because three of the five had no frame. The active tab is a no-op, matching PatientShell.
+  * **`find_care` lost its tab-bar edges and gained a Back edge**, because it is a DetailShell screen
+    now. Back is a `BACK` action rather than a fixed destination, matching `router.back()` — a
+    hardcoded Home would send a user who arrived from Appointments to the wrong place.
+  * `lifestyle` to `lifestyle_manage` is wired **twice**, because the screen offers two ways in (the
+    "Log Daily Activity" CTA and the "Go to Log" button).
+
+  **TRAP: deleting a destination frame silently DROPS the reactions that targeted it** — it does not
+  leave a dangling edge you can find by scanning. `find_care`'s two inbound routes (patient_home's
+  Find Care tile, appointment_management's "Book new") vanished with the old clone and were only
+  caught by an ORPHAN check — "which screens can nothing reach?" — not by a dangling-edge check,
+  which read clean at zero the whole time. Both restored. Also: cloning frames auto-created two
+  unnamed "Flow 1"/"Flow 2" starting points, and the deleted splash left a dangling entry, so
+  `flowStartingPoints` was rewritten wholesale rather than patched.
+
+  **Four GAP cards became RESOLVED** and were rewritten rather than deleted, keeping the reason:
+  Inbox-from-three-tabs, 3-of-5-tab-items, Inbox-unreachable, and
+  lifestyle-to-lifestyle_manage-undeliverable. The first three were closed by PatientShell's single
+  tab map replacing six hand-written switches, three of which had omitted Inbox entirely.
+
+  — **NOW UNBLOCKED, not done:** `find_care`'s ten local chips can finally become `ChoiceChip`
+  instances, since the icon and check slots exist. That was the stated blocker. It is a layout change
+  (the wrapping row will re-pack) so it is a separate, verifiable step.
+
 - 2026-08-05 — Claude — **`find_care`'s chip rows WRAP now, and the chips are on the radius token.**
   Closes leftover (2) from the chrome entry below.
 
