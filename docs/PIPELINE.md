@@ -155,11 +155,13 @@ dark proof:
 
 **Still undesigned** — none. `community` `949:13725`, `lifestyle` `949:13130` and
 `lifestyle_manage` `954:931` were delivered by run `wf_eb1c9d70-aeb` on 2026-08-05, which closes the
-"built in code, absent from Figma" gap for every patient screen. **The round's review gate FAILED
-those three on quality, not on existence** — see §5 — so the frames are present but not accepted:
-the lifestyle pair has no dark proof at all, `981:1549`'s "Scrim @40%" renders fully opaque
-(hiding the wordmark and three cards behind it), and the fifteen-item code-vs-frame list for the
-pair was never written into §5. Do not build from `949:13130` / `954:931` until those are cleared.
+"built in code, absent from Figma" gap for every patient screen.
+
+The round's review gate FAILED those three, and **all four of its findings are now cleared** (see
+§5): dark proofs exist and are proven to flip by pixel measurement (`983:14194`, `983:14243`), the
+opaque scrim `981:1549` is at 40%, the fifteen-item code-vs-frame list is written into §5, and the
+invented "Akosua Mensah" is now the seeded "Ama Mensah" in both component defaults. The frames are
+buildable. The fifteen code-side items are Build work, not design blockers.
 
 **Stubs, unfinished** — `152:148` Explore and `175:190` specialist_profile. `175:190` is worth
 finishing or deleting rather than leaving: it is where "Dr. Sarah Jenkins" and "Accra" leaked into
@@ -179,6 +181,132 @@ The **frame is the handoff artifact** — not a conversation. Append entries her
 read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
+
+- 2026-08-05 — Claude — **"Akosua Mensah" is gone from the Account Menu — and it was in the
+  COMPONENT DEFAULTS, not the instances.** The gate found it on frame `949:10931`; the cause was one
+  level deeper than the report. `scripts/seed_dev_data.py` seeds `first_name: "Ama"`,
+  `last_name: "Mensah"`, `ama.mensah@medapp.dev` — there is no Akosua anywhere in the seed file.
+
+  Fixed at source: `949:10517` (inside `View=Menu` `949:10512`) and `949:10631`, the two component
+  defaults. Seven instances inherited the wrong name without overriding it, so all seven corrected
+  themselves — re-scan of page `945:5796` returns **zero** occurrences of "Akosua" and nine of
+  "Ama Mensah". Fixing the seven instances instead would have left both defaults poisoned, and the
+  next instance anyone drew would have brought it straight back. This is §5c step 2b in practice: a
+  shared component stops structural drift, but only a corrected DEFAULT stops content drift.
+
+  Same defect class as `Alex Rivers` and `Dr. Sarah Jenkins`. **The initials "AM" happened to match**,
+  which is exactly why it survived review — the identity block looked internally consistent.
+
+- 2026-08-05 — Claude — **CLAIM CLOSED `945:3923` "Lifestyle"** — `lifestyle` `949:13130`,
+  `lifestyle_manage` `954:931`, plus state frames `978:1084` (all medications taken), `979:1781`
+  (AI recommendation returned), `981:1488` (workout plan picker open), and the two dark proofs
+  added below. This entry exists because the review gate found there was none: the page had been
+  designed and its whole findings list lived only in a subagent transcript, which is the same as
+  not existing. Recovered from `wf_eb1c9d70-aeb` and written down.
+
+  **The round ended with the Figma bridge disconnected**, and the agent said so rather than
+  claiming completion — `use_figma` returned `Not connected` for its last ~10 minutes. Exactly two
+  deliverables were missing as a result, and both are now done (verified, below):
+
+  * **Dark proofs — DONE.** `lifestyle — Dark proof (pinned Colors/Dark)` **983:14194** and
+    `lifestyle_manage — Dark proof (pinned Colors/Dark)` **983:14243**, both pinned
+    `VariableCollectionId:1:2 → 197:0`, the same pin the accepted overview proof `949:13208`
+    carries (read off it, not typed from memory). **Proven by pixel measurement, not by eye**,
+    because "it looks dark" is what the opaque-scrim defect below also looked like: `lifestyle_manage`
+    light is mean-luminance 238.1 with 92.7% light pixels; its dark proof is mean 42.6 with 91.4%
+    dark pixels — a near-perfect inversion. The `lifestyle` proof is mean 57.5 / 82.2% dark (higher
+    mean because that screen carries more coloured cards). Both render **1000+ distinct colours**,
+    which is the check that separates "flipped correctly" from "covered by a flat slab".
+
+  * **The opaque scrim on `981:1488` — FIXED.** `981:1549` was named "Scrim (color/scrim @40%)" and
+    rendered at 100%, hiding the wordmark, the AI Meal Planner card, Daily Vitality Log, Mindset
+    Check-in and the SaveCloseFab completely. Cause found on inspection: **node opacity 1 AND fill
+    opacity 1** — nothing anywhere was at 40%. Fixed to node `opacity = 0.4`, which is the
+    convention the account menu's working scrim `949:10988` already uses (full-opacity fill bound to
+    `color/scrim`, dimming done on the node). Note the agent's own proposed fix was fill-opacity
+    based; it would have worked visually but left the file with two different ways to build a scrim.
+    Verified by screenshot: all four hidden elements legible again, fill still bound to the token.
+
+  **Where the CODE is wrong and the frame is now right — required Build work.** Fifteen items, none
+  actioned; this is the list the gate could not find:
+
+  1. `title="Lifestyle Management"` → **"Daily Log"** — the bar names a task, not a section, and it
+     should match the hub's "Log Daily Activity" / "Go to Log". `LifestyleManageScreen.tsx:164`.
+  2. `CALM` / `INTENSE` are `fontSize: 10` (`:433`, `:436`) — under BRAND's 12sp floor. Frame is
+     `label-sm` 12.
+  3. **`bg-surface-container-highest` has no Figma variable.** It is in `global.css:84/145` and
+     `palette.cjs` but **not** in the `Colors` collection. Used at `:341` (water track) and `:425`
+     (stress track). Frame uses `color/surface-container`, which is what `IntakeMeter`'s Track binds.
+     Either add the variable or move the code onto `surface-container`. **Blocks build.**
+  4. **The in-card "Save & Close" is deleted** (`RecommendationCard`, `:659–669`). The sticky FAB has
+     the same label and the same destination and is always visible — two full-width primaries to one
+     place is verbatim the defect ruled on for `EmptyState 550:4165`. **Blocks build.**
+  5. **Mood range is a Tab, not a chip.** `useState<"Day"|"Week"|"Month">` is exactly-one-of-three,
+     never empty, never multiple. Frame uses `Tab 517:1513` ×3 — same ruling as the Overview trend
+     switch. The hand-rolled segmented track/thumb (`:510–529`) retires.
+  6. **~14 raw hexes must go.** `NUTRIENTS[].color` `#00685f` / `#0d9488` / `#2170e4` (**that blue is
+     in no token**), `BarChart` tint `#00685f` + labels `#171d1c` / `#3d4947`, `ProgressRing` track
+     `#eaefed`, `MoodCard` `#00685f` / `#3d4947`, `AreaChart` `#0d9488`, `MedRow` `#00685f` /
+     `#3d4947`, and `#f4fffc` / `#008378` on the CTA panel (`:233`, `:250`, `:253`).
+  7. `SectionLabel` (uppercase, tracked, `text-outline`) retires — both cards use
+     `Section Header 517:689`.
+  8. Three section headings hand-set `fontSize: 18`/`22` inline (`:236`, `:262`, `:289`, `:503`,
+     `:181`) — off the ramp. Frame is `headline-md` 20.
+  9. **Line-chart end points are clipped.** `LineChart` runs `x` 0→`W=100` inside a `0 0 100 h`
+     viewBox, so the Mon and Sun dots are half outside the viewport. Inset the domain or pad the
+     viewBox. **Blocks build.**
+  10. Mood axis glyphs were clipped — **Figma-side, already fixed** by the agent (24px artwork had
+      been cropped to a 16px instance; axis column now 24, `clipsContent=false`). The code's
+      `size={16}` scales correctly, so **do not "fix" the code for this one.**
+  11. "View Full Schedule" → **"Schedule"**. Measured at 360dp: with "Full schedule" the Section
+      Header title got 151px and truncated to *"Daily Medicati…"*; with "Schedule" it gets 176px and
+      "Daily Medications" renders whole.
+  12. `paddingBottom: 120` → **80** (`spacing/48` + a `spacing/32` spacer) — exactly clears a 56 FAB
+      at a 24 offset.
+  13. The italic tagline loses its italic (`:625`) — there is no italic in the brand type ramp. Same
+      call as the Overview milestone copy.
+  14. Leading glyphs dropped where no component can carry them: `add` on the Add button, `task-alt`
+      on the FAB. **`task-alt` does not exist in this file** — the FAB uses `icon/chrome-check`. Both
+      return when `Button 1:89` gains the proposed `Icon = None | Leading | Trailing` axis.
+  15. `MANAGE_HREF` is cast `as Href` and the file comment still says the route "may not exist yet".
+      It does exist; drop the cast and the stale comment.
+
+  **Out of scope for that round, and one of these is urgent.**
+
+  * **`Patient BottomTabBar 740:1015` OVERFLOWS AT 360dp, on every patient tab root.** Root is
+    `FILL`; the five tab items are `FIXED` **75** each = 375, plus `paddingLeft 8` + `paddingRight 8`
+    = **391 required**. At 393 it fits with 2px spare; **at 360 it overflows by 31 and the Lifestyle
+    label clips** — confirmed in pixels on a 360 clone. This is the device the app is being tested on.
+    Fix is `FILL` items: (360−16)/5 = 68.8. Design System page, so it was not touched mid-round.
+  * **Three glyphs now have three definitions each**, across three pages. The local frame is titled
+    "Local glyphs (none of these exist in this file)" but `icon/chrome-check` **does** exist on the
+    Design System page as `949:10253`. Same likely for local `icon/exercise 949:639` vs shared
+    `icon/physical-activity 949:10334`, and local `icon/sleep 949:633` vs the Overview round's
+    page-local `icon/sleep 949:1196`. Not repointed — instances would be reshaped while other agents
+    write to `26:84`.
+  * `Input 1:52` has `Show Trailing Icon#9:4` but **no** `Show leading icon`, so its `Icon#9:0` slot
+    is unconditionally visible and a field without a leading glyph needs a `visible=false` override.
+    Proposal: add the boolean, plus a `Lines = Single | Multi` axis — the multiline AI prompt is why
+    `Field / Prompt 954:952` is still hand-drawn.
+  * `Lifestyle / DailyLogRow`'s `Trailing=Stepper` default `Title` is **"Lisinopril 10mg"** — a drug
+    name defaulting into a sleep/water stepper. Per §5c step 2b, change the default before someone
+    ships the inherited value.
+  * `Lifestyle / PlanSelector State=Expanded` describes an inline disclosure **the code does not
+    implement** (the code ships a bottom-sheet `Modal`, `:474`). Either the code adopts inline
+    expansion, or the variant is documented as sheet-content-only.
+
+  **Two API mechanisms worth keeping**, both discovered the hard way: `resize()` is **silently
+  ignored** on instance grandchildren (no throw — it does nothing) and `minWidth` throws "cannot be
+  overridden in an instance", so proportional splits inside an instance need numeric `layoutGrow`
+  weights. And instance nodes carry a `visible:false` white-fill artifact even when the source
+  component has `fills: []` — an audit that does not exclude invisible paints will report false
+  positives (5 of them on the hub alone).
+
+  **No loading / empty / error / offline states were drawn, and that is correct for now:** neither
+  screen has an async surface (the hub reads five module-level consts, the manage screen is pure
+  local `useState`). `EmptyState 517:1773` / `ErrorPanel 517:2111` / `SkeletonCard 517:2291` become
+  **required the moment either screen is wired**, and lifestyle is one of the 19 feature areas still
+  on mock data.
 
 - 2026-08-05 — Claude — **The three wrong-chrome screens are migrated: `find-care`,
   `patient-profile-overview`, `patient-dashboard` are all `DetailShell` now.** Closes the item
