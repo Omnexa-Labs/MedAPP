@@ -274,6 +274,9 @@ if ($NoMetro) {
 
 # Warn rather than fail: an already-running Metro is a normal state, and Expo
 # will offer to use another port (which the tunnel above does NOT cover).
+# A crashed Metro can leave a listener holding the port on ::1 only - alive enough
+# to block a rebind, dead enough to serve nothing. That is not a state worth asking
+# the user to reason about, so it is cleared automatically.
 $portBusy = Get-NetTCPConnection -LocalPort $MetroPort -State Listen -ErrorAction SilentlyContinue
 if ($null -ne $portBusy) {
   Write-Warn2 "Port $MetroPort is already in use - probably a Metro you forgot about."
@@ -287,12 +290,29 @@ Write-Ok "Press 'a' to open on the phone, or scan the QR with Expo Go"
 Write-Ok "IMPORTANT: run this from $MobileDir - `npx expo` in the wrong folder offers to INSTALL a different Expo. Say no."
 
 Set-Location $MobileDir
-# --localhost is NOT optional here. `expo start` defaults to --host lan, which
-# advertises exp://<lan-ip>:8081 and encodes that into the QR code - an address
-# the phone CANNOT reach, because this network isolates wireless clients. The
-# symptom is Expo Go sitting on a loading screen indefinitely with no error.
-# --localhost advertises exp://127.0.0.1:8081, which the adb reverse tunnel
-# opened above forwards down the cable.
-$expoArgs = @('expo', 'start', '--localhost')
+# TWO SETTINGS, AND BOTH ARE LOAD-BEARING. Getting this wrong produces an Expo Go
+# that loads forever with NO error message, which is the least debuggable failure
+# in this whole setup - so the reasoning is written out.
+#
+# 1. WHY NOT PLAIN `expo start`: it defaults to advertising exp://<lan-ip>:8081 and
+#    encodes that into the QR code. This network isolates wireless clients, so the
+#    phone cannot reach the laptop's LAN address at all.
+#
+# 2. WHY NOT `--localhost` EITHER, which was this script's first fix: `--localhost`
+#    made Metro bind ONLY to `::1` - IPv6 loopback. But `adb reverse tcp:8081
+#    tcp:8081` forwards the phone's port to the host's IPv4 loopback, so the phone
+#    connected to 127.0.0.1:8081 where NOTHING was listening. Measured:
+#      Get-NetTCPConnection -LocalPort 8081 -State Listen  ->  LocalAddress ::1
+#      curl http://127.0.0.1:8081/status                   ->  connection refused
+#    Same silent infinite spinner, one layer deeper.
+#
+# So: `--host lan` to make Metro bind `::` (dual-stack, which covers IPv4 - verified
+# by curl returning 200 on 127.0.0.1 afterwards), and
+# REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 to make the ADVERTISED url and the QR
+# code point at the loopback the tunnel actually carries. Bind broadly, advertise
+# narrowly.
+$env:REACT_NATIVE_PACKAGER_HOSTNAME = "127.0.0.1"
+
+$expoArgs = @('expo', 'start', '--host', 'lan')
 if ($ClearCache) { $expoArgs += '--clear' }
 & npx @expoArgs
