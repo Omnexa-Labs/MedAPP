@@ -8,8 +8,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal, get_current_principal
 
 from ..deps import DbSession, RateLimiterDep
-from ..schemas.booking import BookingCancel, BookingCreate, BookingList, BookingOut, BookingStatus, BookingSummaryOut
-from ..services import BookingError, BookingRateLimiter, cancel_booking, create_booking, get_booking, get_booking_summary, list_bookings
+from ..schemas.booking import (
+    BookingCancel,
+    BookingCreate,
+    BookingList,
+    BookingOut,
+    BookingScheduleList,
+    BookingScheduleSummaryOut,
+    BookingStatus,
+    BookingSummaryOut,
+)
+from ..services import (
+    BookingError,
+    BookingRateLimiter,
+    cancel_booking,
+    create_booking,
+    get_booking,
+    get_booking_summary,
+    get_practitioner_schedule_summary,
+    list_bookings,
+    list_practitioner_schedule,
+)
 
 router = APIRouter(prefix="/v1/bookings", tags=["Booking"])
 
@@ -41,6 +60,10 @@ async def create(
 @router.get("", response_model=BookingList)
 async def index(
     all_bookings: bool = Query(default=False),
+    # FILTER ONLY — this value never authorises anything. It is a
+    # doctor_service profile id, which is not comparable to a token subject, so
+    # it cannot prove the caller is that clinician. A practitioner wanting
+    # their own schedule uses GET /v1/bookings/schedule, which takes no id.
     doctor_id: UUID | None = None,
     status_filter: BookingStatus | None = Query(default=None, alias="status"),
     principal: Principal = Depends(get_current_principal),
@@ -63,6 +86,34 @@ async def summary(
     db: AsyncSession = DbSession,
 ) -> BookingSummaryOut:
     return await get_booking_summary(db, principal, all_bookings=all_bookings, doctor_id=doctor_id)
+
+
+# Both practitioner routes are declared BEFORE `/{booking_id}`, for the same
+# reason `/summary` is: a literal segment registered after a UUID path param
+# would be swallowed by it and answer 422.
+@router.get("/schedule", response_model=BookingScheduleList)
+async def practitioner_schedule(
+    status_filter: BookingStatus | None = Query(default=None, alias="status"),
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = DbSession,
+) -> BookingScheduleList:
+    """The caller's own schedule as the treating clinician.
+
+    Takes NO identifier. "Whose schedule" is answered entirely by the verified
+    token, which is what removes the IDOR that an authorising `?doctor_id=`
+    would have created. Returns the minimised schedule projection — no clinical
+    free text; see `BookingScheduleOut`.
+    """
+    return await list_practitioner_schedule(db, principal, status_filter=status_filter)
+
+
+@router.get("/schedule/summary", response_model=BookingScheduleSummaryOut)
+async def practitioner_schedule_summary(
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = DbSession,
+) -> BookingScheduleSummaryOut:
+    """Counts plus the next three consultations, for the practitioner home card."""
+    return await get_practitioner_schedule_summary(db, principal)
 
 
 @router.get("/{booking_id}", response_model=BookingOut)

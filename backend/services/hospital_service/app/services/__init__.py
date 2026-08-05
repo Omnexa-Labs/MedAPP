@@ -5,6 +5,8 @@ from .hospital_service import (
     list_hospitals,
     get_hospital,
     list_reviews,
+    list_staff,
+    may_see_staff_user_ids,
 )
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     "list_hospitals",
     "get_hospital",
     "list_reviews",
+    "list_staff",
+    "may_see_staff_user_ids",
 ]

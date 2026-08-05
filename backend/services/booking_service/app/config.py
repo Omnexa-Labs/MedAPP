@@ -30,5 +30,13 @@ class Settings(BaseSettings):
     # booking is the thing they must not lose.
     telemedicine_http_timeout_seconds: float = 5.0
 
+    # Doctor-profile resolution. Used ONCE PER BOOKING, at creation, to learn
+    # which user_service user owns the doctor_service profile the patient
+    # booked (see services/doctor_directory.py). Deliberately not used on any
+    # read path: the practitioner authorization check must not depend on a
+    # network call. Override with BOOKING_DOCTOR_SERVICE_URL.
+    doctor_service_url: str = "http://doctor_service:8002"
+    doctor_http_timeout_seconds: float = 5.0
+
 
 settings = Settings()

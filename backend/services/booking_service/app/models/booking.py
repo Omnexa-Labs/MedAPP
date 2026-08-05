@@ -15,6 +15,20 @@ class Booking(Base, TimestampMixin):
 
     user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     doctor_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
+    # The user_service USER id of the clinician, denormalised from
+    # doctor_service at creation time. `doctor_id` above is a doctor_service
+    # PROFILE id in a different id space from `Principal.subject`, so it can
+    # never be compared to a token subject — that mismatch is what made
+    # `?doctor_id=` an IDOR. This column is the only thing a practitioner read
+    # authorises on, and the comparison is local: no network call decides
+    # access. See services/doctor_directory.py for the rejected alternatives.
+    #
+    # Nullable because resolution is best-effort on the write path (a patient
+    # must not lose a confirmed slot to a doctor_service outage) and because
+    # rows predating this column cannot be filled by a migration that has no
+    # access to doctor_service's database. **NULL MEANS DENY, NOT ALLOW.**
+    # Repair NULLs with scripts/backfill_booking_doctor_user_id.py.
+    doctor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="booked", index=True)

@@ -126,6 +126,74 @@ async def add_staff_member(db: AsyncSession, principal: Principal, hospital_id: 
     return staff
 
 
+def may_see_staff_user_ids(principal: Principal) -> bool:
+    """Whether this caller gets `user_id` on roster rows.
+
+    Same role set as `_require_staff_writer`: whoever may edit the roster
+    already knows who is on it, so returning the ids they wrote back to them
+    discloses nothing new. Everyone else gets the roster without them.
+    """
+    return principal.role in {"hospital_admin", "platform_admin"}
+
+
+async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) -> list[HospitalStaff]:
+    """Active staff of one hospital, for an AUTHENTICATED caller.
+
+    THE ACCESS RULE, AND WHY IT IS NOT PUBLIC
+    -----------------------------------------
+    Any authenticated principal may read a hospital's roster; anonymous callers
+    may not. That is stricter than the sibling reads on this router
+    (`GET /v1/hospitals`, `/{id}`, `/{id}/reviews` are all public) and the
+    difference is deliberate. Those return facts about an institution. This
+    returns a list of people and where each of them works, which is personal
+    data under Act 843 even without names attached — an employment graph, and a
+    ready-made target list for anyone phoning a hospital pretending to be a
+    colleague. Requiring a token does not make the data secret, but it makes
+    every read attributable to an identified account, which is the precondition
+    for the access log this system still owes (see PIPELINE entry) and it stops
+    anonymous bulk scraping of every hospital in the directory.
+
+    It is NOT narrowed to the hospital's own staff or admins: a patient
+    choosing a facility has a legitimate purpose for seeing which departments
+    and roles it staffs, that is what the `hospital_detail` frame shows, and a
+    rule of "only insiders may look" would leave that screen permanently empty
+    for the people it was designed for.
+
+    Two further minimisations, both enforced here rather than left to callers:
+      * inactive rows are excluded — a former employee's placement at a
+        hospital is history, not a current fact, and nothing on the screen needs
+        it. Admins do not get an override; a leavers list is a different
+        endpoint with a different purpose.
+      * `user_id` is filtered at the serialisation boundary by
+        `may_see_staff_user_ids`.
+
+    Raises `HospitalError` for an unknown hospital, so the router can answer 404
+    instead of an empty roster — `list_reviews` returns `[]` for a nonexistent
+    hospital, which cannot distinguish "no staff published" from "wrong id", and
+    that ambiguity is what put an EmptyState on the screen in the first place.
+    """
+    if not principal.role:
+        # Defensive: an unauthenticated caller cannot reach here (the router
+        # depends on `get_current_principal`), but a role-less principal must
+        # never fall through to a successful read.
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "authentication required")
+
+    hospital = await db.get(HospitalProfile, hospital_id)
+    if hospital is None:
+        raise HospitalError("hospital not found")
+
+    stmt = (
+        select(HospitalStaff)
+        .where(HospitalStaff.hospital_id == hospital_id)
+        .where(HospitalStaff.is_active.is_(True))
+        # Stable ordering so a client can diff two reads: role groups the list
+        # the way the frame renders it, created_at breaks ties deterministically.
+        .order_by(HospitalStaff.role.asc(), HospitalStaff.created_at.asc())
+    )
+    result = await db.scalars(stmt)
+    return list(result.all())
+
+
 async def list_reviews(db: AsyncSession, hospital_id: UUID) -> list[HospitalReview]:
     stmt = select(HospitalReview).where(HospitalReview.hospital_id == hospital_id).where(HospitalReview.is_public.is_(True)).order_by(HospitalReview.created_at.desc())
     result = await db.scalars(stmt)

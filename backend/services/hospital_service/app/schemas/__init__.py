@@ -1,4 +1,13 @@
-from .hospital import HospitalCreate, HospitalList, HospitalOut, HospitalReviewOut, HospitalStaffCreate, HospitalStaffOut
+from .hospital import (
+    HospitalCreate,
+    HospitalList,
+    HospitalOut,
+    HospitalReviewOut,
+    HospitalStaffCreate,
+    HospitalStaffOut,
+    HospitalStaffRoster,
+    HospitalStaffRosterEntry,
+)
 
 __all__ = [
     "HospitalCreate",
@@ -7,4 +16,6 @@ __all__ = [
     "HospitalReviewOut",
     "HospitalStaffCreate",
     "HospitalStaffOut",
+    "HospitalStaffRoster",
+    "HospitalStaffRosterEntry",
 ]
