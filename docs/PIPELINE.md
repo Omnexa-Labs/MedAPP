@@ -182,6 +182,54 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **`find_care`'s chips are `ChoiceChip` instances, and the Helpful Resources
+  glyphs are canonical.** Closes the item the Design System pass unblocked.
+
+  **Nine chips instanced** (`144:281`…`144:305` → `1012:2759`…`1012:2793`): six type chips against
+  `Layout=Hug, State=Default|Selected`, three facet toggles the same. Widths moved by at most 2px and
+  the wrap packing is unchanged (2 lines + 2 lines at 361), so this is a pure canonicalisation. The
+  two selected chips now get their check from the **State axis** rather than a hand-drawn tick — the
+  thing the new structural Check buys.
+
+  **"Specialty" is deliberately NOT converted.** It is a PICKER TRIGGER — the chevron means "opens a
+  menu" and it holds no selected state — and `ChoiceChip.tsx` records why: letting a chip absorb
+  arbitrary trailing chrome is the exact drift the extraction removed. It stays a local frame until
+  the Design System has a trigger primitive (or 11:104 gains a `trailing` property).
+
+  `Show icon` was left at its default **false**, so the swap changes no content. The code DOES draw a
+  leading glyph on five of the six type chips; that divergence is separate and still open — closing it
+  means choosing five glyphs, which is a content decision, not a swap.
+
+  ---
+
+  **Helpful Resources glyphs (`82:105` Patient Home / New User Onboarding) were hand-drawn
+  approximations, not components.** Reported from the canvas. All three were local 24×24 frames
+  holding a single crude vector — `14x18` for a shield, `14x14` for a sparkle, two `10x16` for a book
+  — which is why they read as a blob, a paper plane and a set of bars rather than the glyphs they were
+  named after. Replaced with instances:
+
+  | Tile | Was | Now |
+  |---|---|---|
+  | Data Privacy | local `icon/shield`, one 14×18 vector | **`icon/chrome-shield` 1011:919** (new) |
+  | AI Assistant | local `icon/sparkle`, one 14×14 vector | `icon/chrome-auto-awesome` `550:831` |
+  | User Guide | local `icon/book`, two 10×16 vectors | `icon/chrome-article` `949:10328` |
+
+  `icon/chrome-shield` is **new**, created rather than approximated: the file had no shield or lock
+  glyph at all. Drawn from an SVG path as a 2px stroked shape to match the file's stroke-drawn icon
+  convention, stroke bound to `on-surface-variant` as a neutral default like its siblings. The code
+  side needs nothing — `ChromeIconName` is the whole MaterialIcons union, so `<Icon chrome="shield" />`
+  already type-checks.
+
+  All three instances are tinted to **`color/on-primary-container`**, which is the pair of the 48px
+  plate's `primary-container` fill, so they flip with the mode instead of being frozen white.
+
+  **MECHANISM, and it cost a screenshot:** the glyphs they replaced were
+  `layoutPositioning="ABSOLUTE"` siblings overlaid on the plate, inside a HORIZONTAL auto-layout
+  `TipTile`. A fresh instance defaults to `AUTO`, so it joined the flow and the plates rendered
+  **completely empty** — worse than the defect being fixed. When replacing an absolutely-positioned
+  child in an auto-layout parent, set `layoutPositioning = "ABSOLUTE"` on the replacement before
+  trusting x/y. Verified by screenshot both times, which is the only reason it was caught.
+
 - 2026-08-05 — Claude — **DESIGN SYSTEM PASS: `ChoiceChip` and `Button` have icon axes, and the
   prototype is re-cloned.** Closes both remaining leftovers.
 
