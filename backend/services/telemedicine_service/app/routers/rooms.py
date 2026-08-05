@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..deps import CurrentPrincipalDep, DbSession
 from ..schemas.room import RoomCreate, RoomJoinOut, RoomMessageCreate, RoomMessageOut, RoomOut, RoomTokenOut
-from ..services.room_service import create_room, end_room, generate_room_token, get_room, join_room, leave_room, list_messages, post_message
+from ..services.room_service import create_room, end_room, generate_room_token, get_room, join_room, leave_room, list_messages, post_message, read_room
 
 router = APIRouter(prefix="/v1/rooms", tags=["Rooms"])
 
@@ -18,12 +18,16 @@ async def create(payload: RoomCreate, session: AsyncSession = DbSession, princip
 
 @router.get("/{room_id}", response_model=RoomOut)
 async def read(room_id: UUID, session: AsyncSession = DbSession, principal=CurrentPrincipalDep):
-    return await get_room(session, principal, room_id)
+    # `read_room`, not `get_room`: the audited entry point. `get_room` is the
+    # unaudited internal authorization helper — see its docstring.
+    return await read_room(session, principal, room_id)
 
 
 @router.get("/{room_id}/token", response_model=RoomTokenOut)
 async def token(room_id: UUID, session: AsyncSession = DbSession, principal=CurrentPrincipalDep):
     token_value, expires_at = await generate_room_token(session, principal, room_id)
+    # `get_room` (unaudited) on purpose: `generate_room_token` already wrote the
+    # audit row for this request, and this second call only re-reads the id.
     room = await get_room(session, principal, room_id)
     return {"room_id": room.id, "token": token_value, "expires_at": expires_at}
 

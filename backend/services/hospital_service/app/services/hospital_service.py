@@ -6,9 +6,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.audit import audited_collection_read
 from shared.auth import Principal
 
-from ..models import HospitalProfile, HospitalReview, HospitalStaff, StaffRole
+from ..models import AccessAudit, HospitalProfile, HospitalReview, HospitalStaff, StaffRole
 from ..schemas.hospital import HospitalCreate, HospitalStaffCreate
 
 
@@ -171,27 +172,56 @@ async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) 
     instead of an empty roster — `list_reviews` returns `[]` for a nonexistent
     hospital, which cannot distinguish "no staff published" from "wrong id", and
     that ambiguity is what put an EmptyState on the screen in the first place.
+
+    AUDITED — this is the access log the docstring above promised and could not
+    yet point at. Requiring a token made every read attributable; this makes it
+    recorded.
+
+    The row carries `patient_id = NULL`, deliberately. There is no patient here:
+    the data subjects are the staff, and the hospital is an institution, not a
+    data subject. `resource_id` is the hospital and `record_count` is the size
+    of the roster handed over — which is the number that matters for this
+    endpoint, because the risk it carries is bulk enumeration of an employment
+    graph, not the exposure of one clinical record. `accessor_user_id` plus
+    `created_at` is what turns "someone scraped the directory" into a name and a
+    timestamp.
     """
-    if not principal.role:
-        # Defensive: an unauthenticated caller cannot reach here (the router
-        # depends on `get_current_principal`), but a role-less principal must
-        # never fall through to a successful read.
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "authentication required")
+    async with audited_collection_read(
+        db, AccessAudit, principal, "hospital_staff_roster", resource_id=hospital_id
+    ) as audit:
+        if not principal.role:
+            # Defensive: an unauthenticated caller cannot reach here (the router
+            # depends on `get_current_principal`), but a role-less principal must
+            # never fall through to a successful read. Inside the audited block,
+            # so the refusal is recorded rather than merely returned.
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "authentication required")
 
-    hospital = await db.get(HospitalProfile, hospital_id)
-    if hospital is None:
-        raise HospitalError("hospital not found")
+        hospital = await db.get(HospitalProfile, hospital_id)
+        if hospital is None:
+            # Outside the audit trail by design: `HospitalError` is not a
+            # denial, and a roster that does not exist was not disclosed.
+            raise HospitalError("hospital not found")
 
-    stmt = (
-        select(HospitalStaff)
-        .where(HospitalStaff.hospital_id == hospital_id)
-        .where(HospitalStaff.is_active.is_(True))
-        # Stable ordering so a client can diff two reads: role groups the list
-        # the way the frame renders it, created_at breaks ties deterministically.
-        .order_by(HospitalStaff.role.asc(), HospitalStaff.created_at.asc())
-    )
-    result = await db.scalars(stmt)
-    return list(result.all())
+        stmt = (
+            select(HospitalStaff)
+            .where(HospitalStaff.hospital_id == hospital_id)
+            .where(HospitalStaff.is_active.is_(True))
+            # Stable ordering so a client can diff two reads: role groups the list
+            # the way the frame renders it, created_at breaks ties deterministically.
+            .order_by(HospitalStaff.role.asc(), HospitalStaff.created_at.asc())
+        )
+        result = await db.scalars(stmt)
+        staff = list(result.all())
+        audit.record_count = len(staff)
+        # `admin_override` is left False even for a `hospital_admin`, and that is
+        # a considered choice. Nobody bypasses a rule here — every authenticated
+        # role may read this roster. Admins do get the staff `user_id`s
+        # (`may_see_staff_user_ids`), i.e. a WIDER projection, which is a
+        # different fact from an override. Setting the flag for it would make
+        # `WHERE admin_override IS TRUE` stop meaning "someone bypassed
+        # authorization", which is the one query the column exists for.
+        # Recording projection width needs its own column; flagged, not faked.
+    return staff
 
 
 async def list_reviews(db: AsyncSession, hospital_id: UUID) -> list[HospitalReview]:

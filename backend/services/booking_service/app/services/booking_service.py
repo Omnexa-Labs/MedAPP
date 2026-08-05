@@ -8,9 +8,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.audit import audited_collection_read, audited_read
 from shared.auth import Principal
 
-from ..models import Booking
+from ..models import AccessAudit, Booking
 from ..schemas.booking import (
     BookingCancel,
     BookingCreate,
@@ -180,6 +181,7 @@ async def list_bookings(
     all_bookings: bool = False,
     doctor_id: UUID | None = None,
     status_filter: BookingStatus | None = None,
+    audit: bool = True,
 ) -> BookingList:
     """List bookings where the caller is the PATIENT (or everything, for admin).
 
@@ -196,7 +198,41 @@ async def list_bookings(
     patients by changing one UUID. The practitioner view is
     `list_practitioner_schedule` below, which takes no id from the client at
     all.
+
+    AUDITED. Not in the brief's minimum list, included because `all_bookings=
+    true` is the widest read in this service — an admin pulling every booking of
+    every patient on the platform, `reason` and `notes` included. That is the
+    access a reviewer is most likely to be hunting for, and it was invisible. It
+    is tagged `admin_override` and writes one row per patient exposed; the
+    ordinary self-read is the N=1 case of the same rule.
+
+    `audit=False` exists for `get_booking_summary`, which delegates and records
+    its own access.
     """
+    if not audit:
+        return await _query_bookings(
+            db, principal, all_bookings=all_bookings, doctor_id=doctor_id, status_filter=status_filter
+        )
+
+    async with audited_collection_read(db, AccessAudit, principal, "booking_list") as audit_ctx:
+        audit_ctx.admin_override = all_bookings and principal.role == "admin"
+        bookings = await _query_bookings(
+            db, principal, all_bookings=all_bookings, doctor_id=doctor_id, status_filter=status_filter
+        )
+        audit_ctx.patient_ids.extend(item.user_id for item in bookings.items)
+        audit_ctx.record_count = len(bookings.items)
+    return bookings
+
+
+async def _query_bookings(
+    db: AsyncSession,
+    principal: Principal,
+    *,
+    all_bookings: bool = False,
+    doctor_id: UUID | None = None,
+    status_filter: BookingStatus | None = None,
+) -> BookingList:
+    """`list_bookings`' body, with no audit write. Not for router use."""
     if all_bookings and principal.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin access required")
 
@@ -231,6 +267,7 @@ async def list_practitioner_schedule(
     principal: Principal,
     *,
     status_filter: BookingStatus | None = None,
+    audit: bool = True,
 ) -> BookingScheduleList:
     """List bookings where the caller is the CLINICIAN.
 
@@ -252,7 +289,43 @@ async def list_practitioner_schedule(
 
     Returns the minimised `BookingScheduleOut` projection, not `BookingOut`;
     see that model's docstring for what is left out and why.
+
+    AUDITED — this endpoint shipped deliberately unlogged, pending the shared
+    audit unit that now exists. It is a CROSS-SUBJECT read: one request hands a
+    clinician the identity, appointment time and consultation mode of every
+    patient on their list, so `audited_collection_read` writes one row per
+    distinct patient rather than one row for the request. A single row saying
+    "a schedule was read" cannot be found by a query for one patient, and "who
+    read this patient's record?" is the only question this table exists to
+    answer.
+
+    `audit=False` is for internal callers that have already recorded their own
+    access (`get_practitioner_schedule_summary`), the same discipline as
+    `ehr_service`'s `list_vitals(enforce_access=False)`. It is not a way to
+    turn logging off for a request: nothing reachable from the router passes it.
     """
+    if not audit:
+        return await _query_practitioner_schedule(db, principal, status_filter=status_filter)
+
+    async with audited_collection_read(db, AccessAudit, principal, "booking_schedule") as audit_ctx:
+        # The query runs INSIDE the block, so a non-practitioner's 403 from
+        # `_require_practitioner` is recorded as a denied row on the way past.
+        schedule = await _query_practitioner_schedule(db, principal, status_filter=status_filter)
+        audit_ctx.patient_ids.extend(item.patient_id for item in schedule.items)
+        audit_ctx.record_count = len(schedule.items)
+    return schedule
+
+
+async def _query_practitioner_schedule(
+    db: AsyncSession,
+    principal: Principal,
+    *,
+    status_filter: BookingStatus | None = None,
+) -> BookingScheduleList:
+    """The schedule query, with NO audit write. Never call this directly from a
+    router — it is the shared body of the audited public function and of the
+    summary, so the authorization rule cannot drift between them while the
+    audit write happens exactly once per request."""
     practitioner_user_id = _require_practitioner(principal)
 
     stmt = select(Booking).where(Booking.doctor_user_id == practitioner_user_id)
@@ -283,12 +356,25 @@ async def get_practitioner_schedule_summary(
 
     Same authorization rule as `list_practitioner_schedule` — it delegates, so
     the rule cannot drift between the two endpoints.
+
+    AUDITED under its own resource name, `booking_schedule_summary`, and the
+    delegation passes `audit=False` so a single request produces ONE set of
+    rows. The subjects recorded are the patients actually disclosed — the three
+    upcoming consultations — not every patient the count was computed over: the
+    counts themselves name nobody, and logging fifty subjects for a card that
+    shows three would overstate what was exposed. An audit log that exaggerates
+    is as unusable as one that omits.
     """
-    schedule = await list_practitioner_schedule(db, principal)
-    now = datetime.now(tz=timezone.utc)
-    booked = [item for item in schedule.items if item.status == BookingStatus.BOOKED]
-    cancelled = [item for item in schedule.items if item.status == BookingStatus.CANCELLED]
-    upcoming = [item for item in booked if _as_utc(item.starts_at) >= now][:3]
+    async with audited_collection_read(
+        db, AccessAudit, principal, "booking_schedule_summary"
+    ) as audit_ctx:
+        schedule = await list_practitioner_schedule(db, principal, audit=False)
+        now = datetime.now(tz=timezone.utc)
+        booked = [item for item in schedule.items if item.status == BookingStatus.BOOKED]
+        cancelled = [item for item in schedule.items if item.status == BookingStatus.CANCELLED]
+        upcoming = [item for item in booked if _as_utc(item.starts_at) >= now][:3]
+        audit_ctx.patient_ids.extend(item.patient_id for item in upcoming)
+        audit_ctx.record_count = len(upcoming)
     return BookingScheduleSummaryOut(
         total_count=len(schedule.items),
         booked_count=len(booked),
@@ -310,12 +396,22 @@ async def get_booking_summary(
     identical `doctor_id` gap, because the check was duplicated rather than
     reused. The practitioner counterpart is
     `get_practitioner_schedule_summary`.
+
+    AUDITED under `booking_summary`, with `audit=False` on the delegation so one
+    request writes one set of rows. Subjects recorded are the patients in the
+    three bookings actually returned.
     """
-    bookings = await list_bookings(db, principal, all_bookings=all_bookings, doctor_id=doctor_id)
-    now = datetime.now(tz=timezone.utc)
-    booked = [booking for booking in bookings.items if booking.status == BookingStatus.BOOKED]
-    cancelled = [booking for booking in bookings.items if booking.status == BookingStatus.CANCELLED]
-    upcoming = [booking for booking in booked if _as_utc(booking.starts_at) >= now][:3]
+    async with audited_collection_read(db, AccessAudit, principal, "booking_summary") as audit_ctx:
+        audit_ctx.admin_override = all_bookings and principal.role == "admin"
+        bookings = await list_bookings(
+            db, principal, all_bookings=all_bookings, doctor_id=doctor_id, audit=False
+        )
+        now = datetime.now(tz=timezone.utc)
+        booked = [booking for booking in bookings.items if booking.status == BookingStatus.BOOKED]
+        cancelled = [booking for booking in bookings.items if booking.status == BookingStatus.CANCELLED]
+        upcoming = [booking for booking in booked if _as_utc(booking.starts_at) >= now][:3]
+        audit_ctx.patient_ids.extend(booking.user_id for booking in upcoming)
+        audit_ctx.record_count = len(upcoming)
     return BookingSummaryOut(
         total_count=len(bookings.items),
         booked_count=len(booked),
@@ -335,14 +431,30 @@ async def get_booking(
 
     `require_write=True` is the narrower rule (patient/admin); the default is
     the read rule, which also admits the treating clinician.
+
+    AUDITED, both outcomes and both rules. The write rule is audited too: a
+    cancellation is preceded by reading the booking (`reason`, `notes`, the
+    patient's identity), and "who opened this booking?" has the same answer
+    whether or not they went on to cancel it. `resource` distinguishes the two
+    so a reviewer can tell which door was used.
+
+    The `db.get` is outside the audited block: a nonexistent booking has no
+    patient to attribute the attempt to, so it writes no row (see
+    `shared.audit.recorder.audited_read`).
     """
     booking = await db.get(Booking, booking_id)
     if not booking:
         raise BookingError("booking not found")
-    if require_write:
-        _can_manage_booking(principal, booking)
-    else:
-        _can_read_booking(principal, booking)
+    resource = "booking_write" if require_write else "booking"
+    async with audited_read(db, AccessAudit, principal, resource, resource_id=booking_id) as audit:
+        audit.patient_id = booking.user_id
+        # Set before the check so a 403 names the patient whose booking was
+        # refused, not merely that a refusal happened.
+        audit.admin_override = principal.role == "admin" and booking.user_id != _principal_uuid(principal)
+        if require_write:
+            _can_manage_booking(principal, booking)
+        else:
+            _can_read_booking(principal, booking)
     return booking
 
 
