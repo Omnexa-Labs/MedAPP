@@ -9,6 +9,7 @@
 //  2. tabs whose route does not exist must NOT navigate. Pushing an invented
 //     path, or a patient screen, is worse than a no-op.
 
+import { StyleSheet } from "react-native";
 import { screen, fireEvent } from "@testing-library/react-native";
 import { renderWithSafeArea as render } from "@/test/safe-area";
 
@@ -64,6 +65,34 @@ describe("PractitionerBottomNav", () => {
     expect(tab.props.accessibilityHint).toBe("Not available yet");
     fireEvent.press(tab);
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("makes an unrouted tab visibly AND semantically unavailable, not just hinted", () => {
+    // The defect this locks: Home and Profile have no destination, and that was
+    // announced to assistive tech only. A sighted practitioner saw five identical
+    // tabs, tapped one of the two dead ones, and got silence with no explanation.
+    //
+    // Both channels are asserted because fixing one and not the other is the easy
+    // mistake — the hint alone shipped for weeks.
+    render(<PractitionerBottomNav active="patients" />);
+
+    for (const label of ["Home", "Profile"]) {
+      const tab = screen.getByLabelText(label);
+      expect(tab.props.accessibilityState.disabled).toBe(true);
+      expect(tab.props.accessibilityHint).toBe("Not available yet");
+      // Dimmed. Flattened because the style is an array once a Pressable has both
+      // a className-derived style and an inline one.
+      const style = StyleSheet.flatten(tab.props.style) ?? {};
+      expect(style.opacity).toBe(0.6);
+    }
+
+    // The routed tabs must NOT pick up either treatment.
+    for (const label of ["Schedule", "Inbox"]) {
+      const tab = screen.getByLabelText(label);
+      expect(tab.props.accessibilityState.disabled).toBe(false);
+      const style = StyleSheet.flatten(tab.props.style) ?? {};
+      expect(style.opacity).toBe(1);
+    }
   });
 
   it("no-ops on the already-active tab", () => {

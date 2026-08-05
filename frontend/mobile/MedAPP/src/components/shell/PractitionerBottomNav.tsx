@@ -64,6 +64,14 @@ interface TabDef {
  * practitioner destinations exist?", so a stale entry here is worse than none.
  * Missing today: a practitioner home and a practitioner self-profile.
  *
+ * STATUS 2026-08-05: both are being DESIGNED (Figma page "Practitioner Shell").
+ * Until the screens are built and routed, the two `null` tabs render dimmed and
+ * report `disabled` — see the INTERIM note on the Pressable below, which also
+ * states the condition for removing it. Two of five tabs dead is the same defect
+ * class as the patient nav's six hand-written `onTabPress` switches, three of
+ * which silently dropped Inbox; the difference is that here the destinations do
+ * not exist yet, so a shared tab map cannot fix it.
+ *
  *   Home         (none)                      practitioner home not built
  *   Appointments /(app)/appointments         EXISTS — but AppointmentManagement
  *                                            is authored patient-side ("View My
@@ -148,7 +156,11 @@ export function PractitionerBottomNav({ active = "home", onTabPress }: Props) {
           <Pressable
             key={tab.key}
             accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
+            // `disabled` as well as `selected`. An unrouted tab announced only via
+            // `accessibilityHint` was half-honest: TalkBack read "Not available
+            // yet", but the STATE was still "tab, not selected", so the control
+            // reported itself as actionable. This makes the two agree.
+            accessibilityState={{ selected: isActive, disabled: unrouted }}
             accessibilityLabel={tab.label}
             accessibilityHint={
               isActive
@@ -163,7 +175,24 @@ export function PractitionerBottomNav({ active = "home", onTabPress }: Props) {
               router.push(tab.href);
             }}
             className="flex-1 flex-col items-center justify-center active:opacity-70"
-            style={{ height: TAB_HEIGHT, gap: 4 }}
+            // INTERIM (2026-08-05) — the dimming goes when the two screens land.
+            //
+            // Home and Profile have no destination, and until now that was told to
+            // assistive tech and to NOBODY ELSE: a sighted practitioner saw two
+            // tabs identical to the three that work, tapped one, and got silence.
+            // "Never encode meaning in colour alone" is usually a warning about
+            // colour-ONLY signals; this was the inverse failure, a signal with no
+            // visual channel at all.
+            //
+            // 0.6 is the opacity Button.tsx already uses for disabled, so this
+            // borrows an existing treatment rather than inventing a fourth one.
+            // It is NOT a token: opacity is a state layer here, not a colour.
+            //
+            // REMOVE THIS, and the `unrouted` branch above, once
+            // `practitioner-home` and `practitioner-profile` exist and TABS
+            // carries their hrefs. It is a stopgap that keeps the bar honest in
+            // the meantime, not a design decision to keep.
+            style={{ height: TAB_HEIGHT, gap: 4, opacity: unrouted ? 0.6 : 1 }}
           >
             {/* Decorative: the label directly beneath carries the name, so the
                 glyph is hidden from assistive tech (no `label` prop). */}
