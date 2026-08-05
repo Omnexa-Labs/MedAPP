@@ -153,8 +153,13 @@ dark proof:
 | Telemedicine | `practitioner-telehealth-profile` `831:767` · `waiting-room` `833:857` · `telemedicine-consultation` `837:1190` |
 | Shell | `AccountMenu` `945:5796` (page) — **needs promotion to the Design System page; see §5** |
 
-**Still undesigned** — `community` and `lifestyle` / `lifestyle-manage` (design in flight,
-run `wf_eb1c9d70-aeb`).
+**Still undesigned** — none. `community` `949:13725`, `lifestyle` `949:13130` and
+`lifestyle_manage` `954:931` were delivered by run `wf_eb1c9d70-aeb` on 2026-08-05, which closes the
+"built in code, absent from Figma" gap for every patient screen. **The round's review gate FAILED
+those three on quality, not on existence** — see §5 — so the frames are present but not accepted:
+the lifestyle pair has no dark proof at all, `981:1549`'s "Scrim @40%" renders fully opaque
+(hiding the wordmark and three cards behind it), and the fifteen-item code-vs-frame list for the
+pair was never written into §5. Do not build from `949:13130` / `954:931` until those are cleared.
 
 **Stubs, unfinished** — `152:148` Explore and `175:190` specialist_profile. `175:190` is worth
 finishing or deleting rather than leaving: it is where "Dr. Sarah Jenkins" and "Accra" leaked into
