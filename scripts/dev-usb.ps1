@@ -47,7 +47,39 @@ param(
   [switch]$Full
 )
 
-$ErrorActionPreference = "Stop"
+# DELIBERATELY "Continue", NOT "Stop" - this cost a run, so it is worth the note.
+#
+# Windows PowerShell 5.1 wraps every stderr line from a NATIVE command in an
+# ErrorRecord (NativeCommandError). Under `Stop`, that makes any tool writing a
+# WARNING to stderr fatal. `docker compose` writes
+#   level=warning msg="The \"ANTHROPIC_API_KEY\" variable is not set"
+# for each agent service in the compose file - services this script does not even
+# start, but compose parses the whole file - so the first health check aborted the
+# script while the backend was in fact up and healthy.
+#
+# So: `Continue`, and every native call is checked on $LASTEXITCODE explicitly,
+# which is the only reliable success signal for an .exe. `throw` is still
+# terminating regardless of this preference, so the guard clauses below behave the
+# same way they read.
+# ASCII ONLY IN THIS FILE. Windows PowerShell 5.1 decodes .ps1 as the system ANSI
+# codepage unless the file has a UTF-8 BOM, so one em dash becomes three bytes and
+# the parser dies with "Unexpected token" pointing at innocent-looking words. Use
+# plain hyphens and straight quotes.
+$ErrorActionPreference = "Continue"
+
+# ---------------------------------------------------------------------------
+# .env - created on first run, and this is why compose was warning
+# ---------------------------------------------------------------------------
+# docs/runbooks/local-dev.md's first instruction is `cp .env.example .env`, and
+# skipping it is what produces six
+#   level=warning msg="The \"ANTHROPIC_API_KEY\" variable is not set"
+# lines on every compose call. Harmless in themselves - none of the AI agents is
+# in $SliceServices - but six warnings on every run train you to stop reading
+# compose's output, and the next warning will be a real one.
+#
+# --env-file is passed EXPLICITLY below rather than relying on auto-discovery:
+# Compose resolves a bare `.env` against the project directory, which defaults to
+# the COMPOSE FILE's directory (infra/docker/), not the repo root where .env lives.
 
 # ---------------------------------------------------------------------------
 # Paths and constants
@@ -58,6 +90,15 @@ $MobileDir = Join-Path $RepoRoot "frontend\mobile\MedAPP"
 $ComposeBase = Join-Path $RepoRoot "infra\docker\docker-compose.yml"
 $ComposePorts = Join-Path $RepoRoot "infra\docker\docker-compose.ports.yml"
 $SeedScript = Join-Path $RepoRoot "scripts\seed_dev_data.py"
+$EnvFile = Join-Path $RepoRoot ".env"
+$EnvExample = Join-Path $RepoRoot ".env.example"
+
+if (-not (Test-Path $EnvFile)) {
+  if (Test-Path $EnvExample) {
+    Copy-Item $EnvExample $EnvFile
+    Write-Host "==> Created .env from .env.example (first-run step from local-dev.md)" -ForegroundColor Cyan
+  }
+}
 
 # The gateway's HOST port. 8010, not 8000, because docker-compose.ports.yml
 # offsets every published port by +10 so MedApp can share this machine with
@@ -81,7 +122,7 @@ function Write-Warn2($msg) { Write-Host "    ! $msg" -ForegroundColor Yellow }
 
 # Both compose files, base first. Order matters: the second file's `!override`
 # tags replace the first's port lists rather than appending to them.
-$Compose = @("compose", "-f", $ComposeBase, "-f", $ComposePorts)
+$Compose = @("compose", "--env-file", $EnvFile, "-f", $ComposeBase, "-f", $ComposePorts)
 
 # ---------------------------------------------------------------------------
 # 0. Find adb
@@ -108,8 +149,10 @@ Write-Ok $adb
 
 if (-not $SkipDocker) {
   Write-Step "Checking Docker"
-  docker info *> $null
-  if (-not $?) { throw "Docker is not running. Start Docker Desktop, wait for the whale to settle, and retry." }
+  # `> $null` redirects stdout ONLY. Never `*> $null` on a native command here -
+  # see the note at the top of the file; that is what broke this script once.
+  docker info > $null 2>$null
+  if ($LASTEXITCODE -ne 0) { throw "Docker is not running. Start Docker Desktop, wait for the whale to settle, and retry." }
   Write-Ok "running"
 
   $services = if ($Full) { @() } else { $SliceServices }
@@ -118,17 +161,17 @@ if (-not $SkipDocker) {
   Write-Step "Starting backend ($label)"
   Write-Ok "first run pulls and builds images - this is the slow part"
   & docker @Compose up -d @services
-  if (-not $?) { throw "compose up failed. If it says 'port is already allocated', something else on this machine holds 5442/6389/8010/8011." }
+  if ($LASTEXITCODE -ne 0) { throw "compose up failed. If it says 'port is already allocated', something else on this machine holds 5442/6389/8010/8011." }
 
   # Health-wait before migrating: alembic against a Postgres that has not
   # finished initialising fails in a way that looks like a migration bug.
   Write-Step "Waiting for services to answer /healthz"
-  $portFor = @{ user_service = 8001; doctor_service = 8002; booking_service = 8003 }
+  $portFor = @{ user_service = 8001; doctor_service = 8002; booking_service = 8003; telemedicine_service = 8007 }
   foreach ($svc in @("user_service", "doctor_service")) {
     $ready = $false
     foreach ($attempt in 1..60) {
-      & docker @Compose exec -T $svc curl -fsS "http://127.0.0.1:$($portFor[$svc])/healthz" *> $null
-      if ($?) { $ready = $true; break }
+      & docker @Compose exec -T $svc curl -fsS "http://127.0.0.1:$($portFor[$svc])/healthz" > $null 2>$null
+      if ($LASTEXITCODE -eq 0) { $ready = $true; break }
       Start-Sleep -Seconds 2
     }
     if (-not $ready) { throw "$svc never became healthy. Look at: docker compose -f `"$ComposeBase`" -f `"$ComposePorts`" logs $svc" }
@@ -137,8 +180,13 @@ if (-not $SkipDocker) {
 
   Write-Step "Applying migrations"
   foreach ($svc in $MigrateServices) {
-    & docker @Compose exec -T $svc alembic upgrade head *> $null
-    if (-not $?) { throw "alembic failed for $svc. Run it without the output redirect to see why." }
+    # Captured rather than discarded: on failure the output IS the diagnosis, and
+    # "run it again without the redirect" is a poor answer at 1am.
+    $out = & docker @Compose exec -T $svc alembic upgrade head 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host ($out | Out-String) -ForegroundColor Red
+      throw "alembic failed for $svc - output above."
+    }
     Write-Ok $svc
   }
 } else {
@@ -156,7 +204,7 @@ if (-not $SkipSeed) {
   # INSIDE the container so it can use each service's own layer over the compose
   # network - no host Python, no published ports, no gateway rate limiter.
   Get-Content -Raw $SeedScript | & docker @Compose exec -T user_service python -
-  if (-not $?) { throw "Seeding failed. The stack is up, so this is the seeder's problem - re-run with -SkipDocker to iterate." }
+  if ($LASTEXITCODE -ne 0) { throw "Seeding failed. The stack is up, so this is the seeder's problem - re-run with -SkipDocker -SkipSeed=`$false to iterate." }
 } else {
   Write-Step "Skipping seed (-SkipSeed)"
 }

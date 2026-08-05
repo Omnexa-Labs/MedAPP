@@ -155,6 +155,7 @@ Two traps here:
 | Login fails with valid credentials | Seed never ran, or ran against a fresh volume. Re-seed. |
 | `adb` says `unauthorized` | Unlock the phone, tap **Allow** on the USB-debugging prompt. If no prompt: `adb kill-server`, unplug, replug. |
 | `adb` says `offline`, or lists nothing | Cable in a data port? Phone unlocked? USB mode **File transfer**, not **Charging only**? Then `adb kill-server`. |
+| Six `ANTHROPIC_API_KEY is not set` warnings | You have no `.env`. The script creates one from `.env.example` on first run now. Harmless either way — none of the AI agents is in the seven services this starts. |
 | Metro dies whenever a file is saved | Known: Metro on this project falls over when the file tree changes under it while something else is also writing. Don't run a build or a code-editing agent against the repo while Metro is up. Restart with `.\scripts\dev-usb.ps1 -SkipDocker -SkipSeed`. |
 | Port 8081 already in use | An old Metro. Don't accept Expo's offer of another port — the tunnel only covers 8081. Kill the old one: `Get-NetTCPConnection -LocalPort 8081 -State Listen \| Select-Object -Expand OwningProcess \| ForEach-Object { Stop-Process -Id $_ -Force }` |
 
