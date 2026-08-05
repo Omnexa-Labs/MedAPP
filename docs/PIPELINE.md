@@ -20,8 +20,8 @@ Two non-deterministic agents cannot negotiate; they can only stay apart.
 
 | Surface | Owner | Notes |
 |---|---|---|
-| Figma — screen frames | **Codex** | Currently designing the screens that exist in code but have no frame. |
-| Figma — Design System page | **Codex**, while it is designing | Whoever adds a component owns it. Announce it (§5). |
+| Figma — screen frames | **Codex**, **Claude while Codex is offline** | Codex is out until 8 August (usage limit), so Claude holds every Figma claim. Hand back by re-reading §5 from 2026-08-02 onward — the file has moved a long way. |
+| Figma — Design System page | whoever holds no competing claim | Whoever adds a component owns it. Announce it (§5). **Never edit it while another agent has an open flow claim** — instances get reshaped mid-draw (§5c). |
 | React Native codebase | **Claude** | Builds and reconciles code against frames that already exist. |
 | `docs/BRAND.md`, `docs/MOBILE_UX.md`, this file | **Claude** | Binding on both agents. Propose changes rather than editing unilaterally. |
 | Review gates | **Claude** | Verifies both sides against BRAND. A gate failing your work is the system functioning. |
@@ -131,23 +131,40 @@ Never render the logo as text or a redrawn mark.
 
 ## 4. Screen status
 
-**Designed** — Sign Up (`1:34`, `11:38`, `38:93`, `447:455`), Onboarding & Auth (`50:105`
-Splash, `57:102` Login, `72:117` onboarding_status), Patient Home (`82:105`, `93:102`,
-`110:244`, `261:387`, `949:10550` overview), Find Care & Booking (`144:108`, `158:148`, `164:195`).
+**Verified against a live page-by-page read of the Figma file on 2026-08-03.** The previous
+version of this section was badly stale — it still listed eleven screens as undesigned that had
+frames, including the whole booking flow, both script screens and all three telemedicine screens.
+A status list nobody re-derives is worse than no list, because it gets planned against. Re-read the
+file before trusting it again.
 
-**Stubs, unfinished** — `152:148` Explore, `175:190` specialist_profile.
+**Designed** — every route below has at least a populated frame, and most have state frames and a
+dark proof:
 
-**In progress (Codex)** — Messaging page `548:615`: `Inbox — Messages` `550:2283`,
-`chat_thread` `552:1376`, `ai_assistant` `550:2700` plus its three state frames. Appointments
-page `548:616`.
+| Area | Screens |
+|---|---|
+| Sign Up | `sign_up` `1:34` · `sign_up_verify` `447:455` · step 2 `11:38` · step 3 `38:93` |
+| Onboarding & Auth | `splash` `50:105` · `sign-in` `57:102` (+ `765:696` no-biometric) · `onboarding_status` `72:117` · `forgot_password` `949:10169` · `privacy` · `terms` |
+| Patient Home | `index` `93:102` · `patient-dashboard` `110:244` · `patient-profile-overview` `261:387` · **`overview` `949:10550`** |
+| Find Care & Booking | `find-care` `144:108` · `doctor_profile` `164:195` · `select-time-slot` `756:4384` · `review-appointment` `756:4213` · `booking-confirmed` `756:4742` |
+| Messaging | `inbox` `550:2283` · `chat-thread` `552:1376` · `ai-assistant` `550:2700` |
+| Appointments | `appointments` `550:1826` |
+| Overview & Medications | `active-medications` `559:615` · `medication-details` `828:5944` · `active-script-view` `828:1187` · `active-script-share` `828:5628` |
+| Practitioner | `active-patient-roster-2` `626:4007` · `patient-record` `678:615` |
+| Telemedicine | `practitioner-telehealth-profile` `831:767` · `waiting-room` `833:857` · `telemedicine-consultation` `837:1190` |
+| Shell | `AccountMenu` `945:5796` (page) — **needs promotion to the Design System page; see §5** |
 
-**Still undesigned** — `booking-confirmed`, `review-appointment`,
-`select-time-slot`, `lifestyle`, `lifestyle-manage`, `active-script-share`,
-`active-script-view`, `telemedicine-consultation`, `waiting-room`,
-`practitioner-telehealth-profile`, `forgot-password`, `privacy`, `terms`.
+**Still undesigned** — `community` and `lifestyle` / `lifestyle-manage` (design in flight,
+run `wf_eb1c9d70-aeb`).
 
-Code has ~31 screens; Figma had 16 frames when this gap was found. Closing it is the point of
-the current batches.
+**Stubs, unfinished** — `152:148` Explore and `175:190` specialist_profile. `175:190` is worth
+finishing or deleting rather than leaving: it is where "Dr. Sarah Jenkins" and "Accra" leaked into
+the booking round from, because agents looking for plausible content found the nearest frame on the
+page. A half-finished frame is not inert; it is a content source.
+
+**Figma-only, with no route in the app** — `doctor_profile` `164:195`,
+`explore_discovery_directory_updated_actions` `158:148`, `Patient Home / New User Onboarding`
+`82:105`, `nutritionist` `176:340`. Each is either a screen nobody built or a frame nobody needs;
+worth deciding which, per frame.
 
 ---
 
@@ -1263,7 +1280,165 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   hiding the subtree — hiding would also swallow the initials `<Text>`, i.e. the evidence that the
   fallback chain picked initials over the silhouette.
 
+- 2026-08-05 — Claude — CLAIM page `49:102` "Onboarding & Auth" for the **public unauthenticated
+  flow**: `forgot-password` (a flow, not a page), `privacy`, `terms`. All three are `"Coming next."`
+  stubs in code, so this round is **design-FIRST** — there is no shipped behaviour to preserve and
+  the frames lead the build. Placed clear of Splash `50:105`, Login `57:102`, `onboarding_status`
+  `72:117` and `765:696`; the three new rows start at y=1600. Delivered 13 frames + 2 notes frames.
+
+  **Frames.** forgot-password: `forgot_password / request` **949:10169** (populated) ·
+  `— invalid email` **949:10375** · `— sending` **949:10426** · `— network error` **949:10454** ·
+  `check your email` **949:10589** · `set new password` **949:10870** ·
+  `set new password — code invalid or expired` **949:11325** · `password updated` **949:11373** ·
+  `— DARK PROOF` **949:14517**. Documents: `privacy` **949:12301** (1787 tall) ·
+  `terms` **949:12680** (2077 tall) · `privacy — DARK PROOF` **949:14526** ·
+  `terms — DARK PROOF` **949:14552**. On-canvas reasoning: `NOTES — forgot-password / privacy /
+  terms` **952:1047** and `NOTES — required BUILD work` **952:13213**.
+
+  **Anatomy → shared component.** Chrome on all 13: `Detail AppBar 193:120` — these are Detail
+  screens, so **no** patient bar and **no** bottom tab bar, which is also correct for
+  unauthenticated routes. Fields: `Input 1:52` (`State=Default` ×6, `State=Error` ×2). CTAs:
+  `Button 1:89` (`Variant=Primary` ×7, `Variant=Loading` ×1). Card shell: `Card / Form 435:503` on
+  the four request frames. Confirmation glyph plates: `IconTile 517:1515` `Size=56, Tone=Tint`.
+  Callouts: `InfoCallout 756:4107` ×4. Document metadata rows: `KeyValueRow 517:1772`
+  `Emphasis=Value, Trailing=None` ×2 per document (Last updated / Version). Document section
+  rhythm: `Section Header 517:689` ×5 on privacy, ×6 on terms. Glyphs all via existing icon
+  components (`icon/chrome-mail 9:28`, `icon/lock 9:31`, `icon/chrome-eye 9:34`,
+  `icon/secure 363:565`, `icon/info 517:1778`, `icon/chrome-refresh 9:37`).
+
+  **Account enumeration — the decision.** An unknown address is **never revealed**, and there is
+  deliberately no "no account with that email" frame. `user_service/app/routers/password.py:19-32`
+  returns `202 {"status":"ok"}` unconditionally and does not branch on
+  `request_password_reset()` returning `None`, so the state is unproducible; drawing it would ask
+  the build to reintroduce a leak the backend author removed on purpose. On a medical product that
+  sentence is an oracle for *care relationship*, not for a password. `check your email` **949:10589**
+  is therefore byte-for-byte identical for a registered and an unregistered address and its copy is
+  written to be true in both cases — "If this address is registered with MedApp, a reset code is on
+  its way." **The conditional is a security requirement; it must not be flattened to an assertion in
+  the build.** The frame says the stance out loud in an InfoCallout so the hedge reads as policy.
+
+  **States NOT drawn, with reasons.** (a) "email not registered" — above. (b) Loading/error for
+  privacy and terms — designed as static in-app copy, not fetched, so there is no async branch; a
+  policy that fails to load blocks consent at the moment consent is requested, and the sign-up
+  consent row cannot honestly be ticked against a spinner. If product later fetches the copy or
+  opens it in `expo-web-browser`, both screens need loading + error frames. (c) Rate limit / 429 —
+  the gateway has `auth_rate_limit` middleware but the password routes document no 429 body, so
+  there is nothing specific to depict. (d) Password-strength meter — a new component, not a state.
+  (e) `ErrorPanel 517:2111` is deliberately unused: nothing failed to *load*, the form is present
+  and retryable in place, so the register is an inline `InfoCallout`, matching what
+  `SignInScreen.tsx` already does.
+
+  **Built locally, with why.** Only one thing: the card container on `949:10375` is a local frame,
+  **named** `Card / Form (local frame — 435:503 has no validation slot)`, carrying identical
+  bindings. `Card / Form 435:503` has no slot for a field-level validation message, so the
+  error-state frame cannot use it. That is a component gap, logged below — not a licence to redraw.
+
+  **360dp arithmetic.** Frames 393 wide; body inset 16/16 on every frame, matching
+  `Detail AppBar`'s own 16 per BRAND ("body sections must share the same left/right inset as the app
+  bar above them"). Content column 393−32 = **361** at 393, 360−32 = **328** at 360. The form card
+  is FILL (361 / 328) with a 32 inset, giving an inner column of 297 / 264. Every child is FILL or a
+  centred fixed 56 tile — **there is no multi-item horizontal strip in this delivery**, so nothing
+  can half-slice. Verified by rendering, not arithmetic: all four populated frames plus both
+  documents were cloned to 360, screenshotted, and deleted. One real defect was found that way — the
+  reset-code placeholder read "Paste the code from your email", which wrapped to two lines at a 264
+  inner column and pushed the 52 Input to 60; it is now "Paste your reset code". All eleven section
+  headings fit at 328 without ellipsis. Note Login `57:102` uses a 24 inset and a 345 card; these
+  frames use 16 / 361 because they have an app bar to match. Flagged, not propagated.
+
+  **Legal copy is not designer-owned.** Every paragraph in `949:12301` / `949:12680` is lorem ipsum
+  on purpose and the headings are structural placeholders; the wording, the ordering, "Last updated
+  12 July 2026" and the version numbers are **not approved content** and are owned by counsel. What
+  *is* specified and must be built: body copy is `body-md` on `on-surface` (not
+  `on-surface-variant` — long-form needs full contrast in both modes); the document sits directly on
+  `background` with **no card**, because a card around 1,800px of text recedes rather than lifts;
+  rhythm is `Section Header` + 24 between sections, 12 between paragraphs; bottom inset 48 so the
+  last line clears the gesture bar; and the `Detail AppBar` is persistent chrome **above** the
+  scroll view so back is reachable from any scroll position — that is the way out, and there is no
+  in-body "back to sign in" link.
+
+  **REQUIRED BUILD WORK — the code is wrong or absent and the frame is now right.** Full text on
+  `952:13213`; the load-bearing items: (1) all three screens are new code. (2) There is **no API
+  layer for password recovery at all** — grep of `src` for `password/forgot`, `password/reset`,
+  `forgotPassword`, `resetPassword` returns zero hits and `features/auth/api.ts` exports no such
+  call, though both endpoints exist and are gateway-routed under `/v1/auth`. Assert the **path and
+  body** in the tests; a mocked client will happily accept a fabricated URL, which is how the
+  booking flow shipped a 404 past 595 green tests. (3) All three must use
+  `DetailShell` (`src/components/shell/DetailShell.tsx`), not a bare `SafeAreaView`, claim all four
+  insets, and never render a bottom nav. (4) **Navigation defect:** `privacy.tsx` and `terms.tsx`
+  exit with `<Link href="/(public)/sign-in">`, but they are pushed from the *sign-up* consent row
+  (`SignUpStep1Screen.tsx:367/375`, `SignUpStep3Screen.tsx:358/366`) as well as the sign-in footer —
+  so that link ejects a mid-signup user out of a half-filled form into sign-in. The frames give
+  exactly one exit, the app bar back, which must be `router.back()`. (5) forgot-password keeps its
+  "Back to sign in" text link (it is on the shipped stub) but it must be a real 44pt target and must
+  not be the only exit. (6) `password updated` **949:11373** is terminal because the reset token is
+  single-use and consumed — app bar back **and Android hardware back** must both route *forward* to
+  sign-in; popping returns to a form whose token can no longer be redeemed. A green suite will not
+  catch this. (7) The rule shown on `set new password` is the **sign-up** rule ("Min 8 characters, 1
+  number, 1 symbol", `SignUpStep1Schema`), not the backend's — the backend enforces only
+  `min_length=8` (`schemas/auth.py:82`), so without the client rule a user can reset to a password
+  they could never have registered with and the two screens would state different rules for one
+  credential. Enforce the sign-up regexes client-side on reset. (8) "Updating your password signs
+  you out of MedApp on every device" is **true** — `reset_password()` calls `_revoke_all_for_user()`
+  — so the build must actually clear the local session rather than leave a revoked refresh token in
+  place. Delivery is `LogEmailNotifier` and the token is an opaque string with no link, which is why
+  the flow asks the user to **paste a code** and never depicts a deep link or a formatted code mask.
+
+  **Design-system gaps this round surfaced** (none fixed — the Design System page is not mine to
+  edit mid-claim, per §5c): (a) `Card / Form 435:503` had **zero** instances anywhere in the file
+  before this round, fits exactly one shape (one field, one consent row, one CTA), and has no
+  validation-message slot — give it a field-count/slot story and a validation line, or stop calling
+  it a component. (b) `Input 1:52` has no **Filled** state, so a typed value can only be shown by
+  overriding the placeholder text node's fill to `on-surface`; done here on five instances. (c)
+  `Input 1:52`'s trailing slot is still named "Eye Toggle Target (44x44)" (`1:43` child `318:654`) —
+  the long-standing §5b item, untouched. (d) `Button 1:89` `Variant=Loading` contains **only** a
+  Label — measured `children = [Label]`, no spinner — while the code's `Button` renders one, so
+  `949:10426` can only show a label change. Add a spinner to the variant. (e)
+  `Section Header 517:689`'s Title has `textTruncation = "ENDING"`, so a long heading clips instead
+  of wrapping; one terms heading had to be shortened from "4. Appointments, payments and
+  cancellations" to "4. Payments and cancellations". Either allow wrapping or accept that legal
+  headings must stay short. (f) `InfoCallout 756:4107` is still page-local on
+  `Local Components — review_appointment` and marked PROMOTE; these frames instance it four times
+  from a second page with no local duplicate, so it now has cross-page consumers — promote it. Its
+  variant axis is `Tone=Info | Warning` with **no Error value**, and the Warning variant paints
+  `error-container`/`error`; the code's `InfoCalloutTone` is `"info" | "error"`. The frames use
+  `Tone=Warning` for the transport failure on `949:10454` because it is the only red register
+  available. Rename the variant to `Error` (or add one) so the axis and the code agree.
+
+  **Verification.** All 13 frames screenshotted and inspected, not trusted from metadata. Audited
+  programmatically: **0 unbound solid fills** across all 13 frames (every colour through a variable,
+  white included), **0 visible drop shadows**, minimum font size **12**. All three DARK PROOF frames
+  carry `explicitVariableModes = {"VariableCollectionId:1:2": "197:0"}` and flip completely —
+  including the app bar, the long-form body copy and the `KeyValueRow` metadata — so nothing on
+  these screens was left un-tokenised. **Claim stays OPEN: stages 5–6 (Build, BuildReview) are part
+  of it and it is not released at the design gate.**
+
 ---
+
+- 2026-08-03 — Claude — **The logo is now ONE token-driven lockup on both sides.** Reported from
+  the device: "the logo in dark mode is not right."
+
+  **Code:** `assets/branding/logo-reversed.png` was CORRUPT — a near-empty image in which only the
+  letter counters (the holes in e/d/p) survived, strokes gone. `Logo` now renders one monochrome
+  asset with `tintColor` bound to the mode's own `primary` (teal light / mint dark) and the corrupt
+  file is deleted. Taking the request literally — "use the light logo in dark mode" — would have
+  shipped teal on near-black at about 1.9:1, so the tint is what makes "the same logo" legible.
+  `reversed` survives as a variant name but now means "tint for a dark surface", for callers placing
+  the mark on an always-teal hero card.
+
+  **Figma:** worse than a wrong colour. `Logo` `101:103` and `741:872` inside `Patient AppBar` each
+  held TWO rasters — `Logo (PNG) — primary` and `Logo (PNG) — reversed` — **both `visible=true`,
+  stacked**, so the light artwork sat permanently over the teal and the lockup could not respond to
+  mode at all. Both frames now hold one instance of the vector `Wordmark 26:98`, whose type is bound
+  to `color/primary`, so it flips on its own.
+
+  `Wordmark / Reversed (on dark)` `180:344` and `Icon / Reversed (on dark)` `180:351` are marked
+  DEPRECATED with the reasoning in their descriptions, not deleted — both had **zero** instances,
+  and `180:351` carried three raw `#ffffff` fills. Retired rather than removed so nobody re-adds a
+  second component that cannot follow the mode.
+
+  — **Also found, not fixed: `color/white` resolves `#ffffff` in BOTH modes.** That is a fixed
+  colour wearing a token's name, and it will read as safe to anyone who checks only that a variable
+  is bound. Worth auditing its call sites and probably retiring it.
 
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect
 
