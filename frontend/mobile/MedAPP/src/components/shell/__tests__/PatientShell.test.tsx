@@ -165,10 +165,15 @@ describe("PatientShell", () => {
   });
 
   it("still navigates the highlighted tab when the screen is NOT that tab's root", () => {
-    // find-care / patient-dashboard / patient-profile-overview all render
-    // `activeTab="home"` while being pushed screens. If the shell treated the
-    // highlight as "you are already here", Home would be a dead button on
-    // exactly the screens a user most needs to leave.
+    // This used to name find-care / patient-dashboard / patient-profile-overview
+    // as the callers. As of 2026-08-05 there are NONE: all three are DetailShell
+    // screens, because the PO ruled that a screen outside the five tabs may not
+    // wear the tab bar at all (docs/PIPELINE.md §5). See `isTabRoot`'s doc block.
+    //
+    // The assertion stays, and it is now guarding the prop rather than a screen:
+    // while `isTabRoot={false}` remains part of the API, passing it must give
+    // working tabs. A dead highlighted tab on a screen a user is trying to leave
+    // is the failure it was written for, and it would come back silently.
     render(
       <PatientShell activeTab="home" isTabRoot={false}>
         <Text>Body</Text>

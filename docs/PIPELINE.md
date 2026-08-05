@@ -175,6 +175,53 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **The three wrong-chrome screens are migrated: `find-care`,
+  `patient-profile-overview`, `patient-dashboard` are all `DetailShell` now.** Closes the item
+  queued at the 2026-08-03 find-care entry below and applies the `appointment_management` ruling
+  (PO 2026-08-01) to the last three screens that were wearing a tab bar without being tabs.
+  788 tests green, tsc clean.
+
+  Per screen, because the three were not the same case:
+
+  * **`find-care`** — the reported defect ("the logo is off and it has the bottom nav with Home tab
+    active"). Body heading deleted (the bar carries the name), `paddingBottom` 140 → 32, avatar and
+    `useCurrentUser()` gone with the tab-root bar. Both inbound paths push, so the default
+    `router.back()` is right. **This SUPERSEDES the 2026-07-30 FLAG in the file**, which recorded
+    that frame `144:108` deliberately dropped the back affordance and asked for a
+    `Patient AppBar (Back + …)` variant. The flag was correct to escalate; the ruling went the other
+    way — `Detail AppBar 193:120` already existed and is what a pushed screen takes.
+
+  * **`patient-profile-overview`** — this screen's OWN flag asked for exactly this ruling ("is
+    Patient Profile Overview a detail screen or a nav-bearing destination?") and frame `261:387` had
+    the answer all along: it has no bottom-nav instance and its Body runs the full 2214px. So the
+    frame was right and the file was right to refuse to act unilaterally. Reached by the account
+    menu's `navigate`, which pushes when the route is not in history, so `back()` returns to the tab
+    root the menu was opened from; no fallback href is invented, because every tab root can open it.
+
+  * **`patient-dashboard`** — the one with a real complication. **It has NO INBOUND LINK.** A route
+    audit finds exactly one reference to `/(app)/patient-dashboard` in `src/`: the gitignored
+    preview harness `app/(public)/zpdb.tsx`. That is by design — the IA flag at the top of the file
+    ("NOT registered on any BottomNav tab") was never resolved. DetailAppBar's default back no-ops
+    with no history, so on the only path that reaches this screen the chevron would have been a
+    visible control that does nothing. It therefore supplies `onBack` with a Home fallback, and the
+    test asserts that branch with `canGoBack()` false — the state a cold deep link actually arrives
+    in. **Still needs the IA call: replace Home, replace Overview, become a tab, or delete.** The
+    chrome is honest now; the screen is still an orphan.
+
+  **FLAGGED, needs a PO decision — `PatientShell`'s `isTabRoot={false}` now has ZERO product
+  callers.** Its entire purpose was "a pushed screen that shows the bar and borrows a tab's
+  highlight", and this ruling makes that pattern illegal. Its only remaining callers are
+  PatientShell's own tests. It is documented in place rather than deleted, because deleting public
+  API is not this file's call — but note the asymmetry it creates: `DetailShell` deliberately has no
+  `showBottomNav` prop, on the argument that the prop is the door back to the pattern being removed.
+  `isTabRoot={false}` is now exactly that door, left unlocked. Recommend deleting it.
+
+  — **Design side, NOT done, and deliberately not attempted:** frame `144:108` still instances
+  `Patient AppBar` (`144:109`) and `Patient BottomTabBar` (`145:320`), and `110:244` still instances
+  both (`110:245`, `110:258`). Those four instances are now wrong and should be replaced with a
+  `Detail AppBar 193:120` instance. Not touched because a design round held the file at the time
+  (§5c: no Figma writes against a live claim). `261:387` needs nothing — it was already correct.
+
 - 2026-07-31 — Claude — Legacy shadow sweep landed: 88 card/app-bar shadows removed across 22
   screens; 9 genuinely-floating survivors retokenised. `Card` now structurally strips elevation
   keys from caller `style`. Inbox migrated to `PatientShell`. — *No action needed; don't
@@ -497,7 +544,8 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   **Fix: `find-care` becomes a `DetailShell` screen** — reached by push from Home's Find Care tile
   and from Appointments' "Book new appointment", so `router.back()` is always correct. Same applies
   to `patient-profile-overview` and `patient-dashboard`, which also render `PatientShell` with
-  `activeTab="home"` while not being tab roots. Not yet done; queued.
+  `activeTab="home"` while not being tab roots. ~~Not yet done; queued.~~ **DONE 2026-08-05 — all
+  three migrated; see the entry at the top of this section.**
 
   **Harness lesson, recorded because it nearly cost an analysis.** A light/dark capture pass driven
   through `/zptour?theme=&to=` produced 52 files in which at least one route was **mislabelled** —
@@ -1439,6 +1487,162 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
   — **Also found, not fixed: `color/white` resolves `#ffffff` in BOTH modes.** That is a fixed
   colour wearing a token's name, and it will read as safe to anyone who checks only that a variable
   is bound. Worth auditing its call sites and probably retiring it.
+
+- 2026-08-05 — Claude — CLAIM page `949:10202` **"Community"** (new) for `CommunityScreen`, a
+  patient TAB ROOT (`Patient BottomTabBar Active=Community`). Delivered **7 frames + 1 local
+  components frame + 1 notes frame**. The shipped screen was the INPUT; the frame is now the
+  measure.
+
+  **One screen, four sub-tabs — not four screens.** For You / Following / Explore / Community are a
+  `useState` in `CommunityScreen.tsx`; `ExploreScreen.tsx` and `CommunityHubScreen.tsx` render as
+  PANELS inside the same `ScrollView`, under the same app bar and bottom nav. So the nav gets one
+  screen entry with four populated frames. `Tab Strip 517:1574` already ships exactly those four
+  variant values and is the spine.
+
+  **Frames.** `community — For You (populated)` **949:13725** ·
+  `— Following (populated)` **949:13986** · `— Following · empty feed` **949:14208** ·
+  `— Explore (populated)` **949:14813** · `— Community Hub (populated)` **952:2156** ·
+  `— Community Hub · search no match` **952:13223** ·
+  `— For You · DARK PROOF` **952:13431** (pinned Colors→Dark, `197:0`; pin is on that frame only).
+  `Local Components — community` **949:10486** · `community — design notes` **954:13409**.
+  All 393 wide. Zero unbound solid paints across all seven frames — the dark proof flips whole.
+
+  **Anatomy, all instanced.** `Patient AppBar 741:887` (`Back=Hidden`) and
+  `Patient BottomTabBar 740:1015` (`Active=Community`) on every frame · `Tab Strip 517:1574` +
+  `Tab 517:1513` ×4 · `Section Header 517:689` ×6 (the code hand-rolled six title+"View All" rows) ·
+  `IconTile 517:1515` every glyph plate (48/Tint group cards + My Groups, 56/Tint Discover rows,
+  32/Tint post callout) · `ChoiceChip 11:104` (6 topics, 4 categories) · `SearchField 396:538` ·
+  `Avatar 550:1964` (40 authors, 56 specialists, 40 member stack) · `EmptyState 517:1773`
+  (`Container=Card, Action=No`) all three empty branches · `Button 1:89` the Discover CTA.
+
+  **Built locally, with why.** `GroupCard / Suggested 949:10511` (`Membership=Join|Joined`) ·
+  `PostCard 949:11871` (`Content=Media|Callout|Plain`) · `PostActionBar 949:11489`
+  (`Liked × Bookmarked` — four variants because the code has two independent local toggles per
+  post) · `SpecialistCard / Compact 949:12347` (`Follow=Follow|Following`) ·
+  `HubGroupCard / Joined 949:13090` (`Unread=Yes|No`) · `HubGroupRow / Discover 949:13091`.
+  `Card / Form 435:503` covers none of them: the feed post and the suggested-community card are
+  edge-to-edge (media band and action bar bleed to the border) where `Card / Form` insets
+  everything by 32, and the My Groups card is itself the tap target.
+  — **Two promotion proposals, deliberately NOT acted on** (§5c forbids editing the Design System
+  page mid-claim): (1) `SpecialistCard 413:677` on Find Care is a fixed 361dp full-width profile
+  card; it wants a `Layout=Full|Compact` axis rather than a second definition. (2) `Button 1:89` is
+  a 345×56 full-width control with no compact size, so the five 44pt action pills (Join, Follow,
+  Profile, Join Community, View Details) are local; it wants a `Size` axis.
+
+  **Glyphs added to `Icons 24 — shared 517:2096`** — 14 new 24px components, bound to
+  `color/on-surface-variant`, matching the existing chrome convention: `icon/chrome-check`
+  **949:10253**, `icon/chrome-verified` **949:10257**, `icon/chrome-more-vert` **949:10260**,
+  `icon/chrome-comment` **949:10263**, `icon/chrome-share` **949:10269**, `icon/chrome-bookmark`
+  **949:10272**, `icon/chrome-bookmark-filled` **949:10275**, `icon/chrome-person-add`
+  **949:10324**, `icon/chrome-article` **949:10328**, `icon/heart-filled` **949:10331**,
+  `icon/physical-activity` **949:10334**, `icon/mental-health` **949:10339**,
+  `icon/blood-glucose` **949:10343**, `icon/recovery` **949:10347**. Reused rather than added:
+  `icon/nutrition-24 530:812`, `icon/heart-rate-24 530:809`, `icon/heart 528:830`,
+  `icon/info 517:1778`, `icon/group 550:1887`, `icon/camera 528:842`,
+  `icon/person-search 915:9737`.
+
+  **Defect found in a SHARED component, and fixed.** `IconTile 517:1515` — the three `Size=48`
+  variants (`526:800` Tint, `526:805` Accent, `526:810` Neutral) had
+  `componentPropertyReferences = {}` on their glyph child where the 32/40/56 variants all carry
+  `{ mainComponent: "Glyph#517:8" }`. Property read, not inferred: setting the Glyph swap on a
+  `Size=48` instance recorded the value and rendered `icon/calendar-add` anyway. Now wired on all
+  twelve variants; verified. No existing instance changes, because the default value is unchanged.
+
+  **Content-drift defect caught in my own delivery, and fixed.** All eight `PostActionBar`
+  instances carried the component's default `342 / 48`, so three posts with different engagement
+  read identically. Corrected at the `PostCard` variant level so every frame inherits one truth:
+  `Content=Media` (Dr. Abena Owusu) 342/48, `Content=Callout` (Dr. Efua Asante) **89/12**,
+  `Content=Plain` (Dr. Adjoa Boateng) **210/31** — matching `FEED_POSTS`. This is exactly the §5c
+  step-2b failure mode, third round running; a shared component fixes structure and does nothing
+  about content unless the canon is baked into the defaults.
+
+  **360dp arithmetic** (measured, not asserted). Both horizontal strips are full-bleed at 393 with
+  16/16 content insets, 240 cards and a 16 gap, so card 2 starts at x=272:
+  at 360dp peek = 360−272 = **88 of 240 = 36.7%**; at 393dp = 121/240 = **50.4%**. One width, both
+  devices, no branch; trailing inset 16. The group card got *wider*, not narrower — content
+  240−2×24 = **192**, up from 152 at the old 200dp.
+  `Top Specialists to Follow` now shares that pitch deliberately; the code shipped `w-64` (256dp)
+  cards inside the gutter with no full-bleed and no trailing inset, peeking 360−288 = 72/256 =
+  **28.1%**, below BRAND's floor — a second half-slice nobody had found.
+  The Hub's Discover categories are four KNOWN chips, so BRAND's "prefer fitting" applies and the
+  row **no longer scrolls**: measured hugs 128 / 96 / 127 / 92 wrap to row 1 = 232 and row 2 = 227,
+  both inside the 328 content width at 360dp. Scrolling, "Mental Health" showed 112/127 = 88% — a
+  near-complete item reading as whole, which BRAND rules out as explicitly as a sliver.
+
+  **States NOT drawn, with reasons.** Loading (`SkeletonCard 517:2291`) and error
+  (`ErrorPanel 517:2111`): none of the three files performs any I/O. `SUGGESTED_GROUPS`,
+  `FEED_POSTS`, `HUB_GROUPS`, `SPECIALISTS`, `HERO` and `SUGGESTED_COMMUNITY` are module-level
+  consts — no fetch, no `isLoading`, no error, no offline branch, so there is no state to frame.
+  The code names its future endpoints in comments (`GET /v1/community/memberships`,
+  `?feed=following`, the follow graph); when any lands, this screen needs a `SkeletonCard`
+  reserving the exact `PostCard` height plus an `ErrorPanel`, and that is a design task for the
+  round that adds the query, not a guess now. Also not drawn as screen frames: Explore's
+  `Follow=Following` and the group `Joined` states — per-item local toggles, not screen states, so
+  they ship as component variants with one shown live (Holistic Nutrition is Joined because
+  `joinedGroups` seeds `"g1"`).
+  **Not used from §3, with reasons.** `Detail AppBar 193:120` (tab root, must not carry a back
+  button) · `VitalStatCard 723:625` (nothing here is a clinical measurement) ·
+  `KeyValueRow 517:1772` ("12.5k Members" is a caption, not a label/value pair — forcing it would
+  invent a label the copy does not have).
+
+  — **Required work for the Build round** (§5c step 7; every item is a place the code is wrong and
+  the frame is now right):
+  1. **16 hardcoded hex sites in `CommunityScreen.tsx`** (18 literals — lines 616 and 647 carry two
+     each): lines 154, 155, 163, 164, 172, 173, 505, 541, 553, 578, 590, 616×2, 625, 635, 647×2,
+     667. Plus **7 live in `CommunityHubScreen.tsx`** (79, 89, 98, 108, 208, 306, 344 — an 8th
+     `#3d4947` at 176 is quoted inside a comment) and **2 in `ExploreScreen.tsx`** (296, 360).
+     Every one resolves to a variable in these frames. Note `#0058be` (Hub line 89) is a **blue in
+     no token at all** — the same stray literal the scripts & meds round flagged; it needs a token
+     decision, not a nearest-match substitution.
+  2. **All three files import `MaterialIcons` directly** — 11 JSX sites + 1 type reference in
+     `CommunityScreen`, 5 in the Hub, 2 in Explore. BRAND:
+     `src/components/ui/icons/Icon.tsx` is the ONLY file permitted to import an icon library.
+     The 14 glyphs above are the registry entries this needs.
+  3. **Invented clinicians.** `Dr. Sarah Jenkins`, `Dr. Elena Ross` (`CommunityScreen`);
+     `Dr. Elena Rossi`, `Dr. Marcus Chen`, `Dr. Sarah Luvon` (`ExploreScreen`); and
+     `"Marcus Chen, RN"`. None exists in `scripts/seed_dev_data.py`. The frames use the seeded
+     clinicians — **Dr. Abena Owusu** (Nutrition & Dietetics), **Dr. Efua Asante** (Paediatrics),
+     **Dr. Adjoa Boateng** (Cardiology), **Dr. Nii Tetteh** (Mental Health) — the same rule the
+     Provider Profile round already applied.
+  4. **Three unrelated accent families used decoratively.** The group plates were
+     `tertiary-container` / `primary-container` / `secondary-container` with three frozen foreground
+     hexes plus a three-hex `LinearGradient` corner wash each. All now `IconTile Tone=Tint`; the
+     groups are told apart by **glyph**. BRAND: colour "exists to communicate state, not to
+     decorate".
+  5. **Radii off the 4/12/24/full scale.** `PostCard` `rounded-[20px]`; the Explore hero and the
+     suggested-community card `rounded-2xl` (16); several legacy `rounded-lg`/`xl`. All now
+     `radius/12` or `radius/24`.
+  6. **Type off the ramp via inline `fontSize`** — 24, 18, 16, 14, 10 and `fontWeight: "700"`
+     across all three files. All now text styles. The 10sp `"+12k"` bubble was **below BRAND's 12sp
+     floor** and is now `label-sm`.
+  7. **Tap targets under 44pt.** The Join pill was `py-xs` (4) around a 12sp label ≈ 26pt;
+     `more-vert` was `p-xs` + `hitSlop 6` ≈ 30pt; like / comment / share / bookmark had **no
+     padding at all**. Every one is 44pt in the frames.
+  8. **Hairlines drawn with a SURFACE token.** The post action bar used `border-surface-variant`,
+     the My Groups footer `border-surface-variant/50`. BRAND's hairline token is `outline-variant`,
+     at full strength.
+  9. **Opacity used on accents and on text** — `bg-primary/10`, `bg-primary-container/10`,
+     `border-primary/20`, `bg-primary/20`, `border-tertiary-fixed-dim/30`, `text-white/80`,
+     `on-tertiary-fixed/80`, `bg-surface/90`. Resolved to real tokens (`primary-tint`,
+     `surface-container`, `outline-variant`, `white`, `on-surface-variant`). An alpha on an accent
+     is not a token and does not survive a mode flip.
+  10. **Avatars with no fallback chain.** Post authors are a bare `<Image>` at 48 and specialists at
+      64 — both off the `Avatar` ramp (40/56) and neither with the photo→initials→silhouette chain
+      BRAND requires. Now `Avatar 550:1964` at 40 and 56.
+  11. **The Discover row's 64px glyph plate is off the `IconTile` ramp** (32/40/48/56). Now 56.
+  12. **`formatMembers` rounds badly when membership is bumped.** Joining "Holistic Nutrition"
+      passes 12001, and `n % 1000 !== 0`, so the label becomes `"12.0k Members"` instead of
+      `"12k Members"`. The frame shows `12k`; the helper must round before choosing its precision.
+  13. **The Explore hero stacked a 3-stop transparent→black gradient under white text**, so
+      contrast depended on where the copy landed over an arbitrary photograph. Replaced with a
+      uniform `color/scrim` at 60% and full-strength `color/white` — measurable everywhere, and
+      tokenised.
+  14. **The specialist strip and the category row are both BRAND §"Horizontal strips and
+      carousels" failures at 360dp** — see the arithmetic above. Neither is the strip the code had
+      already fixed; the Suggested Groups fix was real and is preserved verbatim (240 / 16 / 16,
+      36.7%).
+
+  — *Claim stays open through Build and BuildReview per §5c.*
 
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect
 

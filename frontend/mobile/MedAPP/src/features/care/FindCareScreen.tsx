@@ -5,12 +5,13 @@
 // Care is a stack-pushed screen).
 //
 // ============================================================================
-// SHELL MIGRATION (2026-07-30) — inline app bar gone, and READ THE FLAG
+// SHELL MIGRATION (2026-07-30) — inline app bar gone
 // ============================================================================
 // Approved frame: **144:108 "find_care_enhanced_directory_updated_nav"**. Its
 // first child is an instance of "Patient AppBar (Avatar + Logo + Bell)"
 // (144:109 → 101:142) and it also instances "Patient BottomTabBar" (145:320 →
-// 101:143), so the chrome is the shared patient shell's, not this screen's.
+// 101:143) — but see the RE-MIGRATION below: that frame is now known to be
+// wrong, and the PO has ruled against it.
 //
 // Removed with the bar: the back Pressable, the `<Logo variant="wordmark"
 // height={22} />`, the bell Pressable, their two literal `color="#00685f"`
@@ -19,27 +20,56 @@
 // carries no effects at all, and docs/BRAND.md §Elevation: "Separation comes
 // from surface tone and a hairline, never from a blur").
 //
-// ---------------------------------------------------------------------------
-// FLAGGED — the approved frame DROPS this screen's back button
-// ---------------------------------------------------------------------------
-// The old bar was back + logo + bell with NO avatar. Frame 144:108 is the
-// canonical patient bar: logo left, avatar + bell right, **no back slot** — and
-// the designer clearly worked it deliberately, since the frame carries explicit
-// 44x44 tap-target override children for both the bell (149:148) and the avatar
-// (444:881). So this is the approved design, not an omission, and forcing a
-// back button back in would mean either displacing the left-hand logo (which
-// docs/BRAND.md forbids outright) or inventing a bar variant that does not
-// exist.
+// ============================================================================
+// RE-MIGRATION (2026-08-05) — tab-root chrome OUT, DetailShell IN
+// ============================================================================
+// Reported from the device, verbatim: "the logo is off and it has the bottom nav
+// with Home tab active... is a bit confusing." Both halves were confirmed in the
+// capture, and this screen is the third to take the ruling already made for
+// `appointment_management` (docs/PIPELINE.md §5, PO 2026-08-01):
 //
-// Find Care is nonetheless a PUSHED screen, so losing the top-left back is a
-// real reduction in affordance. It is not a dead end: the bottom nav's "home"
-// tab goes to Home (via PatientShell's shared tab map — it used to call
-// `router.back()`, which is a different thing and went wherever you came from)
-// and Android hardware/gesture back is unaffected. But per docs/MOBILE_UX.md §Platform
-// conventions, "back affordance top-left" — this screen no longer has one, and
-// that needs a designer call, most likely the same `Patient AppBar (Back + …)`
-// variant the eight patient detail screens are already blocked on. Raised, not
-// silently absorbed.
+//   Find Care is NOT one of the five patient tabs, so a tab bar here can only
+//   render a LIE — Home selected while the user is demonstrably not on Home.
+//   `Patient BottomTabBar` 740:1015 ships exactly five values and has no way to
+//   fake a sixth, and that absence is deliberate, not an omission.
+//
+// The logo was the same fault seen from the other side. `Detail AppBar 193:120`'s
+// own description: *"No logo — the logo belongs only on tab-root screens."*
+//
+//   was   inline bar (back + logo + bell) + BottomNav
+//   then  <PatientShell activeTab="home" isTabRoot={false}> — the frame's chrome
+//   now   <DetailShell title="Find Care">, per docs/BRAND.md §App shell:
+//         "Detail screens don't get the bottom nav — they get a back button in
+//         the app bar instead."
+//
+// This SUPERSEDES the FLAG that stood here from 2026-07-30, which recorded that
+// frame 144:108 dropped this screen's top-left back affordance and called it a
+// designer decision because the frame carried deliberate 44x44 tap targets for
+// the avatar and bell. The flag was right that the frame said so and right to
+// escalate rather than absorb it. The ruling went the other way: the frame is
+// wrong about the chrome, and `Patient AppBar (Back + …)` was never the answer —
+// `Detail AppBar 193:120` already existed and is what a pushed screen takes.
+// Figma is the source of truth for the DESIGN; 144:108's body content still is.
+// **The frame's two chrome instances need deleting — logged in §5, not done here,
+// because the file is claimed by a running design round.**
+//
+// What the trade costs and buys:
+//   - GAINED a real way out. Every exit was previously a tab, i.e. somewhere
+//     unrelated to where the user came from. Both inbound paths push
+//     (HomeScreen's Find Care tile, Appointments' "Book new"), so `router.back()`
+//     — DetailAppBar's default — is always correct, and it no-ops rather than
+//     throwing on a cold deep link.
+//   - GAINED the top-left back affordance docs/MOBILE_UX.md §Platform conventions
+//     requires and the old flag recorded as missing.
+//   - LOST the five-tab jump-off. Intended: a detail screen returns to where it
+//     was pushed from, and both entry points are themselves tab roots.
+//   - LOST the avatar, and with it the account menu on THIS screen. It is on all
+//     five tab roots (PatientShell mounts `AccountMenu` by default), which is
+//     where a session control belongs; a detail bar carrying one is how the
+//     avatar ended up on a screen with no identity of its own to show.
+//   - The 28px body `<Text>Find Care</Text>` is GONE — the bar carries the screen
+//     name now, and two identical headings stacked is a stutter for a screen
+//     reader as much as for the eye.
 //
 // Translation rules (same as SignInScreen / HomeScreen):
 //   - hover:*, group-hover:*, focus:ring → dropped (RN has no hover).
@@ -55,9 +85,11 @@
 //     /v1/hospitals, /v1/pharmacies is a follow-up once the gateway
 //     surfaces them with the directory shape.
 //
-// The BottomNav is kept visible with `active="home"` — this is a pushed
-// screen, so on iOS the parent tab stays highlighted (matches Material 3
-// + iOS conventions both).
+// (The note that used to sit here — "the BottomNav is kept visible with
+// `active='home'` because a pushed screen keeps its parent tab highlighted" — is
+// what the RE-MIGRATION above overturns. That convention holds when the screen
+// genuinely belongs to a tab's stack; Find Care belongs to no tab, so there was
+// no parent to highlight.)
 //
 // ============================================================================
 // ELEVATION SWEEP (2026-07-31) — every shadow on this screen is gone
@@ -118,7 +150,7 @@
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
-import { PatientShell } from "@/components/shell";
+import { DetailShell } from "@/components/shell";
 import {
   AvatarWithFallback,
   Card,
@@ -129,7 +161,6 @@ import {
 } from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor } from "@/lib/tokens";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useDebouncedValue } from "@/features/care/hooks/use-debounced-value";
 import { useDirectory, type DirectoryChip } from "@/features/care/hooks/use-directory";
 import type {
@@ -178,11 +209,9 @@ const GUTTER = 16;
 // ---------------------------------------------------------------------------
 
 export function FindCareScreen() {
-  // New: the old bar had no avatar, but frame 144:108's does (AvatarWrapper
-  // 444:881). `initialsFor` is the same helper the provider cards already use,
-  // so the fallback chain is photo → initials → silhouette, per docs/BRAND.md
-  // ("Avatars always need a real fallback").
-  const user = useCurrentUser();
+  // `useCurrentUser()` is gone with the avatar (see the RE-MIGRATION note): a
+  // detail bar has no avatar slot, so the hook had no consumer left. `initialsFor`
+  // stays — the provider CARDS use it for their own photo fallback chain.
   const [query, setQuery] = useState("");
   const [activeChip, setActiveChip] = useState<DirectoryChip>("all");
   const [activeFacets, setActiveFacets] = useState<Set<string>>(new Set());
@@ -227,33 +256,35 @@ export function FindCareScreen() {
   };
 
   return (
-    // Chrome is the shell's. `active="home"` is preserved verbatim: this is a
-    // pushed screen, so the parent tab stays highlighted (Material 3 and iOS
-    // agree), and its "home" tab still pops rather than pushing.
-    <PatientShell
-      activeTab="home"
-      avatarUri={user?.avatarUrl}
-      avatarInitials={user?.displayName ? initialsFor(user.displayName) : null}
-      avatarLabel={user?.displayName ?? "Your profile"}
-      // `isTabRoot={false}` — this is a PUSHED screen that borrows the Home
-      // highlight (see the BottomNav note at the top of the file), so it is not
-      // the Home tab and Home must still navigate. Without this the shell would
-      // treat the highlighted tab as "already here" and swallow the press.
-      //
-      // No `onTabPress`: PatientShell owns the tab map now. The switch that was
-      // here handled TWO of five — overview, community and lifestyle all did
-      // nothing — and sent Home through `router.back()`, which from a screen
-      // reachable from more than one place goes wherever you came from rather
-      // than Home. See PatientShell.tsx.
-      isTabRoot={false}
-    >
+    /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
+       See the RE-MIGRATION note at the top of the file for why this is not
+       PatientShell any more.
+
+       `claimsBottomInset` is left at its default. Nothing is pinned to the bottom
+       edge here — the two chip rows wrap and the list scrolls — so the shell
+       claims the inset and the last provider card cannot run under the gesture
+       bar. That inset is also why `paddingBottom` drops from 140 (below).
+
+       No `onBack`: both entry points push (HomeScreen's Find Care tile,
+       Appointments' "Book new"), so DetailAppBar's default `router.back()` is
+       right, and it no-ops rather than throwing on a cold deep link. */
+    <DetailShell title="Find Care">
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: GUTTER, paddingBottom: 140 }}
+        contentContainerStyle={{
+          paddingHorizontal: GUTTER,
+          paddingTop: 16,
+          // 32, not the 140 this screen carried. The 140 was sized to clear the
+          // bottom nav; the nav is gone and the shell now adds the bottom inset on
+          // top, so keeping it would leave ~170px of dead space under the last
+          // card. 32 matches AppointmentManagement and the three booking screens.
+          paddingBottom: 32,
+        }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Page title */}
-        <Text className="mt-md font-headline-xl text-headline-xl text-on-surface">Find Care</Text>
+        {/* No body heading: the bar carries "Find Care" now. The 28px
+            `<Text>Find Care</Text>` that was here would announce
+            "Find Care, heading. Find Care." */}
 
         {/* Search bar — the shared SearchField (Figma 396:538), a composition
             over the canonical Input. Deletes the worst of the five private
@@ -268,7 +299,10 @@ export function FindCareScreen() {
             The clear affordance was also a 24x24 target (`h-6 w-6`); 396:535 is
             named "clear-button (44x44)" and docs/MOBILE_UX.md forbids shipping a
             target under 44pt. */}
-        <View className="mt-md">
+        {/* `mt-md` dropped with the heading it used to sit under — the
+            ScrollView's own `paddingTop: 16` is the top inset now, and keeping
+            both stacked 16 on 16. */}
+        <View>
           <SearchField
             value={query}
             onChangeText={setQuery}
@@ -467,7 +501,7 @@ export function FindCareScreen() {
           )}
         </View>
       </ScrollView>
-    </PatientShell>
+    </DetailShell>
   );
 }
 

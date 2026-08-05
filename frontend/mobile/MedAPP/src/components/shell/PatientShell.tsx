@@ -103,11 +103,22 @@ interface Props extends Pick<ViewProps, "testID"> {
    * TRUE (the default) for the five roots, and it makes the active tab a no-op
    * — re-navigating to the screen you are already on is a wasted frame.
    *
-   * FALSE for a pushed screen that still shows the bar and borrows a tab's
-   * highlight — `find-care`, `patient-dashboard` and `patient-profile-overview`
-   * all render `activeTab="home"` without being Home. On those, EVERY tab must
-   * navigate, including the highlighted one, or the highlighted tab becomes a
-   * dead button on exactly the screens a user most wants to leave.
+   * **`false` NOW HAS NO PRODUCT CALLERS, and that is the ruling, not an
+   * oversight (2026-08-05).** It existed for "a pushed screen that shows the bar
+   * and borrows a tab's highlight" — `find-care`, `patient-dashboard` and
+   * `patient-profile-overview`, all rendering `activeTab="home"` without being
+   * Home. The PO ruled that pattern out: a screen that is not one of the five
+   * tabs may not wear the tab bar, because the bar can only render a lie
+   * (docs/PIPELINE.md §5). All three are `DetailShell` screens now, and the
+   * highlighted-tab-is-a-dead-button problem this prop solved cannot arise on a
+   * screen with no tab bar.
+   *
+   * Kept, not deleted, and deliberately so: the escape hatch is now the DOOR BACK
+   * to the pattern that was ruled out, which is the same argument DetailShell
+   * makes for having no `showBottomNav` prop at all. Deleting it is a public-API
+   * change and the PO's call — FLAGGED in §5. Until then the only callers are
+   * PatientShell's own tests, which lock the behaviour so that a screen passing
+   * `false` still gets working tabs rather than a silent no-op.
    */
   isTabRoot?: boolean;
   /** Detail / transactional screens set this false and get a back-bearing bar instead. */

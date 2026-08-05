@@ -1,13 +1,21 @@
-// Locks the BOTTOM-NAV wiring for find-care.
+// Locks find-care's CHROME to DetailShell.
 //
-// SCOPE: tab wiring only. The provider-card routing on this screen is another
-// agent's work this round, so this file deliberately asserts nothing about the
-// cards and mocks the directory away to an empty result.
+// This file used to assert the OPPOSITE — that all five bottom tabs route from
+// this screen — and that premise is what the PO overturned. The device report
+// was verbatim: "the logo is off and it has the bottom nav with Home tab
+// active... is a bit confusing." Find Care is not one of the five patient tabs,
+// so a tab bar here could only render a lie, and `Detail AppBar 193:120`'s own
+// description says the logo "belongs only on tab-root screens".
 //
-// find-care is the case the shared default had to be designed around: it is a
-// PUSHED screen that borrows the Home highlight, not a tab root. Its old inline
-// switch covered TWO of five (home via `router.back()`, inbox via push) —
-// Overview, Community and Lifestyle silently did nothing.
+// The old assertions are not deleted quietly. The behaviour they locked — five
+// working tabs instead of the two the inline switch once handled — was a real
+// fix, and it is still correct for the tab roots that kept PatientShell (see
+// PatientShell.test.tsx, which is where that contract now lives alone). What
+// changed is that this screen is not one of them.
+//
+// SCOPE: chrome only. Provider-card routing is FindCareScreen.routing.test.tsx
+// and the wrapping chip rows are FindCareScreen.layout.test.tsx, so the
+// directory is mocked away to a settled empty result here.
 
 import { screen, fireEvent } from "@testing-library/react-native";
 import { renderWithSafeArea as render } from "@/test/safe-area";
@@ -25,49 +33,64 @@ jest.mock("expo-router", () => ({
   },
 }));
 
-jest.mock("@/hooks/use-current-user", () => ({
-  useCurrentUser: () => null,
-}));
-
-// The real hook reaches @tanstack/react-query and the care API. This test is
-// about the tab bar, so the directory is stubbed to a settled empty state.
 jest.mock("@/features/care/hooks/use-directory", () => ({
   useDirectory: () => ({ entries: [], isLoading: false, error: null, refetch: jest.fn() }),
 }));
 
 import { FindCareScreen } from "../FindCareScreen";
 
-describe("FindCareScreen bottom nav", () => {
+describe("FindCareScreen chrome", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockPush.mockClear();
     mockReplace.mockClear();
   });
 
-  it("routes ALL FIVE tabs from a pushed screen — three of them did nothing before", () => {
+  it("shows NO bottom tab bar — neither patient nor practitioner", () => {
     render(<FindCareScreen />);
 
-    for (const [label, href] of [
-      ["Home", "/(app)"],
-      ["Overview", "/(app)/overview"],
-      ["Inbox", "/(app)/inbox"],
-      ["Community", "/(app)/community"],
-      ["Lifestyle", "/(app)/lifestyle"],
-    ] as const) {
-      mockReplace.mockClear();
-      fireEvent.press(screen.getByLabelText(label));
-      expect(mockReplace).toHaveBeenCalledWith(href);
+    // The patient five plus the practitioner three. Both sets, because the
+    // failure mode being locked out is "a detail screen grew a tab bar", and it
+    // does not matter which one.
+    for (const tab of [
+      "Home",
+      "Overview",
+      "Inbox",
+      "Community",
+      "Lifestyle",
+      "Schedule",
+      "Patients",
+      "Profile",
+    ]) {
+      expect(screen.queryByLabelText(tab)).toBeNull();
     }
   });
 
-  it("sends Home to Home, not to wherever the user came from", () => {
-    // The old handler called `router.back()`. Find Care is reachable from more
-    // than one place, so "back" and "Home" are different destinations and only
-    // one of them is what the Home tab promises.
+  it("shows NO logo — it belongs only on tab-root screens", () => {
+    // Half of the device report, and the half that is easiest to reintroduce by
+    // accident: <Logo /> carries accessibilityLabel="MedApp".
+    render(<FindCareScreen />);
+    expect(screen.queryByLabelText("MedApp")).toBeNull();
+  });
+
+  it("has exactly one back affordance, and it pops the stack", () => {
+    // The affordance the 2026-07-30 FLAG recorded as MISSING. Both inbound paths
+    // push (Home's Find Care tile, Appointments' "Book new"), so `router.back()`
+    // is always the right destination.
     render(<FindCareScreen />);
 
-    fireEvent.press(screen.getByLabelText("Home"));
-    expect(mockReplace).toHaveBeenCalledWith("/(app)");
-    expect(mockBack).not.toHaveBeenCalled();
+    expect(screen.getAllByLabelText("Go back")).toHaveLength(1);
+    fireEvent.press(screen.getByLabelText("Go back"));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    // Not a hardcoded href: `replace("/(app)")` would send a user who arrived
+    // from Appointments to Home instead of back to Appointments.
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("names the screen ONCE, in the bar", () => {
+    // The 28px body heading is gone; two identical headings stacked would
+    // announce "Find Care, heading. Find Care."
+    render(<FindCareScreen />);
+    expect(screen.getAllByText("Find Care")).toHaveLength(1);
   });
 });

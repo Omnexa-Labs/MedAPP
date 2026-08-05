@@ -36,22 +36,36 @@
 // one of the five tabs, so it correctly has no bottom nav, and with no back
 // affordance a patient who landed here could only leave by the OS gesture.
 //
-// FLAGGED — the remaining half of the frame/behaviour conflict. Frame 261:387
-// still has NO bottom tab bar instance; its Body runs the full 2214px with no
-// nav and no bottom safe-area spacer. This screen still SHIPS one. The nav is
-// KEPT in this pass, deliberately:
-//   - the blocker is gone, so honouring the frame is now *possible* — it is no
-//     longer a choice between the frame and stranding the user;
-//   - but the product owner's detail-screen ruling this round named
-//     `appointment_management` and only that. Dropping the nav here is the same
-//     kind of decision and belongs to the same owner, not to this file;
-//   - and the nav is load-bearing today in a way the frame does not show: its
-//     "home" tab is a live exit to Home (PatientShell's shared tab map), so
-//     removing it before someone confirms the ruling would remove an exit on the
-//     same commit that adds one.
-// Needs a one-line ruling: is Patient Profile Overview a detail screen (drop the
-// nav, keep back) or a nav-bearing destination (add a bottom-nav instance to
-// 261:387)? Either way the back button below is correct and stays.
+// ============================================================================
+// RULED, AND THE FRAME WAS RIGHT (2026-08-05) — DetailShell, no bottom nav
+// ============================================================================
+// The FLAG that stood here asked for a one-line ruling: "is Patient Profile
+// Overview a detail screen (drop the nav, keep back) or a nav-bearing
+// destination (add a bottom-nav instance to 261:387)?" It is a DETAIL SCREEN.
+//
+// The ruling is the one made for `appointment_management` (PO 2026-08-01) and
+// since applied to `find-care` and `patient-dashboard` — docs/PIPELINE.md §5. The
+// reasoning that decided it is not new: this screen was rendering
+// `activeTab="home"` while not being Home, and `Patient BottomTabBar` 740:1015
+// ships exactly five values with no way to name a sixth. The bar could only
+// render a lie.
+//
+// So frame 261:387 was right all along about the nav — its Body runs the full
+// 2214px with no tab bar — and this file's own flag correctly refused to act on
+// that unilaterally. Recording that, because the flag did its job: it named the
+// decision, named the owner, and kept the exit working in the meantime rather
+// than being right at the user's expense.
+//
+// The one thing that changes with it: the nav's "home" tab was a live exit, so it
+// is not removed on the same commit that adds an exit — `DetailShell` carries the
+// back button (this screen already had `hideBack={false}` for it), and both are
+// present in this diff.
+//
+// The AVATAR goes too, and it is the one loss worth naming: `Detail AppBar
+// 193:120` has no avatar slot ("No logo — the logo belongs only on tab-root
+// screens" applies to the whole tab-root lockup). It is no loss in function here
+// — the avatar was already deliberately non-pressable on this screen, because
+// this IS the profile — and the 128px patient avatar in the body is the real one.
 //
 // Translation calls:
 //   - Card containers → shared `Card` (components/ui/Card.tsx), `flat`
@@ -94,7 +108,7 @@ import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import { AvatarWithFallback, Badge, Button, Card } from "@/components/ui";
-import { PatientShell } from "@/components/shell";
+import { DetailShell } from "@/components/shell";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useTokenColor } from "@/lib/tokens";
 
@@ -163,34 +177,28 @@ export function PatientProfileOverviewScreen() {
   const outlineVariant = useTokenColor("outline-variant");
 
   return (
-    // Chrome is the shell's — including the app bar this screen previously had
-    // no equivalent of (see the migration note at the top). `activeTab` stays
-    // "home": no tab maps to Profile, and "home" is what `<BottomNav />` was
-    // already defaulting to here, so nothing about the rendered nav changes.
-    // The avatar is intentionally NOT pressable — this IS the profile screen, so
-    // a tap would be a no-op; PatientAppBar renders it as a plain image when no
-    // `onAvatarPress` is given rather than as a button that does nothing.
-    <PatientShell
-      activeTab="home"
-      // Figma 261:388 -> `Back=Shown`. This screen is always reached by a push
-      // (today: the header avatar), so `router.canGoBack()` is true and the
-      // shell's own predicate draws the button; no `backFallbackHref` is given
-      // because there is no deep link to this screen yet, and inventing one
-      // would be inventing a route.
-      hideBack={false}
-      avatarUri={user?.avatarUrl}
-      avatarInitials={PATIENT.initials}
-      avatarLabel={displayName}
-      // `isTabRoot={false}` — no tab maps to Profile, so this pushed screen
-      // borrows the Home highlight without being Home; Home must still navigate.
-      //
-      // No `onTabPress`: PatientShell owns the tab map now. This screen's switch
-      // was one of the two complete ones, but it still routed Home through
-      // `router.back()` and everything else through `push`. See PatientShell.tsx.
-      isTabRoot={false}
-    >
+    /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
+       See the RULED note at the top of the file — this is the detail-screen
+       chrome frame 261:387 has drawn all along.
+
+       No `onBack`. The one inbound path is the account menu, which reaches this
+       screen with `router.navigate` — that pushes when the route is not already in
+       history, so `router.back()` returns the user to the tab root they opened the
+       menu from. On a cold link with no history DetailAppBar's default no-ops
+       rather than throwing, and a fallback href is deliberately not invented here:
+       every tab root can reach this screen, so there is no single "up".
+
+       `claimsBottomInset` at its default — nothing is pinned to the bottom edge,
+       and the nav that used to occupy the inset is gone. */
+    <DetailShell title="Profile">
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 140 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          // 32, not the 140 that cleared the bottom nav. With the nav gone and
+          // the shell claiming the inset, 140 is ~170px of dead space.
+          paddingBottom: 32,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -415,7 +423,7 @@ export function PatientProfileOverviewScreen() {
           </View>
         </Card>
       </ScrollView>
-    </PatientShell>
+    </DetailShell>
   );
 }
 

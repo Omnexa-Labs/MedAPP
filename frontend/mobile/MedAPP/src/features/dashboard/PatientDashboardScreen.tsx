@@ -77,11 +77,42 @@
 // defaulted `active` to "home", so Home was already the highlighted tab
 // despite the old comment here saying otherwise. Rendering is byte-identical;
 // the comment was the thing that was wrong.
+//
+// ============================================================================
+// RE-MIGRATION (2026-08-05) — tab-root chrome OUT, DetailShell IN
+// ============================================================================
+// Third screen to take the ruling made for `appointment_management` and applied
+// to `find-care` (docs/PIPELINE.md §5, PO 2026-08-01). A screen that is not one
+// of the five patient tabs cannot wear the tab bar, because the bar can only
+// render a lie — and this screen is the clearest case of all three: the IA flag
+// at the top of this file says outright that it is "NOT registered on any
+// BottomNav tab". It was highlighting Home while being, by its own header, a
+// parallel cut of Home.
+//
+// `Detail AppBar 193:120`: "No logo — the logo belongs only on tab-root screens."
+// That takes the `<Logo>` out of the bar and the avatar with it.
+//
+// The paragraph above is superseded on the tabs specifically. It still records
+// something true and worth keeping: five inert tabs were a real defect and the
+// shared tab map was the right fix for the ten screens that legitimately show
+// the bar. This screen simply is not one of them.
+//
+// **FLAGGED — this screen has NO INBOUND LINK, so `router.back()` alone would be
+// a dead control.** A route audit finds exactly one reference to
+// `/(app)/patient-dashboard` in `src/`: the gitignored preview harness
+// `app/(public)/zpdb.tsx`. Nothing in the product pushes it, by design — the IA
+// question above was never answered. DetailAppBar's default back no-ops when
+// there is no history, which on the app's only real path here (a cold deep link)
+// means a visible chevron that does nothing. So this screen supplies its own
+// `onBack` with a Home fallback. That is a mitigation, not a resolution: the
+// screen still needs the IA call — replace Home, replace Overview, become a tab,
+// or be deleted. Until then it is a reviewable orphan with honest chrome.
 
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useAuthStore } from "@/store/auth-store";
-import { PatientShell } from "@/components/shell";
+import { DetailShell } from "@/components/shell";
 import { useTokenShadow } from "@/lib/tokens";
 import {
   Badge,
@@ -206,29 +237,31 @@ export function PatientDashboardScreen() {
   const fabShadow = useTokenShadow("shadow", { y: 2, blur: 6, opacity: 0.08 });
 
   return (
-    // Chrome is the shell's. `paddingBottom: 140` stays — BottomNav is
-    // absolutely positioned and reserves no layout space.
-    <PatientShell
-      activeTab="home"
-      // `isTabRoot={false}` — this screen is NOT the Home tab (it is a parallel
-      // dashboard cut at its own route, see the IA note above); it only borrows
-      // the Home highlight because BottomNav has to highlight something. Home
-      // must therefore still navigate, so it is not marked as the root.
-      //
-      // It previously passed no `onTabPress` at all, which left all five tabs
-      // inert. PatientShell's shared default fixes that without this screen
-      // having to answer the unresolved IA question — the tabs go where they go
-      // from every other patient screen.
-      isTabRoot={false}
-      avatarUri={user?.avatarUrl}
-      avatarInitials={firstName[0]}
-      avatarLabel={user?.displayName ?? "Your profile"}
+    /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
+       See the RE-MIGRATION note at the top of the file: the tab bar and the logo
+       are both out, because this screen is on no tab.
+
+       `onBack` is supplied rather than left to DetailAppBar's default, and the
+       FLAG above is the reason: nothing in the product pushes this route, so on
+       the only path that reaches it there is no history to pop and the default
+       would render a chevron that silently does nothing. `replace`, not `push` —
+       a screen with no inbound link should not deepen the stack on the way out.
+
+       `claimsBottomInset` stays at its default: nothing is pinned to the bottom
+       edge. The FAB is `absolute` INSIDE the scroll content, not docked to the
+       screen, so it does not claim the inset. */
+    <DetailShell
+      title="Dashboard"
+      onBack={() => (router.canGoBack() ? router.back() : router.replace("/(app)"))}
     >
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 24,
           paddingTop: 24,
-          paddingBottom: 140,
+          // 32, not 140. The 140 cleared the bottom nav; the nav is gone and the
+          // shell claims the bottom inset now, so 140 would leave ~170px of dead
+          // space under the last card.
+          paddingBottom: 32,
           gap: 48,
         }}
         showsVerticalScrollIndicator={false}
@@ -374,7 +407,7 @@ export function PatientDashboardScreen() {
       >
         <MaterialIcons name="add" size={28} color="#ffffff" />
       </View>
-    </PatientShell>
+    </DetailShell>
   );
 }
 
