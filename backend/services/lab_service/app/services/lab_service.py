@@ -97,13 +97,67 @@ def _ensure_role(principal: Principal, allowed_roles: set[str], message: str) ->
         raise HTTPException(status.HTTP_403_FORBIDDEN, message)
 
 
-def _can_access_result(principal: Principal, result: LabResult) -> None:
+async def _can_access_result(
+    db: AsyncSession, principal: Principal, result: LabResult
+) -> None:
+    """Who may read a lab result.
+
+    THE `role == "doctor"` BLANKET GRANT IS GONE (2026-08-05, security review).
+    It read:
+
+        if principal.role == "doctor":
+            return
+
+    — no ordering relationship, no consent, no care team. Any account holding the
+    doctor role could read ANY patient's result: `raw_text`, `parsed_values`,
+    `summary`, `external_url`. Special-category health data of every patient in
+    the system, behind a role claim.
+
+    It was not even hard to obtain that claim: `POST /v1/auth/signup` accepted a
+    client-supplied `role` and minted a token with it (fixed in the same pass), so
+    the two defects chained into an UNAUTHENTICATED read of any patient's labs.
+
+    The replacement is the predicate the ordering doctor genuinely has: they
+    ordered the test. `LabOrder.ordered_by_user_id` is the relationship the data
+    model already records, so no new column and no cross-service call is needed.
+
+    Deliberately NOT accepted as sufficient:
+      * role alone — the defect being removed.
+      * "any doctor at the same hospital" — `hospital_admin` and hospital staff
+        rows are self-assignable today (see the same review), so that would be a
+        second role-claim bypass wearing a relationship's clothes.
+
+    `ehr_service` already models this properly with an active `Consent` row
+    (`record_service.py:56`). Lab results should converge on that consent model
+    rather than keep a second, weaker rule — FLAGGED, and the reason this function
+    takes the order relationship as a narrow first step instead of inventing a
+    consent table here.
+
+    Regulation: Ghana Act 843 s.20 (purpose limitation — access outside the
+    treating relationship is a new purpose with no lawful basis) and s.28
+    (safeguards); HIPAA §164.312(a)(1) access control and §164.308(a)(4) minimum
+    necessary; GDPR Art. 9, which permits health-data processing for care only
+    under a treating relationship (Art. 9(2)(h)).
+    """
     if principal.role == "admin":
         return
     if result.patient_id == _principal_uuid(principal):
         return
-    if principal.role == "doctor":
-        return
+    # The ordering clinician, and only for the order this result belongs to.
+    #
+    # Loaded EXPLICITLY, because `LabResult` has no `relationship()` to its order
+    # - only a nullable `lab_order_id` FK. A first version of this reached for
+    # `result.order`, which does not exist: `getattr` would have returned None
+    # forever and 403'd the ordering doctor on every request. It would have failed
+    # closed, which is the right direction to fail, but it would have been broken.
+    #
+    # A result with no `lab_order_id` has no clinician who can claim a
+    # relationship to it, so it never enters this branch. Absence of a
+    # relationship must not read as permission.
+    if principal.role == "doctor" and result.lab_order_id is not None:
+        order = await db.get(LabOrder, result.lab_order_id)
+        if order is not None and order.ordered_by_user_id == _principal_uuid(principal):
+            return
     raise HTTPException(status.HTTP_403_FORBIDDEN, "you can only access your own lab results")
 
 
@@ -172,7 +226,7 @@ async def get_lab_result(db: AsyncSession, principal: Principal, result_id: UUID
     result = await db.get(LabResult, result_id)
     if result is None:
         raise LabError("lab result not found")
-    _can_access_result(principal, result)
+    await _can_access_result(db, principal, result)
     return result
 
 

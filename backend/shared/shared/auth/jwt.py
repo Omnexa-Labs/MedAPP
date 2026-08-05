@@ -76,6 +76,38 @@ def decode_token(
     during the rollout; production callers should set both via env vars
     (`MEDAPP_DEFAULT_JWT_AUDIENCE` / `MEDAPP_DEFAULT_JWT_ISSUER`).
     """
+    # AN EMPTY SECRET IS NEVER A VALID CONFIGURATION, AND PyJWT WILL HAPPILY
+    # VERIFY AGAINST ONE. Measured, not assumed:
+    #
+    #   jwt.decode(jwt.encode({"sub": "attacker", "role": "admin"}, "", "HS256"),
+    #              "", algorithms=["HS256"])
+    #   -> {"sub": "attacker", "role": "admin"}
+    #
+    # PyJWT 2.12 emits `InsecureKeyLengthWarning` for a 0-byte HMAC key and then
+    # proceeds. So a service whose `*_JWT_SECRET` env var is missing does not
+    # reject requests — it accepts a token that ANYONE can mint, for ANY subject,
+    # with ANY role, including admin. No account and no credential required.
+    #
+    # Sixteen services default `jwt_secret: str = ""` in their config and call
+    # this function directly from their `deps.py`. Only `api_gateway` calls
+    # `validate_jwt_secret` at boot, and that only RAISES in production — so a
+    # dev, CI or staging deployment with one unset variable was silently
+    # forgeable, and `validation.py`'s own comment claimed the opposite ("auth
+    # will reject all requests").
+    #
+    # The guard lives HERE rather than in each service's startup because this is
+    # the one function every service funnels through. A boot check protects the
+    # services that remember to call it; this protects all of them.
+    #
+    # Deliberately a hard failure and not a 401: an unset secret is an operator
+    # error, not a bad credential, and returning 401 would let a misconfigured
+    # service look merely unauthorised while being wide open to a forged token.
+    if not secret:
+        raise ValueError(
+            "refusing to verify a JWT against an empty secret — PyJWT would "
+            "accept any forged token. Set the service's *_JWT_SECRET env var."
+        )
+
     options = {
         "verify_aud": audience is not None,
         "verify_iss": issuer is not None,
