@@ -192,7 +192,25 @@ function adaptHospital(h: HospitalWire): FacilityEntry {
     icon: "local-hospital",
     iconTint: "tertiary",
     badges,
-    cta: { label: "View Staff", color: "tertiary" },
+    // "View hospital", NOT "View Staff" (changed 2026-08-05).
+    //
+    // The staff roster this label promised CANNOT BE DELIVERED, and that is a
+    // backend fact, not a design gap. `hospital_service/app/routers/hospitals.py`
+    // exposes only `POST /v1/hospitals/{id}/staff` — there is no GET — and
+    // `HospitalStaffOut` carries `user_id`, `role`, `title`, `department` and no
+    // name or photo, with no user lookup anywhere in that service. So even with a
+    // GET route the response could not name a single person.
+    //
+    // The designed screen (`hospital_detail`, Figma 1020:641) renders its Care
+    // team section as an EmptyState reading "Staff directory not published" for
+    // exactly this reason — drawn rather than omitted, because a button that
+    // lands there has to be answered. This label is the other half of that: a
+    // label whose data does not exist is a promise the next screen has to break.
+    //
+    // Restore "View Staff" when hospital_service ships BOTH a
+    // `GET /v1/hospitals/{id}/staff` route AND name resolution for
+    // `HospitalStaff.user_id`. Not one or the other.
+    cta: { label: "View hospital", color: "tertiary" },
   };
 }
 

@@ -102,7 +102,11 @@ const hospital: FacilityEntry = {
   name: "Korle Bu Teaching Hospital",
   icon: "local-hospital",
   iconTint: "tertiary",
-  cta: { label: "View Staff", color: "tertiary" },
+  // Matches what adaptHospital actually emits. "View Staff" was the old label,
+  // dropped because hospital_service cannot return staff names at all - a
+  // fixture that outlives the adapter is how the invented-clinician names
+  // spread across three screens.
+  cta: { label: "View hospital", color: "tertiary" },
 };
 
 const PROFILE_ROUTE = "/(app)/practitioner-telehealth-profile";
@@ -172,7 +176,7 @@ describe("FindCareScreen — a provider card opens that provider's profile", () 
 describe("FindCareScreen — a facility is not a practitioner", () => {
   it.each([
     ["pharmacy", pharmacy, "View Store — Ridge Pharmacy"],
-    ["hospital", hospital, "View Staff — Korle Bu Teaching Hospital"],
+    ["hospital", hospital, "View hospital — Korle Bu Teaching Hospital"],
   ])("never pushes a %s into a practitioner profile", (_kind, entry, label) => {
     mockEntries = [entry];
     render(<FindCareScreen />);
