@@ -182,6 +182,113 @@ read this section.
 
 Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what the other side should do>`
 
+- 2026-08-05 — Claude — **CLAIM page `1019:640` "Facilities" — `hospital_detail`, `pharmacy_detail`.
+  DELIVERED, and the hospital CTA turns out to be unhonourable.**
+
+  | Frame | Node |
+  |---|---|
+  | `hospital_detail` | `1020:641` |
+  | `hospital_detail — not found · load failed` | `1022:17252` |
+  | `hospital_detail — dark proof` | `1022:17473` |
+  | `pharmacy_detail` | `1022:16476` |
+  | `pharmacy_detail — no pharmacists listed` | `1022:17278` |
+  | `pharmacy_detail — dark proof` | `1022:17511` |
+  | `Local Components — facilities` | `1019:641` |
+
+  **"View Staff" IS NOT BUILDABLE, and the frame says so rather than faking it.**
+  `hospital_service/app/routers/hospitals.py` exposes only **`POST /v1/hospitals/{id}/staff`** —
+  there is **no GET** — and `HospitalStaffOut` carries `user_id`, `role`, `title`, `department` and
+  **no name or photo**, with no user lookup in the service. So the Care team section is an
+  `EmptyState` reading "Staff directory not published" (`1020:16283`), drawn rather than omitted
+  because the button that lands there promises staff. **Required code work:** `adaptHospital`
+  (`features/care/api.ts:195`) must change `cta.label` from "View Staff" to **"View hospital"** until
+  backend ships a GET route *and* name resolution. A label that outlives its data is a lie.
+
+  **The pharmacy side is fully backed and needs no backend work** — `PharmacyOut` carries
+  description, licence number and categories, the full seven-day `operating_hours`, phone, email,
+  website, photo and insurance; `GET /v1/pharmacies/{id}/stock?drug_name=` returns
+  available/quantity/price/currency/source; `GET /v1/pharmacists?pharmacy_id=` returns staff.
+
+  **REFUSED for want of a column — do not add these later without one:** hospital staff names,
+  review attribution (`reviewer_user_id` only), aggregate rating, distance in km (hospitals accept no
+  lat/lng query, unlike nurses), hospital opening hours, "24/7 emergency", hospital photo, bed count,
+  departments, wait time; pharmacy "Open now" (`api.ts` records why it is timezone-unsafe — the hours
+  table with a Today row says the same thing honestly), delivery, ratings, reviews, pharmacist
+  ratings and verified ticks (`is_listable` is not verification).
+
+  **DEFECT REPORTED in `find_care` (read only):** `FacilityCard` instances carry four fields with no
+  backing column — `916:2360` reads "Osu, Accra · 2.4 km · Open 24 hrs" with a "24/7 emergency"
+  badge; `916:2386` reads "· 0.8 km · Closes 22:00" with "Delivery".
+
+  **FLAGGED — the seed contains no pharmacies, hospitals or pharmacists at all.** The two
+  `PractitionerSummaryRow` instances use roster names Kwabena Osei and Abena Owusu per the naming
+  rule, but both are seeded as **doctors with other specialties** — a role conflict, so those rows
+  are **not canon**. Needs seeded pharmacists with PO-chosen names (§5c 2b).
+
+  Built local, proposed for promotion: `HoursRow 1019:650` (`Emphasis=Default|Today` — `KeyValueRow`
+  stacks label above value and has no today emphasis) and `HospitalReviewCard 1019:16078` (the file
+  has no review component; `doctor_profile`'s is a hand-drawn frame).
+
+  Verification: 0 unbound SOLID paints across all seven roots (fills + strokes, `visible:false`
+  excluded); 0 FIXED-width descendants wider than the 296px worst-case 360dp content box; both dark
+  proofs screenshot-verified to invert rather than render as a slab.
+
+- 2026-08-05 — Claude — **CLAIM page `1018:640` "Practitioner Shell" — `practitioner-home`,
+  `practitioner-profile`. DELIVERED (design gate only; Build + BuildReview still owed, §5c 8–9).**
+
+  These are the two destinations `PractitionerBottomNav` has been shipping as `href: null`.
+  **`practitioner-profile` is the CLINICIAN'S OWN profile** — `practitioner-social-profile` and
+  `practitioner-telehealth-profile` are both patient-facing views of a specialist and are not
+  duplicated.
+
+  Frames: `1019:673` home—today · `1022:853` no consultations · `1022:16729` home DARK proof ·
+  `1020:16094` profile—listed · `1022:918` not listed in Find Care · `1022:16587` account & sign out
+  (scrolled) · `1022:16745` profile DARK proof · `1022:16777` home @360dp · locals `1018:641`.
+
+  **FLAG 1 — MISSING ENDPOINT, and it blocks the whole Schedule tab.**
+  `booking_service/app/services/booking_service.py:112-119`: `all_bookings=true` is admin-only, and
+  otherwise the query filters `Booking.user_id == principal`. `doctor_id` only ANDs on top — so
+  `GET /v1/bookings?doctor_id=<self>` returns bookings where the doctor is the **patient**. A
+  practitioner cannot list their own patients' bookings. `/summary` has the identical gap.
+
+  **FLAG 2 — `Practitioner BottomNav 381:628` OVERFLOWS 360dp**, the same defect just fixed on the
+  patient bar: five `FIXED 75` items in a SPACE_BETWEEN row with 8px padding = 391 required. Measured
+  at 360, `TabItem/Profile` spans x=283.2→383, so 23px of touch target is off-screen and the label
+  clips. **The code is immune** (`flex-1` per Pressable) — this is component-side only. Fix on
+  `26:84` when no claim is open; `1022:16777` overrides its instance to FILL to show real rendering.
+
+  **FLAG 3 — Figma and code disagree on the tab-root app bar.** In `Practitioner AppBar Back=Hidden`
+  the back glyph is `visible:false` and `SPACE_BETWEEN` resolves the Logo to `x=16` (left);
+  `PractitionerAppBar.tsx:128` instead renders a 44×44 spacer and keeps it centred at 141.5. One of
+  the two must change.
+
+  **FLAG 4 — PRODUCT DECISION: practitioners have no account route at all.** `AccountMenu` is mounted
+  only by `PatientShell.tsx:226` behind the patient avatar; `PractitionerShell` never mounts it and
+  `PractitionerAppBar` has no avatar — so **appearance and sign-out are unreachable for a clinician
+  today**. Placed on practitioner-profile (`1022:16587` proves reachability). Confirm that versus
+  adding an avatar to the practitioner bar.
+
+  Also: the app bar component hardcodes a **"3" unread badge** while the app has no notifications
+  model (hidden on these instances; needs a `Badge=Shown|Hidden` axis); `SecurityToggleCard 337:798`
+  is the file's only toggle row and wants an audience-neutral name on promotion; the Account "Email"
+  row is not on `DoctorProfile` and crosses into the user service; and **`color/on-success-container`
+  does not exist** in the Colors collection although `ActivePatientRoster2Screen.tsx:762` uses it.
+
+  Built local: `Consultation Card / Practitioner 1018:667`. `AppointmentCard 550:2593` could not be
+  reused — its identity property is literally `Practitioner name#550:50`, and a practitioner-side
+  card is keyed on the PATIENT. Proposed for promotion, or an `Audience=Patient|Practitioner` axis.
+
+  Verification: 965 nodes audited, **0 unbound visible paints**; mode pins on the two dark proofs
+  only; both screenshot-verified to invert.
+
+- 2026-08-05 — Claude — **NOT DELIVERED: `consultation-summary` and `edit-profile`.** The agent was
+  killed by a session limit while probing `Input 1:52` / `Button 1:89` internals; it had established
+  the token and component ground truth and had written nothing to the file. **Nothing to clean up —
+  no page was created and no frames exist.** Resume from scratch. The brief still stands, including
+  the modal-vs-screen call (full pushed screen, on the grounds that a profile edit spans many fields
+  with per-field validation while this file reserves sheets for a single decision) and the hard
+  constraint that **a field `user_service` cannot persist must not appear in an edit form**.
+
 - 2026-08-05 — Claude — **THE INERT-CONTROL AUDIT: 16 dead controls, split into what can be built
   today and what cannot.** Asked for "all tooltip calls functional". Enumerated rather than
   estimated, because half of them cannot be made functional honestly and quietly stubbing those would
