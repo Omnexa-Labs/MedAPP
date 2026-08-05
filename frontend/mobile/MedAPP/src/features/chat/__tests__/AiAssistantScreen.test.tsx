@@ -35,6 +35,73 @@ jest.mock("nativewind", () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Composer media mocks.
+//
+// Mocked at the MODULE BOUNDARY, the same seam the router and nativewind mocks
+// use. No test may reach a real native module: expo-document-picker would try to
+// present a system UI, expo-audio would try to open an audio session, and
+// expo-file-system would try to unlink a real path.
+//
+// The mutable state lives INSIDE each factory and is reached through
+// `jest.requireMock` at test time, not through a closure over a `const`. That is
+// deliberate: babel hoists the `../AiAssistantScreen` import above the top-level
+// `const`s, so a factory that closed over one would evaluate in its temporal
+// dead zone.
+// ---------------------------------------------------------------------------
+
+jest.mock("expo-document-picker", () => ({
+  // Default: the user dismisses. `canceled` is spelled with ONE l, per the SDK
+  // 55 DocumentPicker docs, and the canceled result carries `assets: null`.
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));
+
+jest.mock("expo-audio", () => {
+  const recorder = {
+    isRecording: false,
+    uri: null as string | null,
+    prepareToRecordAsync: jest.fn(async () => {}),
+    // SDK 55: `record()` is synchronous and returns void; only `stop()` is a
+    // promise, and `uri` is readable only after it resolves.
+    record: jest.fn(() => {
+      recorder.isRecording = true;
+    }),
+    stop: jest.fn(async () => {
+      recorder.isRecording = false;
+      recorder.uri = "file:///cache/AV/recording-1.m4a";
+    }),
+  };
+  const permission = {
+    granted: true,
+    status: "granted" as "granted" | "denied" | "undetermined",
+    canAskAgain: true,
+  };
+  return {
+    __recorder: recorder,
+    __permission: permission,
+    RecordingPresets: { HIGH_QUALITY: { extension: ".m4a" }, LOW_QUALITY: { extension: ".m4a" } },
+    useAudioRecorder: () => recorder,
+    getRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
+    requestRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
+    setAudioModeAsync: jest.fn(async () => {}),
+  };
+});
+
+jest.mock("expo-file-system", () => {
+  const deleted: string[] = [];
+  class File {
+    uri: string;
+    exists = true;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    delete() {
+      deleted.push(this.uri);
+    }
+  }
+  return { File, __deleted: deleted };
+});
+
 import { AiAssistantScreen } from "../AiAssistantScreen";
 
 const SOURCE_PATH = join(__dirname, "..", "AiAssistantScreen.tsx");
@@ -51,9 +118,85 @@ function canvas() {
   return screen.UNSAFE_getAllByType(ScrollView)[0];
 }
 
+// ---------------------------------------------------------------------------
+// Composer-media test helpers
+// ---------------------------------------------------------------------------
+
+type PermissionShape = { granted: boolean; status: string; canAskAgain: boolean };
+
+function picker() {
+  return jest.requireMock("expo-document-picker") as {
+    getDocumentAsync: jest.Mock;
+  };
+}
+
+function audio() {
+  return jest.requireMock("expo-audio") as {
+    __recorder: { isRecording: boolean; uri: string | null; stop: jest.Mock; record: jest.Mock };
+    __permission: PermissionShape;
+    getRecordingPermissionsAsync: jest.Mock;
+    requestRecordingPermissionsAsync: jest.Mock;
+    setAudioModeAsync: jest.Mock;
+  };
+}
+
+function fs() {
+  return jest.requireMock("expo-file-system") as { __deleted: string[] };
+}
+
+/** The permission state both `get` and `request` will report. */
+function setMicPermission(next: PermissionShape) {
+  const a = audio();
+  Object.assign(a.__permission, next);
+  // `mockReset`, not `mockImplementation`: an implementation swap leaves the call
+  // history intact, and "did we ask?" is the assertion in the blocked-permission
+  // case, so a stale count from a previous test would pass it wrongly.
+  a.getRecordingPermissionsAsync.mockReset();
+  a.requestRecordingPermissionsAsync.mockReset();
+  a.getRecordingPermissionsAsync.mockImplementation(async () => ({ ...next }));
+  a.requestRecordingPermissionsAsync.mockImplementation(async () => ({ ...next }));
+}
+
+const PICKED_PDF = {
+  canceled: false as const,
+  assets: [
+    {
+      uri: "file:///cache/DocumentPicker/Lab_Panel_Aug2026.pdf",
+      name: "Lab_Panel_Aug2026.pdf",
+      size: 2_400_000,
+      mimeType: "application/pdf",
+      lastModified: 0,
+    },
+  ],
+};
+
+/**
+ * Presses a control and flushes the microtask queue the handler kicks off. Every
+ * composer-media handler is `async`, so a bare `fireEvent.press` would assert
+ * against the state before the picker/permission promise resolved.
+ */
+async function pressAsync(label: string) {
+  await act(async () => {
+    fireEvent.press(screen.getByLabelText(label));
+  });
+}
+
 beforeEach(() => {
   mockBack.mockClear();
   mockScheme.value = "light";
+
+  const a = audio();
+  a.__recorder.isRecording = false;
+  a.__recorder.uri = null;
+  a.__recorder.stop.mockClear();
+  a.__recorder.record.mockClear();
+  a.setAudioModeAsync.mockClear();
+  setMicPermission({ granted: true, status: "granted", canAskAgain: true });
+
+  picker().getDocumentAsync.mockReset();
+  picker().getDocumentAsync.mockResolvedValue({ canceled: true, assets: null });
+
+  fs().__deleted.length = 0;
 });
 
 describe("AiAssistantScreen — renders through DetailShell", () => {
@@ -169,5 +312,220 @@ describe("AiAssistantScreen — behaviour is untouched", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Composer media
+//
+// The defect these lock: "Attach file" and "Voice input" shipped as
+// `<IconButton>` with NO `onPress` — two dead 44pt targets. A test that only
+// asserts the label exists passes on a dead control, so every case below asserts
+// an EFFECT of the press.
+// ---------------------------------------------------------------------------
+
+describe("AiAssistantScreen — attach", () => {
+  it("opens the SDK 55 picker in single-select mode and shows what was picked", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Attach file");
+
+    expect(picker().getDocumentAsync).toHaveBeenCalledWith({
+      type: "*/*",
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    expect(screen.getByTestId("composer-attachment-chip")).toBeTruthy();
+    expect(screen.getByText("Lab_Panel_Aug2026.pdf")).toBeTruthy();
+    // MIME subtype uppercased + decimal size, matching the seeded bubble's format.
+    expect(screen.getByText(/PDF · 2\.4 MB/)).toBeTruthy();
+    // The absence of an upload endpoint is stated in the UI, not hidden.
+    expect(screen.getByText(/not sent yet/)).toBeTruthy();
+  });
+
+  it("attaches it to the sent message and frees the composer slot", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Attach file");
+    await pressAsync("Send message");
+
+    // The chip is gone from the composer…
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    // …and the file is named in the bubble instead.
+    expect(screen.getByText("Lab_Panel_Aug2026.pdf")).toBeTruthy();
+    expect(screen.getByText(/on this device only/)).toBeTruthy();
+    // Consuming an attachment must NOT reap the file — the bubble references it.
+    expect(fs().__deleted).toHaveLength(0);
+  });
+
+  it("sends an attachment with an EMPTY draft — the old guard blocked that", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Attach file");
+    expect(screen.getByLabelText("Send message").props.accessibilityState.disabled).toBe(false);
+
+    await pressAsync("Send message");
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+  });
+
+  it("removing the attachment is possible, and does not delete a picked FILE", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Attach file");
+    await pressAsync("Remove attachment Lab_Panel_Aug2026.pdf");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    // Only captures we created are reaped; a re-pick can hand back the same uri.
+    expect(fs().__deleted).toHaveLength(0);
+  });
+
+  it("a DISMISSED picker leaves nothing stuck and no notice", async () => {
+    render(<AiAssistantScreen />); // default mock resolves { canceled: true }
+
+    await pressAsync("Attach file");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(screen.queryByTestId("composer-media-notice")).toBeNull();
+    // Still live: a second press re-opens the picker.
+    await pressAsync("Attach file");
+    expect(picker().getDocumentAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("surfaces a picker FAILURE instead of silently doing nothing", async () => {
+    picker().getDocumentAsync.mockRejectedValueOnce(new Error("provider went away"));
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Attach file");
+
+    expect(screen.getByTestId("composer-media-notice")).toBeTruthy();
+    expect(screen.getByText(/could not be opened/)).toBeTruthy();
+
+    // …and the notice is clearable, so it can't outlive its cause.
+    await pressAsync("Dismiss message");
+    expect(screen.queryByTestId("composer-media-notice")).toBeNull();
+  });
+
+  it("renders the unimplemented camera control as DISABLED, not as dead", () => {
+    render(<AiAssistantScreen />);
+    expect(screen.getByLabelText("Take photo").props.accessibilityState.disabled).toBe(true);
+  });
+});
+
+describe("AiAssistantScreen — mic", () => {
+  it("requests permission, opens a recording session, and shows a live indicator", async () => {
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+
+    const a = audio();
+    expect(a.getRecordingPermissionsAsync).toHaveBeenCalled();
+    // The session pair the SDK 55 recording example sets.
+    expect(a.setAudioModeAsync).toHaveBeenCalledWith({
+      allowsRecording: true,
+      playsInSilentMode: true,
+    });
+    expect(a.__recorder.record).toHaveBeenCalled();
+    expect(screen.getByTestId("composer-recording-bar")).toBeTruthy();
+    expect(screen.getByText(/Recording ·/)).toBeTruthy();
+    // The label follows the state, so the next tap is announced correctly.
+    expect(screen.getByLabelText("Stop recording")).toBeTruthy();
+    expect(screen.queryByLabelText("Voice input")).toBeNull();
+  });
+
+  it("a second press commits the capture as an attachment and releases the session", async () => {
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+    await pressAsync("Stop recording");
+
+    const a = audio();
+    expect(a.__recorder.stop).toHaveBeenCalled();
+    expect(a.setAudioModeAsync).toHaveBeenLastCalledWith({ allowsRecording: false });
+    expect(screen.queryByTestId("composer-recording-bar")).toBeNull();
+    expect(screen.getByTestId("composer-attachment-chip")).toBeTruthy();
+    expect(screen.getByText("Voice note")).toBeTruthy();
+    expect(screen.getByText(/Audio · \d+:\d\d/)).toBeTruthy();
+    expect(screen.getByLabelText("Voice input")).toBeTruthy();
+  });
+
+  it("discarding an in-flight recording stops the recorder AND reaps the file", async () => {
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+    await pressAsync("Discard recording");
+
+    const a = audio();
+    // Cancelling still has to stop: abandoning would leave the OS mic indicator lit.
+    expect(a.__recorder.stop).toHaveBeenCalled();
+    expect(screen.queryByTestId("composer-recording-bar")).toBeNull();
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(fs().__deleted).toEqual(["file:///cache/AV/recording-1.m4a"]);
+  });
+
+  it("explains a DENIAL in words and stays usable — no silent no-op", async () => {
+    setMicPermission({ granted: false, status: "denied", canAskAgain: true });
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+
+    expect(audio().__recorder.record).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("composer-recording-bar")).toBeNull();
+    expect(screen.getByTestId("composer-media-notice")).toBeTruthy();
+    expect(screen.getByText(/needs microphone access/)).toBeTruthy();
+    // Still the idle control, so the user can grant and retry.
+    expect(screen.getByLabelText("Voice input")).toBeTruthy();
+  });
+
+  it("says SETTINGS when the OS will not prompt again (canAskAgain: false)", async () => {
+    setMicPermission({ granted: false, status: "denied", canAskAgain: false });
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+
+    const a = audio();
+    // Pointless to ask — and asking would be a tap that visibly does nothing.
+    expect(a.requestRecordingPermissionsAsync).not.toHaveBeenCalled();
+    expect(screen.getByText(/Settings/)).toBeTruthy();
+  });
+
+  it("reports a capture that produced no file rather than attaching nothing", async () => {
+    const a = audio();
+    a.__recorder.stop.mockImplementationOnce(async () => {
+      a.__recorder.isRecording = false;
+      a.__recorder.uri = null;
+    });
+    render(<AiAssistantScreen />);
+
+    await pressAsync("Voice input");
+    await pressAsync("Stop recording");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(screen.getByText(/could not be saved/)).toBeTruthy();
+  });
+});
+
+describe("AiAssistantScreen — BRAND compliance", () => {
+  it("imports no icon library — the icon gate is the only file allowed to", () => {
+    const src = code();
+    expect(src).not.toMatch(/@expo\/vector-icons/);
+    expect(src).not.toMatch(/MaterialIcons/);
+  });
+
+  it("carries no raw colour literals, including white", () => {
+    const src = code();
+    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(src).not.toMatch(/\brgba?\(/);
+    // `text-white` is the class form of the same violation.
+    expect(src).not.toMatch(/\btext-white\b/);
+  });
+
+  it("routes the send glyph through the on-primary token, not a frozen white", () => {
+    const src = code();
+    expect(src).toMatch(/useTokenColor\("on-primary"\)/);
+    expect(src).toMatch(/<Icon chrome="send"[\s\S]*?color=\{onPrimary\}/);
   });
 });

@@ -21,10 +21,21 @@
 //   - The 5-minute QR countdown is real local state (setInterval),
 //     mirroring the script in the comp. No network — design-only pass.
 //
+// "Other Options" — ONE of the three is real, and the labels say which.
+// "Download PDF" here was a Pressable with no `onPress` at all: a full-width
+// control that did nothing on tap. It writes a real text file now, through the
+// same @/lib/documents path as the sibling view screen, and is relabelled with
+// the extension it actually produces — there is no PDF generator in this project
+// and `expo-print` is not a dependency. "Print Script" and "Copy Clinical Link"
+// are still inert and are FLAGGED, not fixed, in this pass: printing needs the
+// same missing render pipeline, and there is no clinical-link endpoint to copy.
+// They are the next two controls that need either an implementation or an honest
+// disabled state.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   Modal,
@@ -37,7 +48,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell } from "@/components/shell";
+import { Toast, useToast } from "@/components/feedback";
 import { Card, Icon } from "@/components/ui";
+import {
+  buildPrescriptionDocument,
+  describeSaveResult,
+  formatDocumentTimestamp,
+  prescriptionFileName,
+  saveTextDocument,
+} from "@/lib/documents";
 import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor, type ColorScheme } from "@/lib/tokens";
 
@@ -181,6 +200,39 @@ export function ActiveScriptShareScreen() {
     setQrVisible(false);
     if (qrInterval.current) clearInterval(qrInterval.current);
   };
+
+  // Download — a real write, reported by the shared toast. See the note at the
+  // head of this file for why the label names ".txt".
+  const { message: toastMessage, tone: toastTone, show: showToast, clear: clearToast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  const onDownload = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // This screen carries a SUBSET of the Rx fields — it has no quantity,
+      // refills, license or DOB in its params. The builder omits what it isn't
+      // given rather than substituting sample values, so the file is a shorter
+      // record here, not an invented one.
+      const body = buildPrescriptionDocument({
+        drug,
+        patient,
+        scriptId,
+        prescriber,
+        issuedDate,
+        generatedAt: formatDocumentTimestamp(),
+      });
+      const result = await saveTextDocument({
+        fileName: prescriptionFileName({ drug, scriptId }),
+        body,
+        dialogTitle: "Save or send your prescription",
+      });
+      const { tone, message } = describeSaveResult(result);
+      showToast(tone, message);
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, drug, patient, scriptId, prescriber, issuedDate, showToast]);
 
   // The bar's verified glyph, resolved by token name instead of the `#00685f`
   // (light-mode color/primary) the hand-rolled bar froze.
@@ -400,7 +452,15 @@ export function ActiveScriptShareScreen() {
             Other Options
           </Text>
           <View className="gap-sm">
-            <OtherOption icon="picture-as-pdf" label="Download PDF" />
+            {/* `picture-as-pdf` went with the word PDF — the glyph asserted the
+                format just as loudly as the label did. */}
+            <OtherOption
+              icon="download"
+              label={saving ? "Saving…" : "Download Copy (.txt)"}
+              accessibilityLabel="Download a text copy of this prescription"
+              onPress={onDownload}
+              disabled={saving}
+            />
             <OtherOption icon="print" label="Print Script" />
             <OtherOption icon="link" label="Copy Clinical Link" />
           </View>
@@ -414,6 +474,11 @@ export function ActiveScriptShareScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Download outcome. Sibling of the ScrollView inside DetailShell, which is
+          where the view screen's toast sits too — 30 clears the shell's bottom
+          inset, and a detail screen has no BottomNav to clear. */}
+      <Toast message={toastMessage} tone={toastTone} onDismiss={clearToast} bottom={30} />
 
       {/* Success modal */}
       <Modal
@@ -527,13 +592,41 @@ export function ActiveScriptShareScreen() {
 // Pieces
 // ---------------------------------------------------------------------------
 
-function OtherOption({ icon, label }: { icon: IconName; label: string }) {
+/**
+ * A full-width option row.
+ *
+ * `onPress` is optional and `accessibilityLabel` now separable from the visible
+ * label — the download row's label changes to "Saving…" mid-write, and letting
+ * that string double as the accessible name would rename the control under a
+ * screen reader while it worked.
+ *
+ * FLAGGED: two of the three rows still pass no `onPress`. That is pre-existing
+ * and deliberately left visible rather than papered over — see the note at the
+ * head of this file.
+ */
+function OtherOption({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  disabled,
+}: {
+  icon: IconName;
+  label: string;
+  accessibilityLabel?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
   const primary = useTokenColor("primary");
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
       className="flex-row items-center gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-md active:bg-surface-container"
+      style={{ opacity: disabled ? 0.6 : 1 }}
     >
       <MaterialIcons name={icon} size={24} color={primary} />
       <Text className="font-label-md text-label-md text-on-surface">{label}</Text>

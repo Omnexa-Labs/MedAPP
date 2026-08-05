@@ -46,6 +46,63 @@ jest.mock("nativewind", () => ({
   }),
 }));
 
+// ---------------------------------------------------------------------------
+// Composer media mocks. Mocked at the MODULE BOUNDARY, like the router and
+// nativewind mocks above — no test may reach a real native module. Mutable state
+// lives inside each factory and is reached via `jest.requireMock` at test time,
+// because babel hoists the `../ChatThreadScreen` import above the top-level
+// `const`s and a closure over one would hit its temporal dead zone.
+//
+// The exhaustive coverage of the shared hook (denial, blocked, capture failure,
+// picker failure) lives in AiAssistantScreen.test.tsx. What THIS file locks is
+// that this screen's two controls — which shipped with no `onPress` at all — are
+// wired to it, and that its own attachment message shape is populated.
+// ---------------------------------------------------------------------------
+
+jest.mock("expo-document-picker", () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));
+
+jest.mock("expo-audio", () => {
+  const recorder = {
+    isRecording: false,
+    uri: null as string | null,
+    prepareToRecordAsync: jest.fn(async () => {}),
+    record: jest.fn(() => {
+      recorder.isRecording = true;
+    }),
+    stop: jest.fn(async () => {
+      recorder.isRecording = false;
+      recorder.uri = "file:///cache/AV/recording-1.m4a";
+    }),
+  };
+  const permission = { granted: true, status: "granted", canAskAgain: true };
+  return {
+    __recorder: recorder,
+    __permission: permission,
+    RecordingPresets: { HIGH_QUALITY: { extension: ".m4a" }, LOW_QUALITY: { extension: ".m4a" } },
+    useAudioRecorder: () => recorder,
+    getRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
+    requestRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
+    setAudioModeAsync: jest.fn(async () => {}),
+  };
+});
+
+jest.mock("expo-file-system", () => {
+  const deleted: string[] = [];
+  class File {
+    uri: string;
+    exists = true;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    delete() {
+      deleted.push(this.uri);
+    }
+  }
+  return { File, __deleted: deleted };
+});
+
 import { ChatThreadScreen } from "../ChatThreadScreen";
 
 const SOURCE_PATH = join(__dirname, "..", "ChatThreadScreen.tsx");
@@ -58,9 +115,71 @@ function code(): string {
     .replace(/\/\/.*$/gm, "");
 }
 
+type PermissionShape = { granted: boolean; status: string; canAskAgain: boolean };
+
+function picker() {
+  return jest.requireMock("expo-document-picker") as { getDocumentAsync: jest.Mock };
+}
+
+function audio() {
+  return jest.requireMock("expo-audio") as {
+    __recorder: { isRecording: boolean; uri: string | null; stop: jest.Mock; record: jest.Mock };
+    __permission: PermissionShape;
+    getRecordingPermissionsAsync: jest.Mock;
+    requestRecordingPermissionsAsync: jest.Mock;
+    setAudioModeAsync: jest.Mock;
+  };
+}
+
+function fs() {
+  return jest.requireMock("expo-file-system") as { __deleted: string[] };
+}
+
+function setMicPermission(next: PermissionShape) {
+  const a = audio();
+  Object.assign(a.__permission, next);
+  a.getRecordingPermissionsAsync.mockReset();
+  a.requestRecordingPermissionsAsync.mockReset();
+  a.getRecordingPermissionsAsync.mockImplementation(async () => ({ ...next }));
+  a.requestRecordingPermissionsAsync.mockImplementation(async () => ({ ...next }));
+}
+
+const PICKED_PDF = {
+  canceled: false as const,
+  assets: [
+    {
+      uri: "file:///cache/DocumentPicker/Referral.pdf",
+      name: "Referral.pdf",
+      size: 812_000,
+      mimeType: "application/pdf",
+      lastModified: 0,
+    },
+  ],
+};
+
+/** Every composer-media handler is async, so the press has to be flushed. */
+async function pressAsync(label: string) {
+  await act(async () => {
+    fireEvent.press(screen.getByLabelText(label));
+  });
+}
+
 beforeEach(() => {
   mockBack.mockClear();
   mockScheme.value = "light";
+
+  const a = audio();
+  a.__recorder.isRecording = false;
+  a.__recorder.uri = null;
+  a.__recorder.stop.mockClear();
+  a.__recorder.record.mockClear();
+  a.setAudioModeAsync.mockClear();
+  setMicPermission({ granted: true, status: "granted", canAskAgain: true });
+
+  picker().getDocumentAsync.mockReset();
+  picker().getDocumentAsync.mockResolvedValue({ canceled: true, assets: null });
+
+  fs().__deleted.length = 0;
 });
 
 describe("ChatThreadScreen — renders through DetailShell", () => {
@@ -189,5 +308,121 @@ describe("ChatThreadScreen — behaviour is untouched", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Composer media
+//
+// The defect: BOTH "Attach file" and "Voice message" were `<Pressable>`s with no
+// `onPress` — dead 44pt targets, exactly like AiAssistantScreen's pair. A label
+// assertion passes on a dead control, so every case asserts an EFFECT.
+// ---------------------------------------------------------------------------
+
+describe("ChatThreadScreen — attach", () => {
+  it("opens the SDK 55 picker in single-select mode and shows what was picked", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+
+    expect(picker().getDocumentAsync).toHaveBeenCalledWith({
+      type: "*/*",
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    expect(screen.getByTestId("composer-attachment-chip")).toBeTruthy();
+    expect(screen.getByText("Referral.pdf")).toBeTruthy();
+    expect(screen.getByText(/PDF · 812 KB/)).toBeTruthy();
+  });
+
+  it("sends it through this screen's OWN attachment message kind", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+    await pressAsync("Send message");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    // Rendered by the pre-existing OutgoingBubble attachment card, not a new one.
+    expect(screen.getByText("Referral.pdf")).toBeTruthy();
+    expect(screen.getByText(/on this device only/)).toBeTruthy();
+    // The message references the file, so consuming must not reap it.
+    expect(fs().__deleted).toHaveLength(0);
+  });
+
+  it("sends with an EMPTY draft once something is attached", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+    expect(screen.getByLabelText("Send message").props.accessibilityState.disabled).toBe(false);
+    await pressAsync("Send message");
+    expect(screen.getByText("Referral.pdf")).toBeTruthy();
+  });
+
+  it("keeps the SEEDED (already-uploaded) attachment's download affordance", () => {
+    render(<ChatThreadScreen />);
+    // Lab_Panel_May2026.pdf has no `localUri`, so it is NOT device-local media and
+    // its download glyph must survive the suppression added for local files.
+    expect(screen.getByText("Lab_Panel_May2026.pdf")).toBeTruthy();
+    expect(screen.getByText("PDF · 2.4 MB")).toBeTruthy();
+  });
+
+  it("a DISMISSED picker leaves nothing stuck", async () => {
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(screen.queryByTestId("composer-media-notice")).toBeNull();
+    await pressAsync("Attach file");
+    expect(picker().getDocumentAsync).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ChatThreadScreen — mic", () => {
+  it("records on the first press and commits an attachment on the second", async () => {
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Voice message");
+    const a = audio();
+    expect(a.setAudioModeAsync).toHaveBeenCalledWith({
+      allowsRecording: true,
+      playsInSilentMode: true,
+    });
+    expect(a.__recorder.record).toHaveBeenCalled();
+    expect(screen.getByTestId("composer-recording-bar")).toBeTruthy();
+
+    await pressAsync("Stop recording");
+    expect(a.__recorder.stop).toHaveBeenCalled();
+    // Session handed back, so the OS mic indicator clears.
+    expect(a.setAudioModeAsync).toHaveBeenLastCalledWith({ allowsRecording: false });
+    expect(screen.getByText("Voice note")).toBeTruthy();
+    expect(screen.getByLabelText("Voice message")).toBeTruthy();
+  });
+
+  it("discards a recording without attaching it, and reaps the file", async () => {
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Voice message");
+    await pressAsync("Discard recording");
+
+    expect(audio().__recorder.stop).toHaveBeenCalled();
+    expect(screen.queryByTestId("composer-recording-bar")).toBeNull();
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(fs().__deleted).toEqual(["file:///cache/AV/recording-1.m4a"]);
+  });
+
+  it("explains a permission DENIAL rather than doing nothing", async () => {
+    setMicPermission({ granted: false, status: "denied", canAskAgain: true });
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Voice message");
+
+    expect(audio().__recorder.record).not.toHaveBeenCalled();
+    expect(screen.getByTestId("composer-media-notice")).toBeTruthy();
+    expect(screen.getByText(/needs microphone access/)).toBeTruthy();
+    expect(screen.getByLabelText("Voice message")).toBeTruthy();
   });
 });

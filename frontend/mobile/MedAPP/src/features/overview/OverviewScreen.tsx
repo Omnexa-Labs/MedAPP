@@ -60,15 +60,38 @@
 // the rendered face, so it is left as-is for a follow-up rather than changed
 // under a chrome migration.
 //
+// ============================================================================
+// DOWNLOAD REPORT — the button had no `onPress` at all
+// ============================================================================
+// "Report" was a filled primary CTA, first in the quick-actions row, wired to
+// nothing: it rendered its press animation and returned. It now writes this
+// screen's own content to a real text file and hands it to the OS share sheet
+// (see @/lib/documents for the SDK 55 expo-file-system facts and the failure
+// paths). It is a .txt and not a PDF because this project has no PDF generator
+// and `expo-print` is not a dependency; the accessible label says so.
+//
+// Its sibling "Export" is still inert and is FLAGGED, not fixed — "export data"
+// means the full record, which lives behind ehr_service, not on this screen.
+// Wiring it to the same on-screen summary would make two buttons that produce
+// identical files under different promises.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
-// expo-* APIs here. None today beyond expo-router.
+// expo-* APIs here.
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Card, VitalStatCard, type HealthIconName } from "@/components/ui";
 import { PatientShell } from "@/components/shell";
+import { Toast, useToast } from "@/components/feedback";
+import {
+  buildHealthReportDocument,
+  describeSaveResult,
+  formatDocumentTimestamp,
+  healthReportFileName,
+  saveTextDocument,
+} from "@/lib/documents";
 import { useTokenColor } from "@/lib/tokens";
 
 /**
@@ -176,7 +199,8 @@ const MILESTONES: Milestone[] = [
   {
     date: "Oct 28, 2023",
     title: "Cardiology Consultation",
-    body: "Follow-up with Dr. Jenkins. Heart rate variability improving.",
+    // Was "Dr. Jenkins" — see the CLINICIAN NAMES note below.
+    body: "Follow-up with Dr. Adjoa Boateng. Heart rate variability improving.",
     icon: "event",
     tint: "#0058be",
   },
@@ -222,9 +246,40 @@ interface Script {
   issuedDate: string;
 }
 
+// ---------------------------------------------------------------------------
+// CLINICIAN NAMES — corrected to the seeded roster, and why that had to happen
+// in this change
+// ---------------------------------------------------------------------------
+// These entries read "Dr. Sarah Jenkins" and "Dr. Mark Chen", and the Cardiology
+// milestone above cited "Dr. Jenkins". None of the three exists: the seeded
+// roster (scripts/seed_dev_data.py) is Kwabena Osei (General Practice), Adjoa
+// Boateng (Cardiology), Yaw Darko (Dermatology), Efua Asante (Paediatrics), Nii
+// Tetteh (Mental Health) and Abena Owusu (Nutrition & Dietetics). Find Care lists
+// those six, so any other name reads as a bug to a tester — and
+// ActiveScriptViewScreen had already made exactly this correction to its own
+// prescriber fallback.
+//
+// It could not be deferred past the download work. This screen's data is now
+// WRITTEN TO A FILE the user keeps and may forward to a pharmacy or a clinician,
+// and a fabricated prescriber inside a persisted medical record is a different
+// class of defect from a fabricated one on a throwaway screen. The names also
+// travel onward as route params into the two script screens, so leaving them
+// would have re-seeded the invented cardiologist that screen deleted.
+//
+// Assignment follows specialty, not alphabet: Lisinopril for hypertension is
+// Cardiology -> Adjoa Boateng (the same doctor ActiveScriptViewScreen falls back
+// to, so the two screens now agree instead of showing two prescribers for one
+// script), and the "GP" script is General Practice -> Kwabena Osei.
+//
+// FLAGGED, deliberately unchanged: `patient` is "Alex Rivers", where the seeded
+// patient is Ama Mensah. It is one identity threaded through router params into
+// several screens — including files owned by other agents in this pass — so
+// correcting it is its own change, not a rider on this one.
+// ---------------------------------------------------------------------------
+
 const SCRIPTS: Script[] = [
   {
-    prescriber: "Dr. Sarah Jenkins",
+    prescriber: "Dr. Adjoa Boateng",
     meta: "Cardiology • Oct 12",
     drug: "Lisinopril 10mg",
     patient: "Alex Rivers",
@@ -232,7 +287,7 @@ const SCRIPTS: Script[] = [
     issuedDate: "Oct 12, 2023",
   },
   {
-    prescriber: "Dr. Mark Chen",
+    prescriber: "Dr. Kwabena Osei",
     meta: "GP • Sep 05",
     drug: "Atorvastatin 20mg",
     patient: "Alex Rivers",
@@ -277,8 +332,58 @@ function viewHref(s: Script): Href {
 // Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * The toast's offset, derived like the one on the script screens but against a
+ * different obstruction: PatientShell renders BottomNav as an `absolute bottom-0`
+ * overlay 80px tall (8 + 48 + 24, per BottomNav.tsx), so 110 puts the chip 30
+ * above the bar's top edge. 30 alone would park it behind the tabs.
+ */
+const TOAST_BOTTOM = 110;
+
 export function OverviewScreen() {
   const [range, setRange] = useState<TrendRange>("7D");
+  const { message: toastMessage, tone: toastTone, show: showToast, clear: clearToast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  // The glyph and label ON the filled Report button. It was `#ffffff` / the
+  // `text-white` utility — a frozen literal that docs/BRAND.md forbids, and the
+  // wrong one in principle: content on a `primary` fill is `on-primary`, which is
+  // what tones correctly if the fill ever changes.
+  //
+  // FLAGGED: this screen still holds ~10 other raw hexes (`#00685f` in five
+  // places, `#e4e9e7`, `#dee4e1`, the milestone/device tints, two rgba() teals).
+  // They are outside a download fix and are left for the token sweep that has
+  // already been through this file's cards — only the line this change touched is
+  // corrected, rather than leaving a fresh literal behind.
+  const onPrimary = useTokenColor("on-primary");
+
+  const onDownloadReport = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // Only this screen's own content, and only the parts that carry a unit or a
+      // label. The sparkline `bars` arrays are omitted on purpose: they are static
+      // design heights with no dates and no units, and a column of bare numbers
+      // under a "Latest vitals" heading would be read as measurements.
+      const body = buildHealthReportDocument({
+        range,
+        metrics: TREND_METRICS.map((m) => ({ label: m.label, value: m.value, unit: m.unit })),
+        doses: MED_DOSES,
+        milestones: MILESTONES.map((m) => ({ date: m.date, title: m.title, body: m.body })),
+        devices: DEVICES.map((d) => ({ name: d.name, syncedAgo: d.syncedAgo })),
+        generatedAt: formatDocumentTimestamp(),
+      });
+      const result = await saveTextDocument({
+        fileName: healthReportFileName({ range }),
+        body,
+        dialogTitle: "Save or send your health report",
+      });
+      const { tone, message } = describeSaveResult(result);
+      showToast(tone, message);
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, range, showToast]);
 
   return (
     <PatientShell
@@ -331,15 +436,24 @@ export function OverviewScreen() {
         <View className="mt-md flex-row gap-sm">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Download report"
+            // The label names the format, because the button text can't: "Report"
+            // is one word in a two-up row. See the DOWNLOAD REPORT note at the head
+            // of this file for why it is .txt and not PDF.
+            accessibilityLabel="Download your health report as a text file"
+            accessibilityState={{ disabled: saving, busy: saving }}
+            disabled={saving}
+            onPress={onDownloadReport}
             // Shadow deleted. This is a filled button in a two-up row, not a
             // floating surface — and its sibling "Export" never had one, so
             // the pair read as two different elevation languages side by
             // side. Neither has one now.
             className="flex-1 flex-row items-center justify-center gap-xs rounded-xl bg-primary py-md active:scale-[0.98]"
+            style={{ opacity: saving ? 0.6 : 1 }}
           >
-            <MaterialIcons name="download" size={20} color="#ffffff" />
-            <Text className="font-label-md text-label-md text-white">Report</Text>
+            <MaterialIcons name="download" size={20} color={onPrimary} />
+            <Text className="font-label-md text-label-md text-on-primary">
+              {saving ? "Saving…" : "Report"}
+            </Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -537,6 +651,16 @@ export function OverviewScreen() {
           </View>
         </Card>
       </ScrollView>
+
+      {/* Download outcome. PatientShell wraps its children in a `flex-1` View, so
+          this absolutely-positioned sibling anchors to that box — see TOAST_BOTTOM
+          for the clearance over the floating BottomNav. */}
+      <Toast
+        message={toastMessage}
+        tone={toastTone}
+        onDismiss={clearToast}
+        bottom={TOAST_BOTTOM}
+      />
     </PatientShell>
   );
 }

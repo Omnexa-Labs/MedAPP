@@ -21,6 +21,25 @@
 //     canned AI acknowledgement appears after a short "typing" delay.
 //     No backend — design-only pass.
 //
+// ---------------------------------------------------------------------------
+// COMPOSER MEDIA (attach + mic)
+// ---------------------------------------------------------------------------
+// The paperclip and the mic used to be decoration: `<IconButton>` with no
+// `onPress` at all, two dead 44pt targets. They are now wired through
+// ./useComposerMedia, which owns the SDK 55 surface (expo-document-picker,
+// expo-audio, expo-file-system) and documents every API fact it relies on.
+//
+// The picked file and the recording are REAL and device-local. There is NO
+// upload: this project has no endpoint that accepts composer media, so the
+// attachment is folded into the locally-appended message and rendered from its
+// `file://` uri. A POST to an invented route was explicitly REJECTED — a faked
+// upload reads as working software and would only be caught in QA. See the
+// FLAGGED block in ./useComposerMedia for the endpoint this needs.
+//
+// "photo-camera" is still decoration and is now HONEST about it: it renders
+// disabled rather than pretending, because expo-image-picker / expo-camera are
+// not installed and adding a dependency was out of scope for this change.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
@@ -35,12 +54,17 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
-import { Card, ChoiceChip, ChoiceChipRow, Icon } from "@/components/ui";
+import { Card, ChoiceChip, ChoiceChipRow, Icon, type ChromeIconName } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
+import { ComposerMediaTray } from "./ComposerMediaTray";
+import { useComposerMedia, type ComposerAttachment } from "./useComposerMedia";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+// Was `React.ComponentProps<typeof MaterialIcons>["name"]`, which required this
+// screen to import an icon library — docs/BRAND.md forbids that outright
+// ("Screens must never import an icon library directly"). `ChromeIconName` is
+// re-exported by the icon gate for exactly this reason.
+type IconName = ChromeIconName;
 
 const AVATAR_URI =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuC319cU4Q8p7tB5-nJPUL3cuQiHCYq3DlR3MrStRvrqTClur01Zo4gu3VbPCVgfBSpQWIyi-T-_YsiLemUscKuclQtAG8_xOcbRpBxZRm-kx95fB_dlZ4hM7gVFVf1fThArdG1ucHGvFhkgw7l4xB5cYn4RwwpZ6qjsVsuSRn9s2GWcheK3QyTFQFb4b4VJJPTqimZw_YCXPByAz5Enu6R15yds-zdamX7wmmg-JF3X8kvjQjkQCzMXa35mE-wTJQExc0MqIaTmnVgc";
@@ -64,6 +88,12 @@ interface ChatMessage {
   escalation?: boolean;
   // Optional italic safety disclaimer footer.
   disclaimer?: string;
+  // A file the user attached from the composer. This is a DEVICE-LOCAL
+  // reference: `attachment.uploaded` is always false and `attachment.uri` is a
+  // `file://` path, because there is no upload endpoint (see the header). It is
+  // modelled on the message rather than kept in a side-table so the bubble can
+  // render it without a lookup, matching how ChatThreadScreen already does it.
+  attachment?: ComposerAttachment;
 }
 
 const SEED_MESSAGES: ChatMessage[] = [
@@ -135,9 +165,24 @@ export function AiAssistantScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Attach + mic. See the COMPOSER MEDIA block in the header.
+  const media = useComposerMedia();
+
   // The bar's notification glyph, by token name rather than the `#3d4947` the
   // hand-rolled bar froze (the LIGHT value of color/on-surface-variant).
   const mutedGlyph = useTokenColor("on-surface-variant");
+  // Composer glyph + fill tokens. Every one of these was a frozen hex literal
+  // (`#3d4947`, `#00685f`, `#bcc9c6`, `#6d7a77`, `#171d1c`, and a `#ffffff` on
+  // the send glyph that measured ~1.5:1 against `primary` in dark mode).
+  const onPrimary = useTokenColor("on-primary");
+  const primary = useTokenColor("primary");
+  const disabledFill = useTokenColor("outline-variant");
+  const placeholder = useTokenColor("outline");
+  const inputText = useTokenColor("on-surface");
+  // The insight card's glyph, on a `primary-container` fill. Was `#f4fffc` — the
+  // LIGHT value of on-primary-container, so it stayed near-white on the light
+  // teal that token becomes in dark mode.
+  const onPrimaryContainer = useTokenColor("on-primary-container");
 
   useEffect(() => {
     return () => {
@@ -150,10 +195,31 @@ export function AiAssistantScreen() {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
+  // `attachment` is read at call time rather than passed, so every existing
+  // caller (the quick-action chips, the return key) picks it up unchanged.
+  //
+  // The guard changed shape: it used to be "no text, no send", which would have
+  // made an attachment unsendable without typing something first. Now EITHER a
+  // non-empty draft OR a pending attachment is enough.
   const send = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
-    setMessages((prev) => [...prev, { id: makeId(), author: "user", paragraphs: [trimmed] }]);
+    const attachment = media.attachment;
+    if (!trimmed && !attachment) return;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: makeId(),
+        author: "user",
+        // An attachment-only message has no paragraphs at all; the bubble
+        // renders just the file card, which is why `paragraphs` is filtered
+        // rather than defaulted to a placeholder string.
+        paragraphs: trimmed ? [trimmed] : [],
+        attachment: attachment ?? undefined,
+      },
+    ]);
+    // Releases the composer slot WITHOUT reaping the file — the message above
+    // now references its uri. (`clearAttachment` would delete a capture.)
+    if (attachment) media.consumeAttachment();
     setDraft("");
     scrollToEnd();
     // Simulated assistant reply.
@@ -239,7 +305,7 @@ export function AiAssistantScreen() {
                 role. */}
           <Card className="mb-md flex-row items-start gap-md">
             <View className="mt-xs rounded-full bg-primary-container p-sm">
-              <MaterialIcons name="health-and-safety" size={20} color="#f4fffc" />
+              <Icon chrome="health-and-safety" size={20} color={onPrimaryContainer} />
             </View>
             <View className="flex-1">
               <Text className="mb-xs font-label-md text-label-md text-primary">
@@ -298,15 +364,25 @@ export function AiAssistantScreen() {
             </ChoiceChipRow>
           </View>
 
+          {/* Pending attachment / live recording / permission notice. Sits ABOVE
+                the pill so the pill's geometry is untouched. */}
+          <ComposerMediaTray media={media} />
+
           {/* Multimodal input bar */}
           <View className="mx-md flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-highest p-xs">
-            <IconButton icon="attach-file" label="Attach file" />
-            <IconButton icon="photo-camera" label="Take photo" />
+            <IconButton
+              icon="attach-file"
+              label="Attach file"
+              onPress={() => void media.pickFile()}
+              disabled={media.isPicking || media.isRecording}
+            />
+            {/* Honestly disabled rather than dead — see the header. */}
+            <IconButton icon="photo-camera" label="Take photo" disabled />
             <TextInput
               value={draft}
               onChangeText={setDraft}
               placeholder="Ask me about your symptoms…"
-              placeholderTextColor="#6d7a77"
+              placeholderTextColor={placeholder}
               onSubmitEditing={() => send(draft)}
               returnKeyType="send"
               multiline
@@ -315,21 +391,40 @@ export function AiAssistantScreen() {
                 minHeight: 40,
                 maxHeight: 96,
                 paddingHorizontal: 8,
-                color: "#171d1c",
+                color: inputText,
                 fontSize: 16,
                 lineHeight: 20,
               }}
               accessibilityLabel="Message MedAI"
             />
-            <IconButton icon="mic" label="Voice input" />
+            {/* Press to start, press again to commit — ./useComposerMedia argues
+                  why this is a toggle and not press-and-hold (the permission
+                  dialog breaks a held gesture). The label changes with the state
+                  so a screen reader announces what the next tap will do. */}
+            <IconButton
+              icon={media.isRecording ? "stop" : "mic"}
+              label={media.isRecording ? "Stop recording" : "Voice input"}
+              tint={media.isRecording ? "error" : "muted"}
+              onPress={() => void media.toggleRecording()}
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Send message"
+              // `accessibilityState` rather than `disabled`: the control is still
+              // pressable (the press is a no-op) and the greyed fill must have a
+              // non-visual equivalent.
+              accessibilityState={{ disabled: !draft.trim() && !media.attachment }}
               onPress={() => send(draft)}
               className="h-10 w-10 items-center justify-center rounded-full active:scale-95"
-              style={{ backgroundColor: draft.trim() ? "#00685f" : "#bcc9c6" }}
+              style={{
+                backgroundColor: draft.trim() || media.attachment ? primary : disabledFill,
+              }}
             >
-              <MaterialIcons name="send" size={20} color="#ffffff" />
+              {/* Was `<MaterialIcons ... color="#ffffff" />`: a direct icon-library
+                    import (docs/BRAND.md forbids it outside the icon gate) AND a
+                    frozen white that measured ~1.5:1 on `primary` in dark mode,
+                    where the token correctly resolves to a near-black #003731. */}
+              <Icon chrome="send" size={20} color={onPrimary} />
             </Pressable>
           </View>
         </View>
@@ -354,16 +449,24 @@ function UserBubble({ message }: { message: ChatMessage }) {
             {p}
           </Text>
         ))}
+        {message.attachment ? <BubbleAttachment attachment={message.attachment} /> : null}
       </View>
     </View>
   );
 }
 
 function AiBubble({ message }: { message: ChatMessage }) {
+  // All three were frozen LIGHT-mode hexes (`#00685f` = primary, `#515f74` =
+  // secondary, `#ffffff` = on-primary), so every glyph in this bubble was the
+  // wrong colour in dark mode. docs/BRAND.md: "Never hardcode a hex."
+  const primary = useTokenColor("primary");
+  const secondary = useTokenColor("secondary");
+  const onPrimary = useTokenColor("on-primary");
+
   return (
     <View className="mb-sm w-full flex-row justify-start gap-sm">
       <View className="mt-xs h-8 w-8 items-center justify-center rounded-full border border-primary/20 bg-primary/10">
-        <MaterialIcons name="smart-toy" size={16} color="#00685f" />
+        <Icon chrome="smart-toy" size={16} color={primary} />
       </View>
       {/* `aiBubbleShadow` is gone — a message bubble is a content surface, i.e.
           the CARD role, and docs/BRAND.md §Elevation gives a card no drop shadow.
@@ -397,7 +500,7 @@ function AiBubble({ message }: { message: ChatMessage }) {
         {message.suggestions ? (
           <View className="mt-sm rounded-lg border border-secondary-fixed-dim bg-secondary-fixed/30 p-sm">
             <View className="mb-xs flex-row items-center gap-xs">
-              <MaterialIcons name="info" size={16} color="#515f74" />
+              <Icon chrome="info" size={16} color={secondary} />
               <Text className="font-label-md text-label-md text-on-secondary-container">
                 Suggestions:
               </Text>
@@ -426,8 +529,11 @@ function AiBubble({ message }: { message: ChatMessage }) {
                 accessibilityLabel="Talk to a professional"
                 className="flex-row items-center justify-center gap-xs rounded-full bg-primary py-sm active:scale-[0.98]"
               >
-                <MaterialIcons name="chat-bubble" size={16} color="#ffffff" />
-                <Text className="font-label-md text-label-md text-white">
+                <Icon chrome="chat-bubble" size={16} color={onPrimary} />
+                {/* `text-white` is the class form of the same violation — a
+                    literal, not a token. On a `bg-primary` button the pair is
+                    `text-on-primary`. */}
+                <Text className="font-label-md text-label-md text-on-primary">
                   Talk to a Professional
                 </Text>
               </Pressable>
@@ -436,7 +542,7 @@ function AiBubble({ message }: { message: ChatMessage }) {
                 accessibilityLabel="Schedule a consultation"
                 className="flex-row items-center justify-center gap-xs rounded-full border border-primary py-sm active:bg-primary/5"
               >
-                <MaterialIcons name="calendar-today" size={16} color="#00685f" />
+                <Icon chrome="calendar-today" size={16} color={primary} />
                 <Text className="font-label-md text-label-md text-primary">
                   Schedule a Consultation
                 </Text>
@@ -458,16 +564,80 @@ function AiBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-function IconButton({ icon, label }: { icon: IconName; label: string }) {
+/**
+ * A composer glyph button.
+ *
+ * 36x36 with `hitSlop={4}` = a 44x44 touch target, which is docs/MOBILE_UX.md's
+ * floor; the drawn box stays 36 because four of them plus a text field have to
+ * fit inside one pill at 360dp.
+ *
+ * `onPress` is OPTIONAL only because one control (photo-camera) has no
+ * implementation to point at yet. When it is absent the button renders in the
+ * disabled treatment and reports `accessibilityState.disabled`, so it can no
+ * longer be a control that LOOKS live and does nothing — the bug this change
+ * fixes for the other two.
+ */
+function IconButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+  tint = "muted",
+}: {
+  icon: IconName;
+  label: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  tint?: "muted" | "error";
+}) {
+  const muted = useTokenColor("on-surface-variant");
+  const error = useTokenColor("error");
+  const off = useTokenColor("outline-variant");
+  const isDisabled = disabled || !onPress;
+  const color = isDisabled ? off : tint === "error" ? error : muted;
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled }}
+      disabled={isDisabled}
       hitSlop={4}
+      onPress={onPress}
       className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
     >
-      <MaterialIcons name={icon} size={22} color="#3d4947" />
+      <Icon chrome={icon} size={22} color={color} />
     </Pressable>
+  );
+}
+
+/**
+ * The attachment card inside a user bubble.
+ *
+ * Deliberately does NOT offer "open" or "download": the file is device-local and
+ * unsent (see the header), so a download affordance would be a lie and an open
+ * affordance needs a viewer this screen does not have. It states what is
+ * attached, and that it has not been sent.
+ */
+function BubbleAttachment({ attachment }: { attachment: ComposerAttachment }) {
+  const glyph = useTokenColor("on-surface-variant");
+
+  return (
+    <View className="mt-xs flex-row items-center gap-sm rounded-md border border-outline-variant bg-surface-container-highest p-sm">
+      <Icon
+        chrome={attachment.kind === "recording" ? "mic" : "description"}
+        size={22}
+        color={glyph}
+      />
+      <View className="min-w-0 flex-1">
+        <Text className="font-label-md text-label-md text-on-surface" numberOfLines={1}>
+          {attachment.name}
+        </Text>
+        <Text className="font-label-sm text-label-sm text-on-surface-variant" numberOfLines={1}>
+          {attachment.meta} · on this device only
+        </Text>
+      </View>
+    </View>
   );
 }
 

@@ -27,6 +27,36 @@
 //   - Seed data mirrors the Stitch comp. Replace with useQuery(["thread", id])
 //     once GET /v1/threads/:id ships.
 //
+// ---------------------------------------------------------------------------
+// COMPOSER MEDIA (attach + mic)
+// ---------------------------------------------------------------------------
+// CHECKED, AND THE ANSWER WAS NO: neither the "Attach file" control nor the
+// "Voice message" control had an `onPress`. Both were dead 44pt targets, exactly
+// like AiAssistantScreen's pair. They now share ./useComposerMedia with that
+// screen — the SDK 55 surface (expo-document-picker, expo-audio,
+// expo-file-system) and the permission model are documented there in full.
+//
+// The picked file and the recording are REAL and device-local. There is NO
+// upload — this project has no endpoint that accepts composer media — so the
+// attachment rides along on the locally-appended message and the bubble renders
+// from its `file://` uri. Faking a POST to an invented route was explicitly
+// rejected. See the FLAGGED block in ./useComposerMedia.
+//
+// This screen's message model ALREADY had `kind: "attachment"` with a
+// `{ name, meta, icon }` payload — the seeded `Lab_Panel_May2026.pdf` bubble
+// uses it — so a real attachment needed no new message shape, just the two extra
+// device-local fields (`uri`, `local`). That is why the outgoing attachment card
+// below is unchanged apart from suppressing its download affordance for local
+// media, which cannot be downloaded from anywhere.
+//
+// FLAGGED FOR A FOLLOW-UP (pre-existing, deliberately NOT fixed here): the
+// bubbles, the vitals panel, the clinical menu and the FAB in this file are
+// still full of frozen hexes (`#00685f`, `#dee4e1`, `#171d1c`, `#6d7a77`,
+// `rgba(255,255,255,…)`) and still import MaterialIcons directly — both
+// docs/BRAND.md violations. This change retokenised and re-routed only the
+// COMPOSER, which is what it touches; retokenising ~600 lines of bubble
+// rendering in the same commit would have buried the behaviour change.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
 
 import { useEffect, useRef, useState } from "react";
@@ -44,7 +74,10 @@ import { useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
 import { Icon, VitalStatCard, type VitalStatTrend } from "@/components/ui";
-import { useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { blendTokens, useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { useResolvedScheme } from "@/lib/theme";
+import { ComposerMediaTray } from "./ComposerMediaTray";
+import { useComposerMedia } from "./useComposerMedia";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
@@ -89,6 +122,13 @@ interface ChatMessage {
     name: string;
     meta: string; // e.g. "PDF · 2.4 MB"
     icon: IconName;
+    /**
+     * Set for media the user just attached from the composer. A DEVICE-LOCAL
+     * `file://` path — never a server url, because there is no upload endpoint
+     * (see the header). Absent on the seeded messages, which stand in for
+     * already-uploaded server attachments.
+     */
+    localUri?: string;
   };
   // kind === "vitals" (incoming card from doctor)
   vitals?: {
@@ -215,6 +255,8 @@ export function ChatThreadScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
   const [draft, setDraft] = useState("");
   const [clinicalOpen, setClinicalOpen] = useState(false);
+  // Attach + mic. See the COMPOSER MEDIA block in the header.
+  const media = useComposerMedia();
   // The bar's two action glyphs, resolved by token name for the current mode.
   // The hand-rolled bar froze them at `#00685f` and `#3d4947` — the LIGHT values
   // of color/primary and color/on-surface-variant.
@@ -230,6 +272,20 @@ export function ChatThreadScreen() {
   // `card-surface` is the role that resolves to a surface which LIFTS off the
   // page in both modes (#FFFFFF light, #242B2A dark).
   const menuSurface = useTokenColor("card-surface");
+  // Composer tokens. Every one of these replaces a frozen LIGHT-mode literal
+  // (`#3d4947`, `#6d7a77`, `#171d1c`, `#bcc9c6`, and a `#ffffff` send glyph that
+  // measured ~1.5:1 on `primary` in dark mode).
+  const onPrimary = useTokenColor("on-primary");
+  const disabledFill = useTokenColor("outline-variant");
+  const placeholder = useTokenColor("outline");
+  const inputText = useTokenColor("on-surface");
+  // The send button's pressed fill. The literal it replaces was `#005049` — a
+  // hand-darkened teal. This is the M3 STATE LAYER instead (`primary` tinted
+  // towards its own `on-primary`), which is the same 0.12 recipe InboxScreen's
+  // FAB and Button already use, and which correctly lightens in dark mode where
+  // hand-darkening would have gone the wrong way.
+  const { scheme } = useResolvedScheme();
+  const primaryPressed = blendTokens("primary", "on-primary", PRESSED_STATE_LAYER, scheme);
   const scrollRef = useRef<ScrollView>(null);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -243,24 +299,48 @@ export function ChatThreadScreen() {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   };
 
+  // The guard used to be "no text, no send". An attachment-only message is a
+  // legitimate send (a photo of a rash, a dictated note), so EITHER a non-empty
+  // draft OR a pending attachment now qualifies. `media.attachment` is read at
+  // call time so every existing caller — the return key, the clinical share
+  // menu — picks it up without a signature change.
   const send = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    const pending = media.attachment;
+    if (!trimmed && !pending) return;
     setClinicalOpen(false);
     setMessages((prev) => [
       ...prev,
       {
         id: makeId(),
         direction: "outgoing",
-        kind: "text",
-        text: trimmed,
+        kind: pending ? "attachment" : "text",
+        // `undefined`, not "": OutgoingBubble skips the text block entirely for a
+        // falsy value, so an attachment-only message renders as just the card.
+        text: trimmed || undefined,
         timestamp: new Date().toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         }),
+        // `delivered` stays true to match the seeded messages' local-demo
+        // convention, but note it is a LIE for an attachment: nothing was
+        // uploaded. It is left alone rather than made conditional because
+        // per-message delivery state is the backend's to own, and inventing a
+        // "pending" tick here would be inventing wire semantics.
         delivered: true,
+        attachment: pending
+          ? {
+              name: pending.name,
+              meta: pending.meta,
+              icon: pending.kind === "recording" ? "mic" : "description",
+              localUri: pending.uri,
+            }
+          : undefined,
       },
     ]);
+    // Frees the composer slot WITHOUT reaping the file — the message above now
+    // references its uri. (`clearAttachment` would delete a capture.)
+    if (pending) media.consumeAttachment();
     setDraft("");
     scrollToEnd();
     if (replyTimer.current) clearTimeout(replyTimer.current);
@@ -530,39 +610,35 @@ export function ChatThreadScreen() {
               the app bar at the top. Its separation is the top hairline, now at
               full-strength `outline-variant` instead of `/20`, because with the
               blur gone the hairline is the only edge. */}
-        <View className="border-t border-outline-variant bg-surface px-md pb-sm pt-sm">
-          <View className="flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-low px-sm py-xs">
-            {/* Clinical menu toggle (apps icon) */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Clinical actions"
-              hitSlop={4}
-              onPress={() => setClinicalOpen((v) => !v)}
-              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-            >
-              <MaterialIcons
-                name={clinicalOpen ? "close" : "apps"}
-                size={22}
-                color={clinicalOpen ? "#00685f" : "#3d4947"}
-              />
-            </Pressable>
+        <View className="border-t border-outline-variant bg-surface pb-sm pt-sm">
+          {/* Pending attachment / live recording / permission notice, ABOVE the
+                pill so the pill's geometry is untouched. It carries its own `mx-md`
+                gutter, which is why this container's `px-md` moved onto the pill. */}
+          <ComposerMediaTray media={media} />
 
-            {/* Attach */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Attach file"
-              hitSlop={4}
-              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-            >
-              <MaterialIcons name="attach-file" size={22} color="#3d4947" />
-            </Pressable>
+          <View className="mx-md flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-low px-sm py-xs">
+            {/* Clinical menu toggle (apps icon) */}
+            <ComposerIconButton
+              icon={clinicalOpen ? "close" : "apps"}
+              label="Clinical actions"
+              tint={clinicalOpen ? "primary" : "muted"}
+              onPress={() => setClinicalOpen((v) => !v)}
+            />
+
+            {/* Attach — was a Pressable with NO onPress at all. */}
+            <ComposerIconButton
+              icon="attach-file"
+              label="Attach file"
+              onPress={() => void media.pickFile()}
+              disabled={media.isPicking || media.isRecording}
+            />
 
             {/* Text input */}
             <TextInput
               value={draft}
               onChangeText={setDraft}
               placeholder="Type a message…"
-              placeholderTextColor="#6d7a77"
+              placeholderTextColor={placeholder}
               onSubmitEditing={() => send(draft)}
               returnKeyType="send"
               multiline
@@ -571,27 +647,30 @@ export function ChatThreadScreen() {
                 minHeight: 36,
                 maxHeight: 96,
                 paddingHorizontal: 4,
-                color: "#171d1c",
+                color: inputText,
                 fontSize: 16,
                 lineHeight: 22,
               }}
               accessibilityLabel="Message input"
             />
 
-            {/* Mic */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Voice message"
-              hitSlop={4}
-              className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
-            >
-              <MaterialIcons name="mic" size={22} color="#3d4947" />
-            </Pressable>
+            {/* Mic — also had no onPress. Press to start, press again to commit;
+                  ./useComposerMedia argues why this is a toggle rather than
+                  press-and-hold (a system permission dialog breaks a held
+                  gesture). The label follows the state so a screen reader
+                  announces what the next tap does. */}
+            <ComposerIconButton
+              icon={media.isRecording ? "stop" : "mic"}
+              label={media.isRecording ? "Stop recording" : "Voice message"}
+              tint={media.isRecording ? "error" : "muted"}
+              onPress={() => void media.toggleRecording()}
+            />
 
             {/* Send */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Send message"
+              accessibilityState={{ disabled: !draft.trim() && !media.attachment }}
               onPress={() => send(draft)}
               style={({ pressed }) => ({
                 width: 36,
@@ -599,15 +678,74 @@ export function ChatThreadScreen() {
                 borderRadius: 18,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: draft.trim() ? (pressed ? "#005049" : "#00685f") : "#bcc9c6",
+                backgroundColor:
+                  draft.trim() || media.attachment
+                    ? pressed
+                      ? primaryPressed
+                      : primary
+                    : disabledFill,
               })}
             >
-              <MaterialIcons name="send" size={18} color="#ffffff" />
+              {/* Was `color="#ffffff"` — a frozen literal that measured ~1.5:1 on
+                    `primary` in dark mode, where `on-primary` correctly resolves
+                    to a near-black #003731. */}
+              <Icon chrome="send" size={18} color={onPrimary} />
             </Pressable>
           </View>
         </View>
       </KeyboardAvoidingView>
     </DetailShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Composer controls
+// ---------------------------------------------------------------------------
+
+/** M3's pressed state-layer opacity. Same constant InboxScreen's FAB uses. */
+const PRESSED_STATE_LAYER = 0.12;
+
+/**
+ * A composer glyph button. Extracted because the three in the pill were three
+ * copies of the same Pressable, and two of them had no `onPress` — the drift that
+ * let them ship as decoration.
+ *
+ * 36x36 drawn with `hitSlop={4}` is a 44x44 target, docs/MOBILE_UX.md's floor;
+ * the drawn box stays 36 so four controls plus the field fit one pill at 360dp.
+ * `disabled` reports through `accessibilityState` as well as the fill, because a
+ * greyed glyph is not announced.
+ */
+function ComposerIconButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+  tint = "muted",
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  tint?: "muted" | "primary" | "error";
+}) {
+  const muted = useTokenColor("on-surface-variant");
+  const primary = useTokenColor("primary");
+  const error = useTokenColor("error");
+  const off = useTokenColor("outline-variant");
+  const color = disabled ? off : tint === "primary" ? primary : tint === "error" ? error : muted;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      hitSlop={4}
+      onPress={onPress}
+      className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
+    >
+      <Icon chrome={icon} size={22} color={color} />
+    </Pressable>
   );
 }
 
@@ -681,10 +819,19 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
                   {message.attachment.name}
                 </Text>
                 <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}>
-                  {message.attachment.meta}
+                  {/* Local media says so, in words. There is no upload endpoint,
+                      so "sent" would be false. */}
+                  {message.attachment.localUri
+                    ? `${message.attachment.meta} · on this device only`
+                    : message.attachment.meta}
                 </Text>
               </View>
-              <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.8)" />
+              {/* The download glyph is suppressed for device-local media: there is
+                  nowhere to download it FROM, and a control that cannot work is
+                  the exact defect this change was opened to fix. */}
+              {message.attachment.localUri ? null : (
+                <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.8)" />
+              )}
             </View>
           </View>
         ) : null}

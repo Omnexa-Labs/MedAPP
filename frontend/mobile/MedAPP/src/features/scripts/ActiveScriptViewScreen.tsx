@@ -17,26 +17,42 @@
 //     not worth the weight for a 3% texture.
 //   - The 2-column document body collapses to a single column on
 //     mobile, matching the comp's md: breakpoints.
-//   - Download triggers a fade+slide success toast via Animated,
-//     mirroring the comp's #toast.
+//   - Download triggers a fade+slide toast, mirroring the comp's #toast — but
+//     it now reports a REAL file. See the DOWNLOAD note below.
+//
+// ============================================================================
+// DOWNLOAD — the button used to lie, and the label had to change with the fix
+// ============================================================================
+// `showDownloadToast()` was the entire download implementation: it animated the
+// words "Document downloaded successfully" onto the screen and wrote nothing.
+// Nothing was saved, nothing was shareable, and the user's next stop was their
+// Files app to look for a document that had never existed.
+//
+// It writes a real file now, via @/lib/documents (read that module's header for
+// the SDK 55 expo-file-system facts and the failure paths). The button therefore
+// no longer says "Download PDF": there is no PDF generator in this project and
+// `expo-print` is not a dependency, so a control labelled PDF would be the same
+// lie with a file attached. It names the extension it actually produces, and the
+// toast names the file rather than asserting a vague success. If a PDF pipeline
+// lands later, the label moves back with it — not before.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
-import { useEffect, useRef } from "react";
-import {
-  Animated,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useCallback, useState } from "react";
+import { Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell } from "@/components/shell";
+import { Toast, useToast } from "@/components/feedback";
 import { Icon } from "@/components/ui";
+import {
+  buildPrescriptionDocument,
+  describeSaveResult,
+  formatDocumentTimestamp,
+  prescriptionFileName,
+  saveTextDocument,
+} from "@/lib/documents";
 import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor } from "@/lib/tokens";
 
@@ -97,30 +113,75 @@ export function ActiveScriptViewScreen() {
   const instructions = params.instructions ?? "Once daily in the morning";
   const indication = params.indication ?? "Hypertension management";
 
-  // Download success toast — fade + slide, auto-dismiss after 3s.
-  const toastOpacity = useRef(new Animated.Value(0)).current;
-  const toastTranslate = useRef(new Animated.Value(16)).current;
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The toast's Animated plumbing moved into the shared <Toast>
+  // (src/components/feedback) when the Overview screen's download needed the
+  // same chip. Same 220ms fade+slide, same 3s dwell, same inverse pill.
+  // Destructured, not held as an object: `show`/`clear` are stable but the hook's
+  // return value is a fresh object each render, so depending on it would rebuild
+  // `onDownload` every time the screen re-rendered.
+  const { message: toastMessage, tone: toastTone, show: showToast, clear: clearToast } = useToast();
 
-  useEffect(() => {
-    return () => {
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-    };
-  }, []);
+  // `saving` exists so a second tap can't start a second write while the share
+  // sheet from the first is still up. Also drives the button's own label: a file
+  // write plus a share sheet is not instant, and a control that looks inert for a
+  // beat is how people end up tapping it three times.
+  const [saving, setSaving] = useState(false);
 
-  const showDownloadToast = () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    Animated.parallel([
-      Animated.timing(toastOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
-      Animated.timing(toastTranslate, { toValue: 0, duration: 220, useNativeDriver: true }),
-    ]).start();
-    toastTimer.current = setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(toastOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(toastTranslate, { toValue: 16, duration: 220, useNativeDriver: true }),
-      ]).start();
-    }, 3000);
-  };
+  const fileName = prescriptionFileName({ drug, scriptId });
+
+  const onDownload = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // Only what this screen renders — every value below is displayed in the
+      // document above. Nothing is synthesised to round the record out.
+      const body = buildPrescriptionDocument({
+        drug,
+        patient,
+        scriptId,
+        prescriber,
+        issuedDate,
+        rxNumber,
+        dob,
+        clinic,
+        license,
+        quantity,
+        refills,
+        instructions,
+        indication,
+        generatedAt: formatDocumentTimestamp(),
+      });
+      const result = await saveTextDocument({
+        fileName,
+        body,
+        dialogTitle: "Save or send your prescription",
+      });
+      const { tone, message } = describeSaveResult(result);
+      showToast(tone, message);
+    } finally {
+      // In `finally` and not after the await: saveTextDocument resolves rather
+      // than throwing for every expected failure, but an unexpected throw must
+      // still not leave the button permanently disabled.
+      setSaving(false);
+    }
+  }, [
+    saving,
+    fileName,
+    drug,
+    patient,
+    scriptId,
+    prescriber,
+    issuedDate,
+    rxNumber,
+    dob,
+    clinic,
+    license,
+    quantity,
+    refills,
+    instructions,
+    indication,
+    showToast,
+  ]);
 
   // The "Verified" tag that used to live inside the hand-rolled bar. Its glyph
   // was frozen at `#00685f` (the LIGHT value of color/primary) — resolved by
@@ -147,11 +208,10 @@ export function ActiveScriptViewScreen() {
   const ctaFill = tokenColor("primary", scheme);
   const ctaPressed = blendTokens("primary", "on-primary", 0.12, scheme);
   const onPrimary = useTokenColor("on-primary");
-  // The toast is an INVERSE surface (a dark chip in light mode), so its accent
-  // is `inverse-primary`, not `primary-fixed` — the frozen #89f5e7 mint would
-  // have sat on a near-white chip once the surface itself flipped.
-  const inversePrimary = useTokenColor("inverse-primary");
-  const inverseOnSurface = useTokenColor("inverse-on-surface");
+  // The toast's three colours (`inverse-surface` / `inverse-on-surface` /
+  // `inverse-primary`, which replaced the frozen #2c3130 / #edf2f0 / #89f5e7
+  // trio) moved into the shared <Toast> with the chip itself. They are resolved
+  // by the same token names there — this screen no longer names them.
 
   const goShare = () => {
     router.push({
@@ -379,14 +439,23 @@ export function ActiveScriptViewScreen() {
             <MaterialIcons name="send" size={20} color={onPrimary} />
             <Text className="font-label-md text-label-md text-on-primary">Share Prescription</Text>
           </Pressable>
+          {/* Was "Download PDF" onto a toast-only stub. The extension is in the
+              label because that is what the file is — see the DOWNLOAD note at the
+              head of this file. `picture-as-pdf` would have been the wrong glyph
+              for the same reason, so this keeps the neutral download arrow. */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Download PDF"
-            onPress={showDownloadToast}
+            accessibilityLabel="Download a text copy of this prescription"
+            accessibilityState={{ disabled: saving, busy: saving }}
+            disabled={saving}
+            onPress={onDownload}
             className="flex-row items-center justify-center gap-xs rounded-xl border border-outline-variant bg-surface-container-highest py-md active:scale-[0.98]"
+            style={{ opacity: saving ? 0.6 : 1 }}
           >
             <MaterialIcons name="download" size={20} color={onSurface} />
-            <Text className="font-label-md text-label-md text-on-surface">Download PDF</Text>
+            <Text className="font-label-md text-label-md text-on-surface">
+              {saving ? "Saving…" : "Download Copy (.txt)"}
+            </Text>
           </Pressable>
         </View>
 
@@ -412,29 +481,15 @@ export function ActiveScriptViewScreen() {
         </View>
       </ScrollView>
 
-      {/* Download success toast */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          bottom: TOAST_BOTTOM,
-          alignSelf: "center",
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          backgroundColor: tokenColor("inverse-surface", scheme),
-          paddingHorizontal: 24,
-          paddingVertical: 12,
-          borderRadius: 999,
-          opacity: toastOpacity,
-          transform: [{ translateY: toastTranslate }],
-        }}
-      >
-        <MaterialIcons name="check-circle" size={20} color={inversePrimary} />
-        <Text className="font-label-md text-label-md" style={{ color: inverseOnSurface }}>
-          Document downloaded successfully
-        </Text>
-      </Animated.View>
+      {/* Download outcome toast. The copy is no longer a hardcoded
+          "Document downloaded successfully" — it comes from the save result, so
+          the chip cannot claim a file that was never written. */}
+      <Toast
+        message={toastMessage}
+        tone={toastTone}
+        onDismiss={clearToast}
+        bottom={TOAST_BOTTOM}
+      />
     </DetailShell>
   );
 }
