@@ -110,7 +110,9 @@ afterAll(() => {
 
 const FULL_PARAMS = {
   practitionerId: "8f1a1f0e-6c5a-4a2f-9a1f-9b0e1d2c3a45",
-  practitionerName: "Dr. Sarah Jenkins",
+  // Seeded roster only — an invented clinician in a fixture is how the name
+  // spread into three screens in the first place.
+  practitionerName: "Dr. Kwabena Osei",
   practitionerSpecialty: "Senior Cardiologist",
   date: TOMORROW,
   time: "10:00 AM",
@@ -514,7 +516,7 @@ describe("frame reconciliation", () => {
   it("draws the practitioner through the shared row, with a real fallback", () => {
     mockParams = { ...FULL_PARAMS };
     render(<SelectTimeSlotScreen />);
-    expect(screen.getByText("Dr. Sarah Jenkins")).toBeTruthy();
+    expect(screen.getByText("Dr. Kwabena Osei")).toBeTruthy();
     expect(screen.getByLabelText("Verified")).toBeTruthy();
   });
 

@@ -11,6 +11,15 @@ jest.mock("nativewind", () => ({
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
 
+// @/lib/share is mocked at the module boundary: it imports expo-sharing and
+// expo-file-system, neither of which has a native module under Jest. The
+// mechanism itself is covered in src/lib/__tests__/share.test.ts — here the
+// question is only whether the button calls it, and with what.
+const mockShareTextFile = jest.fn(() => Promise.resolve("shared" as const));
+jest.mock("@/lib/share", () => ({
+  shareTextFile: (...args: unknown[]) => mockShareTextFile(...(args as [])),
+}));
+
 import { router } from "expo-router";
 import { ActiveMedicationsScreen } from "../ActiveMedicationsScreen";
 
@@ -102,6 +111,43 @@ describe("ActiveMedicationsScreen", () => {
     for (const tab of ["Home", "Overview", "Community", "Lifestyle", "Schedule", "Patients", "Profile"]) {
       expect(screen.queryByLabelText(tab)).toBeNull();
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Share medication list — was an Alert saying sharing needed a backend.
+  // -------------------------------------------------------------------------
+  it("shares the list as a text file instead of alerting a placeholder", () => {
+    render(<ActiveMedicationsScreen />);
+    fireEvent.press(screen.getByLabelText("Share medication list"));
+
+    expect(mockShareTextFile).toHaveBeenCalledTimes(1);
+    const [args] = mockShareTextFile.mock.calls[0] as unknown as [
+      { filename: string; body: string; offline?: boolean },
+    ];
+    expect(args.filename).toBe("medapp-medications.txt");
+    expect(args.body).toContain("Metformin");
+    expect(args.body).toContain("Take 1 tablet with breakfast and dinner.");
+    // Nothing fabricated escapes: the card's hardcoded fill line is not a field.
+    expect(args.body).not.toMatch(/Last filled|days left/i);
+  });
+
+  it("marks the export as a stale copy when the screen is offline", () => {
+    params.state = "offline";
+    render(<ActiveMedicationsScreen />);
+    fireEvent.press(screen.getByLabelText("Share medication list"));
+
+    // The offline flag reaches the body builder, not shareTextFile — a list
+    // dated today that is actually days old is what a recipient acts on.
+    const [args] = mockShareTextFile.mock.calls[0] as unknown as [{ body: string }];
+    expect(args.body).toContain("Last saved copy");
+    expect(args.body).toContain("while offline");
+  });
+
+  it("opens no share sheet over an empty list", () => {
+    params.state = "empty";
+    render(<ActiveMedicationsScreen />);
+    fireEvent.press(screen.getByLabelText("Share medication list"));
+    expect(mockShareTextFile).not.toHaveBeenCalled();
   });
 
   it("uses Overview as a safe back fallback for deep links", () => {

@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Alert, FlatList, Pressable, Text, View } from "react-native";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { DetailShell } from "@/components/shell";
 import { Button, Card, Icon } from "@/components/ui";
+import { shareTextFile } from "@/lib/share";
 import { useTokenColor } from "@/lib/tokens";
+import { buildMedicationListText } from "./list-export";
 import { ACTIVE_MEDICATIONS } from "./mock-data";
 import type { ActiveMedication, MedicationScreenState } from "./types";
 
@@ -36,6 +38,35 @@ export function ActiveMedicationsScreen() {
     Alert.alert("Add medication", "Medication entry will be available when your records connection is set up.");
   };
 
+  /**
+   * "Share medication list" — was an Alert saying sharing would arrive with the
+   * records connection. It never needed one: the list is already on the device,
+   * and handing it to another app is a client capability, not a backend one.
+   *
+   * A FILE (`@/lib/share` → expo-sharing), not a text message. This is the one
+   * share in the app whose recipient wants to KEEP what they are given — a
+   * pharmacist or a locum reads a medication list, prints it, attaches it to a
+   * referral. `shareTextFile` degrades to the text sheet on its own where file
+   * sharing is unavailable, so there is nothing to branch on here.
+   *
+   * The empty state opens no sheet. `buildMedicationListText` would happily
+   * return a header and a disclaimer with nothing between them, and a share
+   * sheet onto that is worse than the button appearing to do nothing — it is a
+   * document asserting "these are your medications" over a blank list.
+   *
+   * `offline` is passed through so the export dates itself honestly — see
+   * ./list-export.ts.
+   */
+  const shareMedicationList = useCallback(() => {
+    if (medications.length === 0) return;
+    void shareTextFile({
+      filename: "medapp-medications.txt",
+      body: buildMedicationListText({ medications, at: new Date(), offline: isOffline }),
+      dialogTitle: "Share medication list",
+      subject: "MedApp — active medications",
+    });
+  }, [isOffline, medications]);
+
   return (
     <DetailShell
       title="Active medications"
@@ -44,7 +75,7 @@ export function ActiveMedicationsScreen() {
         else router.replace("/(app)/overview" as Href);
       }}
       actions={
-        <Pressable accessibilityRole="button" accessibilityLabel="Share medication list" onPress={() => Alert.alert("Share medication list", "Sharing will be available when your records connection is set up.")} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70">
+        <Pressable accessibilityRole="button" accessibilityLabel="Share medication list" onPress={shareMedicationList} className="h-11 w-11 items-center justify-center rounded-full active:opacity-70">
           <Icon chrome="share" size={24} />
         </Pressable>
       }

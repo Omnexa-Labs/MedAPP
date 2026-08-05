@@ -53,27 +53,51 @@ interface Specialist {
   avatarUri: string;
 }
 
+// ---------------------------------------------------------------------------
+// Specialists are SEEDED CLINICIANS (2026-08-05).
+//
+// Was "Dr. Elena Rossi" (Cardiologist), "Dr. Marcus Chen" (Neurologist) and
+// "Dr. Sarah Luvon" (Nutrition Scientist) — none in scripts/seed_dev_data.py.
+// Tapping any of them anywhere else in the product finds nobody.
+//
+// The ROLE and the BIO moved with the name, deliberately. A pure re-label would
+// have left Nii Tetteh described as a neurologist, which is the mistake
+// PractitionerSocialProfileScreen's header warns about: the copy has to match the
+// clinician's actual specialty, or the inconsistency just moves.
+//
+//   Cardiologist        -> Adjoa Boateng, Cardiology  (bio already cardiac, kept)
+//   Neurologist         -> Nii Tetteh, Mental Health  (bio REWRITTEN; the seed has
+//                          no neurologist, and cognitive wellness is the honest
+//                          overlap rather than a claim he does neurology)
+//   Nutrition Scientist -> Abena Owusu, Nutrition & Dietetics (gut-health bio kept;
+//                          she is the nutrition practitioner elsewhere too)
+//
+// Abena Owusu and Adjoa Boateng also author posts in CommunityScreen. That is
+// consistent on purpose — the same clinician appearing in a feed and in a
+// specialist list is what a real product looks like.
+// ---------------------------------------------------------------------------
+
 const SPECIALISTS: Specialist[] = [
   {
     id: "s1",
-    name: "Dr. Elena Rossi",
-    role: "Cardiologist",
+    name: "Dr. Adjoa Boateng",
+    role: "Cardiology",
     bio: "Leading expert in non-invasive cardiac procedures and longevity science.",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuDBDrJ_bLoKqNh7OsbHEXh90o3P0QJ-P5m4BhsdbTiG2MvVUHjqcDOpVDLWp_6Wrnv2SU46mI7X3eY9kM8ugPbWzKbt6_qlvU3gwhrlvU4Gl-Wjczn3PfuLfSiQRoIqztqSjodQr1wXpo5CMic3NUjIPIXyS_PLXMAV4W50MyX60AO4cRmygfk0NROkQN7KQwQkFzHcxKK-T1RQInxiB_qAJ9-_YVe77ZZDWRhUIe2OkQ-Wuml8eZ6ZhcPc_42gOz26qzRVvY661Kxa",
   },
   {
     id: "s2",
-    name: "Dr. Marcus Chen",
-    role: "Neurologist",
-    bio: "Specializing in neuroplasticity and cognitive wellness strategies.",
+    name: "Dr. Nii Tetteh",
+    role: "Mental Health",
+    bio: "Cognitive wellness, sleep and stress — the day-to-day levers on mental health.",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuAW3qjEWINt8sFCfPMMpz5wqyrUSGIc36R-1RnQit2jIoIzDK9D2zadwd5fX5qv5wyLTaBBR-roQw2CmF14Z4l5u5SNPC2XLCqftecWmfrYFWzMhQNeq2yGcaszMZ3kOlFw78x1AQBPPMmSXLcjbcB2UxDjOzCNy80BsjHkJ3pqGsSAQN_ayrAJiLo118gCl7KwiCM5Mxybn9mWVn6TzvFDU93s0z6Z3ed_xD64Z6lwHSE0R4FVmeVEMqXs0uKMF37C7D5HJpwwbnNv",
   },
   {
     id: "s3",
-    name: "Dr. Sarah Luvon",
-    role: "Nutrition Scientist",
+    name: "Dr. Abena Owusu",
+    role: "Nutrition & Dietetics",
     bio: "Advocating for gut health through evidence-based dietary interventions.",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuC4CBPHDlgAzPCFrQP3Wi3OMhrbIhK72mJtXM8pjrJ6rGVb90jQEXASnM9zJ01WU9Hou6-XSpis4F0TDNymId4iqj5NV5ydTWMron5jUNgEirPRlTVS-7LTpjKl9lBYWisku0NorXvIAA9ADIJIDpbXROCwx_7aBgLR7tTJlsg3veD6iz3tiNhsZpUrajArn0IRJ-_4ID1u-VtPjztvzSAZ7NlC3xbDuWmp6gsVmUCD4FmHgvbUmnc9iiyrNvfKNuMKhLhOoiGcch8F",

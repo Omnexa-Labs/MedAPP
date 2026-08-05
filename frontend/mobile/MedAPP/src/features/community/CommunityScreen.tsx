@@ -62,6 +62,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Card } from "@/components/ui";
 import { PatientShell } from "@/components/shell";
+import { shareText } from "@/lib/share";
 import { useAuthStore } from "@/store/auth-store";
 import { ExploreScreen } from "@/features/community/ExploreScreen";
 import { CommunityHubScreen } from "@/features/community/CommunityHubScreen";
@@ -208,13 +209,49 @@ interface FeedPost {
   groupId?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Feed authors are SEEDED CLINICIANS, not invented ones (2026-08-05).
+//
+// This shipped with "Dr. Sarah Jenkins" (Clinical Nutritionist), "Marcus Chen,
+// RN" (Pediatric Care) and "Dr. Elena Ross" (Cardiology). None of the three
+// exists in scripts/seed_dev_data.py, which is the roster of record, so a tester
+// who had just scrolled Find Care met three more clinicians who could not be
+// booked, messaged or found anywhere else in the product. Same defect and the
+// same fix as PractitionerSocialProfileScreen and ActiveScriptViewScreen.
+//
+// It stopped being cosmetic when the post Share action became functional: the
+// share text includes `post.author`, so an invented clinician now LEAVES THE
+// DEVICE in a message someone else reads.
+//
+// Each post was mapped onto the seeded doctor whose real specialty the post body
+// already describes — not re-labelled at random, which would have produced a
+// cardiologist writing about gut microbiome:
+//
+//   p1  gut-brain axis, plant fibres, microbiome  -> Abena Owusu, Nutrition & Dietetics
+//   p2  toddler allergies vs. common cold         -> Efua Asante, Paediatrics
+//   p3  hypertension home BP logging              -> Adjoa Boateng, Cardiology
+//
+// p3 is the neatest fit: Adjoa Boateng's seeded bio IS hypertension management
+// and heart-failure follow-up.
+//
+// Specialty strings are the seed's own spellings ("Paediatrics", "Nutrition &
+// Dietetics"), so the feed, Find Care and the booking flow agree.
+//
+// FLAGGED, not fixed here: p1 and p3 still share ONE avatarUri, so two different
+// named doctors wear the same stock photograph. The honest fix is not deleting
+// the URI — line ~578 renders it through a raw <Image>, so a missing source
+// gives a blank box, and docs/BRAND.md requires "avatars always need a real
+// fallback". PostCard should adopt <AvatarWithFallback /> first; that is a
+// separate change from a rename and is logged rather than half-done.
+// ---------------------------------------------------------------------------
+
 const FEED_POSTS: FeedPost[] = [
   {
     id: "p1",
-    author: "Dr. Sarah Jenkins",
+    author: "Dr. Abena Owusu",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuC1F9YZ9jEQ7LqHXwwZfzFIS1Tke2IyLooPSWu5-ASvK0f2jCBFRzjmXWtTKSHsJvQeDHGklLiflFAD8QwTxxpG17snWQf8hGxQcSk1O6UfUp7vhtcdKIqt0mZB-YrzRa6T4Kd3ypPHwIy9X0uYNVt1XxGcYucN1CNf_o8oCYj8SDqxpQSYOKsMrmnxUj_Eq-DwJWHxwDcw-VmbYplmj0HOPrPFYFvZMWstx8LSj7bDQchjgaVDmemWlGujBbGsBZCbP1YOAeYXeiSV",
-    role: "Clinical Nutritionist",
+    role: "Nutrition & Dietetics",
     ago: "2h ago",
     body: "Understanding the gut-brain axis is crucial for managing systemic inflammation. Recent studies show that incorporating diverse plant fibers can shift microbiome composition in just 48 hours. Here's a simple graphic breaking down the best sources.",
     clampBody: true,
@@ -229,10 +266,10 @@ const FEED_POSTS: FeedPost[] = [
   },
   {
     id: "p2",
-    author: "Marcus Chen, RN",
+    author: "Dr. Efua Asante",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuBeDSZTRWbfzneMe8FW0JDMPgrXyQ5HpKiZ66RZsrChlx5zwi4wgAl2dniZ7hT08oy3i1ZF6w_dPlfv8KK2tJefxkSDLJM-VxvIDnfyji4RSIXTbakQTIhv8rGY2bKCRiJ7XCjMFWF-28ZdPAommHVrMS_AVPhFNNMiL91TIef4MQ-_FKqeAiPMB6B1mhcpZPjGWVss1xPNLmm8bjtEIM1ZWiXyITCM7qLPMuwLkcP8hWVFsQc99k-nlKEQoBig6WwkM8U5zWEr3KUk",
-    role: "Pediatric Care",
+    role: "Paediatrics",
     ago: "5h ago",
     body: "Seasonal allergies are starting early this year. Here is a quick checklist for parents to differentiate between common cold symptoms and allergic rhinitis in toddlers. Swipe through for the breakdown.",
     infoCard: {
@@ -247,7 +284,7 @@ const FEED_POSTS: FeedPost[] = [
   },
   {
     id: "p3",
-    author: "Dr. Elena Ross",
+    author: "Dr. Adjoa Boateng",
     avatarUri:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuC1F9YZ9jEQ7LqHXwwZfzFIS1Tke2IyLooPSWu5-ASvK0f2jCBFRzjmXWtTKSHsJvQeDHGklLiflFAD8QwTxxpG17snWQf8hGxQcSk1O6UfUp7vhtcdKIqt0mZB-YrzRa6T4Kd3ypPHwIy9X0uYNVt1XxGcYucN1CNf_o8oCYj8SDqxpQSYOKsMrmnxUj_Eq-DwJWHxwDcw-VmbYplmj0HOPrPFYFvZMWstx8LSj7bDQchjgaVDmemWlGujBbGsBZCbP1YOAeYXeiSV",
     role: "Cardiology",
@@ -515,6 +552,48 @@ function GroupCard({
   );
 }
 
+/**
+ * The text body behind a post's Share action.
+ *
+ * TEXT, via React Native's own sheet — not a file. A post is a paragraph
+ * somebody pastes into a chat; wrapping it in a `.txt` attachment would make
+ * the recipient open a document to read three sentences. See @/lib/share for
+ * the full argument.
+ *
+ * WHAT IS DELIBERATELY LEFT OUT:
+ *
+ *   * A LINK. There is no permalink to share. The social backend does not exist
+ *     yet (see `followedByUser` above — the follow graph is modelled locally),
+ *     so there is no canonical URL for a post and no route that would resolve a
+ *     post id. Synthesising something like `medapp.app/p/p1` would be a link
+ *     that 404s for whoever taps it. When the feed endpoint lands, the URL goes
+ *     at the end of this string.
+ *
+ *   * `post.ago` ("2h ago"). It is relative to the moment the reader opened the
+ *     app, and the share is read later and elsewhere. There is no absolute
+ *     timestamp on `FeedPost` to substitute, so the share carries no date at
+ *     all rather than a wrong one.
+ *
+ *   * `imageUri` / `imageBadge`. A text share cannot carry the image, and the
+ *     badge ("Medical Journal") without it is a provenance claim about content
+ *     the recipient cannot see.
+ *
+ *   * The like and comment counts. Engagement on our feed is not part of what
+ *     the reader is being told.
+ *
+ * The info card IS included: it is post content the reader sees inline, and on
+ * p2 it carries the actual clinical distinction the post is about — dropping it
+ * would ship the "swipe through for the breakdown" pointer without the
+ * breakdown.
+ */
+export function buildPostShareText(post: FeedPost): string {
+  const attribution = `${post.author} · ${post.role}`;
+  const parts = [attribution, post.body];
+  if (post.infoCard) parts.push(`${post.infoCard.title}: ${post.infoCard.text}`);
+  parts.push("Shared from the MedApp community.");
+  return parts.join("\n\n");
+}
+
 function PostCard({ post }: { post: FeedPost }) {
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
@@ -627,9 +706,19 @@ function PostCard({ post }: { post: FeedPost }) {
               {post.comments}
             </Text>
           </Pressable>
+          {/* Was a Pressable with no `onPress` at all — a live-looking control
+              that did nothing. It now opens the OS share sheet with the post's
+              own text; see buildPostShareText above for what it carries and
+              what it refuses to invent. */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Share"
+            onPress={() => {
+              void shareText(buildPostShareText(post), {
+                dialogTitle: "Share post",
+                subject: `${post.author} on MedApp`,
+              });
+            }}
             className="flex-row items-center active:scale-95"
           >
             <MaterialIcons name="share" size={22} color="#3d4947" />
