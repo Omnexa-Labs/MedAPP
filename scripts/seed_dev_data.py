@@ -226,15 +226,40 @@ async def _ensure_user(db, spec: dict[str, Any], *, role: str) -> User:
     """Create or refresh a user through user_service's own service layer."""
     existing = await db.scalar(select(User).where(User.email == spec["email"]))
     if existing is None:
+        # ALWAYS signs up as "user", then elevates. As of 2026-08-05
+        # `SignupRequest` REFUSES a clinician role: public signup used to accept
+        # a client-supplied `role`, mint a token carrying it, and gate nothing on
+        # KYC, so anyone could become a doctor with one unauthenticated request.
+        #
+        # Passing `role=role` here would now raise a validation error and break
+        # the seed - but the honest fix is not to exempt the seed from the rule.
+        # It is to make the seed do what the product does: create the account,
+        # then PROVISION the role out of band. That is exactly what
+        # `kyc_service.review_submission` does when an admin approves a
+        # submission (`target.role = sub.submitted_role`); a seed is simply the
+        # admin, without the paperwork.
         payload = SignupRequest(
             email=spec["email"],
             password=spec["password"],
             first_name=spec["first_name"],
             last_name=spec["last_name"],
             phone=spec.get("phone"),
-            role=role,
+            role="user",
         )
         user = await auth_service.signup(db, payload)
+        # The elevation, and it mirrors APPROVAL rather than signup - both fields,
+        # not just the role. `auth_service.signup` sets
+        # `kyc_status = "not_required" if role == "user" else "pending"`, so
+        # signing up as a user leaves a clinician marked "not_required", which is
+        # false. `kyc_service.review_submission` sets BOTH on approval
+        # (`target.role = ...; target.kyc_status = "approved"`), so this does too.
+        #
+        # This is also more truthful than the seed was BEFORE today: it used to
+        # leave every seeded doctor on "pending" forever - a clinician who applied
+        # and was never reviewed. A seeded doctor is meant to be a working one.
+        user.role = role
+        if role != "user":
+            user.kyc_status = "approved"
         action = "created"
     else:
         user = existing
