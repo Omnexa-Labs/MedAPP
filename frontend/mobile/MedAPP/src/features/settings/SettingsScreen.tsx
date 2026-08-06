@@ -126,7 +126,19 @@ export function SettingsScreen() {
             <Text className="font-label-md text-label-md text-on-surface" numberOfLines={1}>
               {displayName}
             </Text>
-            <Text className="font-body-md text-body-md text-on-surface-variant" numberOfLines={1}>
+            {/* 13, not `text-body-md`'s 16. The frame specifies 13 and the
+                device proved why: at 16 this line truncated to "View and edit
+                your profi…" inside the 229dp the card leaves after the 56pt
+                avatar, the 12 gaps and the chevron. Set through `style` because
+                13 is not a step on the type scale — the same escape hatch
+                HomeScreen uses — rather than inventing a `body-sm` utility that
+                tailwind.config.js does not define and NativeWind would drop
+                SILENTLY, falling back to unstyled system text. */}
+            <Text
+              className="font-body-md text-on-surface-variant"
+              style={{ fontSize: 13 }}
+              numberOfLines={1}
+            >
               View and edit your profile
             </Text>
           </View>

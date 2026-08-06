@@ -519,11 +519,24 @@ export function AccountMenu({
                 accessibilityRole="button"
                 accessibilityLabel="Sign out"
                 onPress={confirmSignOut}
-                className="min-h-[48px] w-full items-center justify-center rounded-full px-4 py-3"
-                style={({ pressed }) => ({
-                  backgroundColor: error,
-                  opacity: pressed ? 0.78 : 1,
-                })}
+                // PROVEN ON DEVICE, 2026-08-06: this used to pass a FUNCTION
+                // style — `({ pressed }) => ({ backgroundColor: error, opacity
+                // … })` — alongside `className`. NativeWind's Pressable wrapper
+                // resolves `className` into `style` itself, and the function
+                // form was dropped: the fill never painted. The dark capture
+                // showed `on-error` dark-red text on the bare card with no pill.
+                //
+                // It is worse in LIGHT mode, which is why this is a fix and not
+                // a polish item: there `on-error` is #FFFFFF, so the label of the
+                // one destructive confirm button in the app renders white on
+                // `card-surface` — invisible.
+                //
+                // A plain OBJECT style survives the wrapper (the Text beside it
+                // always rendered its colour correctly, which is what isolated
+                // the cause), and the press feedback moves to `active:` — the
+                // same shape every other Pressable in this file already uses.
+                className="min-h-[48px] w-full items-center justify-center rounded-full px-4 py-3 active:opacity-[0.78]"
+                style={{ backgroundColor: error }}
               >
                 <Text className="font-label-md text-label-md" style={{ color: onError }}>
                   Sign out
