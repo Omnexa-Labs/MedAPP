@@ -36,7 +36,6 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API
 // here. Only expo-status-bar is used.
 
-import { useState } from "react";
 import { View, type ViewProps } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -44,7 +43,6 @@ import { router, type Href } from "expo-router";
 import { useResolvedScheme } from "@/lib/theme";
 import { BottomNav, type PatientTab } from "@/features/home/components/BottomNav";
 import { PatientAppBar } from "./PatientAppBar";
-import { AccountMenu } from "./AccountMenu";
 
 // ---------------------------------------------------------------------------
 // THE TAB MAP — one copy, here, and nowhere else
@@ -58,6 +56,13 @@ import { AccountMenu } from "./AccountMenu";
 //
 // A screen may still pass its own `onTabPress` to override — but it should need
 // a real reason, and "this is my own tab" is not one (see `isTabRoot`).
+/**
+ * Where the app bar's avatar goes. Exported for the same reason
+ * `PATIENT_TAB_HREFS` is: the suite asserts against the map rather than
+ * re-typing the route string, and `SettingsScreen` is the only destination.
+ */
+export const SETTINGS_HREF = "/(app)/settings" as Href;
+
 export const PATIENT_TAB_HREFS: Record<PatientTab, Href> = {
   home: "/(app)" as Href,
   overview: "/(app)/overview" as Href,
@@ -175,13 +180,25 @@ export function PatientShell({
   testID,
 }: Props) {
   const { scheme } = useResolvedScheme();
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
-  // The shared default for the avatar. A screen's own `onAvatarPress` wins, and
-  // when one is supplied the menu is not mounted at all — `avatarExpanded` stays
-  // `undefined` so the bar does not announce a disclosure that isn't there.
-  const usesAccountMenu = !onAvatarPress;
-  const handleAvatarPress = onAvatarPress ?? (() => setAccountMenuOpen(true));
+  // The shared default for the avatar: NAVIGATE to Settings. A screen's own
+  // `onAvatarPress` still wins.
+  //
+  // This used to open `<AccountMenu />` as a popover anchored under the bell.
+  // That component carried a flag against itself — at 393dp its 320dp panel
+  // reads as a menu, at 360dp as a sheet, because `<AppearanceSelector />` has a
+  // fixed 298dp intrinsic width while the screen does not — and the PO's call
+  // was a full page. `SettingsScreen` is that page; see its header.
+  //
+  // `navigate`, not `push`: the same dedupe the menu's Profile row used. Settings
+  // is one destination and a user who taps the avatar twice must not stack two
+  // copies of it.
+  //
+  // The menu component is NOT deleted. `PractitionerProfileScreen` still mounts
+  // it with `initialView="confirm-sign-out"`, and `SettingsScreen` does the same
+  // for its own Sign out row — the confirmation, its copy, and the
+  // `router.replace`-before-`signOut()` ordering all still live in one file.
+  const handleAvatarPress = onAvatarPress ?? (() => router.navigate(SETTINGS_HREF));
 
   // The shared default. `onTabPress` wins if a screen supplies one.
   const handleTabPress =
@@ -210,32 +227,14 @@ export function PatientShell({
           avatarInitials={avatarInitials}
           avatarLabel={avatarLabel}
           onAvatarPress={handleAvatarPress}
-          avatarExpanded={usesAccountMenu ? accountMenuOpen : undefined}
+          // No `avatarExpanded`. The avatar now NAVIGATES; it does not expand a
+          // panel, and announcing `expanded: false` for a control that opens a
+          // screen would be a false disclosure.
           unreadCount={unreadCount}
           onNotificationsPress={onNotificationsPress}
         />
         <View className="flex-1">{children}</View>
         {showBottomNav ? <BottomNav active={activeTab} onTabPress={handleTabPress} /> : null}
-        {/* Mounted only when the shell owns the avatar. Inside the SafeAreaView
-            is fine — a <Modal> renders into its own window and is not clipped by
-            an ancestor — and it keeps the menu adjacent to the bar it belongs to.
-            It is rendered AFTER BottomNav so that, in the one case where RN falls
-            back to in-tree rendering (Fabric web), the menu still paints on top
-            of the absolutely-positioned nav rather than under it. */}
-        {usesAccountMenu ? (
-          <AccountMenu
-            visible={accountMenuOpen}
-            onClose={() => setAccountMenuOpen(false)}
-            // The same three values the bar's avatar uses, so the panel's
-            // identity row and the avatar the user tapped cannot disagree about
-            // the photo or the initials. The two components fall back to
-            // DIFFERENT defaults on purpose when a screen supplies no name:
-            // "Your profile" names a control, "Your account" names a session.
-            accountName={avatarLabel}
-            avatarUri={avatarUri}
-            avatarInitials={avatarInitials}
-          />
-        ) : null}
       </SafeAreaView>
     </View>
   );

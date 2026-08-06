@@ -2241,10 +2241,41 @@ them when they land.
 (the iOS-Settings shape), not a filled red slab. The filled destructive treatment stays on the
 CONFIRM dialog, which is unchanged and still the second of the two guards — this row only opens it.
 
-**NOT BUILT.** Design only, for PO review, per the request. The RN work — a new route, moving
-`AppearanceSelector` and sign-out off `AccountMenu`, and deciding whether the popover survives at
-all for the practitioner shell (which opens it with `initialView="confirm-sign-out"` and
-`profileHref={null}`) — is a follow-up and is not in this change.
+**BUILT 2026-08-06** (this section was "NOT BUILT" for one commit). See §5x below.
+
+## 5x. **DONE 2026-08-06** — Settings page built, and the patient avatar now navigates
+
+Files: `src/features/settings/SettingsScreen.tsx`, `src/app/(app)/settings.tsx`,
+`src/features/settings/__tests__/SettingsScreen.test.tsx`, plus `PatientShell` and its suite.
+
+**The behavioural change, stated plainly:** `PatientShell` no longer mounts `<AccountMenu />`. The
+avatar calls `router.navigate(SETTINGS_HREF)`. `navigate`, not `push` — the same dedupe the menu's
+Profile row used, so a double tap cannot stack two copies of Settings. `avatarExpanded` is gone
+from the bar call: the avatar opens a screen, and announcing `expanded: false` for it would be a
+false disclosure.
+
+**`AccountMenu` is NOT deleted, and that is the point.** Both `SettingsScreen` and
+`PractitionerProfileScreen` mount it with `initialView="confirm-sign-out"` / `profileHref={null}`.
+The confirmation copy, the cancel-first button order and the `router.replace`-before-`signOut()`
+ordering therefore still live in exactly one file. A hand-rolled second confirm dialog on the
+settings page would have been a second sign-out flow to keep in step with the rules that component
+exists to enforce.
+
+**Coverage moved with the behaviour rather than being deleted.** Five popover cases in
+`PatientShell.test.tsx` became navigation cases; the assertions that actually mattered — sign-out
+is reachable, sign-out is confirmed, the profile route is not orphaned, the appearance control has
+a home — are now in `SettingsScreen.test.tsx`. Those four exist because each names a defect that
+was real before the account menu landed.
+
+`npx tsc --noEmit` clean. **73 suites / 959 tests pass.**
+
+**NOT VERIFIED ON DEVICE.** The Itel is mid-onboarding (a cold start dropped it into the flow and
+step 2 requires a date of birth, which is the user's to enter). Everything above is verified by
+type-check and suite only; the screen has not been seen rendering on hardware.
+
+**Deliberately not built:** Notifications, Privacy & Security, Language, About. None of those
+screens or preferences exist, so a row for any of them would be a designed promise the product
+cannot keep — the same defect class as the dead avatar this change fixed.
 
 ## 5z. **DONE 2026-08-06** — dark proofs for the three Patient Home frames, and the 36 unflippable paints they exposed
 

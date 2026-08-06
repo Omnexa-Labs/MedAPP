@@ -37,7 +37,7 @@ jest.mock("@/store/auth-store", () => ({
   useAuthStore: { getState: () => ({ signOut: mockSignOut }) },
 }));
 
-import { PatientShell, PATIENT_TAB_HREFS } from "../PatientShell";
+import { PatientShell, PATIENT_TAB_HREFS, SETTINGS_HREF } from "../PatientShell";
 
 /** Every tab, with where it must go. Drives the table-driven cases below. */
 const ALL_TABS = [
@@ -269,87 +269,51 @@ describe("PatientShell", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // THE ACCOUNT MENU — in the SHELL, on purpose
+  // THE AVATAR — a SHELL default, still, but it now NAVIGATES
   //
   // Same reasoning as the tab map above, and the same evidence: `onAvatarPress`
   // was plumbed shell -> bar and NO screen passed it, so the avatar was a dead
-  // 44pt control on all 12 patient screens, `signOut()` was unreachable from
-  // anywhere in the app, and two more things (the profile route, the appearance
-  // control) had no entry point either. Per-screen wiring is how the Inbox tab
-  // went missing from three roots. These cases lock the default in place so a
-  // screen cannot omit it and so nobody "tidies" it back out into the screens.
+  // 44pt control on all 12 patient screens. Per-screen wiring is how the Inbox
+  // tab went missing from three roots. These cases lock the default in place so
+  // a screen cannot omit it and so nobody "tidies" it back out into the screens.
+  //
+  // WHAT CHANGED: the destination used to be an <AccountMenu /> popover mounted
+  // by this shell. It is now the Settings SCREEN — the component flagged its own
+  // 320dp panel as reading like a menu at 393dp and a sheet at 360dp, and the PO
+  // ruled it a full page. The popover assertions below became navigation
+  // assertions; the sign-out and appearance COVERAGE moved with the behaviour to
+  // SettingsScreen's own suite, which is where those controls now live.
   // ---------------------------------------------------------------------------
 
-  it("opens the account menu from the avatar with no screen wiring at all", () => {
-    render(
-      <PatientShell>
-        <Text>Body</Text>
-      </PatientShell>,
-    );
-    expect(screen.queryByLabelText("Sign out")).toBeNull();
-    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
-    expect(screen.getByLabelText("Profile")).toBeTruthy();
-    expect(screen.getByLabelText("Appearance")).toBeTruthy();
-    expect(screen.getByLabelText("Sign out")).toBeTruthy();
-  });
-
-  it("makes signing out reachable — two taps, from a tab root", async () => {
+  it("opens Settings from the avatar with no screen wiring at all", () => {
     render(
       <PatientShell>
         <Text>Body</Text>
       </PatientShell>,
     );
     fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
-    fireEvent.press(screen.getByLabelText("Sign out")); // menu row -> confirm
-    expect(mockSignOut).not.toHaveBeenCalled();
-    fireEvent.press(screen.getByLabelText("Sign out")); // confirm button
-    expect(mockReplace).toHaveBeenCalledWith("/(public)/sign-in");
-    await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
+    expect(mockNavigate).toHaveBeenCalledWith(SETTINGS_HREF);
+    expect(mockNavigate).toHaveBeenCalledWith("/(app)/settings");
   });
 
-  it("un-orphans the profile route from the avatar", () => {
+  it("navigates rather than pushes, so a double tap cannot stack two Settings", () => {
     render(
       <PatientShell>
         <Text>Body</Text>
       </PatientShell>,
     );
     fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
-    fireEvent.press(screen.getByLabelText("Profile"));
-    expect(mockNavigate).toHaveBeenCalledWith("/(app)/patient-profile-overview");
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it("announces the avatar as a disclosure, and tracks its state", () => {
+  it("no longer mounts the account popover, or announces the avatar as a disclosure", () => {
+    // The avatar opens a SCREEN now. Announcing `expanded` for it would be a
+    // false disclosure, and the menu must not be in the tree at all — a mounted
+    // second sign-out path is exactly what this change removes.
     render(
       <PatientShell>
-        <Text>Body</Text>
-      </PatientShell>,
-    );
-    const avatar = screen.getByRole("button", { name: "Your profile" });
-    expect(avatar.props.accessibilityState).toMatchObject({ expanded: false });
-    expect(avatar.props.accessibilityHint).toBe("Opens your account menu");
-    fireEvent.press(avatar);
-    expect(
-      screen.getByRole("button", { name: "Your profile" }).props.accessibilityState,
-    ).toMatchObject({ expanded: true });
-  });
-
-  it("carries the account name into the menu so sign-out names a session", () => {
-    render(
-      <PatientShell avatarLabel="Melchizedek Narh">
-        <Text>Body</Text>
-      </PatientShell>,
-    );
-    fireEvent.press(screen.getByRole("button", { name: "Melchizedek Narh" }));
-    expect(screen.getByText("Melchizedek Narh")).toBeTruthy();
-  });
-
-  it("yields the avatar to a screen that really does override it — and then claims no disclosure", () => {
-    // The escape hatch stays open (a screen may have a genuine reason), but when
-    // it is used the shell must not mount the menu OR announce an `expanded`
-    // state for a control that opens nothing.
-    const onAvatarPress = jest.fn();
-    render(
-      <PatientShell onAvatarPress={onAvatarPress}>
         <Text>Body</Text>
       </PatientShell>,
     );
@@ -357,13 +321,25 @@ describe("PatientShell", () => {
     // `expanded` specifically — Pressable always normalises accessibilityState
     // into a five-key object, so the object itself is never undefined.
     expect(avatar.props.accessibilityState.expanded).toBeUndefined();
-    expect(avatar.props.accessibilityHint).toBeUndefined();
-    fireEvent.press(avatar);
-    expect(onAvatarPress).toHaveBeenCalled();
     expect(screen.queryByLabelText("Sign out")).toBeNull();
+    expect(screen.queryByLabelText("Appearance")).toBeNull();
   });
 
-  it("keeps the menu available on a detail screen that has no bottom nav", () => {
+  it("yields the avatar to a screen that really does override it", () => {
+    // The escape hatch stays open (a screen may have a genuine reason), and when
+    // it is used the shell must not also navigate.
+    const onAvatarPress = jest.fn();
+    render(
+      <PatientShell onAvatarPress={onAvatarPress}>
+        <Text>Body</Text>
+      </PatientShell>,
+    );
+    fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
+    expect(onAvatarPress).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps the avatar working on a detail screen that has no bottom nav", () => {
     // A pushed screen loses the tab bar, not its account. Patient Profile
     // Overview is exactly this shape.
     render(
@@ -372,6 +348,6 @@ describe("PatientShell", () => {
       </PatientShell>,
     );
     fireEvent.press(screen.getByRole("button", { name: "Your profile" }));
-    expect(screen.getByLabelText("Sign out")).toBeTruthy();
+    expect(mockNavigate).toHaveBeenCalledWith(SETTINGS_HREF);
   });
 });
