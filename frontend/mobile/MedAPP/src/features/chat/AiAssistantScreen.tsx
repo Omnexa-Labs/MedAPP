@@ -46,7 +46,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -55,7 +54,14 @@ import {
   View,
 } from "react-native";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
-import { Card, ChoiceChip, ChoiceChipRow, Icon, type ChromeIconName } from "@/components/ui";
+import {
+  Card,
+  ChoiceChip,
+  ChoiceChipRow,
+  Icon,
+  KeyboardInset,
+  type ChromeIconName,
+} from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import { ComposerMediaTray } from "./ComposerMediaTray";
 import { useComposerMedia, type ComposerAttachment } from "./useComposerMedia";
@@ -280,24 +286,12 @@ export function AiAssistantScreen() {
         </Pressable>
       }
     >
-      <KeyboardAvoidingView
-        // ANDROID GETS A BEHAVIOUR NOW, AND THAT IS THE FIX (2026-08-05).
-        //
-        // This read `Platform.OS === "ios" ? "padding" : undefined`, i.e. the KAV
-        // did NOTHING on Android. That was right for years: Android's
-        // `adjustResize` shrank the window itself, so a KAV would have
-        // double-counted. Under SDK 55's default edge-to-edge the window is no
-        // longer resized, so "let Android handle it" now means "nothing handles
-        // it" — and the composer sat under the keyboard on every screen with a
-        // bottom input, which is exactly how it was reported.
-        //
-        // "padding" on both platforms, because the composer is the LAST child of
-        // a flex column: padding the container's bottom lifts it by the keyboard
-        // height, which is the behaviour this layout wants. "height" would resize
-        // the container and fight the ScrollView above it.
-        behavior="padding"
-        className="flex-1"
-      >
+      {/* KeyboardInset, NOT KeyboardAvoidingView. The KAV infers the keyboard from a
+          WINDOW RESIZE, and under SDK 55's Android edge-to-edge the window is no
+          longer resized — proven on device, where setting behavior="padding" left
+          the composer still absent and the list still clipped at the keyboard's
+          top edge. KeyboardInset reads the IME inset from the platform instead. */}
+      <KeyboardInset className="flex-1">
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 }}
@@ -442,7 +436,7 @@ export function AiAssistantScreen() {
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardInset>
     </DetailShell>
   );
 }

@@ -84,7 +84,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -96,6 +95,7 @@ import { useLocalSearchParams } from "expo-router";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
 import {
   Icon,
+  KeyboardInset,
   VitalStatCard,
   type ChromeIconName,
   type VitalStatTrend,
@@ -499,28 +499,12 @@ export function ChatThreadScreen() {
         </View>
       }
     >
-      <KeyboardAvoidingView
-        // ANDROID GETS A BEHAVIOUR NOW (2026-08-05). Same one-line fix as
-        // AiAssistantScreen, and the same reason.
-        //
-        // This read `Platform.OS === "ios" ? "padding" : undefined`, so the KAV
-        // did NOTHING on Android. Correct for years — `adjustResize` shrank the
-        // window itself and a KAV would have double-counted — but under SDK 55's
-        // default edge-to-edge the window is no longer resized, so "let Android
-        // handle it" became "nothing handles it". Reported from the device as the
-        // keyboard covering the composer on EVERY screen with a bottom input,
-        // which is what identified it as a platform change and not a screen bug.
-        //
-        // "padding" on both platforms: the composer is the last child of a flex
-        // column, so padding the container's bottom lifts it by the keyboard
-        // height. "height" would resize the container and fight the message list.
-        behavior="padding"
-        className="flex-1"
-        // 0, and deliberately: DetailShell renders this KAV BELOW the app bar, so
-        // there is no bar height to subtract. A non-zero value here would push the
-        // composer past the keyboard rather than onto it.
-        keyboardVerticalOffset={0}
-      >
+      {/* KeyboardInset, NOT KeyboardAvoidingView. The KAV infers the keyboard from a
+          WINDOW RESIZE, and under SDK 55's Android edge-to-edge the window is no
+          longer resized — proven on device, where setting behavior="padding" left
+          the composer still absent and the list still clipped at the keyboard's
+          top edge. KeyboardInset reads the IME inset from the platform instead. */}
+      <KeyboardInset className="flex-1">
         {/* -----------------------------------------------------------
               Chat canvas
           ----------------------------------------------------------- */}
@@ -755,7 +739,7 @@ export function ChatThreadScreen() {
             </Pressable>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardInset>
     </DetailShell>
   );
 }

@@ -33,6 +33,8 @@ export { BrandMark, type BrandMarkName } from "./brand/BrandMark";
 export { Logo, type LogoVariant } from "./Logo";
 export { AvatarWithFallback, type AvatarTone } from "./AvatarWithFallback";
 export { AppearanceSelector } from "./AppearanceSelector";
+// Replaces KeyboardAvoidingView, which cannot work under Android edge-to-edge.
+export { KeyboardInset } from "./KeyboardInset";
 // -- Booking flow (Figma page 144:107). Eight shared components the frames
 // instance; every one of them replaces a private copy in 2+ screens.
 // "Who you are booking with" (Figma 780:5363) — the ONE practitioner row. The

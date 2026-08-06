@@ -11,7 +11,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { KeyboardAvoidingView as KeyboardAvoidingViewForRegression, ScrollView } from "react-native";
+import { KeyboardInset } from "@/components/ui";
 import { screen, fireEvent, act } from "@testing-library/react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -260,26 +261,33 @@ describe("AiAssistantScreen — the composer still clears the keyboard", () => {
     expect(areas[0].props.edges).toEqual(["top", "left", "right"]);
   });
 
-  it("keeps the composer and the quick-action chips INSIDE the KeyboardAvoidingView", () => {
+  it("keeps the composer and the quick-action chips INSIDE the KeyboardInset", () => {
     render(<AiAssistantScreen />);
-    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    const kav = screen.UNSAFE_getByType(KeyboardInset);
     expect(kav.findAllByProps({ accessibilityLabel: "Message MedAI" }).length).toBeGreaterThan(0);
     expect(kav.findAllByProps({ accessibilityLabel: "Send message" }).length).toBeGreaterThan(0);
     expect(kav.findAllByType(ScrollView).length).toBeGreaterThan(0);
   });
 
-  it("keeps the app bar OUTSIDE the KeyboardAvoidingView", () => {
+  it("keeps the app bar OUTSIDE the KeyboardInset", () => {
     render(<AiAssistantScreen />);
-    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
+    const kav = screen.UNSAFE_getByType(KeyboardInset);
     expect(kav.findAllByProps({ accessibilityLabel: "Go back" })).toHaveLength(0);
     expect(kav.findAllByProps({ accessibilityLabel: "Notifications" })).toHaveLength(0);
   });
 
-  it("preserves the KAV's own configuration verbatim — and adds no offset it never had", () => {
+  it("uses KeyboardInset, because a KeyboardAvoidingView cannot work here", () => {
+    // This test asserted `behavior === (ios ? "padding" : undefined)` — it
+    // LOCKED IN the broken configuration. On Android that expression means "do
+    // nothing", and under SDK 55 edge-to-edge the window is never resized, so a
+    // KAV has no signal to work from at all. Verified on device: with
+    // behavior="padding" forced, the composer was still hidden by the keyboard.
+    //
+    // So the assertion is inverted: there must be NO KeyboardAvoidingView left,
+    // and the inset component must be the one wrapping the composer.
     render(<AiAssistantScreen />);
-    const kav = screen.UNSAFE_getByType(KeyboardAvoidingView);
-    expect(kav.props.behavior).toBe(Platform.OS === "ios" ? "padding" : undefined);
-    expect(kav.props.keyboardVerticalOffset).toBeUndefined();
+    expect(screen.UNSAFE_queryAllByType(KeyboardAvoidingViewForRegression)).toHaveLength(0);
+    expect(screen.UNSAFE_getByType(KeyboardInset)).toBeTruthy();
   });
 
   it("keeps the scroll padding unchanged — no bottom nav reserve to drop", () => {
