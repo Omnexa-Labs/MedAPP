@@ -2200,6 +2200,58 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
 
   — *Claim stays open through Build and BuildReview per §5c.*
 
+## 5z. **DONE 2026-08-06** — dark proofs for the three Patient Home frames, and the 36 unflippable paints they exposed
+
+Page `74:102` held seven frames but only ONE dark pin (`overview — Dark proof`, `949:13208`).
+Three dark proofs now exist, each pinned to `Colors/Dark` via
+`setExplicitVariableModeForCollection("VariableCollectionId:1:2", "197:0")`:
+
+| Proof | id | source |
+| --- | --- | --- |
+| `patient_home_active_care_focus — Dark proof` | `1042:1903` | `93:102` |
+| `Patient Home / New User Onboarding — Dark proof` | `1045:2176` | `82:105` |
+| `Patient Home / Patient Dashboard — Dark proof` | `1042:2092` | `110:244` |
+
+**The proof paid for itself on the first measurement.** Onboarding did not flip: mean luminance
+141.4 with **43.5% of pixels still light**, against a clean sibling's 42.6 / 91.4% dark. An audit
+of every VISIBLE solid paint found why — `82:105` carried **36 hardcoded paints with no bound
+variable**, which no mode can move:
+
+- 18 white FRAME fills (`Hero`, `QuickActions`, `BentoRow`, `Tips`, `Header`, `VitalsStack`,
+  the `ChecklistItem`s and the `TipTile` wrappers) → `color/surface`
+- 14 white glyph strokes → `color/on-primary` (they sit on filled teal chips, confirmed from the
+  rendered light frame, NOT inferred from node names)
+- 2 `#BA1A1A` alert strokes → `color/error`
+- `ProgressTrack` `#BCC9C6` → `color/outline-variant`, `ProgressFill` `#008378` → `color/primary`
+
+The other two frames audited clean (0 unbound of 124 and 113), which is why only one of the three
+misbehaved. The stale proof cloned before the fix was deleted and re-cloned from the corrected
+source — hence the new id `1045:2176`.
+
+**Verified by pixel measurement, not by eye**, per the standard set by the lifestyle pair; "it
+looks dark" is exactly what the opaque-scrim defect also looked like.
+
+| Frame | light mean | dark mean | dark px | distinct colours |
+| --- | --- | --- | --- | --- |
+| Onboarding, **before** | 235.3 | 141.4 ❌ | 44.9% | 1272 |
+| Onboarding, **after** | 232.7 | **42.2** | 87.3% | 974 |
+| active_care_focus | — | **47.7** | 70.3% | 1459 |
+| Patient Dashboard | — | **46.3** | 82.7% | 2659 |
+
+Light mode is unharmed (235.3 → 232.7; the drift is `color/surface` and the two progress tokens
+resolving a hair off pure white, not a visual change). The distinct-colour counts are the guard
+against the flat-slab failure: a frame covered by an opaque dark rectangle measures dark AND
+collapses to a handful of colours. These do not.
+
+**One judgement call to flag, not a defect I fixed:** in dark mode the Emergency chip reads as a
+solid saturated red circle, where light mode shows a pale container with a red glyph. That is what
+`color/error` / `color/error-container` resolve to in the dark ramp — a token-ramp decision, not a
+frame decision. Raise it with the PO if the emphasis is wrong.
+
+**Still true after this change:** these three frames all belong to ONE tab. `82:105` has never been
+built and has no route; `110:244` has been orphaned since July. The dark proofs do not resolve that
+— see the open item above.
+
 ## 5b. ~~OPEN TASK~~ **DONE 2026-08-01, gate ACCEPTED** — the trailing-eye defect
 
 > Kept for the reasoning, not as a work item. The fix landed and passed the gate; the residual
