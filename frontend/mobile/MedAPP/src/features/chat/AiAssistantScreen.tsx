@@ -281,7 +281,21 @@ export function AiAssistantScreen() {
       }
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // ANDROID GETS A BEHAVIOUR NOW, AND THAT IS THE FIX (2026-08-05).
+        //
+        // This read `Platform.OS === "ios" ? "padding" : undefined`, i.e. the KAV
+        // did NOTHING on Android. That was right for years: Android's
+        // `adjustResize` shrank the window itself, so a KAV would have
+        // double-counted. Under SDK 55's default edge-to-edge the window is no
+        // longer resized, so "let Android handle it" now means "nothing handles
+        // it" — and the composer sat under the keyboard on every screen with a
+        // bottom input, which is exactly how it was reported.
+        //
+        // "padding" on both platforms, because the composer is the LAST child of
+        // a flex column: padding the container's bottom lifts it by the keyboard
+        // height, which is the behaviour this layout wants. "height" would resize
+        // the container and fight the ScrollView above it.
+        behavior="padding"
         className="flex-1"
       >
         <ScrollView
