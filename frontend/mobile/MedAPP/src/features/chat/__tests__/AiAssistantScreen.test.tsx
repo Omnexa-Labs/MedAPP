@@ -531,9 +531,23 @@ describe("AiAssistantScreen — BRAND compliance", () => {
     expect(src).not.toMatch(/\btext-white\b/);
   });
 
-  it("routes the send glyph through the on-primary token, not a frozen white", () => {
+  it("pairs the send glyph with WHICHEVER fill it is sitting on", () => {
+    // Was: assert the glyph is literally `color={onPrimary}`. That caught the
+    // original defect (a frozen `#ffffff`) but then FROZE A SECOND ONE, because
+    // the button has two fills and only one of them is `primary`.
+    //
+    // With an empty draft the background is `outline-variant`, and an
+    // `on-primary` glyph on it measures ~1.4:1 in light and ~1.3:1 in dark —
+    // invisible in both, and an empty draft is the default state. Reported from
+    // the device exactly that way.
+    //
+    // So the assertion is now about the PAIRING, not one token name: both tokens
+    // must be present and the glyph must choose between them.
     const src = code();
     expect(src).toMatch(/useTokenColor\("on-primary"\)/);
-    expect(src).toMatch(/<Icon chrome="send"[\s\S]*?color=\{onPrimary\}/);
+    expect(src).toMatch(/useTokenColor\("on-surface-variant"\)/);
+    expect(src).toMatch(/<Icon[\s\S]*?chrome="send"[\s\S]*?color=\{[^}]*\?[^}]*onPrimary[^}]*:[^}]*mutedGlyph[^}]*\}/);
+    // And no frozen literal, which is what the original test existed to prevent.
+    expect(src).not.toMatch(/chrome="send"[\s\S]{0,200}#[0-9a-fA-F]{6}/);
   });
 });

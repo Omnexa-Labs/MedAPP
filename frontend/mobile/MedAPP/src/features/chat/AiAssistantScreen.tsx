@@ -428,11 +428,30 @@ export function AiAssistantScreen() {
                 backgroundColor: draft.trim() || media.attachment ? primary : disabledFill,
               }}
             >
-              {/* Was `<MaterialIcons ... color="#ffffff" />`: a direct icon-library
-                    import (docs/BRAND.md forbids it outside the icon gate) AND a
-                    frozen white that measured ~1.5:1 on `primary` in dark mode,
-                    where the token correctly resolves to a near-black #003731. */}
-              <Icon chrome="send" size={20} color={onPrimary} />
+              {/* THE GLYPH FOLLOWS THE FILL. Reported: "the send button is not
+                  visible on both light and dark mode" — and it was invisible in
+                  BOTH, for opposite reasons.
+
+                  The background switches to `outline-variant` when there is
+                  nothing to send, but the glyph stayed `on-primary`
+                  unconditionally. `on-primary` is the pair of the PRIMARY fill,
+                  not of this one:
+
+                    light  255,255,255 white on 188,201,198 grey   ~1.4:1
+                    dark     0,55,49 near-black on a dark grey     ~1.3:1
+
+                  Both miss WCAG's 3:1 for a non-text control by a wide margin,
+                  and an empty draft is the DEFAULT state — so the control was
+                  invisible the moment the screen opened, which is exactly how it
+                  was reported.
+
+                  `on-surface-variant` is the correct pair for a neutral fill and
+                  is what every other muted glyph here already uses. */}
+              <Icon
+                chrome="send"
+                size={20}
+                color={draft.trim() || media.attachment ? onPrimary : mutedGlyph}
+              />
             </Pressable>
           </View>
         </View>
