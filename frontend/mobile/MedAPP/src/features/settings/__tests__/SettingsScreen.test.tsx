@@ -93,6 +93,22 @@ describe("SettingsScreen", () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it("cancelling CLOSES the sheet — it does not reveal the account popover", () => {
+    // Regression, caught on device. `AccountMenu`'s cancel used to hardcode
+    // setView("menu"), which is only right for a caller that arrived FROM the
+    // menu. Here it dropped a full account popover — its own identity row, a
+    // duplicate Appearance control and a second Sign out — on top of Settings.
+    render(<SettingsScreen />);
+    fireEvent.press(screen.getByLabelText("Sign out"));
+    fireEvent.press(screen.getByLabelText("Stay signed in"));
+
+    // Exactly one "Sign out" left: this screen's own row. Two would mean the
+    // popover is still mounted over it.
+    expect(screen.getAllByLabelText("Sign out")).toHaveLength(1);
+    // And the confirmation itself is gone.
+    expect(screen.queryByLabelText("Stay signed in")).toBeNull();
+  });
+
   it("carries no trailing app-bar action — there is nothing here to share", () => {
     // The Figma frame hides Detail AppBar's action slot. An icon that looks live
     // and does nothing is the defect the tooltip pass existed to remove.

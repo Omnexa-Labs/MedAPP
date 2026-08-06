@@ -510,7 +510,20 @@ export function AccountMenu({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Stay signed in"
-                onPress={() => setView("menu")}
+                // CAUGHT ON DEVICE, 2026-08-06. This used to be a bare
+                // `setView("menu")`, which is only correct for a caller that
+                // ARRIVED from the menu. For a caller whose `initialView` is
+                // "confirm-sign-out" — `SettingsScreen` and
+                // `PractitionerProfileScreen`, i.e. both of them — cancelling
+                // revealed a full account popover the screen never intended to
+                // show, floating over its own content, with a duplicate
+                // Appearance control and a second Sign out row. The screenshot
+                // showed exactly that stacked over Settings.
+                //
+                // "Stay signed in" means CANCEL. Where that lands depends on
+                // where the user came from: back to the menu if the menu is
+                // where the confirmation was raised, otherwise out entirely.
+                onPress={() => (initialView === "menu" ? setView("menu") : close())}
                 className="min-h-[48px] w-full items-center justify-center rounded-full border border-outline px-4 py-3 active:opacity-70"
               >
                 <Text className="font-label-md text-label-md text-on-surface">Stay signed in</Text>
