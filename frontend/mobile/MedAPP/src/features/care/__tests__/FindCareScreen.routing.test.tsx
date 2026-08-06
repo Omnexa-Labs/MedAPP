@@ -174,6 +174,15 @@ describe("FindCareScreen — a provider card opens that provider's profile", () 
 });
 
 describe("FindCareScreen — a facility is not a practitioner", () => {
+  // These used to assert `router.push` was NOT called at all, because there was
+  // no facility screen to call it with and both practitioner profiles would
+  // have put a building's name over a person's page. That premise expired on
+  // 2026-08-06: `hospital-detail` and `pharmacy-detail` now exist. What the
+  // suite still locks is the part that was never about the missing route — a
+  // facility must not reach a PRACTITIONER profile — plus the two things the
+  // no-op could not be asked about before: that the destination is per kind,
+  // and that the id it carries is the wire id the detail GET wants.
+
   it.each([
     ["pharmacy", pharmacy, "View Store — Ridge Pharmacy"],
     ["hospital", hospital, "View hospital — Korle Bu Teaching Hospital"],
@@ -183,10 +192,47 @@ describe("FindCareScreen — a facility is not a practitioner", () => {
 
     fireEvent.press(screen.getByLabelText(label));
 
-    // FLAGGED in the screen: there is no facility detail route in the app, and
-    // both practitioner profiles would put a building's name over a person's
-    // page. A no-op is honest; a plausible push is not.
-    expect(router.push).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(lastPush().pathname).not.toBe(PROFILE_ROUTE);
+    // Not the OTHER practitioner profile either.
+    expect(lastPush().pathname).not.toBe("/(app)/practitioner-social-profile");
+  });
+
+  it("sends a hospital to hospital-detail with its hospital_id", () => {
+    mockEntries = [hospital];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View hospital — Korle Bu Teaching Hospital"));
+
+    expect(lastPush().pathname).toBe("/(app)/hospital-detail");
+    // `FacilityEntry.id` is `hospital_id` off the wire — the value
+    // `GET /v1/hospitals/{id}` takes. A slug or a name here 404s.
+    expect(lastPush().params).toEqual({ hospitalId: "hosp-1" });
+  });
+
+  it("sends a pharmacy to pharmacy-detail with its pharmacy id", () => {
+    mockEntries = [pharmacy];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Store — Ridge Pharmacy"));
+
+    expect(lastPush().pathname).toBe("/(app)/pharmacy-detail");
+    expect(lastPush().params).toEqual({ pharmacyId: "store-2" });
+  });
+
+  it("keeps the two kinds on separate destinations", () => {
+    // The regression this guards is a "facility-detail" collapse: one screen
+    // that takes either kind and switches two thirds of itself off. The two
+    // records share three columns and live in two services with two different
+    // spellings of "phone".
+    mockEntries = [hospital, pharmacy];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View hospital — Korle Bu Teaching Hospital"));
+    fireEvent.press(screen.getByLabelText("View Store — Ridge Pharmacy"));
+
+    const pushed = (router.push as jest.Mock).mock.calls.map((c) => c[0].pathname);
+    expect(new Set(pushed).size).toBe(2);
   });
 });
 

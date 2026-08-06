@@ -582,8 +582,10 @@ function initialsFor(name: string): string | null {
 //                renders the identity and withholds the booking dock instead of
 //                offering a CTA whose only outcome is a wrong record.
 //
-//   hospitals    Facilities. FLAGGED, deliberately not wired — see FacilityCard.
-//   pharmacies
+//   hospitals    Facilities, and NOT people. `hospital-detail` and
+//   pharmacies   `pharmacy-detail` respectively — see `openFacility` below,
+//                which replaced the "deliberately not wired" FLAG on 2026-08-06
+//                when both screens shipped.
 //
 // `providerKind` is the entry's `category` verbatim. This screen deliberately
 // does NOT re-implement the bookability predicate: it forwards the category and
@@ -696,6 +698,48 @@ function PersonCard({ entry }: { entry: PersonEntry }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// What a FACILITY's tap does — one destination per kind, resolved here.
+//
+// RESOLVED 2026-08-06. This replaces the FLAG that stood inside FacilityCard's
+// CTA from 2026-08-02, which recorded that facilities were deliberately NOT
+// routed: `src/app/(app)/` had no facility screen, and the two nearest
+// candidates were both practitioner profiles, so any push would have put a
+// building's name over a person's page — in one case above a "Book appointment"
+// CTA. A no-op was the honest answer while that was true. Both screens now
+// exist, designed (Figma page 1019:640 "Facilities"), so it no longer is.
+//
+// HOSPITALS AND PHARMACIES GO TO DIFFERENT SCREENS, and that is the same
+// discipline the person-card block above states, not an exception to it. It is
+// not laziness about a shared "facility" page: the two records overlap on name,
+// address and phone and on nothing else. A hospital has accreditation, a care
+// team roster and patient reviews; a pharmacy has a seven-day opening-hours
+// table, a licence number, a live stock counter and a pharmacist list. They are
+// also two different services with two different column sets — `contact_phone`
+// on one, `phone` on the other. One screen with two thirds of itself switched
+// off is not a shared screen, it is two screens sharing a bug surface.
+//
+// The param name is the one the destination reads, and it carries `entry.id`,
+// which `adaptHospital` / `adaptPharmacy` set from `hospital_id` / `id` — i.e.
+// the wire id the single-resource GET wants. NOT the slug, and not the name.
+//
+// `pharmacists` and the two person categories never reach here: they are
+// `PersonEntry`, rendered by PersonCard. The `default` branch is unreachable
+// today and is a compile-time exhaustiveness guard rather than a runtime one —
+// if `DirectoryCategory` grows a sixth facility kind, this is where it has to
+// be answered.
+
+function openFacility(entry: FacilityEntry): void {
+  const pathname =
+    entry.category === "hospitals" ? "/(app)/hospital-detail" : "/(app)/pharmacy-detail";
+  const params =
+    entry.category === "hospitals" ? { hospitalId: entry.id } : { pharmacyId: entry.id };
+  // Cast because expo-router's typed routes only regenerate on dev-server
+  // start, so a route added in this pass is not in the generated union yet —
+  // the same cast, for the same reason, as the PersonCard push above.
+  router.push({ pathname, params } as unknown as Href);
+}
+
 function FacilityCard({ entry }: { entry: FacilityEntry }) {
   const { scheme } = useResolvedScheme();
   const iconBg = entry.iconTint === "tertiary" ? "bg-tertiary-container" : "bg-secondary-container";
@@ -802,30 +846,7 @@ function FacilityCard({ entry }: { entry: FacilityEntry }) {
             backgroundColor: pressed ? ctaPressed : ctaIdle,
           },
         ]}
-        onPress={() => {
-          // ------------------------------------------------------------------
-          // FLAGGED — facilities are deliberately NOT routed, and specifically
-          // not into a practitioner profile.
-          //
-          // A hospital's "View Staff" and a pharmacy's "View Store" want a
-          // FACILITY detail screen. `src/app/(app)/` has no such route: the two
-          // nearest candidates are `practitioner-telehealth-profile`, which is a
-          // named clinician with a booking dock, and
-          // `practitioner-social-profile`, which renders a seeded dietitian and
-          // her seeded reviews and does not read params at all. Sending a
-          // pharmacy to either one would put a building's name over a person's
-          // profile, and in the first case over a "Book appointment" CTA.
-          //
-          // So this stays a no-op, which is honest, rather than a plausible
-          // push, which would not be. What it needs is a designed
-          // `hospital-detail` / `pharmacy-detail` frame plus routes — out of
-          // scope for the booking funnel, raised rather than absorbed.
-          //
-          // The one adjacent thing the backend already supports is
-          // `careApi.listPharmacists({ pharmacyId })` — i.e. a pharmacy's staff
-          // list is one query away once there is a screen to put it on.
-          // ------------------------------------------------------------------
-        }}
+        onPress={() => openFacility(entry)}
       >
         <Text
           style={{
