@@ -2200,6 +2200,52 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
 
   — *Claim stays open through Build and BuildReview per §5c.*
 
+## 5y. **FOR REVIEW 2026-08-06** — the account popover becomes a full Settings page
+
+Requested by the PO. It also closes a defect `AccountMenu.tsx` had already flagged against
+itself: *"at 393 a 320 panel leaves 57dp of scrim and reads as a menu. At 360 it leaves 24dp and
+reads as a sheet. Same component, two different affordances… Either the selector gets a compact
+variant or this becomes a real bottom sheet — that is a design call, and the plain build below is
+the interim."* A full page is the third answer, and it removes the arithmetic entirely: the
+`AppearanceSelector` needs 298dp of intrinsic width and now gets 361, so the `PANEL_PAD = 4`
+hack and the `MENU_MAX_WIDTH` clamp both stop being load-bearing.
+
+Frames on page `945:5796` (Account Menu):
+
+| Frame | id |
+| --- | --- |
+| `settings — full page (replaces avatar popover)` | `1047:1427` |
+| `settings — full page · DARK proof (pinned Colors/Dark)` | `1048:17523` |
+
+Everything is instanced, not redrawn: `Detail AppBar` `193:120`, `Section Header` `517:689` ×2,
+`AppearanceSelector` `949:10205`, `icon/chrome-arrow-right` `1002:890`. Every fill is a bound
+token.
+
+**Verified by measurement:** light 243.9 mean / 96.8% light px → dark 27.7 / 96.1% dark px, with
+distinct colours holding at 594 → 617 (the guard against a flat dark slab).
+
+**Two defects caught in the first render and fixed:**
+- The `Detail AppBar` ships a trailing **share** action. Settings is a leaf reached from the
+  avatar with nothing to share — an icon that looks live and does nothing is the class of thing
+  the tooltip pass existed to remove. Hidden on the instance; the component exposes no property
+  for it.
+- The chevron was painted white-on-white and rendered as nothing. Rebound to `on-surface-variant`.
+
+**Scope, stated plainly.** The page carries exactly what the popover carried — identity/Profile,
+Appearance, Sign out — and nothing invented. A real settings page would normally also hold
+Notifications, Privacy & Security, Language and About; none of those screens or preferences exist,
+so adding rows would have designed promises the app cannot keep. The page has obvious room for
+them when they land.
+
+**Deliberate change from the popover:** Sign out is a centred `error`-toned row on its own card
+(the iOS-Settings shape), not a filled red slab. The filled destructive treatment stays on the
+CONFIRM dialog, which is unchanged and still the second of the two guards — this row only opens it.
+
+**NOT BUILT.** Design only, for PO review, per the request. The RN work — a new route, moving
+`AppearanceSelector` and sign-out off `AccountMenu`, and deciding whether the popover survives at
+all for the practitioner shell (which opens it with `initialView="confirm-sign-out"` and
+`profileHref={null}`) — is a follow-up and is not in this change.
+
 ## 5z. **DONE 2026-08-06** — dark proofs for the three Patient Home frames, and the 36 unflippable paints they exposed
 
 Page `74:102` held seven frames but only ONE dark pin (`overview — Dark proof`, `949:13208`).

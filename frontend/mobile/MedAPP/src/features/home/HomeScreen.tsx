@@ -604,7 +604,11 @@ function WellnessRow({
   // freeze the TINTS table had. Resolved by name it steps with the mode.
   const accent = useTokenColor("primary");
   return (
-    <View className="flex-row items-center justify-between rounded-2xl border border-white bg-white/60 p-sm">
+    // `border-white bg-white/60` was a literal, so in dark mode these two rows
+    // stayed light-grey pills while everything around them went dark — the one
+    // unflippable surface left on this screen. Same tokens as `InputTrigger`
+    // below, which is the sibling control and already rendered correctly.
+    <View className="flex-row items-center justify-between rounded-2xl border border-outline-variant/20 bg-surface-container-low p-sm">
       <View className="flex-row items-center gap-sm">
         <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/10">
           {/* Decorative — the row's label is immediately to its right. */}
