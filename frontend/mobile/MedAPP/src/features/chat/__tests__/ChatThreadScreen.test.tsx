@@ -184,7 +184,7 @@ beforeEach(() => {
 });
 
 describe("ChatThreadScreen — renders through DetailShell", () => {
-  it("keeps the bar's title, subtitle, avatar, presence dot and both actions", () => {
+  it("keeps the bar's title, subtitle, avatar, presence dot and the video action", () => {
     render(<ChatThreadScreen />);
 
     expect(screen.getByText("Dr. Adjoa Boateng")).toBeTruthy();
@@ -192,7 +192,13 @@ describe("ChatThreadScreen — renders through DetailShell", () => {
     expect(screen.getByLabelText("Dr. Adjoa Boateng")).toBeTruthy(); // avatar
     expect(screen.getByLabelText("Online")).toBeTruthy();
     expect(screen.getByLabelText("Video call")).toBeTruthy();
-    expect(screen.getByLabelText("Conversation info")).toBeTruthy();
+  });
+
+  it("no longer draws the dead 'Conversation info' action", () => {
+    // It had no `onPress`, and `chat_thread` 552:1376's app bar does not draw
+    // it. Asserted as an ABSENCE so it cannot quietly return.
+    render(<ChatThreadScreen />);
+    expect(screen.queryByLabelText("Conversation info")).toBeNull();
   });
 
   it("routes the back button through the shell to router.back()", () => {

@@ -1,4 +1,5 @@
-// Chat Thread screen — the focused one-on-one message conversation view.
+// Chat Thread screen — the focused message conversation view.
+// Figma: `chat_thread` 552:1376, page 548:615 "Messaging".
 // Reached from:
 //   • InboxScreen → tap any ConversationItem
 //   • PractitionerSocialProfileScreen → "Message" button
@@ -8,24 +9,66 @@
 //     furniture when the keyboard is up on a focused chat journey).
 //   - Back arrow is the return affordance.
 //
-// Translation calls (HTML → React Native):
-//   - backdrop-blur header → the shared DetailAppBar. (The original translation
-//     added a shadow; docs/BRAND.md §Elevation gives a bar none.)
-//   - outgoing bubble: bg-primary (#00685f), text-on-primary (#ffffff),
-//     rounded-2xl with rounded-br-none (tail on the right).
-//   - incoming bubble: bg-surface-container-highest (#dee4e1),
-//     text-on-surface (#171d1c), rounded-2xl with rounded-bl-none (tail left).
-//   - PDF attachment card: white/10 bg + white/20 border, inside outgoing bubble.
-//   - Vitals card: primary-tinted bg with 2×2 stat grid, shown as a special
-//     "incoming" message kind.
-//   - done_all (double tick) → done-all icon in primary color.
-//   - Clinical Actions FAB: absolute bottom-[96], right-4, zIndex 20.
-//     Toggles a share-options sheet above it.
-//   - medical_services → medical-services (may fall back to local-hospital).
-//   - Input bar is a pill (rounded-full) at the bottom, just above the safe area.
-//   - KeyboardAvoidingView (padding on iOS) shifts content up.
-//   - Seed data mirrors the Stitch comp. Replace with useQuery(["thread", id])
-//     once GET /v1/threads/:id ships.
+// ---------------------------------------------------------------------------
+// RECONCILED AGAINST 552:1376 ON 2026-08-06 — AND THE FRAME AND THIS SCREEN
+// ARE NOT THE SAME CONVERSATION. READ THIS BEFORE "FINISHING THE JOB".
+// ---------------------------------------------------------------------------
+// 552:1376 draws a PRACTITIONER-SIDE GROUP THREAD: an "ICU Night Shift" room
+// with a `ThreadContextBar` (552:1383) reading "8 members · 3 online now", a
+// per-message `Sender` line ("Dr. Sarah Chen · Attending Physician"), a
+// `DayDivider / shift start` and a `SystemEvent / joined` row.
+//
+// This screen is the PATIENT-SIDE 1:1 thread. InboxScreen pushes `?name=&role=`
+// into it, and the route in docs/PIPELINE.md §4 maps `chat-thread 552:1376` to
+// exactly this file. So one of the two is wrong about what this route IS, and
+// that is a PO call, not something to infer. What was reconciled here is
+// therefore the frame's ANATOMY — the parts that are true of any thread — and
+// the group-specific content is FLAGGED at the bottom of this header rather
+// than built.
+//
+// Adopted from the frame:
+//   - Composer / Chat 552:1512, the SAME component the AI screen instances: a
+//     52-tall `field-surface` pill with three 44x44 targets.
+//   - Incoming bubble on `card-surface` with an `outline-variant` hairline at
+//     radius/12 — not a fill-only `surface-container-highest` blob at radius 20.
+//   - Bubble body text at `body-md` 16. This closes the "STILL FLAGGED" note
+//     the previous header carried: the 15/22 it would not move without a design
+//     call now HAS one — 552:1403 and 552:1496 both bind `body-md`.
+//   - The vitals message is a CARD, not a teal panel (552:1428). See VitalsCard.
+//
+// NOT adopted, and why — each of these is a frame element with no data source
+// or a frame element that breaks a repo rule:
+//
+//   1. THE FRAME'S NAMES ARE NOT IN THE ROSTER. "Dr. Sarah Chen", "Mark
+//      Thompson" and "Nurse Jennifer" are invented. The seeded roster is Ama
+//      Mensah (patient) plus doctors Kwabena Osei, Adjoa Boateng, Yaw Darko,
+//      Efua Asante, Nii Tetteh and Abena Owusu. docs/PIPELINE.md §4 records
+//      that "Dr. Sarah Jenkins" leaked into the booking round from a
+//      half-finished frame, and §5 records "Akosua Mensah" being corrected out
+//      of the Account Menu components on 2026-08-05. This is the same defect,
+//      one page over. The frame needs the correction; the code does not adopt
+//      the names.
+//   2. `ThreadContextBar` 552:1383 — "8 members · 3 online now", an avatar
+//      stack, a +6 overflow. There is no thread-membership endpoint. There are
+//      no messaging endpoints AT ALL (docs/PIPELINE.md's inert-control audit:
+//      "New conversation — InboxScreen. No messaging endpoints."), so member
+//      count, presence and the roster behind the +6 would all be fabricated.
+//   3. `SystemEvent / joined` 552:1510 — same reason: join/leave events are a
+//      wire concept this app has no wire for.
+//   4. The per-message `Sender` line. It is what makes a GROUP thread legible;
+//      in a 1:1 the app bar already names the other party, so it would be the
+//      same name repeated down the page. It goes in with the group thread, if
+//      the PO rules that this route becomes one.
+//
+// KEPT DESPITE BEING ABSENT FROM THE FRAME (a drop has to be flagged, and so
+// does a keep): the Clinical Actions FAB and its share menu. 552:1376 draws
+// neither, but they are the only route to sharing clinical data into a thread
+// and they work. The composer's duplicate `apps` toggle IS removed — it opened
+// the same menu as the FAB, and dropping it is what gets the composer down to
+// the frame's three controls.
+//
+// Seed data: replace with useQuery(["thread", id]) once GET /v1/threads/:id
+// ships.
 //
 // ---------------------------------------------------------------------------
 // COMPOSER MEDIA (attach + mic)
@@ -74,17 +117,16 @@
 // `label-md` 14) and every timestamp was 11px, BELOW BRAND's 12sp floor (now
 // `label-sm` 12).
 //
-// STILL FLAGGED, deliberately not changed: the bubble BODY text is 15px/22,
-// which is on no BRAND step (`body-md` is 16). Its colour is retokenised here
-// but its size is left alone, because moving 15 -> 16 reflows every bubble in
-// the thread and that is a design call, not a token migration.
+// ~~STILL FLAGGED~~ CLOSED 2026-08-06 by the frame: the bubble BODY text was
+// 15px/22, on no BRAND step, and was left alone because moving 15 -> 16 reflows
+// every bubble and that is a design call. 552:1403 / 552:1496 bind `body-md`,
+// so the design call is made and the bubbles are on the ramp.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
 
 import { useEffect, useRef, useState } from "react";
 import {
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -94,8 +136,10 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
 import {
+  Card,
   Icon,
   KeyboardInset,
+  SectionHeader,
   VitalStatCard,
   type ChromeIconName,
   type VitalStatTrend,
@@ -489,13 +533,11 @@ export function ChatThreadScreen() {
           >
             <Icon chrome="videocam" size={24} color={primary} />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Conversation info"
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-          >
-            <Icon chrome="info-outline" size={24} color={mutedGlyph} />
-          </Pressable>
+          {/* The "Conversation info" button is GONE. It had no `onPress` — a
+              dead control, the exact class docs/PIPELINE.md's inert-control
+              audit enumerates — and 552:1376's app bar does not draw it. The
+              frame's single trailing action is a share/export glyph, which is
+              not wired here either; it is left OUT rather than added dead. */}
         </View>
       }
     >
@@ -519,8 +561,11 @@ export function ChatThreadScreen() {
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={scrollToEnd}
         >
-          {/* Timeline divider */}
-          <TimelineDivider label="Today · Tap any message for details" />
+          {/* `DayDivider` 552:1398. The label lost "· Tap any message for
+              details": no message on this screen is pressable, so the divider
+              was promising an interaction that does not exist. The frame's
+              divider states when the conversation starts and nothing else. */}
+          <TimelineDivider label="Today" />
 
           {messages.map((m) =>
             m.direction === "outgoing" ? (
@@ -662,15 +707,17 @@ export function ChatThreadScreen() {
                 gutter, which is why this container's `px-md` moved onto the pill. */}
           <ComposerMediaTray media={media} />
 
-          <View className="mx-md flex-row items-center gap-xs rounded-full border border-outline-variant/30 bg-surface-container-low px-sm py-xs">
-            {/* Clinical menu toggle (apps icon) */}
-            <ComposerIconButton
-              icon={clinicalOpen ? "close" : "apps"}
-              label="Clinical actions"
-              tint={clinicalOpen ? "primary" : "muted"}
-              onPress={() => setClinicalOpen((v) => !v)}
-            />
+          {/* `Composer / Chat (State=Empty, Docked=Yes)` 552:1512 — the SAME
+              component instance the AI screen carries (550:2956), so the two
+              composers stop being two different pills: a 52-tall `field-surface`
+              rounded-full field holding three 44x44 targets with 24px glyphs and
+              4px between them.
 
+              What changed from the comp translation: `surface-container-low` ->
+              `field-surface` (the role Input already uses, and the frame's
+              `var(--color-field-surface)`), the `/30` hairline -> full strength,
+              and the FOURTH control is gone — see the header. */}
+          <View className="mx-md h-[52px] flex-row items-center gap-xs rounded-full border border-outline-variant bg-field-surface p-xs">
             {/* Attach — was a Pressable with NO onPress at all. */}
             <ComposerIconButton
               icon="attach-file"
@@ -690,9 +737,8 @@ export function ChatThreadScreen() {
               multiline
               style={{
                 flex: 1,
-                minHeight: 36,
                 maxHeight: 96,
-                paddingHorizontal: 4,
+                paddingHorizontal: 8,
                 color: inputText,
                 fontSize: 16,
                 lineHeight: 22,
@@ -718,10 +764,14 @@ export function ChatThreadScreen() {
               accessibilityLabel="Send message"
               accessibilityState={{ disabled: !draft.trim() && !media.attachment }}
               onPress={() => send(draft)}
+              // 44x44, per `Send — 44x44 target` in 552:1512 and
+              // docs/MOBILE_UX.md's floor. It was drawn at 36 and met the floor
+              // only through its neighbours' hitSlop, which the send button did
+              // not even have.
               style={({ pressed }) => ({
-                width: 36,
-                height: 36,
-                borderRadius: 18,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor:
@@ -753,7 +803,7 @@ export function ChatThreadScreen() {
                   is what every other muted glyph here already uses. */}
               <Icon
                 chrome="send"
-                size={18}
+                size={24}
                 color={draft.trim() || media.attachment ? onPrimary : mutedGlyph}
               />
             </Pressable>
@@ -784,8 +834,10 @@ const ACTIVE_STATE_LAYER = 0.16;
  * copies of the same Pressable, and two of them had no `onPress` — the drift that
  * let them ship as decoration.
  *
- * 36x36 drawn with `hitSlop={4}` is a 44x44 target, docs/MOBILE_UX.md's floor;
- * the drawn box stays 36 so four controls plus the field fit one pill at 360dp.
+ * 44x44 DRAWN, matching the `Attach`/`Voice input` targets inside
+ * `Composer / Chat` 552:1512 rather than meeting docs/MOBILE_UX.md's floor with
+ * `hitSlop` on a 36px box. The drawn box was 36 so that FOUR controls plus the
+ * field would fit one pill at 360dp; the frame has three, which fit at 44.
  * `disabled` reports through `accessibilityState` as well as the fill, because a
  * greyed glyph is not announced.
  */
@@ -814,11 +866,10 @@ function ComposerIconButton({
       accessibilityLabel={label}
       accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
-      hitSlop={4}
       onPress={onPress}
-      className="h-9 w-9 items-center justify-center rounded-full active:bg-surface-variant/50"
+      className="h-11 w-11 items-center justify-center rounded-full active:bg-surface-variant/50"
     >
-      <Icon chrome={icon} size={22} color={color} />
+      <Icon chrome={icon} size={24} color={color} />
     </Pressable>
   );
 }
@@ -846,20 +897,19 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
             // Was `backgroundColor: "#00685f"` — the LIGHT value of
             // color/primary frozen in JS, so the bubble stayed dark teal in dark
             // mode while its `on-primary` text correctly went near-black.
+            // radius 20 -> `radius/12` (552:1496) — 20 is on no BRAND step
+            // (4/12/24/full) and was inherited from the comp's `rounded-2xl`.
+            // The 4px "tail" corner goes with it: the frame draws every bubble
+            // corner equal and lets left/right alignment carry the direction.
             className="bg-primary"
             style={{
-              borderRadius: 20,
-              borderBottomRightRadius: message.attachment ? 20 : 4,
+              borderRadius: 12,
               paddingHorizontal: 16,
-              paddingVertical: 10,
+              paddingVertical: 12,
               marginBottom: message.attachment ? 4 : 0,
             }}
           >
-            {/* 15/22 is off BRAND's ramp and is left alone on purpose — see the
-                STILL FLAGGED note in the header. Only the colour moves. */}
-            <Text className="text-on-primary" style={{ fontSize: 15, lineHeight: 22 }}>
-              {message.text}
-            </Text>
+            <Text className="font-body-md text-body-md text-on-primary">{message.text}</Text>
           </View>
         ) : null}
 
@@ -868,8 +918,7 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           <View
             className="bg-primary"
             style={{
-              borderRadius: 20,
-              borderBottomRightRadius: 4,
+              borderRadius: 12,
               padding: 12,
             }}
           >
@@ -924,7 +973,12 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           style={{ paddingRight: 4 }}
         >
           {/* Was 11px — under BRAND's 12sp floor — at a frozen `#6d7a77`. */}
-          <Text className="font-label-sm text-label-sm text-outline">{message.timestamp}</Text>
+          {/* `Meta / Timestamp` — `label-sm` on `on-surface-variant` per
+              552:1403's variables. `outline` is a hairline role, not a text
+              role, and at 12sp it was the weakest text on the screen. */}
+          <Text className="font-label-sm text-label-sm text-on-surface-variant">
+            {message.timestamp}
+          </Text>
           {message.delivered ? <Icon chrome="done-all" size={14} color={primary} /> : null}
         </View>
       </View>
@@ -932,37 +986,39 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
   );
 }
 
+/**
+ * `Message / … — request` 552:1403 and its siblings.
+ *
+ * THE INCOMING BUBBLE IS A CARD, NOT A GREY BLOB. The comp filled it with
+ * `surface-container-highest` and gave it no edge; 552:1403 binds
+ * `card-surface` with an `outline-variant` hairline at `radius/12` — the same
+ * treatment `<Card>` carries, which is why the two read as one system in the
+ * frame and did not in the app. A fill-only bubble also has no edge at all in
+ * dark mode, where `surface-container-highest` sits a step from the page.
+ *
+ * The vitals message (552:1428) takes the SAME surface at full width, which is
+ * the resolution of the flag VitalStatCard's migration left open — see below.
+ */
+const INCOMING_BUBBLE = "rounded-md border border-outline-variant bg-card-surface px-4 py-3";
+
 function IncomingBubble({ message, contactName }: { message: ChatMessage; contactName: string }) {
   if (message.kind === "vitals" && message.vitals) {
     return (
       <View className="mb-sm w-full items-start">
-        <View style={{ maxWidth: "88%" }}>
-          {/* Intro text */}
+        {/* 552:1428 draws the vitals message at the FULL content width (361 of
+            361), not at the 88% a bubble takes, because two stat cards side by
+            side do not fit in a bubble. */}
+        <View className="w-full">
           {message.text ? (
-            <View
-              // `#dee4e1` is the LIGHT value of surface-container-highest, so it
-              // stayed near-white in dark mode under `on-surface` text that had
-              // correctly gone near-white too — the bubble was unreadable.
-              className="bg-surface-container-highest"
-              style={{
-                borderRadius: 20,
-                borderBottomLeftRadius: 4,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                marginBottom: 6,
-              }}
-            >
-              <Text className="text-on-surface" style={{ fontSize: 15, lineHeight: 22 }}>
-                {message.text}
-              </Text>
+            <View className={`${INCOMING_BUBBLE} mb-xs self-start`} style={{ maxWidth: "88%" }}>
+              <Text className="font-body-md text-body-md text-on-surface">{message.text}</Text>
             </View>
           ) : null}
 
-          {/* Vitals card */}
           <VitalsCard vitals={message.vitals} />
 
           <Text
-            className="font-label-sm text-label-sm text-outline"
+            className="font-label-sm text-label-sm text-on-surface-variant"
             style={{ marginTop: 4, marginLeft: 4 }}
           >
             {message.timestamp} · {contactName}
@@ -975,23 +1031,13 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
   return (
     <View className="mb-xs w-full items-start">
       <View style={{ maxWidth: "80%" }}>
-        <View
-          className="bg-surface-container-highest"
-          style={{
-            borderRadius: 20,
-            borderBottomLeftRadius: 4,
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-          }}
-        >
+        <View className={INCOMING_BUBBLE}>
           {message.text ? (
-            <Text className="text-on-surface" style={{ fontSize: 15, lineHeight: 22 }}>
-              {message.text}
-            </Text>
+            <Text className="font-body-md text-body-md text-on-surface">{message.text}</Text>
           ) : null}
         </View>
         <Text
-          className="font-label-sm text-label-sm text-outline"
+          className="font-label-sm text-label-sm text-on-surface-variant"
           style={{ marginTop: 4, marginLeft: 4 }}
         >
           {message.timestamp}
@@ -1005,50 +1051,40 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
 // Vitals card — rendered inside an incoming bubble
 // ---------------------------------------------------------------------------
 
+/**
+ * `Message / … — vitals` 552:1428 — and the resolution of the flag the
+ * VitalStatCard migration left open.
+ *
+ * THAT FLAG READ: "211:241 / VitalStatCard binds its fill to the `card-surface`
+ * ROLE and exposes no `className`/`style`, deliberately, so a screen cannot
+ * express a private variant of a clinical reading. The local copy was a
+ * TRANSLUCENT WHITE tile ON an accent surface… it needs a designer call: either
+ * 211:241 gains an `OnAccent` tone, or this message stops being teal and becomes
+ * a normal incoming bubble."
+ *
+ * THE FRAME ANSWERS: the second one. 552:1428 is a plain `Card` — `card-surface`,
+ * `elevation/card`, radius/24, 16 inset — carrying a `Header` instance, two
+ * `VitalStatCard`s and a plain-text `Note`. There is no teal panel, so there is
+ * no on-accent problem to solve and 211:241 does NOT need an `OnAccent` tone.
+ *
+ * What that deletes: `bg-primary` on the panel, the `on-primary/15`+`/10`
+ * washed note box, and the `on-primary/80` uppercase caption — three treatments
+ * that only existed to survive the teal.
+ *
+ * The header is the shared `SectionHeader` (756:4413), which is what 0:44 is an
+ * instance of. The note is `body-md` on `on-surface-variant`: 0:83 is a text
+ * node, not a box.
+ */
 function VitalsCard({ vitals }: { vitals: NonNullable<ChatMessage["vitals"]> }) {
-  // RN has no currentColor, so the header glyph needs a real string — by TOKEN
-  // NAME, replacing `rgba(255,255,255,0.8)`, which stayed white-on-light-teal in
-  // dark mode where `on-primary` correctly becomes dark.
-  const onPrimary = useTokenColor("on-primary");
-
   return (
-    <View
-      // Was `backgroundColor: "#00685f"` — the LIGHT value of color/primary,
-      // frozen in JS, so the panel stayed dark teal in dark mode. `bg-primary`
-      // and the `text-on-primary` pairs below flip with the mode as BRAND
-      // requires ("Text on an accent must use its `on-*` pair").
-      // radius 20 -> 24, and the note box's 10 -> 12: BRAND's radius scale is
-      // 4/12/24/full and had neither 20 nor 10 on it.
-      className="rounded-card rounded-bl-xs bg-primary p-4"
-      style={{ gap: 12 }}
-    >
-      {/* Header. Glyph was 18 (off BRAND's 24/20 ramp) at
-          `rgba(255,255,255,0.8)`; now 20 at `on-primary` with the opacity
-          carried by the token class so it inverts correctly. */}
-      <View className="flex-row items-center gap-xs">
-        <Icon name="heart-rate" size={20} color={onPrimary} />
-        <Text className="font-label-sm text-label-sm uppercase text-on-primary/80">
-          Vitals summary
-        </Text>
-      </View>
+    <Card style={{ gap: 12 }}>
+      <SectionHeader title="Vitals summary" icon="heart-rate" />
 
-      {/* 2-up stat grid — now the shared VitalStatCard (Figma 211:241).
-          Deletes the local `VitalStat`, which was one of the six private copies
-          the component was extracted to end: it drew the value at 18px/700 (the
-          ramp has no 18 step; 211:247 is `headline-lg` 24) and the label at
-          11px, BELOW BRAND's 12sp floor, and carried seven literals.
-
-          FLAGGED — the one thing the shared component cannot express here:
-          211:241 / VitalStatCard binds its fill to the `card-surface` ROLE and
-          exposes no `className`/`style`, deliberately, so a screen cannot
-          express a private variant of a clinical reading. The local copy was a
-          TRANSLUCENT WHITE tile ON an accent surface. So the two readings now
-          render as normal cards inside the teal panel instead of as
-          white-on-teal washes. That is a deliberate VISUAL CHANGE to this
-          message, and it needs a designer call: either 211:241 gains an
-          `OnAccent` tone, or this message stops being teal and becomes a normal
-          incoming bubble. It was NOT resolved with a one-off style prop, which
-          would re-admit the drift the extraction removed. */}
+      {/* 2-up stat grid — the shared VitalStatCard (Figma 211:241), which is
+          what 0:51 / 0:67 instance. Deletes the local `VitalStat`, one of six
+          private copies: it drew the value at 18px/700 (the ramp has no 18 step;
+          211:247 is `headline-lg` 24) and the label at 11px, BELOW BRAND's 12sp
+          floor, and carried seven literals. */}
       <View className="flex-row gap-sm">
         <View className="flex-1">
           <VitalStatCard
@@ -1068,11 +1104,8 @@ function VitalsCard({ vitals }: { vitals: NonNullable<ChatMessage["vitals"]> }) 
         </View>
       </View>
 
-      {/* Note */}
-      <View className="rounded-md border border-on-primary/15 bg-on-primary/10 p-3">
-        <Text className="font-label-sm text-label-sm text-on-primary/90">{vitals.note}</Text>
-      </View>
-    </View>
+      <Text className="font-body-md text-body-md text-on-surface-variant">{vitals.note}</Text>
+    </Card>
   );
 }
 

@@ -201,11 +201,15 @@ beforeEach(() => {
 });
 
 describe("AiAssistantScreen — renders through DetailShell", () => {
-  it("keeps the bar's title, avatar and action", () => {
+  it("keeps the bar's title, and NOTHING else — 550:2700 draws back + title", () => {
     render(<AiAssistantScreen />);
-    expect(screen.getByText("MedAI")).toBeTruthy();
-    expect(screen.getByLabelText("Your profile")).toBeTruthy();
-    expect(screen.getByLabelText("Notifications")).toBeTruthy();
+    // "MedAI" is now on the bar AND in the identity header (550:2708).
+    expect(screen.getAllByText("MedAI").length).toBeGreaterThan(0);
+    // The comp put the user's own avatar in `leading` and an unwired bell in
+    // `actions`. The frame's `Detail AppBar — MedAI` has neither, and the bell
+    // was a dead control. Asserted as absences so they cannot drift back.
+    expect(screen.queryByLabelText("Your profile")).toBeNull();
+    expect(screen.queryByLabelText("Notifications")).toBeNull();
   });
 
   it("routes the back button through the shell to router.back()", () => {
@@ -310,8 +314,10 @@ describe("AiAssistantScreen — behaviour is untouched", () => {
       fireEvent.press(screen.getByLabelText("Send message"));
       expect(screen.getByText("My head still hurts")).toBeTruthy();
 
-      fireEvent.press(screen.getByText("Check Vitals"));
-      expect(screen.getAllByText("Check Vitals").length).toBeGreaterThan(1);
+      // `Suggested prompt` labels come from 550:2947…550:2953 now: four chips,
+      // sentence case. The comp's "Check Vitals" was reworded copy.
+      fireEvent.press(screen.getByText("Check my vitals"));
+      expect(screen.getAllByText("Check my vitals").length).toBeGreaterThan(1);
 
       act(() => {
         jest.advanceTimersByTime(900);
@@ -417,9 +423,121 @@ describe("AiAssistantScreen — attach", () => {
     expect(screen.queryByTestId("composer-media-notice")).toBeNull();
   });
 
-  it("renders the unimplemented camera control as DISABLED, not as dead", () => {
+  it("has no camera control at all — 550:2956 draws three composer targets", () => {
+    // It used to render permanently disabled, which was honest about having no
+    // implementation but still put a fourth control in the pill and forced all
+    // four down to 36px. `Composer / Chat` has Attach, Voice input and Send.
     render(<AiAssistantScreen />);
-    expect(screen.getByLabelText("Take photo").props.accessibilityState.disabled).toBe(true);
+    expect(screen.queryByLabelText("Take photo")).toBeNull();
+    expect(screen.getByLabelText("Attach file")).toBeTruthy();
+    expect(screen.getByLabelText("Voice input")).toBeTruthy();
+    expect(screen.getByLabelText("Send message")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Frame reconciliation — `ai_assistant` 550:2700 and its state frames.
+//
+// These assert the things that DRIFTED, not the things that render. The screen
+// diverged because every recent change was driven by a device symptom and none
+// re-read the frame; a test that names the node id is the cheapest way to make
+// the next drift fail loudly instead of accumulating.
+// ---------------------------------------------------------------------------
+
+describe("AiAssistantScreen — reconciled against 550:2700", () => {
+  it("PINS the AI Disclosure Line (550:2971) outside the scroller", () => {
+    render(<AiAssistantScreen />);
+    const line = screen.getByTestId("ai-disclosure-line");
+    expect(line).toBeTruthy();
+    expect(screen.getByText(/MedAI is an AI assistant\./)).toBeTruthy();
+    expect(screen.getByText(/not a diagnosis — for medical advice, talk to a practitioner/))
+      .toBeTruthy();
+    // The whole point: it must NOT be a property of a message. If it ever moves
+    // back onto one it will scroll away, which is the defect this fixed.
+    expect(code()).not.toMatch(/disclaimer/);
+  });
+
+  it("draws FOUR suggested prompts, with the frame's labels and no glyphs", () => {
+    render(<AiAssistantScreen />);
+    for (const label of [
+      "Check my vitals",
+      "Explain a lab report",
+      "Symptom checker",
+      "Find a clinic",
+    ]) {
+      expect(screen.getByText(label)).toBeTruthy();
+    }
+    // 550:2947's `Icon` slot is hidden in every instance, so no chip may pass one.
+    expect(code()).not.toMatch(/ChoiceChip[\s\S]{0,120}icon=/);
+  });
+
+  it("uses the frame's placeholder and timestamp divider", () => {
+    render(<AiAssistantScreen />);
+    expect(screen.getByPlaceholderText("Ask about a symptom…")).toBeTruthy();
+    expect(screen.getByText("Today, 10:24")).toBeTruthy();
+  });
+
+  it("opens with the Assistant Identity Header (550:2708), not an insight card", () => {
+    render(<AiAssistantScreen />);
+    expect(screen.getByTestId("assistant-identity-header")).toBeTruthy();
+    expect(screen.getByText("AI health assistant · not a clinician")).toBeTruthy();
+    // The comp's card appears in no frame, and named a clinician who is in no
+    // roster.
+    expect(screen.queryByText("AI Health Insight")).toBeNull();
+    expect(code()).not.toMatch(/Dr\. Smith/);
+  });
+
+  it("labels every assistant turn as machine-generated, inside the bubble", () => {
+    render(<AiAssistantScreen />);
+    expect(screen.getAllByText("MedAI · AI-generated").length).toBeGreaterThan(1);
+  });
+
+  it("renders the safety warning as an error callout, not a muted footnote", () => {
+    render(<AiAssistantScreen />);
+    expect(screen.getByTestId("ai-safety-callout")).toBeTruthy();
+    expect(screen.getByText(/seek medical care now/)).toBeTruthy();
+    // It used to be italic `label-sm` in `outline` — the quietest text on the
+    // screen for the line that says when to stop reading and get help.
+    expect(code()).not.toMatch(/fontStyle: "italic"/);
+  });
+
+  it("names only roster clinicians", () => {
+    // 550:2721 says "Dr. Mensah"; Ama Mensah is the seeded PATIENT. Kwabena
+    // Osei is the seeded GP. See the FLAGGED note on SEED_MESSAGES.
+    render(<AiAssistantScreen />);
+    expect(screen.getByText(/Dr\. Osei can advise/)).toBeTruthy();
+    expect(code()).not.toMatch(/Dr\. Mensah/);
+  });
+
+  it("shows the thinking turn (550:4659) while a reply is pending", () => {
+    jest.useFakeTimers();
+    try {
+      render(<AiAssistantScreen />);
+      expect(screen.queryByTestId("ai-thinking-turn")).toBeNull();
+
+      fireEvent.changeText(screen.getByLabelText("Message MedAI"), "Is ibuprofen safe?");
+      fireEvent.press(screen.getByLabelText("Send message"));
+      expect(screen.getByTestId("ai-thinking-turn")).toBeTruthy();
+      expect(screen.getByText(/MedAI · AI-generated · thinking…/)).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(900);
+      });
+      expect(screen.queryByTestId("ai-thinking-turn")).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("draws the send target at 44, not 40", () => {
+    // docs/MOBILE_UX.md's floor, and `Send — 44x44 target` in 550:2956. The
+    // class is asserted from source because RNTL does not resolve NativeWind
+    // classes to a measured box.
+    // Scoped to the send Pressable rather than to `h-10 w-10` anywhere: the
+    // thinking skeleton legitimately draws a 40px placeholder block, which is
+    // not a control and has no target floor.
+    expect(code()).toMatch(/h-11 w-11 items-center justify-center rounded-full active:scale-95/);
+    expect(code()).not.toMatch(/h-10 w-10 items-center justify-center rounded-full/);
   });
 });
 
