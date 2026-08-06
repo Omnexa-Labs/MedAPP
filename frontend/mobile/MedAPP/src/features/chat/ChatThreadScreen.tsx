@@ -10,65 +10,43 @@
 //   - Back arrow is the return affordance.
 //
 // ---------------------------------------------------------------------------
-// RECONCILED AGAINST 552:1376 ON 2026-08-06 — AND THE FRAME AND THIS SCREEN
-// ARE NOT THE SAME CONVERSATION. READ THIS BEFORE "FINISHING THE JOB".
+// RESOLVED 2026-08-06 — THE FRAME WAS WRONG, AND IT HAS BEEN CORRECTED
 // ---------------------------------------------------------------------------
-// 552:1376 draws a PRACTITIONER-SIDE GROUP THREAD: an "ICU Night Shift" room
-// with a `ThreadContextBar` (552:1383) reading "8 members · 3 online now", a
-// per-message `Sender` line ("Dr. Sarah Chen · Attending Physician"), a
-// `DayDivider / shift start` and a `SystemEvent / joined` row.
+// This header used to say "the frame and this screen are not the same
+// conversation" and park the question. The PO has now ruled, and the ruling was
+// that 552:1376 WAS WRONG: it drew a clinician group room — "ICU Night Shift",
+// "8 members - 3 online now", per-message senders, shift/join events — on the
+// route that serves the patient's 1:1 with their doctor.
 //
-// This screen is the PATIENT-SIDE 1:1 thread. InboxScreen pushes `?name=&role=`
-// into it, and the route in docs/PIPELINE.md §4 maps `chat-thread 552:1376` to
-// exactly this file. So one of the two is wrong about what this route IS, and
-// that is a PO call, not something to infer. What was reconciled here is
-// therefore the frame's ANATOMY — the parts that are true of any thread — and
-// the group-specific content is FLAGGED at the bottom of this header rather
-// than built.
+// What changed in Figma (docs/PIPELINE.md 5w):
+//   * 552:1376 is now the patient 1:1. Its thread was rewritten; it had been
+//     clinician handover talk about "Patient-8821", i.e. the patient reading
+//     about themselves in the third person.
+//   * The group design was RECOVERED, not discarded, as `practitioner_chat`
+//     1057:1448 (+ dark proof 1059:17684) on the Practitioner Shell page.
+//   * `Chat Bubble / Other` 550:2013 shipped an invented "Dr. Sarah Chen" as the
+//     DEFAULT of its Sender property — corrected to the seeded roster. That was
+//     the third instance of the invented-name defect.
 //
-// Adopted from the frame:
-//   - Composer / Chat 552:1512, the SAME component the AI screen instances: a
-//     52-tall `field-surface` pill with three 44x44 targets.
-//   - Incoming bubble on `card-surface` with an `outline-variant` hairline at
-//     radius/12 — not a fill-only `surface-container-highest` blob at radius 20.
-//   - Bubble body text at `body-md` 16. This closes the "STILL FLAGGED" note
-//     the previous header carried: the 15/22 it would not move without a design
-//     call now HAS one — 552:1403 and 552:1496 both bind `body-md`.
-//   - The vitals message is a CARD, not a teal panel (552:1428). See VitalsCard.
+// ONE COMPONENT SERVES BOTH THREADS. See ChatThreadScreenProps below: the two
+// are the same anatomy and differ in data plus three strings, so the group-ness
+// is DATA (`ChatMessage.senderName`, `kind: "system"`) rather than a mode flag.
+// PractitionerChatScreen.tsx is the thin caller.
 //
-// NOT adopted, and why — each of these is a frame element with no data source
-// or a frame element that breaks a repo rule:
-//
-//   1. THE FRAME'S NAMES ARE NOT IN THE ROSTER. "Dr. Sarah Chen", "Mark
-//      Thompson" and "Nurse Jennifer" are invented. The seeded roster is Ama
-//      Mensah (patient) plus doctors Kwabena Osei, Adjoa Boateng, Yaw Darko,
-//      Efua Asante, Nii Tetteh and Abena Owusu. docs/PIPELINE.md §4 records
-//      that "Dr. Sarah Jenkins" leaked into the booking round from a
-//      half-finished frame, and §5 records "Akosua Mensah" being corrected out
-//      of the Account Menu components on 2026-08-05. This is the same defect,
-//      one page over. The frame needs the correction; the code does not adopt
-//      the names.
-//   2. `ThreadContextBar` 552:1383 — "8 members · 3 online now", an avatar
-//      stack, a +6 overflow. There is no thread-membership endpoint. There are
-//      no messaging endpoints AT ALL (docs/PIPELINE.md's inert-control audit:
-//      "New conversation — InboxScreen. No messaging endpoints."), so member
-//      count, presence and the roster behind the +6 would all be fabricated.
-//   3. `SystemEvent / joined` 552:1510 — same reason: join/leave events are a
-//      wire concept this app has no wire for.
-//   4. The per-message `Sender` line. It is what makes a GROUP thread legible;
-//      in a 1:1 the app bar already names the other party, so it would be the
-//      same name repeated down the page. It goes in with the group thread, if
-//      the PO rules that this route becomes one.
+// STILL FLAGGED, and inherited by the practitioner room — there are no
+// messaging endpoints AT ALL, so these are seeded and cannot be live:
+//   1. `ThreadContextBar` member count and presence ("8 members - 3 online
+//      now"), including the +6 overflow roster.
+//   2. `SystemEvent / joined` rows. Join/leave is a wire concept with no wire.
+//   3. Delivery receipts. The double tick is seeded per-message.
+// Replace with useQuery(["thread", id]) once GET /v1/threads/:id ships.
 //
 // KEPT DESPITE BEING ABSENT FROM THE FRAME (a drop has to be flagged, and so
-// does a keep): the Clinical Actions FAB and its share menu. 552:1376 draws
-// neither, but they are the only route to sharing clinical data into a thread
-// and they work. The composer's duplicate `apps` toggle IS removed — it opened
-// the same menu as the FAB, and dropping it is what gets the composer down to
-// the frame's three controls.
-//
-// Seed data: replace with useQuery(["thread", id]) once GET /v1/threads/:id
-// ships.
+// does a keep): the Clinical Actions FAB and its share menu. Neither frame
+// draws them, but they are the only route to sharing clinical data into a
+// thread and they work. The composer's duplicate `apps` toggle IS removed — it
+// opened the same menu as the FAB, and dropping it is what gets the composer
+// down to the frame's three controls.
 //
 // ---------------------------------------------------------------------------
 // COMPOSER MEDIA (attach + mic)
@@ -183,14 +161,29 @@ const SEED_CONTACT = {
 // ---------------------------------------------------------------------------
 
 type MessageDirection = "incoming" | "outgoing";
-type MessageKind = "text" | "attachment" | "vitals";
+// "system" is a thread EVENT, not a message: "Nii Tetteh joined the shift".
+// It exists for the practitioner care-team room (1057:1448), where people enter
+// and leave. A 1:1 never produces one, so the patient thread simply has none in
+// its seed rather than needing a flag to suppress them.
+type MessageKind = "text" | "attachment" | "vitals" | "system";
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   direction: MessageDirection;
   kind: MessageKind;
   text?: string;
   timestamp: string;
+  /**
+   * Who sent it, rendered above the bubble. Set only in a GROUP thread — in a
+   * 1:1 the app bar already names the other party, so it would be the same name
+   * repeated down the page.
+   *
+   * Deliberately a property of the MESSAGE rather than a `variant` prop on the
+   * screen: it is the data that differs between the two threads, not the
+   * rendering, and `AccountMenu` is the precedent for parameterising one
+   * component over shipping a second copy of it.
+   */
+  senderName?: string;
   // outgoing only — show double-tick delivered status
   delivered?: boolean;
   // kind === "attachment"
@@ -313,7 +306,46 @@ function makeId() {
 // Screen
 // ---------------------------------------------------------------------------
 
-export function ChatThreadScreen() {
+/**
+ * Both threads render through this one component.
+ *
+ * The practitioner care-team room (Figma 1057:1448) and the patient 1:1
+ * (552:1376) are the SAME anatomy — app bar, day divider, bubbles, attachment
+ * cards, a vitals card, the docked composer — differing only in their data and
+ * three strings. Shipping a second screen would mean a second composer, a
+ * second media hook wiring and a second set of bubble rules to keep in step,
+ * which is exactly the argument `AccountMenu` makes for being parameterised
+ * rather than copied for its second audience.
+ *
+ * Everything here defaults to the PATIENT behaviour, so the existing route and
+ * its suite are unchanged by the practitioner variant existing.
+ */
+export interface ChatThreadScreenProps {
+  /** Overrides the app bar title. Defaults to the contact's name. */
+  threadTitle?: string;
+  /** Overrides the app bar subtitle. Defaults to `Doctor · <role>`. */
+  threadSubtitle?: string;
+  /** `DayDivider` label. "Today" for a 1:1, "Shift started · 19:00" for a room. */
+  dividerLabel?: string;
+  /** Composer placeholder. "Message the care team…" in the room. */
+  composerPlaceholder?: string;
+  /** Seeded thread contents. */
+  seedMessages?: ChatMessage[];
+  /**
+   * A room rather than a person: renders a group glyph instead of an avatar and
+   * drops the presence dot, which belongs to one identity.
+   */
+  isGroup?: boolean;
+}
+
+export function ChatThreadScreen({
+  threadTitle,
+  threadSubtitle,
+  dividerLabel = "Today",
+  composerPlaceholder = "Type a message…",
+  seedMessages = SEED_MESSAGES,
+  isGroup = false,
+}: ChatThreadScreenProps = {}) {
   // Accept lightweight params from the navigation call for personalisation.
   const params = useLocalSearchParams<{
     name?: string;
@@ -328,7 +360,7 @@ export function ChatThreadScreen() {
     isOnline: SEED_CONTACT.isOnline,
   };
 
-  const [messages, setMessages] = useState<ChatMessage[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
   const [draft, setDraft] = useState("");
   const [clinicalOpen, setClinicalOpen] = useState(false);
   // Attach + mic. See the COMPOSER MEDIA block in the header.
@@ -484,12 +516,14 @@ export function ChatThreadScreen() {
     // `Content=Title + Badge` variant.
     // ------------------------------------------------------------------
     <DetailShell
-      title={contact.name}
-      subtitle={`Doctor · ${contact.role}`}
+      title={threadTitle ?? contact.name}
+      subtitle={threadSubtitle ?? `Doctor · ${contact.role}`}
       claimsBottomInset={false}
       leading={
         <View className="relative shrink-0">
-          {contact.avatarUri ? (
+          {/* A room is not a person: no photo, and no presence dot, because
+              presence belongs to one identity. */}
+          {contact.avatarUri && !isGroup ? (
             <Image
               source={{ uri: contact.avatarUri }}
               style={{
@@ -508,11 +542,11 @@ export function ChatThreadScreen() {
               }}
             >
               <Text className="font-label-md text-on-primary-container">
-                {contact.name[0]?.toUpperCase() ?? "?"}
+                {isGroup ? "#" : (threadTitle ?? contact.name)[0]?.toUpperCase() ?? "?"}
               </Text>
             </View>
           )}
-          {contact.isOnline ? (
+          {contact.isOnline && !isGroup ? (
             <View
               className="absolute bottom-0 right-0 rounded-full border-2 border-surface bg-primary"
               style={{ width: 12, height: 12 }}
@@ -565,10 +599,12 @@ export function ChatThreadScreen() {
               details": no message on this screen is pressable, so the divider
               was promising an interaction that does not exist. The frame's
               divider states when the conversation starts and nothing else. */}
-          <TimelineDivider label="Today" />
+          <TimelineDivider label={dividerLabel} />
 
           {messages.map((m) =>
-            m.direction === "outgoing" ? (
+            m.kind === "system" ? (
+              <SystemEventRow key={m.id} label={m.text ?? ""} />
+            ) : m.direction === "outgoing" ? (
               <OutgoingBubble key={m.id} message={m} />
             ) : (
               <IncomingBubble key={m.id} message={m} contactName={contact.name} />
@@ -730,7 +766,7 @@ export function ChatThreadScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Type a message…"
+              placeholder={composerPlaceholder}
               placeholderTextColor={placeholder}
               onSubmitEditing={() => send(draft)}
               returnKeyType="send"
@@ -1002,6 +1038,12 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
 const INCOMING_BUBBLE = "rounded-md border border-outline-variant bg-card-surface px-4 py-3";
 
 function IncomingBubble({ message, contactName }: { message: ChatMessage; contactName: string }) {
+  // Resolved by NAME so they step with the mode. The outgoing card's pair are
+  // `on-primary` / `on-primary` at 75% because it sits on a `primary` fill; an
+  // incoming card sits on `card-surface`, so it takes the on-surface pair.
+  const incomingGlyph = useTokenColor("primary");
+  const incomingGlyphMuted = useTokenColor("on-surface-variant");
+
   if (message.kind === "vitals" && message.vitals) {
     return (
       <View className="mb-sm w-full items-start">
@@ -1031,9 +1073,60 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
   return (
     <View className="mb-xs w-full items-start">
       <View style={{ maxWidth: "80%" }}>
+        {/* `Sender` 550:2014, gated by the component's `Show sender` boolean.
+            Present only when the message carries one, which is only ever in a
+            group thread — see the note on `ChatMessage.senderName`. */}
+        {message.senderName ? (
+          <Text
+            className="font-label-sm text-label-sm text-on-surface-variant"
+            style={{ marginBottom: 4, marginLeft: 4 }}
+          >
+            {message.senderName}
+          </Text>
+        ) : null}
+
         <View className={INCOMING_BUBBLE}>
           {message.text ? (
             <Text className="font-body-md text-body-md text-on-surface">{message.text}</Text>
+          ) : null}
+
+          {/* INCOMING ATTACHMENTS HAD NO CARD AT ALL. Only OutgoingBubble
+              rendered one, so a file sent BY the other party fell through to
+              its text and the `attachment` payload was dropped silently — both
+              552:1409 (the doctor's Lab_Panel) and 1057:1448 draw it. Same
+              anatomy as the outgoing card, in incoming tokens: the outgoing one
+              sits on `primary` and uses `on-primary` washes, so this uses
+              `on-surface` washes over `card-surface` for the same contrast
+              relationship in either mode. */}
+          {message.kind === "attachment" && message.attachment ? (
+            <View
+              className={`flex-row items-center gap-base rounded-md border border-outline-variant bg-surface-container-low p-3 ${
+                message.text ? "mt-sm" : ""
+              }`}
+            >
+              <View className="h-10 w-10 items-center justify-center rounded-md bg-primary/12">
+                <Icon chrome={message.attachment.icon} size={22} color={incomingGlyph} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text className="font-label-md text-label-md text-on-surface" numberOfLines={1}>
+                  {message.attachment.name}
+                </Text>
+                <Text
+                  className="font-label-sm text-label-sm text-on-surface-variant"
+                  style={{ marginTop: 2 }}
+                >
+                  {message.attachment.localUri
+                    ? `${message.attachment.meta} · on this device only`
+                    : message.attachment.meta}
+                </Text>
+              </View>
+              {/* Suppressed for device-local media: there is nowhere to download
+                  it FROM, and a control that cannot work is the defect this
+                  screen's composer pass was opened to fix. */}
+              {message.attachment.localUri ? null : (
+                <Icon chrome="download" size={20} color={incomingGlyphMuted} />
+              )}
+            </View>
           ) : null}
         </View>
         <Text
@@ -1043,6 +1136,21 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
           {message.timestamp}
         </Text>
       </View>
+    </View>
+  );
+}
+
+/**
+ * `SystemEvent / joined` 552:1510 — a thread EVENT, centred and unbubbled.
+ *
+ * Only the practitioner care-team room produces these. It was flagged as "a
+ * wire concept this app has no wire for", and that is still true: it is seeded,
+ * not live, and is listed in the FLAGGED block at the top of PractitionerChatScreen.
+ */
+function SystemEventRow({ label }: { label: string }) {
+  return (
+    <View className="my-sm w-full items-center">
+      <Text className="font-label-sm text-label-sm text-on-surface-variant">{label}</Text>
     </View>
   );
 }

@@ -2200,6 +2200,40 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
 
   — *Claim stays open through Build and BuildReview per §5c.*
 
+## 5v. **DONE 2026-08-06** — practitioner care-team room built
+
+Files: `src/features/chat/PractitionerChatScreen.tsx`, `src/app/(app)/practitioner-chat.tsx`,
+`src/features/chat/__tests__/PractitionerChatScreen.test.tsx`, plus `ChatThreadScreen`.
+
+**ONE COMPONENT SERVES BOTH THREADS.** The room and the patient 1:1 are the same anatomy — app
+bar, divider, bubbles, attachment cards, vitals card, docked composer — differing in data and three
+strings. A second screen would have meant a second composer, a second `useComposerMedia` wiring and
+a second delivery-receipt path to keep in step. `AccountMenu` is the precedent. So the group-ness is
+DATA, not a mode flag: `ChatMessage.senderName` renders the `Sender` line, `kind: "system"` renders
+a join event. The patient thread simply has neither in its seed.
+
+**A real divergence found while building: incoming attachments had no card at all.** Only
+`OutgoingBubble` carried an attachment branch, so a file sent BY the other party dropped its
+payload and rendered as bare text — against BOTH frames, `552:1409` (the doctor's Lab_Panel) and
+`1057:1448`. `IncomingBubble` now renders the same anatomy in incoming tokens (`on-surface` washes
+over `card-surface`, mirroring the outgoing card's `on-primary` over `primary`). Covered by a
+regression case.
+
+`ChatThreadScreen`'s header is rewritten: it had parked the frame conflict as an open PO question,
+and the question is now answered.
+
+`npx tsc --noEmit` clean. **74 suites / 967 tests pass** — the new suite includes a case asserting
+the patient 1:1 is untouched, since both now share a renderer and the patient suite alone would not
+catch a group-data leak.
+
+**OPEN — the route has no entry point yet.** `/(app)/practitioner-chat` exists and renders, but
+nothing links to it: the practitioner Inbox tab points at the shared audience-neutral `/(app)/inbox`,
+and giving that screen an audience branch is a decision, not an inference. This is the orphan-route
+defect this repo keeps fighting, logged rather than half-wired.
+
+**Inherited flags, unchanged:** member count, presence, join events and delivery receipts are all
+SEEDED. There are no messaging endpoints at all, so none can be live.
+
 ## 5w. **DONE 2026-08-06** — the chat_thread frame described the wrong conversation. PO ruled the FRAME wrong.
 
 Raised by the PO: "the chat design doesn't match what is on figma." It did not, and the code had
