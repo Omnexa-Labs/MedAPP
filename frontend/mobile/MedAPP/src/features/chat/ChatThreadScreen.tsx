@@ -49,13 +49,35 @@
 // below is unchanged apart from suppressing its download affordance for local
 // media, which cannot be downloaded from anywhere.
 //
-// FLAGGED FOR A FOLLOW-UP (pre-existing, deliberately NOT fixed here): the
-// bubbles, the vitals panel, the clinical menu and the FAB in this file are
-// still full of frozen hexes (`#00685f`, `#dee4e1`, `#171d1c`, `#6d7a77`,
-// `rgba(255,255,255,…)`) and still import MaterialIcons directly — both
-// docs/BRAND.md violations. This change retokenised and re-routed only the
-// COMPOSER, which is what it touches; retokenising ~600 lines of bubble
-// rendering in the same commit would have buried the behaviour change.
+// THAT FOLLOW-UP IS NOW DONE. The composer pass above deliberately left the
+// bubbles, the clinical menu and the FAB on frozen LIGHT-mode hexes so the
+// behaviour change stayed reviewable; this pass finishes the file. What changed:
+//
+//   `#00685f`  -> `bg-primary` / `useTokenColor("primary")`
+//   `#dee4e1`  -> `bg-surface-container-highest`
+//   `#171d1c`  -> `text-on-surface`
+//   `#6d7a77`  -> `text-outline` (the same role the composer's placeholder took)
+//   `#f0f5f3`  -> `bg-surface-container-low` (240,245,242 — a 1/255 blue shift)
+//   `#004d46` / `#005049` -> `blendTokens("primary", "on-primary", …)`, the M3
+//              state layer, because a hand-darkened teal darkens the WRONG WAY
+//              in dark mode where `primary` is already the light end.
+//   `rgba(255,255,255,…)` -> `bg-on-primary/<a>` at the same alphas, so the
+//              washes invert with the accent they sit on.
+//   `rgba(0,131,120,0.12)` -> `bg-primary-container/12` (an exact token match).
+//   `rgba(0,0,0,0.06)` -> `outline-variant`, BRAND's hairline role.
+//
+// MaterialIcons is no longer imported here: every glyph goes through the shared
+// `<Icon chrome=… />` gate, and `IconName` is its re-exported `ChromeIconName`.
+// docs/BRAND.md: "Screens must never import an icon library directly."
+//
+// Two type-ramp fixes came with it — the menu row's label was 15px inline (now
+// `label-md` 14) and every timestamp was 11px, BELOW BRAND's 12sp floor (now
+// `label-sm` 12).
+//
+// STILL FLAGGED, deliberately not changed: the bubble BODY text is 15px/22,
+// which is on no BRAND step (`body-md` is 16). Its colour is retokenised here
+// but its size is left alone, because moving 15 -> 16 reflows every bubble in
+// the thread and that is a design call, not a token migration.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
 
@@ -71,15 +93,25 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
-import { Icon, VitalStatCard, type VitalStatTrend } from "@/components/ui";
+import {
+  Icon,
+  VitalStatCard,
+  type ChromeIconName,
+  type VitalStatTrend,
+} from "@/components/ui";
 import { blendTokens, useTokenColor, useTokenShadow } from "@/lib/tokens";
 import { useResolvedScheme } from "@/lib/theme";
 import { ComposerMediaTray } from "./ComposerMediaTray";
 import { useComposerMedia } from "./useComposerMedia";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
+// The glyph names this screen's own tables carry. `ChromeIconName` comes from the
+// Icon gate rather than from @expo/vector-icons, which src/components/ui/icons is
+// the only file allowed to import ("Screens must never import an icon library
+// directly"). Every one of these names is UI chrome, so they all take
+// `<Icon chrome=… />`; a clinical concept would take `<Icon name=… />` instead
+// (see VitalsCard's `heart-rate` below).
+type IconName = ChromeIconName;
 
 // ---------------------------------------------------------------------------
 // Contact / thread meta — seeded from the Stitch comp.
@@ -286,6 +318,15 @@ export function ChatThreadScreen() {
   // hand-darkening would have gone the wrong way.
   const { scheme } = useResolvedScheme();
   const primaryPressed = blendTokens("primary", "on-primary", PRESSED_STATE_LAYER, scheme);
+  // The FAB's OPEN (selected) fill — the same recipe one layer deeper, replacing
+  // the hand-darkened `#004d46`. It has to stay distinguishable from
+  // `primaryPressed` because the FAB can be open AND pressed at once.
+  const primaryActive = blendTokens("primary", "on-primary", ACTIVE_STATE_LAYER, scheme);
+  // The clinical menu's row chrome. Both replace literals that assumed a white
+  // menu: a 6% teal wash and a 6% BLACK hairline, the latter invisible on the
+  // #242B2A surface `card-surface` resolves to in dark mode.
+  const menuRowPressed = useTokenColor("primary", 0.06);
+  const hairline = useTokenColor("outline-variant");
   const scrollRef = useRef<ScrollView>(null);
   const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -459,9 +500,25 @@ export function ChatThreadScreen() {
       }
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // ANDROID GETS A BEHAVIOUR NOW (2026-08-05). Same one-line fix as
+        // AiAssistantScreen, and the same reason.
+        //
+        // This read `Platform.OS === "ios" ? "padding" : undefined`, so the KAV
+        // did NOTHING on Android. Correct for years — `adjustResize` shrank the
+        // window itself and a KAV would have double-counted — but under SDK 55's
+        // default edge-to-edge the window is no longer resized, so "let Android
+        // handle it" became "nothing handles it". Reported from the device as the
+        // keyboard covering the composer on EVERY screen with a bottom input,
+        // which is what identified it as a platform change and not a screen bug.
+        //
+        // "padding" on both platforms: the composer is the last child of a flex
+        // column, so padding the container's bottom lifts it by the keyboard
+        // height. "height" would resize the container and fight the message list.
+        behavior="padding"
         className="flex-1"
-        // Extra offset so the input bar clears the keyboard cleanly on iOS.
+        // 0, and deliberately: DetailShell renders this KAV BELOW the app bar, so
+        // there is no bar height to subtract. A non-zero value here would push the
+        // composer past the keyboard rather than onto it.
         keyboardVerticalOffset={0}
       >
         {/* -----------------------------------------------------------
@@ -535,30 +592,28 @@ export function ChatThreadScreen() {
                   gap: 12,
                   paddingHorizontal: 16,
                   paddingVertical: 14,
-                  backgroundColor: pressed ? "rgba(0,104,95,0.06)" : "transparent",
+                  // Was `rgba(0,104,95,0.06)` — the LIGHT `primary` frozen at 6%.
+                  backgroundColor: pressed ? menuRowPressed : "transparent",
                   borderTopWidth: i > 0 ? 1 : 0,
-                  borderTopColor: "rgba(0,0,0,0.06)",
+                  // Was `rgba(0,0,0,0.06)`, which is invisible on a #242B2A
+                  // dark-mode menu. `outline-variant` is BRAND's hairline role.
+                  borderTopColor: hairline,
                 })}
               >
                 <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: "rgba(0,131,120,0.12)",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
+                  // `rgba(0,131,120,0.12)` was an exact match for
+                  // `primary-container` at 12%, so it becomes that token. Radius
+                  // 10 -> 12, the same off-scale correction VitalsCard's note box
+                  // already took (BRAND's scale is 4/12/24/full).
+                  className="h-9 w-9 items-center justify-center rounded-md bg-primary-container/12"
                 >
-                  <MaterialIcons name={a.icon} size={18} color="#00685f" />
+                  <Icon chrome={a.icon} size={18} color={primary} />
                 </View>
+                {/* Was 15px/600 inline at `#171d1c`. 15 is on no BRAND step;
+                    `label-md` is the 14/600 the ramp actually defines. */}
                 <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: "#171d1c",
-                    minWidth: 160,
-                  }}
+                  className="font-label-md text-label-md text-on-surface"
+                  style={{ minWidth: 160 }}
                 >
                   {a.label}
                 </Text>
@@ -588,16 +643,23 @@ export function ChatThreadScreen() {
                 borderRadius: 16,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: clinicalOpen ? "#004d46" : pressed ? "#005049" : "#00685f",
+                // Was `#004d46` / `#005049` / `#00685f` — two hand-darkened
+                // teals over the LIGHT `primary`. Hand-darkening is backwards in
+                // dark mode, where `primary` resolves to the LIGHT end of the
+                // ramp (107,216,203) and "deeper" has to mean lighter. The M3
+                // state layer gets that right in both modes for free.
+                backgroundColor: clinicalOpen
+                  ? primaryActive
+                  : pressed
+                    ? primaryPressed
+                    : primary,
               },
               floatingShadow,
             ]}
           >
-            <MaterialIcons
-              name={clinicalOpen ? "close" : "medical-services"}
-              size={24}
-              color="#ffffff"
-            />
+            {/* `#ffffff` was frozen here too — same ~1.5:1 dark-mode failure the
+                composer's send glyph had. */}
+            <Icon chrome={clinicalOpen ? "close" : "medical-services"} size={24} color={onPrimary} />
           </Pressable>
         </View>
 
@@ -706,6 +768,14 @@ export function ChatThreadScreen() {
 const PRESSED_STATE_LAYER = 0.12;
 
 /**
+ * One layer deeper than pressed, for a control that is HELD OPEN rather than
+ * momentarily touched — here, the clinical-actions FAB while its menu is up.
+ * 0.16 is M3's next published step above pressed, so the open and pressed fills
+ * stay distinct (the FAB can be both) without inventing a per-variant token.
+ */
+const ACTIVE_STATE_LAYER = 0.16;
+
+/**
  * A composer glyph button. Extracted because the three in the pill were three
  * copies of the same Pressable, and two of them had no `onPress` — the drift that
  * let them ship as decoration.
@@ -754,14 +824,26 @@ function ComposerIconButton({
 // ---------------------------------------------------------------------------
 
 function OutgoingBubble({ message }: { message: ChatMessage }) {
+  // RN takes no `currentColor`, so the two glyphs in here need real strings.
+  // `on-primary` for the ones sitting ON the teal bubble, `primary` for the
+  // delivery tick, which sits on the page.
+  const onPrimary = useTokenColor("on-primary");
+  const primary = useTokenColor("primary");
+  // The download glyph's `rgba(255,255,255,0.8)`, expressed as the token it was
+  // standing in for.
+  const onPrimaryMuted = useTokenColor("on-primary", 0.8);
+
   return (
     <View className="mb-xs w-full items-end">
       <View style={{ maxWidth: "80%" }}>
         {/* Text portion (above attachment if present) */}
         {message.text ? (
           <View
+            // Was `backgroundColor: "#00685f"` — the LIGHT value of
+            // color/primary frozen in JS, so the bubble stayed dark teal in dark
+            // mode while its `on-primary` text correctly went near-black.
+            className="bg-primary"
             style={{
-              backgroundColor: "#00685f",
               borderRadius: 20,
               borderBottomRightRadius: message.attachment ? 20 : 4,
               paddingHorizontal: 16,
@@ -769,56 +851,52 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
               marginBottom: message.attachment ? 4 : 0,
             }}
           >
-            <Text style={{ color: "#ffffff", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
+            {/* 15/22 is off BRAND's ramp and is left alone on purpose — see the
+                STILL FLAGGED note in the header. Only the colour moves. */}
+            <Text className="text-on-primary" style={{ fontSize: 15, lineHeight: 22 }}>
+              {message.text}
+            </Text>
           </View>
         ) : null}
 
         {/* Attachment card */}
         {message.kind === "attachment" && message.attachment ? (
           <View
+            className="bg-primary"
             style={{
-              backgroundColor: "#00685f",
               borderRadius: 20,
               borderBottomRightRadius: 4,
               padding: 12,
             }}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 10,
-                backgroundColor: "rgba(255,255,255,0.12)",
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.2)",
-                padding: 12,
-              }}
-            >
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  backgroundColor: "rgba(255,255,255,0.2)",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <MaterialIcons name={message.attachment.icon} size={22} color="#ffffff" />
+            {/* The card's fill and border were `rgba(255,255,255,0.12)` and
+                `rgba(255,255,255,0.2)` — white washes that only read as "a
+                lighter patch of the accent" while the accent is dark. In dark
+                mode the bubble is pale teal and a white wash disappears into it.
+                `on-primary` at the same alphas inverts with the bubble.
+
+                Two off-scale numbers came along with the classes, both moving to
+                the nearest real step: the row `gap` 10 -> 8 (BRAND's scale is
+                4/8/12/…) and the icon tile's radius 10 -> 12. Padding 12 and the
+                card's own radius 12 were already on-scale and are unchanged. */}
+            <View className="flex-row items-center gap-base rounded-md border border-on-primary/20 bg-on-primary/12 p-3">
+              <View className="h-10 w-10 items-center justify-center rounded-md bg-on-primary/20">
+                <Icon chrome={message.attachment.icon} size={22} color={onPrimary} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
+                {/* 14/600 is exactly `label-md`, so the inline pair becomes the
+                    token that already means it. */}
                 <Text
-                  style={{
-                    color: "#ffffff",
-                    fontSize: 14,
-                    fontWeight: "600",
-                  }}
+                  className="font-label-md text-label-md text-on-primary"
                   numberOfLines={1}
                 >
                   {message.attachment.name}
                 </Text>
-                <Text style={{ color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 2 }}>
+                {/* …and 12 is exactly `label-sm`. */}
+                <Text
+                  className="font-label-sm text-label-sm text-on-primary/75"
+                  style={{ marginTop: 2 }}
+                >
                   {/* Local media says so, in words. There is no upload endpoint,
                       so "sent" would be false. */}
                   {message.attachment.localUri
@@ -830,7 +908,7 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
                   nowhere to download it FROM, and a control that cannot work is
                   the exact defect this change was opened to fix. */}
               {message.attachment.localUri ? null : (
-                <MaterialIcons name="download" size={20} color="rgba(255,255,255,0.8)" />
+                <Icon chrome="download" size={20} color={onPrimaryMuted} />
               )}
             </View>
           </View>
@@ -841,8 +919,9 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           className="mt-xs flex-row items-center justify-end gap-xs"
           style={{ paddingRight: 4 }}
         >
-          <Text style={{ fontSize: 11, color: "#6d7a77" }}>{message.timestamp}</Text>
-          {message.delivered ? <MaterialIcons name="done-all" size={14} color="#00685f" /> : null}
+          {/* Was 11px — under BRAND's 12sp floor — at a frozen `#6d7a77`. */}
+          <Text className="font-label-sm text-label-sm text-outline">{message.timestamp}</Text>
+          {message.delivered ? <Icon chrome="done-all" size={14} color={primary} /> : null}
         </View>
       </View>
     </View>
@@ -857,8 +936,11 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
           {/* Intro text */}
           {message.text ? (
             <View
+              // `#dee4e1` is the LIGHT value of surface-container-highest, so it
+              // stayed near-white in dark mode under `on-surface` text that had
+              // correctly gone near-white too — the bubble was unreadable.
+              className="bg-surface-container-highest"
               style={{
-                backgroundColor: "#dee4e1",
                 borderRadius: 20,
                 borderBottomLeftRadius: 4,
                 paddingHorizontal: 16,
@@ -866,14 +948,19 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
                 marginBottom: 6,
               }}
             >
-              <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
+              <Text className="text-on-surface" style={{ fontSize: 15, lineHeight: 22 }}>
+                {message.text}
+              </Text>
             </View>
           ) : null}
 
           {/* Vitals card */}
           <VitalsCard vitals={message.vitals} />
 
-          <Text style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}>
+          <Text
+            className="font-label-sm text-label-sm text-outline"
+            style={{ marginTop: 4, marginLeft: 4 }}
+          >
             {message.timestamp} · {contactName}
           </Text>
         </View>
@@ -885,8 +972,8 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
     <View className="mb-xs w-full items-start">
       <View style={{ maxWidth: "80%" }}>
         <View
+          className="bg-surface-container-highest"
           style={{
-            backgroundColor: "#dee4e1",
             borderRadius: 20,
             borderBottomLeftRadius: 4,
             paddingHorizontal: 16,
@@ -894,10 +981,15 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
           }}
         >
           {message.text ? (
-            <Text style={{ color: "#171d1c", fontSize: 15, lineHeight: 22 }}>{message.text}</Text>
+            <Text className="text-on-surface" style={{ fontSize: 15, lineHeight: 22 }}>
+              {message.text}
+            </Text>
           ) : null}
         </View>
-        <Text style={{ fontSize: 11, color: "#6d7a77", marginTop: 4, marginLeft: 4 }}>
+        <Text
+          className="font-label-sm text-label-sm text-outline"
+          style={{ marginTop: 4, marginLeft: 4 }}
+        >
           {message.timestamp}
         </Text>
       </View>
@@ -988,16 +1080,13 @@ function TimelineDivider({ label }: { label: string }) {
   return (
     <View className="my-sm flex-row items-center gap-sm">
       <View className="h-px flex-1 bg-surface-container-highest" style={{ opacity: 0.7 }} />
-      <Text
-        style={{
-          fontSize: 11,
-          color: "#6d7a77",
-          paddingHorizontal: 8,
-          paddingVertical: 3,
-          backgroundColor: "#f0f5f3",
-          borderRadius: 99,
-        }}
-      >
+      {/* Was 11px at `#6d7a77` on an `#f0f5f3` chip — a size under BRAND's 12sp
+          floor on two frozen light-mode fills. `surface-container-low` is the
+          token `#f0f5f3` was approximating (240,245,242, a 1/255 blue shift), and
+          it darkens to #171D1C in dark mode where the literal did not. Vertical
+          padding 3 -> 4 puts it on the spacing scale; `rounded-full` replaces the
+          99 that was standing in for it. */}
+      <Text className="rounded-full bg-surface-container-low px-base py-xs font-label-sm text-label-sm text-outline">
         {label}
       </Text>
       <View className="h-px flex-1 bg-surface-container-highest" style={{ opacity: 0.7 }} />
