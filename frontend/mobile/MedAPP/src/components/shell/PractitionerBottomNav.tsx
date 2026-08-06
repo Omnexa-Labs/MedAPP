@@ -48,49 +48,60 @@ interface TabDef {
   label: string;
   /** Health Icons name — the frame uses the domain set, not chrome, for tabs. */
   icon: HealthIconName;
-  /**
-   * Real route in src/app/(app)/, or `null` where the practitioner destination
-   * does not exist yet. `null` tabs render (the shell is fixed across the app —
-   * docs/BRAND.md: "Never rename, reorder, or add tabs on a single screen") but
-   * no-op on press and say so to assistive tech, rather than pushing an invented
-   * path or a patient screen.
-   */
-  href: Href | null;
+  /** Real route in src/app/(app)/. Every tab has one; see the map below. */
+  href: Href;
 }
 
 /**
- * FLAGGED — route coverage for the practitioner tab set. Keep this in sync with
+ * Route coverage for the practitioner tab set. Keep this in sync with
  * `src/app/(app)/`; it is the one place anyone looks to answer "which
  * practitioner destinations exist?", so a stale entry here is worse than none.
- * Missing today: a practitioner home and a practitioner self-profile.
  *
- * STATUS 2026-08-05: both are being DESIGNED (Figma page "Practitioner Shell").
- * Until the screens are built and routed, the two `null` tabs render dimmed and
- * report `disabled` — see the INTERIM note on the Pressable below, which also
- * states the condition for removing it. Two of five tabs dead is the same defect
- * class as the patient nav's six hand-written `onTabPress` switches, three of
- * which silently dropped Inbox; the difference is that here the destinations do
- * not exist yet, so a shared tab map cannot fix it.
+ * STATUS 2026-08-05: **complete — all five tabs navigate.** `practitioner-home`
+ * and `practitioner-profile` were built from the approved Figma page
+ * "Practitioner Shell" (1018:640) and routed, which is the condition the INTERIM
+ * treatment on the Pressable below stated for its own removal. That treatment —
+ * the `unrouted` const, the 0.6 opacity, the `disabled` accessibility state and
+ * the "Not available yet" hint — is GONE, along with the `href: null` case in
+ * `TabDef`. Nothing in this component can render a dead tab any more, which is
+ * the point: the type no longer permits one.
  *
- *   Home         (none)                      practitioner home not built
- *   Appointments /(app)/appointments         EXISTS — but AppointmentManagement
- *                                            is authored patient-side ("View My
- *                                            Appointments" from BookingConfirmed).
- *                                            Wired because it exists and is the
- *                                            right concept; needs a practitioner
- *                                            variant.
- *   Inbox        /(app)/inbox                EXISTS — audience-neutral.
+ * Two of five tabs used to be dead here, the same defect class as the patient
+ * nav's six hand-written `onTabPress` switches, three of which silently dropped
+ * Inbox. That comparison now holds all the way: both bars are a single map.
+ *
+ *   Home         /(app)/practitioner-home     EXISTS — PractitionerHomeScreen,
+ *                                             Figma 1019:673 / 1022:853.
+ *   Appointments /(app)/appointments          EXISTS — but AppointmentManagement
+ *                                             is authored patient-side ("View My
+ *                                             Appointments" from BookingConfirmed).
+ *                                             Wired because it exists and is the
+ *                                             right concept; STILL needs a
+ *                                             practitioner variant. This is the
+ *                                             one remaining audience mismatch in
+ *                                             the bar.
+ *   Inbox        /(app)/inbox                 EXISTS — audience-neutral.
  *   Patients     /(app)/active-patient-roster-2   EXISTS — ActivePatientRoster2Screen,
- *                                            which mounts <PractitionerShell
- *                                            activeTab="patients" hideBack>.
- *   Profile      (none)                      practitioner-social-profile is the
- *                                            PATIENT-facing view of a specialist
- *                                            (entry points: Explore, Community),
- *                                            not the practitioner's own profile,
- *                                            so it is deliberately NOT wired here.
+ *                                             which mounts <PractitionerShell
+ *                                             activeTab="patients" hideBack>.
+ *   Profile      /(app)/practitioner-profile  EXISTS — PractitionerProfileScreen,
+ *                                             Figma 1020:16094 / 1022:918. NOT
+ *                                             `practitioner-social-profile`,
+ *                                             which is the PATIENT-facing view of
+ *                                             a specialist (entry points: Explore,
+ *                                             Community) and is deliberately not
+ *                                             wired here.
  */
+export const PRACTITIONER_TAB_HREFS: Record<PractitionerTab, Href> = {
+  home: "/(app)/practitioner-home" as Href,
+  appointments: "/(app)/appointments" as Href,
+  inbox: "/(app)/inbox" as Href,
+  patients: "/(app)/active-patient-roster-2" as Href,
+  profile: "/(app)/practitioner-profile" as Href,
+};
+
 const TABS: TabDef[] = [
-  { key: "home", label: "Home", icon: "home", href: null },
+  { key: "home", label: "Home", icon: "home", href: PRACTITIONER_TAB_HREFS.home },
   {
     // "Schedule", not "Appointments". At label-sm 12 in a ~75px tab,
     // "Appointments" (12 chars) truncated to "Appointmen..." on device. The floor
@@ -106,17 +117,17 @@ const TABS: TabDef[] = [
     key: "appointments",
     label: "Schedule",
     icon: "appointment",
-    href: "/(app)/appointments" as Href,
+    href: PRACTITIONER_TAB_HREFS.appointments,
   },
-  { key: "inbox", label: "Inbox", icon: "message", href: "/(app)/inbox" as Href },
+  { key: "inbox", label: "Inbox", icon: "message", href: PRACTITIONER_TAB_HREFS.inbox },
   // The "-2" is vestigial, not meaningful: there is no roster 1. `features/roster/`
   // is an empty directory and no `/(app)/active-patient-roster` route exists, so
   // there is nothing to compare against or hold as regression coverage. A shared
   // nav is now coupled to a name that implies a sibling which was never built —
   // worth renaming to `active-patient-roster` when the screen next moves, together
   // with `features/roster2/` and `ActivePatientRoster2Screen`.
-  { key: "patients", label: "Patients", icon: "community", href: "/(app)/active-patient-roster-2" as Href },
-  { key: "profile", label: "Profile", icon: "doctor", href: null },
+  { key: "patients", label: "Patients", icon: "community", href: PRACTITIONER_TAB_HREFS.patients },
+  { key: "profile", label: "Profile", icon: "doctor", href: PRACTITIONER_TAB_HREFS.profile },
 ];
 
 const BAR_HEIGHT = 64;

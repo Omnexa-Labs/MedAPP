@@ -56,42 +56,39 @@ describe("PractitionerBottomNav", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/inbox");
   });
 
-  it("pushes Patients now that the roster route exists, while Profile remains unavailable", () => {
-    render(<PractitionerBottomNav active="home" />);
-    fireEvent.press(screen.getByLabelText("Patients"));
-    expect(mockPush).toHaveBeenCalledWith("/(app)/active-patient-roster-2");
-    mockPush.mockClear();
-    const tab = screen.getByLabelText("Profile");
-    expect(tab.props.accessibilityHint).toBe("Not available yet");
-    fireEvent.press(tab);
-    expect(mockPush).not.toHaveBeenCalled();
+  it("routes ALL FIVE tabs — Home and Profile are no longer dead", () => {
+    // Converted, not deleted. This used to assert Profile was unavailable, and
+    // its sibling asserted the dimming. Both were correct while the destinations
+    // did not exist; both had to fail the moment they did, which is what a
+    // conditional treatment's test is FOR. See PRACTITIONER_TAB_HREFS.
+    render(<PractitionerBottomNav active="inbox" />);
+
+    for (const [label, href] of [
+      ["Home", "/(app)/practitioner-home"],
+      ["Schedule", "/(app)/appointments"],
+      ["Patients", "/(app)/active-patient-roster-2"],
+      ["Profile", "/(app)/practitioner-profile"],
+    ] as const) {
+      mockPush.mockClear();
+      fireEvent.press(screen.getByLabelText(label));
+      expect(mockPush).toHaveBeenCalledWith(href);
+    }
   });
 
-  it("makes an unrouted tab visibly AND semantically unavailable, not just hinted", () => {
-    // The defect this locks: Home and Profile have no destination, and that was
-    // announced to assistive tech only. A sighted practitioner saw five identical
-    // tabs, tapped one of the two dead ones, and got silence with no explanation.
-    //
-    // Both channels are asserted because fixing one and not the other is the easy
-    // mistake — the hint alone shipped for weeks.
+  it("leaves NO tab dimmed or disabled — the interim treatment is gone", () => {
+    // The mirror of the test this replaces. Home and Profile once rendered at
+    // 0.6 opacity with `disabled: true` and a "Not available yet" hint, because
+    // they went nowhere. Now they go somewhere, so every trace must be gone —
+    // a tab that still looks unavailable while working is the same lie in
+    // reverse.
     render(<PractitionerBottomNav active="patients" />);
 
-    for (const label of ["Home", "Profile"]) {
+    for (const label of ["Home", "Schedule", "Inbox", "Patients", "Profile"]) {
       const tab = screen.getByLabelText(label);
-      expect(tab.props.accessibilityState.disabled).toBe(true);
-      expect(tab.props.accessibilityHint).toBe("Not available yet");
-      // Dimmed. Flattened because the style is an array once a Pressable has both
-      // a className-derived style and an inline one.
+      expect(tab.props.accessibilityState.disabled).toBeFalsy();
+      expect(tab.props.accessibilityHint).not.toBe("Not available yet");
       const style = StyleSheet.flatten(tab.props.style) ?? {};
-      expect(style.opacity).toBe(0.6);
-    }
-
-    // The routed tabs must NOT pick up either treatment.
-    for (const label of ["Schedule", "Inbox"]) {
-      const tab = screen.getByLabelText(label);
-      expect(tab.props.accessibilityState.disabled).toBe(false);
-      const style = StyleSheet.flatten(tab.props.style) ?? {};
-      expect(style.opacity).toBe(1);
+      expect(style.opacity ?? 1).toBe(1);
     }
   });
 

@@ -128,7 +128,7 @@
 import { useContext, useState } from "react";
 import { Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { AppearanceSelector, AvatarWithFallback, Icon } from "@/components/ui";
 import { useTokenColor, useTokenShadow } from "@/lib/tokens";
 import { PATIENT_APP_BAR_HEIGHT } from "./PatientAppBar";
@@ -165,7 +165,47 @@ async function signOutNow() {
   await useAuthStore.getState().signOut();
 }
 
-/** Where Profile goes. The route exists and, until this menu, nothing linked to it. */
+// ============================================================================
+// NOW SHARED WITH THE PRACTITIONER SHELL (PO ruling, 2026-08-05)
+// ============================================================================
+// The PO ruled that the account menu lives on `practitioner-profile`. Until that
+// screen existed, a clinician could not sign out or change appearance AT ALL —
+// the practitioner app bar has no avatar (PractitionerAppBar's own flag: "the
+// avatar is GONE from this bar"), so there was no surface to hang this off, and
+// `signOut()` was unreachable for the entire practitioner audience.
+//
+// This file was NOT copied. Three things were patient-specific and are now
+// props, each defaulting to the patient behaviour so `PatientShell` is unchanged:
+//
+//   profileHref   was the hardcoded `ACCOUNT_MENU_PROFILE_HREF`. The
+//                 practitioner passes `null`, which HIDES the Profile row —
+//                 correct, because the only screen that opens this menu for a
+//                 clinician IS their profile, and a row that navigates to the
+//                 screen you are already on is the stutter `goToProfile`'s
+//                 `navigate` was chosen to avoid in the first place.
+//   anchorTop     was `PATIENT_APP_BAR_HEIGHT`, baked in. The practitioner bar
+//                 is a different height and the panel would otherwise float
+//                 over or under it.
+//   initialView   was always "menu". The practitioner profile draws a
+//                 destructive "Sign out" BUTTON (1020:16202), not a menu row,
+//                 so it opens straight onto the confirmation — the button IS
+//                 the "Sign out" affordance, and making the user press a second
+//                 identical one inside a popover would be a maze, not a guard.
+//                 The confirmation itself is preserved, which is the guard that
+//                 actually matters (see the two-guards note above).
+//
+// What is NOT parameterised, deliberately: the confirmation copy, the sign-out
+// ordering (`router.replace` before `signOut()`), the separation rules, and the
+// Appearance block. Those are the reasons this component exists; a second
+// audience is not a reason to make them negotiable.
+// ============================================================================
+
+/**
+ * Where Profile goes FOR A PATIENT. The route exists and, until this menu,
+ * nothing linked to it. Kept as a named export because `PatientShell` and its
+ * tests assert against it; it is now the DEFAULT of `profileHref`, not the only
+ * possible value.
+ */
 export const ACCOUNT_MENU_PROFILE_HREF = "/(app)/patient-profile-overview" as const;
 /** Where sign-out lands. `(app)`'s guard agrees; this navigates there on purpose. */
 export const SIGN_OUT_HREF = "/(public)/sign-in" as const;
@@ -206,9 +246,28 @@ export interface AccountMenuProps {
   accountName?: string;
   avatarUri?: string | null;
   avatarInitials?: string | null;
+  /**
+   * Where the Profile row goes, or `null` to omit the row entirely.
+   *
+   * `null` is for a caller that IS the profile — the practitioner profile screen
+   * opens this menu, so a "Profile" row there would navigate to itself.
+   */
+  profileHref?: Href | null;
+  /**
+   * Distance from the top of the screen (BELOW the safe-area inset, which is
+   * added on top of this) at which the panel hangs. Defaults to the patient app
+   * bar's height, which is what the patient avatar sits in.
+   */
+  anchorTop?: number;
+  /**
+   * Which view opens first. A caller whose own affordance already says "Sign
+   * out" passes `"confirm-sign-out"` so the confirmation is the FIRST thing the
+   * user sees rather than the second identical button.
+   */
+  initialView?: MenuView;
 }
 
-type MenuView = "menu" | "confirm-sign-out";
+export type MenuView = "menu" | "confirm-sign-out";
 
 export function AccountMenu({
   visible,
@@ -216,8 +275,11 @@ export function AccountMenu({
   accountName = "Your account",
   avatarUri,
   avatarInitials,
+  profileHref = ACCOUNT_MENU_PROFILE_HREF,
+  anchorTop = PATIENT_APP_BAR_HEIGHT,
+  initialView = "menu",
 }: AccountMenuProps) {
-  const [view, setView] = useState<MenuView>("menu");
+  const [view, setView] = useState<MenuView>(initialView);
   // `useContext(SafeAreaInsetsContext)` — NOT `useSafeAreaInsets()`, which THROWS
   // ("No safe area value available") when there is no `<SafeAreaProvider>` above
   // it. At runtime there always is one, but this component is mounted by
@@ -239,13 +301,17 @@ export function AccountMenu({
   // tinted with the `shadow` token rather than grey.
   const shadow = useTokenShadow("shadow", { y: 2, blur: 6, opacity: 0.08 });
 
-  // Always reopen on the menu, never on a half-finished confirmation.
+  // Always reopen on the view the caller asked for, never on a half-finished
+  // confirmation. `initialView`, not a literal "menu": a caller that opens
+  // straight onto the confirmation must not have a dismissal silently promote it
+  // to the full menu the next time its button is pressed.
   const close = () => {
-    setView("menu");
+    setView(initialView);
     onClose();
   };
 
   const goToProfile = () => {
+    if (!profileHref) return;
     close();
     // `navigate`, not `push`. PatientShell argues AGAINST `navigate` for TAB
     // switching and that reasoning does not transfer: there the objection is
@@ -256,7 +322,7 @@ export function AccountMenu({
     // the existing instance when there is one and pushes when there is not,
     // which is precisely the dedupe wanted. The screen keeps its own back button
     // (`hideBack={false}`), so a push is still the right shape when it happens.
-    router.navigate(ACCOUNT_MENU_PROFILE_HREF);
+    router.navigate(profileHref);
   };
 
   const confirmSignOut = () => {
@@ -304,7 +370,7 @@ export function AccountMenu({
               {
                 width: accountMenuWidth(width),
                 right: MENU_MARGIN,
-                top: topInset + PATIENT_APP_BAR_HEIGHT + PANEL_OFFSET,
+                top: topInset + anchorTop + PANEL_OFFSET,
                 padding: PANEL_PAD,
               },
               shadow,
@@ -357,20 +423,31 @@ export function AccountMenu({
             <View className="h-px bg-outline-variant" />
 
             {/* Profile — the reason the avatar is a button at all, and the link
-                that un-orphans /(app)/patient-profile-overview. */}
-            <Pressable
-              accessibilityRole="menuitem"
-              accessibilityLabel="Profile"
-              onPress={goToProfile}
-              className="flex-row items-center gap-3 rounded-md px-3 active:opacity-70"
-              style={{ minHeight: ROW_HEIGHT }}
-            >
-              <Icon chrome="person-outline" size={GLYPH} color={onSurfaceVariant} />
-              <Text className="flex-1 font-body-md text-body-md text-on-surface">Profile</Text>
-              <Icon chrome="chevron-right" size={GLYPH} color={onSurfaceVariant} />
-            </Pressable>
+                that un-orphans /(app)/patient-profile-overview.
 
-            <View className="h-px bg-outline-variant" />
+                OMITTED, not disabled, when `profileHref` is null. The
+                practitioner profile screen is the only caller that does that,
+                and there the row would navigate to itself; a dimmed row would
+                imply a destination exists and is temporarily out of reach,
+                which is the same half-truth the dimmed nav tabs told. Its
+                divider goes with it, or the panel opens on a stray hairline. */}
+            {profileHref ? (
+              <>
+                <Pressable
+                  accessibilityRole="menuitem"
+                  accessibilityLabel="Profile"
+                  onPress={goToProfile}
+                  className="flex-row items-center gap-3 rounded-md px-3 active:opacity-70"
+                  style={{ minHeight: ROW_HEIGHT }}
+                >
+                  <Icon chrome="person-outline" size={GLYPH} color={onSurfaceVariant} />
+                  <Text className="flex-1 font-body-md text-body-md text-on-surface">Profile</Text>
+                  <Icon chrome="chevron-right" size={GLYPH} color={onSurfaceVariant} />
+                </Pressable>
+
+                <View className="h-px bg-outline-variant" />
+              </>
+            ) : null}
 
             {/* Appearance — the orphaned three-way control, given a home. The
                 heading is a plain label, not a SectionHeader: SectionHeader is

@@ -27,24 +27,38 @@ export {
 // body, with no bottom nav and no way to ask for one.
 export { DetailShell, DETAIL_SHELL_EDGES } from "./DetailShell";
 export { PatientAppBar, PATIENT_APP_BAR_HEIGHT } from "./PatientAppBar";
-// What the patient app bar's AVATAR opens — Profile, Appearance, Sign out.
-// `PatientShell` mounts it by default, so a screen normally never names it; it is
-// exported for tests and for a future practitioner equivalent. Reaching for it
-// directly from a screen re-creates the per-screen-chrome problem the shell
-// exists to end.
+// Profile, Appearance, Sign out — for BOTH audiences now, from one file.
+//
+// Patient: `PatientShell` mounts it by default behind the app bar's avatar, so a
+// patient screen never names it. Reaching for it directly from a patient screen
+// re-creates the per-screen-chrome problem the shell exists to end.
+//
+// Practitioner: mounted by `PractitionerProfileScreen`, because the PO ruled the
+// account menu lives there and the practitioner app bar has no avatar to hang it
+// off. It is parameterised (`profileHref`, `anchorTop`, `initialView`), NOT
+// duplicated — a second copy would be a second sign-out flow to keep in step
+// with the confirmation rules this component exists to enforce.
 export {
   AccountMenu,
   accountMenuWidth,
   ACCOUNT_MENU_PROFILE_HREF,
   SIGN_OUT_HREF,
   type AccountMenuProps,
+  type MenuView,
 } from "./AccountMenu";
 // PATIENT_TAB_HREFS is the single source of truth for where the five patient
 // tabs go. Exported so a test (or a future `<Tabs>` layout) can assert against
 // the map rather than re-typing the route strings.
 export { PatientShell, PATIENT_TAB_HREFS } from "./PatientShell";
-export { PractitionerAppBar } from "./PractitionerAppBar";
-export { PractitionerBottomNav, type PractitionerTab } from "./PractitionerBottomNav";
+export { PractitionerAppBar, PRACTITIONER_APP_BAR_HEIGHT } from "./PractitionerAppBar";
+// PRACTITIONER_TAB_HREFS is the practitioner counterpart of PATIENT_TAB_HREFS:
+// the single source of truth for where the five practitioner tabs go, exported
+// so a test asserts against the map rather than re-typing the route strings.
+export {
+  PractitionerBottomNav,
+  PRACTITIONER_TAB_HREFS,
+  type PractitionerTab,
+} from "./PractitionerBottomNav";
 export { PractitionerShell } from "./PractitionerShell";
 // Re-exported so a patient screen can type its `activeTab` without reaching into
 // the features tree. The bar itself stays in features/home for now — 12 screens

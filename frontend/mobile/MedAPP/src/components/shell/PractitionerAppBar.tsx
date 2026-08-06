@@ -45,7 +45,15 @@ import { router, type Href } from "expo-router";
 import { Icon, Logo } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 
-const BAR_HEIGHT = 64;
+/**
+ * Exported for the same reason `PATIENT_APP_BAR_HEIGHT` is: `AccountMenu`
+ * anchors itself below the bar it was opened from, and a second copy of "64"
+ * in the practitioner profile screen is a number that would silently stop
+ * agreeing with this file the day 656:850 changes height.
+ */
+export const PRACTITIONER_APP_BAR_HEIGHT = 64;
+
+const BAR_HEIGHT = PRACTITIONER_APP_BAR_HEIGHT;
 const TARGET = 44; // the frame's own touch target — already >= the 44pt floor
 const GLYPH = 24;
 const LOGO_HEIGHT = 42;
