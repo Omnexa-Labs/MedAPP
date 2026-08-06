@@ -92,10 +92,12 @@
 //     exists. Flag carried by SignupAppBar itself.
 
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Button, Card, Icon } from "@/components/ui";
+import { Button, Card, Icon,
+  KeyboardInset,
+} from "@/components/ui";
 import { SignupAppBar } from "@/features/auth/components/SignupAppBar";
 import {
   CODE_LENGTH,
@@ -241,10 +243,10 @@ export function SignUpVerifyScreen({ email, onVerified, onBack }: Props) {
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
 
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
+        {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
           {/* AppBar + Stepper (292:157) — outside the ScrollView, as the frame
               pins it above the body. Step=1 unchanged: the gate closes out step
               1 rather than adding a step. */}
@@ -453,7 +455,7 @@ export function SignUpVerifyScreen({ email, onVerified, onBack }: Props) {
               />
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInset>
       </SafeAreaView>
     </View>
   );

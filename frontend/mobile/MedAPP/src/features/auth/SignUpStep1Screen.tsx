@@ -88,7 +88,7 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
 
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Link, router } from "expo-router";
@@ -102,6 +102,7 @@ import {
   Icon,
   Input,
   type BrandMarkName,
+  KeyboardInset,
 } from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { useTokenColor } from "@/lib/tokens";
@@ -150,10 +151,10 @@ export function SignUpStep1Screen({ onNext }: Props) {
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
 
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
+        {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
           {/* ---------------- AppBar + Stepper (292:157) ----------------
               Outside the ScrollView: the frame pins it above the body, and it
               carries the only way back out of the flow. Extracted to
@@ -457,7 +458,7 @@ export function SignUpStep1Screen({ onNext }: Props) {
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInset>
       </SafeAreaView>
     </View>
   );

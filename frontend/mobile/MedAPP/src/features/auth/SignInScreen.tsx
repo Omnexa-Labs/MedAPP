@@ -79,8 +79,6 @@
 
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -100,6 +98,7 @@ import {
   Input,
   Logo,
   type InfoCalloutTone,
+  KeyboardInset,
 } from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { useTokenColor } from "@/lib/tokens";
@@ -223,10 +222,10 @@ export function SignInScreen({ onSuccess }: Props) {
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
 
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
+        {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
           <ScrollView
             // The frame centres its column, but at 393px the content is ~850px
             // tall — taller than the viewport on the target devices — so it has
@@ -529,7 +528,7 @@ export function SignInScreen({ onSuccess }: Props) {
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInset>
       </SafeAreaView>
     </View>
   );

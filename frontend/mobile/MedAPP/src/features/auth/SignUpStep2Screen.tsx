@@ -117,9 +117,7 @@
 
 import { useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -129,7 +127,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Card, ChoiceChip, Icon, Input, type HealthIconName } from "@/components/ui";
+import { Button, Card, ChoiceChip, Icon, Input, type HealthIconName,
+  KeyboardInset,
+} from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { useTokenColor } from "@/lib/tokens";
 import { SignupAppBar } from "@/features/auth/components/SignupAppBar";
@@ -273,10 +273,10 @@ export function SignUpStep2Screen({ onBack, onNext }: Props) {
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
 
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
+        {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
           {/* AppBar + Stepper (292:585) — outside the ScrollView: the frame
               pins it above the body, and it carries the way back out. */}
           <SignupAppBar
@@ -523,7 +523,7 @@ export function SignUpStep2Screen({ onBack, onNext }: Props) {
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInset>
       </SafeAreaView>
     </View>
   );

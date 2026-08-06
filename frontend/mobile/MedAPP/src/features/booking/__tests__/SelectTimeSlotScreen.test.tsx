@@ -520,13 +520,17 @@ describe("frame reconciliation", () => {
     expect(screen.getByLabelText("Verified")).toBeTruthy();
   });
 
-  it("keeps the docked CTA inside a KeyboardAvoidingView (758:2091)", () => {
+  it("keeps the docked CTA inside the keyboard inset (758:2091)", () => {
+    // Was KeyboardAvoidingView. That component infers the keyboard from a window
+    // resize, and Android edge-to-edge no longer resizes the window — proven on
+    // device, where the chat composer stayed buried even with behavior="padding".
+    // The intent of this test is unchanged: the docked CTA must ride up with the
+    // keyboard rather than sit under it.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { KeyboardInset } = require("@/components/ui");
     render(<SelectTimeSlotScreen />);
-    const kav = screen.UNSAFE_getByType(
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      require("react-native").KeyboardAvoidingView,
-    );
-    expect(within(kav).getByLabelText("Book Now")).toBeTruthy();
+    const inset = screen.UNSAFE_getByType(KeyboardInset);
+    expect(within(inset).getByLabelText("Book Now")).toBeTruthy();
   });
 
   it("carries no colour literal, no icon-library import, and no frozen date or rating", () => {

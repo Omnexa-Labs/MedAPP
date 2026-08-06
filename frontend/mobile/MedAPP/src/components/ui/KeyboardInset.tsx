@@ -41,12 +41,13 @@
 // the content column shrinks and a bottom-anchored child rides up with it. That
 // matches what the old KAV was TRYING to do with `behavior="padding"`.
 //
-// The subtlety is the safe-area inset. Under edge-to-edge, a screen that already
-// reserves the bottom inset (for the gesture bar) would double-count it once the
-// keyboard is open — the keyboard covers the gesture bar, so that reservation is
-// no longer needed. `subtractBottomInset` handles that: pass it when the parent
-// claims the bottom inset itself. The value is clamped at 0 so a small keyboard
-// on a large inset can never produce negative padding.
+// NO SAFE-AREA SUBTRACTION, and that was a deliberate removal. A first version
+// took a `subtractBottomInset` prop and called `useSafeAreaInsets()` for screens
+// whose shell reserves the gesture bar. Nothing passed it — every current caller
+// sits in a shell with `claimsBottomInset={false}` — and the hook made this
+// component REQUIRE a SafeAreaProvider, which broke two booking suites that
+// render without one. An unused option that imposes a context requirement is a
+// bad trade; add it back with a caller when a screen actually needs it.
 //
 // Animated rather than a state update on a keyboard event: `useAnimatedKeyboard`
 // tracks the IME frame-by-frame on the UI thread, so the composer travels WITH
@@ -56,35 +57,21 @@
 // None is used — reanimated and safe-area-context only.
 
 import type { ReactNode } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from "react-native-reanimated";
 
 interface Props {
   children: ReactNode;
-  /**
-   * True when the PARENT already reserves the bottom safe-area inset. The
-   * keyboard covers the gesture bar, so that reservation must come back off
-   * while it is open or the composer floats above the keyboard by the inset.
-   */
-  subtractBottomInset?: boolean;
   className?: string;
   testID?: string;
 }
 
-export function KeyboardInset({
-  children,
-  subtractBottomInset = false,
-  className,
-  testID,
-}: Props) {
+export function KeyboardInset({ children, className, testID }: Props) {
   const keyboard = useAnimatedKeyboard();
-  const insets = useSafeAreaInsets();
 
   const style = useAnimatedStyle(() => {
-    const inset = subtractBottomInset ? insets.bottom : 0;
-    // Clamped: a keyboard shorter than the inset must not push content DOWN.
-    const padding = Math.max(keyboard.height.value - inset, 0);
-    return { paddingBottom: padding };
+    // Clamped at 0 — `height` should never be negative, but a floor costs
+    // nothing and a negative padding would push content off-screen.
+    return { paddingBottom: Math.max(keyboard.height.value, 0) };
   });
 
   return (

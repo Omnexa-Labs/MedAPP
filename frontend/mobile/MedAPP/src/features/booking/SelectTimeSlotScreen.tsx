@@ -110,7 +110,7 @@
 // This file uses none.
 
 import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { Platform, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { DetailShell } from "@/components/shell";
 import {
@@ -124,6 +124,7 @@ import {
   Input,
   PractitionerSummaryRow,
   SectionHeader,
+  KeyboardInset,
 } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import {
@@ -409,10 +410,10 @@ export function SelectTimeSlotScreen() {
           the bar ride above the keyboard in 758:2091 instead of sitting behind
           it. It is a direct child of the shell's flex-1 body, i.e. BELOW the app
           bar — a KAV above the bar lifts the bar off the top of the screen. */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
-      >
+      {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
         <ScrollView
           contentContainerStyle={{ paddingTop: GUTTER, paddingBottom: SCROLL_BOTTOM_PAD }}
           showsVerticalScrollIndicator={false}
@@ -583,7 +584,7 @@ export function SelectTimeSlotScreen() {
             disabled: !canProceed,
           }}
         />
-      </KeyboardAvoidingView>
+      </KeyboardInset>
     </DetailShell>
   );
 }
