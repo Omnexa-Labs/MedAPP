@@ -2200,6 +2200,43 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
 
   — *Claim stays open through Build and BuildReview per §5c.*
 
+## 5w. **DONE 2026-08-06** — the chat_thread frame described the wrong conversation. PO ruled the FRAME wrong.
+
+Raised by the PO: "the chat design doesn't match what is on figma." It did not, and the code had
+already flagged why (`ChatThreadScreen.tsx` header, "THE FRAME AND THIS SCREEN ARE NOT THE SAME
+CONVERSATION"). `552:1376` drew a clinician GROUP room — "ICU Night Shift", "8 members · 3 online
+now", per-message sender attribution, "Shift started · 19:00", "Nurse Jennifer joined the shift" —
+on the route that serves the patient's 1:1 with their doctor.
+
+**PO ruling: the frame was wrong.** The evidence supported it — `InboxScreen` pushes `?name=&role=`
+as a 1:1; there are no messaging endpoints at all, so member count, presence and join events would
+all have been fabricated; and the frame's cast was invented.
+
+### `552:1376` is now the patient↔doctor 1:1
+Title → `Dr. Adjoa Boateng`, context bar → `Doctor · Cardiologist` / `Online now`, divider →
+`Today`, composer → `Type a message…`. Sender attribution is off, and the whole thread was rewritten
+— it had been clinician handover talk about "Patient-8821", i.e. the patient reading about
+themselves in the third person.
+
+### `practitioner_chat — care team thread` is new, on Practitioner Shell
+`1057:1448` (light) and `1059:17684` (DARK proof, pinned). The group design was **recovered, not
+redrawn** — it was good work filed against the wrong route. Measured 223.5 → 53.3 mean luminance,
+83.9% light → 81.4% dark, colours 983 → 1001.
+
+### Two library-level defects fixed on the way
+1. **`Chat Bubble / Other` (`550:2013`) shipped `"Dr. Sarah Chen · Attending Physician"` as the
+   DEFAULT of its `Sender#550:8` property.** Every future instance would inherit an invented name.
+   This is the third occurrence of that defect (booking's "Dr. Sarah Jenkins", the Account Menu's
+   "Akosua Mensah"). Default is now `Dr. Kwabena Osei · Attending Physician`, from the seeded roster.
+2. **Sender was being switched with a raw `visible = false` on the text node instead of the
+   component's `Show sender#550:11` boolean.** An instance does not expose invisible children, so
+   the node did not survive duplication at all — cloning the frame produced a bubble with no Sender
+   to restore. Both frames now use the property.
+
+**Practitioner chat was entirely undesigned before this** — Practitioner Shell held only home and
+profile, and the practitioner Inbox tab points at the shared `/(app)/inbox`. PO asked for design
+then build; the build is the next entry.
+
 ## 5y. **FOR REVIEW 2026-08-06** — the account popover becomes a full Settings page
 
 Requested by the PO. It also closes a defect `AccountMenu.tsx` had already flagged against
