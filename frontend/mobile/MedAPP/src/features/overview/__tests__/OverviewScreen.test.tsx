@@ -6,7 +6,14 @@
 // <PatientShell onTabPress>. Each has an assertion below.
 
 import { screen, fireEvent } from "@testing-library/react-native";
-import { renderWithSafeArea as render } from "@/test/safe-area";
+import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -18,6 +25,25 @@ jest.mock("expo-router", () => ({
     push: (...args: unknown[]) => mockPush(...args),
     replace: (...args: unknown[]) => mockReplace(...args),
     canGoBack: () => true,
+  },
+}));
+
+// OverviewScreen now reads live vitals, which pulls in three things this suite
+// did not previously need. Predicted in docs/api/inbox_service.md after the
+// chat migration hit the identical trio:
+//   1. `@/hooks/use-current-user` -> auth-store -> `@/lib/config`, which THROWS
+//      at require time under Jest (the landmine AccountMenu.tsx documents).
+//   2. `./api` -> `@/lib/api/client` -> the same throw.
+//   3. react-query hooks cannot be conditional, so a QueryClientProvider is
+//      required even though these cases never exercise a live fetch.
+jest.mock("@/hooks/use-current-user", () => ({
+  useCurrentUser: () => ({ id: "me", displayName: "Ama Mensah", avatarUrl: null }),
+}));
+jest.mock("../api", () => ({
+  ehrApi: {
+    getSummary: jest.fn(async () => ({ patient: null, latestVitals: [], activeConsents: [] })),
+    getBundle: jest.fn(async () => ({ patient: null, vitals: [], consents: [] })),
+    listVitals: jest.fn(async () => []),
   },
 }));
 

@@ -78,7 +78,10 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { ehrApi, type Vital } from "./api";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -148,6 +151,48 @@ interface TrendMetric {
   bars: number[]; // 0..100 heights
 }
 
+/**
+ * Map a live `Vital` onto the card this screen already draws.
+ *
+ * `kind` is FREE TEXT on the wire (`max_length=64`), not an enum, so this
+ * matches loosely and falls back to the raw kind as the label rather than
+ * dropping a reading it does not recognise — a vital the UI cannot name is
+ * still a vital the patient recorded.
+ *
+ * `bars` are NOT derived. They are static design heights with no dates and no
+ * units; inventing a sparkline from a single latest value would draw a trend
+ * that was never measured. The bars stay decorative until the timeline is
+ * charted properly, which needs `GET /{id}/vitals` and a real chart component.
+ */
+function vitalToMetric(v: Vital): TrendMetric {
+  const k = v.kind.toLowerCase();
+  const known: Record<string, { label: string; icon: TrendMetric["icon"] }> = {
+    heart_rate: { label: "Heart Rate", icon: "heart-rate" },
+    heartrate: { label: "Heart Rate", icon: "heart-rate" },
+    blood_pressure: { label: "Blood Pressure", icon: "blood-pressure" },
+    bloodpressure: { label: "Blood Pressure", icon: "blood-pressure" },
+  };
+  const meta = known[k] ?? { label: v.kind, icon: "heart-rate" as TrendMetric["icon"] };
+  return {
+    label: meta.label,
+    // `value` is a STRING on the wire ("122/80") — never parsed as a number.
+    value: v.value,
+    unit: v.unit ?? "",
+    icon: meta.icon,
+    bars: [40, 35, 50, 45, 30, 35, 40],
+  };
+}
+
+/**
+ * The design's placeholder readings.
+ *
+ * KEPT, and used only when the service returns NO vitals. `ehr_service` has no
+ * seeded EHR content yet, so a live-but-empty account would otherwise render an
+ * Overview with no numbers at all — which reads as "your readings are gone"
+ * rather than "nothing recorded yet". FLAGGED: this is a stand-in, and it must
+ * go the moment the seeder covers this service, because placeholder numbers on
+ * a health screen are indistinguishable from real ones.
+ */
 const TREND_METRICS: TrendMetric[] = [
   {
     label: "Heart Rate",
@@ -342,6 +387,23 @@ const TOAST_BOTTOM = 110;
 
 export function OverviewScreen() {
   const [range, setRange] = useState<TrendRange>("7D");
+
+  // `GET /v1/patients/{userId}/summary`. Both PHI routes returned 500 until
+  // 2026-08-07 (two stacked bugs — see docs/api/ehr_service.md), which is why
+  // this screen was still on static data.
+  const currentUser = useCurrentUser();
+  const { data: summary } = useQuery({
+    queryKey: ["ehr", "summary", currentUser?.id],
+    queryFn: () => ehrApi.getSummary(currentUser?.id as string),
+    enabled: Boolean(currentUser?.id),
+  });
+
+  // Live readings when there are any, the design's placeholders when there are
+  // not — see the note on TREND_METRICS.
+  const metrics = useMemo(() => {
+    const live = summary?.latestVitals ?? [];
+    return live.length ? live.map(vitalToMetric) : TREND_METRICS;
+  }, [summary]);
   const { message: toastMessage, tone: toastTone, show: showToast, clear: clearToast } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -367,7 +429,7 @@ export function OverviewScreen() {
       // under a "Latest vitals" heading would be read as measurements.
       const body = buildHealthReportDocument({
         range,
-        metrics: TREND_METRICS.map((m) => ({ label: m.label, value: m.value, unit: m.unit })),
+        metrics: metrics.map((m) => ({ label: m.label, value: m.value, unit: m.unit })),
         doses: MED_DOSES,
         milestones: MILESTONES.map((m) => ({ date: m.date, title: m.title, body: m.body })),
         devices: DEVICES.map((d) => ({ name: d.name, syncedAgo: d.syncedAgo })),
@@ -383,7 +445,7 @@ export function OverviewScreen() {
     } finally {
       setSaving(false);
     }
-  }, [saving, range, showToast]);
+  }, [saving, range, showToast, metrics]);
 
   return (
     <PatientShell
@@ -504,7 +566,7 @@ export function OverviewScreen() {
                   is deleted. The sparkline goes in the component's `footer` slot,
                   which is exactly why that slot is a slot and not a `chart` prop:
                   MiniChart never becomes a dependency of a primitive. */}
-            {TREND_METRICS.map((m) => (
+            {metrics.map((m) => (
               <View key={m.label} style={{ width: "50%", paddingHorizontal: 6, marginBottom: 12 }}>
                 <VitalStatCard
                   label={m.label}
