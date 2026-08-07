@@ -25,7 +25,7 @@ Standing rules this register exists to serve:
 | `nurse_service` / `pharmacist_service` | 13 | ✅ [directory_services.md](directory_services.md) | discovery lists wired |
 | `social_service` | 9 | ❌ | Community — **not wired** |
 | `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
-| `lab_service` | 4 | ❌ | **not wired** |
+| `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
 | `notification_service` | 5 | ❌ | **not wired** |
 | `payment_service` | 6 | ❌ | **not wired** |
 | `wearable_sync_service` | 5 | ❌ | Lifestyle/wearables — **not wired** |

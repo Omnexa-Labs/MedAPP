@@ -75,6 +75,13 @@ ROUTES: dict[str, str] = {
     "/v1/me/preferences": settings.notification_service_url,
     "/v1/me/inbox": settings.notification_service_url,
     "/v1/lab": settings.lab_service_url,
+    # The PATIENT-facing lab routes live under /v1/me/lab (lab_service mounts a
+    # second router there: /results, /summary, /search). Without this entry the
+    # longest matching prefix is "/v1/me" -> user_service, which has no such
+    # routes, so a patient asking for their own lab results got a 404 from the
+    # wrong service. Proven live before the fix. Longer prefix wins, and
+    # lab_service already owns this exact path, so no rewrite is needed.
+    "/v1/me/lab": settings.lab_service_url,
     "/v1/patients": settings.ehr_service_url,
     "/v1/wearables": settings.wearable_sync_service_url,
     "/v1/social": settings.social_service_url,
