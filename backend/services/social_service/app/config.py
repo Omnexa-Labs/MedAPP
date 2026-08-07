@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Service-to-service identity lookup. Internal only - this route is
     # deliberately absent from the api_gateway ROUTES table.
     user_service_url: str = "http://user_service:8001"
+    # Off in tests and anywhere without a broker. Matches the publish_events
+    # flag the publishing services carry.
+    consume_events: bool = True
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
 

@@ -152,10 +152,24 @@ both the client must fall back to initials and a neutral label. **It must never 
 `authorUserId`**: a raw UUID as a byline is worse than no byline, and on an anonymous post it
 deanonymises the author outright.
 
-### KNOWN STALENESS
-A user who later changes their name keeps the old one on existing posts. user_service publishes no
-profile-changed event yet. The outbox machinery in `shared/events` is where that refresh belongs,
-and it is not built.
+### ~~KNOWN STALENESS~~ ADDRESSED 2026-08-07 (code written, NOT yet verified)
+`user_service` now publishes `user.profile.updated` from `PATCH /me` **only when the display name
+actually changed** — a PATCH touching allergies must not make every consumer rewrite its rows.
+
+`social_service` is the **first consumer in this codebase** (everything else only published). It
+subscribes on startup and rewrites `author_name` on both `social_posts` and `post_comments`.
+
+**Anonymous posts are excluded**: the UPDATE is scoped to rows where `author_name IS NOT NULL`. An
+anonymous post has no name by construction, and writing one during a rename would deanonymise its
+author through the back door — the exact leak `create_post` avoids by never storing it.
+
+Subscription failure is non-fatal: a broker outage must not stop the feed serving. `consume_events`
+turns it off where there is no broker.
+
+**NOT VERIFIED.** Docker Desktop's daemon went down before the rebuild, so neither the publisher nor
+the consumer has been exercised against a running stack. The obvious end-to-end check: rename a
+seeded doctor via `PATCH /v1/me`, then re-read `/v1/social/feed` and confirm the byline changed on
+their existing posts.
 
 ### Feed gaps now
 | Field | State |

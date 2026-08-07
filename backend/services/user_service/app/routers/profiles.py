@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..deps import CurrentUser, DbSession
+from ..events import publish
 from ..models import User
 from ..schemas import UserOut, UserUpdate
 
@@ -26,10 +27,13 @@ async def me(user: User = CurrentUser) -> UserOut:
 # PATCH "/me" updates the authenticated user's own profile.
 @router.patch("", response_model=UserOut)
 async def update_me(
+    request: Request,
     payload: UserUpdate,
     user: User = CurrentUser,
     db: AsyncSession = DbSession,
 ) -> UserOut:
+    before_name = f"{user.first_name} {user.last_name}".strip()
+
     # Only supplied fields are applied; absent fields remain untouched.
     # Privileged fields (role, kyc_status, is_active, …) are blocked at the
     # schema layer; this loop's allowlist is a defensive second line so a
@@ -39,4 +43,26 @@ async def update_me(
             continue
         setattr(user, field, value)
     await db.flush()
+
+    # Announce a DISPLAY NAME change so denormalised copies can catch up.
+    #
+    # Other services snapshot the name at write time (social_service puts it on
+    # every post and comment) because identity lives here and a read-time join
+    # would be an N+1 across the network. The cost of that choice is staleness,
+    # and staleness here is not cosmetic: someone who marries, corrects a
+    # misspelling, or transitions would otherwise keep their old name on
+    # everything they have ever written. Deadnaming a patient in a health app is
+    # a harm, not a stale cache.
+    #
+    # Only fired when the name ACTUALLY changed — a PATCH that touches allergies
+    # should not make every consumer rewrite its rows.
+    new_name = f"{user.first_name} {user.last_name}".strip()
+    if new_name != before_name:
+        await publish(
+            request.app,
+            event_type="user.profile.updated",
+            subject=str(user.id),
+            data={"user_id": str(user.id), "display_name": new_name},
+        )
+
     return UserOut.model_validate(user)
