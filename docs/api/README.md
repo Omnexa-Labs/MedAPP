@@ -23,7 +23,7 @@ Standing rules this register exists to serve:
 | `hospital_service` | 7 | ✅ [hospital_service.md](hospital_service.md) | hospital detail wired |
 | `pharmacy_service` | 7 | ✅ [directory_services.md](directory_services.md) | pharmacy detail wired |
 | `nurse_service` / `pharmacist_service` | 13 | ✅ [directory_services.md](directory_services.md) | discovery lists wired |
-| `social_service` | 9 | ❌ | Community — **not wired** |
+| `social_service` | 9 | ✅ [social_service.md](social_service.md) | Client verified live; **feed screen blocked - PostOut has no author name, avatar or counts** |
 | `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
 | `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
 | `notification_service` | 5 | ❌ | **not wired** |
@@ -98,6 +98,13 @@ existed against the real one**. Worth grepping for in any service before wiring 
 `scripts/seed_dev_data.py` covers users, doctors and bookings. It does **not** cover EHR content,
 threads, labs, prescriptions or social. Expect empty states, and be careful that "empty" is not
 rendered as "lost".
+
+### Host-port collisions caused by the override file itself
+`docker-compose.ports.yml` moves ports to dodge other projects, but three of its choices landed on
+ports MedApp services already publish: `api_gateway` 8010 vs `ehr_service`, `ehr_service` 8020 vs
+`hms_service`, `user_service` 8011 vs `social_service`. Each only surfaced when the two services
+were first started together. The file now carries the rule: **an override host port must not be a
+port any base service already publishes** - list every effective host port before changing one.
 
 ### Local stack
 - `make up` / `make seed` ignore `docker-compose.ports.yml` (both hardcode one `-f`). On a machine
