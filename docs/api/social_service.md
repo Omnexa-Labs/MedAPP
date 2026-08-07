@@ -43,8 +43,8 @@ service, not inferred. `inbox_service` has the same split, so treat it as a hous
 
 | Screen needs | On the wire? |
 | --- | --- |
-| author display name | NO - only `author_user_id` (a UUID) |
-| author avatar | NO |
+| author display name | **YES since 2026-08-07** - `author_name` on `PostOut` |
+| author avatar | NO, and not planned for v1 - **initials instead** (no avatar exists anywhere for patients) |
 | like count | **YES since 2026-08-07** - `like_count` on `PostOut` |
 | comment count | **YES since 2026-08-07** - `comment_count` on `PostOut` (approved only) |
 | follow state | NO - there is no follow graph at all |
@@ -111,3 +111,57 @@ the worst kind to rely on.
 Remaining for the feed screen: `author_name` and `author_avatar_url` (step 2), which are blocked -
 the JWT carries no display name, `Principal` is only subject+role, and `user_service` has no
 lookup-by-id, so denormalising at write needs a new internal endpoint or a name claim in the token.
+
+---
+
+## Step 2 done 2026-08-07: `author_name`, and initials instead of avatars
+
+`PostOut` now carries `author_name`, resolved from user_service at WRITE time and snapshotted onto
+the row.
+
+**Why a snapshot and not a join:** identity lives in another service with no shared database.
+Resolving at read time would be an N+1 across the network on every feed paint, and would take
+Community down whenever user_service blinked. Writes are rare; feeds are read constantly.
+
+**The lookup runs as the AUTHOR.** The caller's bearer token is forwarded to
+`GET http://user_service:8001/users/{id}`, so a caller can never resolve a name they could not have
+resolved themselves, and social_service needs no service identity of its own.
+
+**Failure is non-fatal.** If user_service is unreachable the post is still created with a null name.
+Losing a display name is a degraded feed row; losing the post is losing what someone wrote.
+
+### Anonymity holds in the DATABASE, not the serialiser
+An anonymous post never gets a name written at all - it is absent from the row, not present and
+filtered on the way out. A name that exists in the table is one a future query, export, admin screen
+or log line can leak.
+
+Verified against Postgres directly:
+
+| title | is_anonymous | author_name |
+| --- | --- | --- |
+| Anon | t | `<NULL>` |
+| Named | f | `Kwabena Osei` |
+
+### Avatars: initials for v1 (PO decision)
+There is **no avatar anywhere for a patient** - `User` has no such column, and only clinicians have
+one, on `doctor_service.photo_url`. Rather than block Community on an avatar-upload feature nobody
+has scoped, v1 renders initials through the existing `AvatarWithFallback`.
+
+`authorName` is null in two cases the UI must not conflate - anonymous, and lookup-failed - and in
+both the client must fall back to initials and a neutral label. **It must never print
+`authorUserId`**: a raw UUID as a byline is worse than no byline, and on an anonymous post it
+deanonymises the author outright.
+
+### KNOWN STALENESS
+A user who later changes their name keeps the old one on existing posts. user_service publishes no
+profile-changed event yet. The outbox machinery in `shared/events` is where that refresh belongs,
+and it is not built.
+
+### Feed gaps now
+| Field | State |
+| --- | --- |
+| author name | DONE |
+| like count | DONE |
+| comment count | DONE |
+| avatar | initials for v1, by decision |
+| follow state | deferred - no follow graph |

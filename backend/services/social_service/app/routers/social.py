@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -15,9 +15,16 @@ router = APIRouter(prefix="/v1/social", tags=["Social"])
 
 
 @router.post("/posts", response_model=PostOut, status_code=status.HTTP_201_CREATED)
-async def create_blog_post(payload: PostCreate, db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
+async def create_blog_post(
+    payload: PostCreate,
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+    # Forwarded to user_service so the name lookup runs AS THE AUTHOR rather
+    # than under a service identity this service does not have.
+    authorization: str | None = Header(default=None),
+):
     try:
-        post = await create_post(db, principal, payload)
+        post = await create_post(db, principal, payload, authorization)
     except HTTPException:
         raise
     except SocialError as exc:
@@ -28,6 +35,11 @@ async def create_blog_post(payload: PostCreate, db: AsyncSession = DbSession, pr
             "kind": post.kind,
             "author_user_id": post.author_user_id,
             "author_role": post.author_role,
+            # MUST be listed here. This builds PostOut from an explicit dict, so
+            # `from_attributes` never runs and an omitted field silently takes
+            # its default - which is how like_count/comment_count shipped
+            # reporting 0 for a post that had one of each.
+            "author_name": post.author_name,
             "title": post.title,
             "body": post.body,
             "excerpt": post.excerpt,
@@ -50,6 +62,11 @@ async def read_feed(db: AsyncSession = DbSession):
             "kind": post.kind,
             "author_user_id": post.author_user_id,
             "author_role": post.author_role,
+            # MUST be listed here. This builds PostOut from an explicit dict, so
+            # `from_attributes` never runs and an omitted field silently takes
+            # its default - which is how like_count/comment_count shipped
+            # reporting 0 for a post that had one of each.
+            "author_name": post.author_name,
             "title": post.title,
             "body": post.body,
             "excerpt": post.excerpt,

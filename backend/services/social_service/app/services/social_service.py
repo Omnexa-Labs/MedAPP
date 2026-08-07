@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
 
+from .identity import resolve_display_name
 from ..models import ModerationStatus, PostComment, PostReaction, PostKind, SocialPost, SocialQuestion
 from ..schemas.social import CommentCreate, PostCreate, QAAnswerCreate, QAQuestionCreate, ReactionCreate
 
@@ -55,13 +56,29 @@ def _ensure_moderation_access(principal: Principal) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "moderation access required")
 
 
-async def create_post(db: AsyncSession, principal: Principal, payload: PostCreate) -> SocialPost:
+async def create_post(
+    db: AsyncSession,
+    principal: Principal,
+    payload: PostCreate,
+    authorization: str | None = None,
+) -> SocialPost:
     _ensure_creator_access(principal)
     now = datetime.now(tz=UTC)
+
+    # Snapshot the author display name, EXCEPT on an anonymous post.
+    #
+    # Not stored at all when anonymous - not stored-and-hidden. A name that
+    # exists in the row is a name that a future query, export, admin screen or
+    # log line can leak. Anonymity on a health forum has to hold in the
+    # database, not just in the serialiser.
+    author_name = None
+    if not payload.is_anonymous:
+        author_name = await resolve_display_name(str(_principal_uuid(principal)), authorization)
     post = SocialPost(
         kind=PostKind.BLOG.value,
         author_user_id=_principal_uuid(principal),
         author_role=principal.role,
+        author_name=author_name,
         title=payload.title.strip(),
         body=payload.body.strip(),
         excerpt=_normalize_text(payload.excerpt),

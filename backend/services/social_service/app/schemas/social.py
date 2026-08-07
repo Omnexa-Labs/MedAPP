@@ -21,6 +21,10 @@ class PostOut(BaseModel):
     kind: str
     author_user_id: UUID
     author_role: str
+    # Resolved at write time from user_service. None for an anonymous post, and
+    # None when the lookup failed - the client must handle both and fall back to
+    # initials or a neutral label rather than printing a UUID.
+    author_name: str | None = None
     title: str
     body: str
     excerpt: str | None = None

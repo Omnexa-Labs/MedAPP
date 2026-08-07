@@ -42,6 +42,7 @@ interface PostOutWire {
   kind: string;
   author_user_id: string;
   author_role: string;
+  author_name: string | null;
   title: string;
   body: string;
   excerpt: string | null;
@@ -91,6 +92,18 @@ export interface Post {
   kind: string;
   authorUserId: string;
   authorRole: string;
+  /**
+   * Resolved from user_service at write time. NULL in two different cases the
+   * UI must not conflate:
+   *   - the post is anonymous, and the name is not merely hidden but absent
+   *     from the database entirely;
+   *   - the lookup failed when the post was written.
+   *
+   * Either way: fall back to initials via `AvatarWithFallback` and a neutral
+   * label. NEVER print `authorUserId` — a raw UUID as a byline is worse than
+   * no byline, and on an anonymous post it deanonymises the author outright.
+   */
+  authorName: string | null;
   title: string;
   body: string;
   excerpt: string | null;
@@ -145,6 +158,7 @@ function toPost(w: PostOutWire): Post {
     kind: w.kind,
     authorUserId: w.author_user_id,
     authorRole: w.author_role,
+    authorName: w.author_name ?? null,
     title: w.title,
     body: w.body,
     excerpt: w.excerpt ?? null,
