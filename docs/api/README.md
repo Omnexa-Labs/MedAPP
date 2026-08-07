@@ -26,7 +26,7 @@ Standing rules this register exists to serve:
 | `social_service` | 9 | ✅ [social_service.md](social_service.md) | Client verified live; **feed screen blocked - PostOut has no author name, avatar or counts** |
 | `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
 | `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
-| `notification_service` | 5 | ❌ | **not wired** |
+| `notification_service` | 5 | ✅ [notification_service.md](notification_service.md) | Client verified live; **no notifications screen exists** |
 | `payment_service` | 6 | ❌ | **not wired** |
 | `wearable_sync_service` | 5 | ❌ | Lifestyle/wearables — **not wired** |
 | `onboarding_service` | 8 | ❌ | **not wired** |
