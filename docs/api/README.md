@@ -1,0 +1,103 @@
+# API contracts — index and gap register
+
+One row per backend service: whether its contract is documented, whether the app talks to it, and
+what is knowingly incomplete. **If you are wiring a service, read its contract doc first; if there
+isn't one, writing it is part of the job.**
+
+Standing rules this register exists to serve:
+- **Create endpoints only if they don't already exist** (CTO). Twice now a "missing" endpoint turned
+  out to be present and merely unrouted or undocumented.
+- **Document each logic and the API contract** (Emmanuel Kabu, 2026-08-07).
+
+---
+
+## Status
+
+| Service | Routes | Contract doc | App wiring |
+| --- | ---: | --- | --- |
+| `inbox_service` | 8 | ✅ [inbox_service.md](inbox_service.md) | Inbox + chat thread wired; practitioner room + AI handoff seeded |
+| `ehr_service` | 7 | ✅ [ehr_service.md](ehr_service.md) | Overview wired; patient-record deliberately not |
+| `user_service` | 17 | ❌ **owed** | auth + `/v1/me` wired |
+| `booking_service` | 8 | ❌ **owed** | booking + appointments wired |
+| `doctor_service` | 9 | ❌ **owed** | Find Care wired |
+| `hospital_service` | 7 | ❌ **owed** | hospital detail wired |
+| `pharmacy_service` | 7 | ❌ **owed** | pharmacy detail wired |
+| `nurse_service` / `pharmacist_service` | 13 | ❌ **owed** | discovery lists wired |
+| `social_service` | 9 | ❌ | Community — **not wired** |
+| `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
+| `lab_service` | 4 | ❌ | **not wired** |
+| `notification_service` | 5 | ❌ | **not wired** |
+| `payment_service` | 6 | ❌ | **not wired** |
+| `wearable_sync_service` | 5 | ❌ | Lifestyle/wearables — **not wired** |
+| `onboarding_service` | 8 | ❌ | **not wired** |
+| `analytics_service` | 5 | ❌ | **not wired** |
+| `pms_service` | 47 | ❌ | Medications/scripts — **not wired** |
+| `hms_service` | 51 | ❌ | Roster/dashboard — **not wired** |
+| `api_gateway` | 0 own | ❌ | Proxy only — see gateway gap below |
+
+**"owed"** = the app already calls it, but the contract was never written down. That is a real debt:
+those clients were built before the documentation rule and their gaps are recorded only in code
+comments, if at all.
+
+---
+
+## Cross-cutting gaps
+
+### The gateway is a silent single point of failure
+`api_gateway` has no routes of its own — it proxies via a `ROUTES` prefix table. A service missing
+from that table returns `404 {"error":"unknown route"}` **while the service itself is healthy**.
+`inbox_service` was missing for months; from the app's side messaging simply did not exist, which
+is almost certainly the origin of the false "no messaging endpoints" claim.
+
+**No test can catch this.** Frontend suites mock the client; backend suites call the service
+directly. Only an end-to-end call through port 8010 exercises it.
+
+> **Before wiring any service, check it is in `backend/services/api_gateway/app/config.py::ROUTES`.**
+> `hms_service` and `pms_service` are **not** in it today — 98 routes unreachable from the app.
+
+### The `server_default` migration defect
+Hand-written migrations that spell `created_at`/`updated_at` as `nullable=False` without
+`server_default`. The model mixin declares one, but a hand-written migration never consults model
+metadata, so the live column gets NOT NULL and no DEFAULT and every INSERT fails.
+
+Confirmed in **four** services: inbox, hospital, lab (migrations written, **never applied**) and
+ehr (fixed 2026-08-07 by `20260807_0002`). **Assume any unwired service has it until proven
+otherwise** — it will not show up until the first write.
+
+### Dependency return types are unenforced
+`ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
+`Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
+existed against the real one**. Worth grepping for in any service before wiring it.
+
+### Seed coverage
+`scripts/seed_dev_data.py` covers users, doctors and bookings. It does **not** cover EHR content,
+threads, labs, prescriptions or social. Expect empty states, and be careful that "empty" is not
+rendered as "lost".
+
+### Local stack
+- `make up` / `make seed` ignore `docker-compose.ports.yml` (both hardcode one `-f`). On a machine
+  where another project holds 5432 they fail, and `make seed` tears down running containers. Pass
+  both files explicitly.
+- The `COMPOSE_FILE=a:b` form is POSIX-only; on Windows the colon is read as part of the drive path.
+
+---
+
+## Per-service gaps already recorded
+
+**`inbox_service`** — no message preview, unread count or counterparty on `ThreadOut` (three
+additive fields would fix all three, no new route); no presence, join events, delivery receipts or
+attachments. `last_message_at` is set at creation, not first message. `sender_role` is coarse
+("user"), so group attribution reads wrong.
+
+**`ehr_service`** — `GET /v1/patients` 404s. Path param is a **user** id despite its name.
+`kind` is free text, `value` is a string. No seeded content. Patient-record blocked on slug-vs-UUID,
+consent gating and a preview-state harness. Consent create/delete intentionally unwrapped —
+legally weighted, needs a designed flow.
+
+---
+
+## Undocumented-by-me, and I should say so plainly
+The five "owed" rows above are clients **I did not document**, written before the documentation
+rule landed. Their gaps may exist only as code comments or not at all. They should be
+retro-documented to this template before more services are added, or this register will keep
+drifting from the truth.
