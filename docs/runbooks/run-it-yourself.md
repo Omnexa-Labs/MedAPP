@@ -246,3 +246,25 @@ A leftover metro-cache lock from an orphaned Metro makes `--clear` throw
 ### Expo Go replays its last URL
 Launching with no path (or `/--/`) reopens whatever URL Expo Go last held, which strands the app in
 the signup wizard. An explicit route overrides it: `exp://127.0.0.1:8081/--/community`.
+
+### A blank white screen on launch — FIXED 2026-08-07
+`src/app/_layout.tsx` renders `null` until BOTH stores report `isHydrating: false`. Two ways that
+stranded the app, both now closed:
+
+1. **`welcome-store.hydrate` had no error handling at all.** A throwing `prefs.get` left the flag
+   true forever. Observed on device after app data was cleared: `expo-secure-store` hit a damaged
+   keystore (`keystore2: Error::Km(UNKNOWN_ERROR)`) and the app never painted — no error, no splash.
+   Now `try/finally`, with `hasSeenWelcome: false` as the honest fallback (showing the intro again
+   beats showing nothing). `auth-store.hydrate` got the same `finally` guarantee.
+2. **A native call that HANGS is not covered by `finally`.** Added a 4s watchdog: if hydration has
+   not settled, render anyway. An unresolved auth store reports `isAuthenticated: false`, so
+   `index.tsx` routes to sign-in — a re-login is a far better outcome than a blank screen.
+
+Fonts are deliberately outside the watchdog: `useFonts` exposes `fontsError`, which `fontsReady`
+already treats as ready, and rendering without fonts is a real visual regression.
+
+Five tests in `src/store/__tests__/hydration-gate.test.ts` lock the guarantee that hydration
+finishes whatever storage does.
+
+**If you see a blank screen on an older build**, the recovery is `adb uninstall host.exp.exponent`
+and reinstall — a damaged keystore does not repair itself.

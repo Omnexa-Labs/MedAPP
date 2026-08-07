@@ -58,7 +58,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ token: null, user: null, isAuthenticated: false, isHydrating: false });
       }
     } catch {
-      set({ token: null, user: null, isAuthenticated: false, isHydrating: false });
+      set({ token: null, user: null, isAuthenticated: false });
+    } finally {
+      // FINALLY, so no future edit can add a path that leaves this true. The
+      // root layout paints nothing while it is, so a stuck flag is a blank app
+      // rather than a degraded one. Every branch above already cleared it; this
+      // makes that a property of the function instead of a habit.
+      set({ isHydrating: false });
     }
   },
 

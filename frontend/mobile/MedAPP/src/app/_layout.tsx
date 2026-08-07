@@ -6,7 +6,7 @@
 
 import "../../global.css";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
@@ -60,7 +60,36 @@ export default function RootLayout() {
 
   const fontsReady = fontsLoaded || !!fontsError;
   const storesReady = !isAuthHydrating && !isWelcomeHydrating;
-  const ready = fontsReady && storesReady && appearanceHydrated;
+
+  // WATCHDOG. The stores now clear `isHydrating` in a `finally`, so a THROWN
+  // error can no longer strand this gate — but a native call that never settles
+  // still can, and `finally` does not run for a promise that never resolves.
+  //
+  // That is not hypothetical: on device, `expo-secure-store` sat on a damaged
+  // keystore (`keystore2: Error::Km(UNKNOWN_ERROR)`) and the app rendered a
+  // blank white screen indefinitely. `return null` below means a stuck flag is
+  // not a degraded app, it is NO app.
+  //
+  // After the timeout we render anyway. The consequence is understood and
+  // acceptable: an unresolved auth store reports `isAuthenticated: false`, so
+  // `index.tsx` routes to sign-in. A user who has to log in again is a far
+  // better outcome than a user staring at nothing.
+  //
+  // 4s is longer than a healthy hydrate by an order of magnitude (it is two
+  // local reads) and short enough not to read as a hang.
+  const [hydrationTimedOut, setHydrationTimedOut] = useState(false);
+  useEffect(() => {
+    if (storesReady && appearanceHydrated) return;
+    const timer = setTimeout(() => setHydrationTimedOut(true), 4000);
+    return () => clearTimeout(timer);
+  }, [storesReady, appearanceHydrated]);
+
+  // Fonts are deliberately NOT covered by the watchdog: `useFonts` already
+  // reports `fontsError`, which `fontsReady` treats as ready, so that path has
+  // its own escape and rendering without them is a real visual regression.
+  // Hydration is ready when it genuinely finished, OR when we gave up waiting.
+  const hydrationReady = (storesReady && appearanceHydrated) || hydrationTimedOut;
+  const ready = fontsReady && hydrationReady;
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
