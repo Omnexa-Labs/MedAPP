@@ -31,8 +31,8 @@ Standing rules this register exists to serve:
 | `wearable_sync_service` | 5 | ❌ | Lifestyle/wearables — **not wired** |
 | `onboarding_service` | 8 | ❌ | **not wired** |
 | `analytics_service` | 5 | ❌ | **not wired** |
-| `pms_service` | 47 | ❌ | Medications/scripts — **not wired** |
-| `hms_service` | 51 | ❌ | Roster/dashboard — **not wired** |
+| `pms_service` | 47 | ❌ | Medications/scripts — not wired; **now reachable at `/v1/pms/*`** |
+| `hms_service` | 51 | ❌ | Roster/dashboard — not wired; **now reachable at `/v1/hms/*`** (503s, see below) |
 | `api_gateway` | 0 own | ❌ | Proxy only — see gateway gap below |
 
 **"owed"** = the app already calls it, but the contract was never written down. That is a real debt:
@@ -53,7 +53,32 @@ is almost certainly the origin of the false "no messaging endpoints" claim.
 directly. Only an end-to-end call through port 8010 exercises it.
 
 > **Before wiring any service, check it is in `backend/services/api_gateway/app/config.py::ROUTES`.**
-> `hms_service` and `pms_service` are **not** in it today — 98 routes unreachable from the app.
+
+#### HMS and PMS are NAMESPACED, and that was not optional (added 2026-08-07)
+They are separate products and could not take their own prefixes:
+
+- **`pms_service` mounts `/v1/auth`** — already owned by `user_service`. A duplicate key in the
+  `ROUTES` dict does not raise, it **silently wins**, so a naive add would have proxied *every login
+  in the product* to the pharmacy system. This was caught before applying, not after.
+- **`pms_service` also mounts `/v1/prescriptions`**, which the mobile app already calls.
+- **`hms_service` mounts at bare `/v1`**, which would match everything not claimed by a longer
+  prefix and turn clean 404s into HMS errors.
+
+So the public surface is `/v1/hms/*` and `/v1/pms/*`, and `_rewrite_path` strips the namespace
+before proxying. No service was modified and no endpoint created — only the public address:
+
+    /v1/hms/patients  ->  hms_service  /v1/patients
+    /v1/pms/auth      ->  pms_service  /v1/auth
+
+**Verified**: `/v1/auth/login` still returns a `user_service` token (the regression that mattered);
+`/v1/hms/*` and `/v1/pms/*` both reach their services.
+
+**Two things a wirer must know:**
+1. **`hms_service` 500s** — its container cannot resolve the `postgres` host, so migrations have
+   never run. An infra fault, not a routing one, and unfixed.
+2. **`/v1/pms/*` returns 401 for a MedApp token.** PMS has its OWN `/v1/auth` and its own identities;
+   a patient token is not valid there. Wiring anything to PMS needs a second credential story,
+   which is a product decision, not a client detail.
 
 ### The `server_default` migration defect
 Hand-written migrations that spell `created_at`/`updated_at` as `nullable=False` without

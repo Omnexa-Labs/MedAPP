@@ -65,6 +65,18 @@ def _rewrite_path(path: str, upstream: str) -> str:
     if upstream == settings.user_service_url and normalized.startswith("v1/"):
         normalized = normalized.removeprefix("v1/")
 
+    # HMS and PMS are namespaced publicly (see ROUTES) because their own
+    # prefixes collide with routes already in use — most dangerously
+    # pms_service's "/v1/auth". The namespace is a GATEWAY concept only, so it
+    # is removed here and the upstream sees its own unchanged path:
+    #   /v1/hms/patients -> v1/patients
+    if upstream == settings.hms_service_url and normalized.startswith("v1/hms"):
+        normalized = "v1/" + normalized.removeprefix("v1/hms").lstrip("/")
+        return normalized.rstrip("/")
+    if upstream == settings.pms_service_url and normalized.startswith("v1/pms"):
+        normalized = "v1/" + normalized.removeprefix("v1/pms").lstrip("/")
+        return normalized.rstrip("/")
+
     if upstream == settings.user_service_url and normalized.startswith("profile"):
         if normalized == "profile":
             return "v1/me"

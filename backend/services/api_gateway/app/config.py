@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # SERVICE_PORT). It shares that number with onboarding_service, which is
     # fine — they are different hostnames on the compose network.
     inbox_service_url: str = "http://inbox_service:8013"
+    hms_service_url: str = "http://hms_service:8020"
+    pms_service_url: str = "http://pms_service:8030"
 
     # Agents
     concierge_agent_url: str = "http://concierge_agent:9001"
@@ -85,6 +87,28 @@ ROUTES: dict[str, str] = {
     # service itself was healthy and complete the whole time. No new endpoint was
     # created here; this maps a route that already existed.
     "/v1/threads": settings.inbox_service_url,
+    # ------------------------------------------------------------------
+    # HMS and PMS are SEPARATE PRODUCTS, and are namespaced on purpose.
+    # ------------------------------------------------------------------
+    # They cannot be mounted on their own prefixes. Checked before adding:
+    #
+    #   * pms_service mounts "/v1/auth" — already mapped to user_service. A
+    #     second "/v1/auth" key in this dict does not error, it SILENTLY WINS,
+    #     so every login in the product would have been proxied to the pharmacy
+    #     system.
+    #   * pms_service also mounts "/v1/prescriptions", which the mobile app
+    #     already calls.
+    #   * hms_service mounts at bare "/v1", which would match every path not
+    #     claimed by a longer prefix and turn clean 404s into HMS errors.
+    #
+    # So the public surface is namespaced and `_rewrite_path` strips the
+    # namespace before proxying. No service was modified and no endpoint was
+    # created — only the public address changes:
+    #
+    #   /v1/hms/patients  ->  hms_service  /v1/patients
+    #   /v1/pms/auth      ->  pms_service  /v1/auth
+    "/v1/hms": settings.hms_service_url,
+    "/v1/pms": settings.pms_service_url,
     "/agents/concierge": settings.concierge_agent_url,
     "/agents/recommend": settings.smart_recommend_agent_url,
     "/agents/chat": settings.medical_chat_agent_url,

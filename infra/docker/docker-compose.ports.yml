@@ -56,6 +56,11 @@ services:
   #
   # ehr_service moves rather than the gateway, because the gateway's 8010 is the
   # one baked into API_BASE_URL, the adb reverse tunnel and this file's own
-  # header. Same +10 convention: 8010 -> 8020.
+  # header.
+  #
+  # 8021, NOT 8020. The +10 convention used everywhere else in this file lands
+  # on 8020, which hms_service already publishes in the base compose — so the
+  # first fix for one collision created another. +11 is the smallest free step
+  # that keeps the mapping guessable.
   ehr_service:
-    ports: !override ["8020:8010"]
+    ports: !override ["8021:8010"]
