@@ -129,9 +129,27 @@ the race spelled differently — two services had exactly that and were converte
 **Verified**: containers removed, cold start, **zero** `connect_failed` and zero subscribe failures,
 and a `PATCH /v1/me` rename propagated to the denormalised snapshots with no manual restart.
 
-**STILL OPEN — this is a compose-level fix, not a runtime one.** If the broker restarts while a
-service is up, that service goes silent again with nothing to signal it. A reconnecting bus (or a
-readiness probe that reflects bus health) is the durable answer, and it is not built.
+### The runtime half — FIXED 2026-08-07 (the compose fix alone was not enough)
+Compose ordering does not exist in Kubernetes, and it does nothing for a broker that restarts while
+a service is up. Both halves are now closed:
+
+- **`EventBus._ensure_connected()`** — `publish()` connects on demand if it never connected, or if
+  the connection has since closed. `aio_pika.connect_robust` already recovers a connection it has
+  ALREADY made, so the genuine hole was a connect that never succeeded once. After the first
+  success this is two attribute reads.
+- **Services keep the bus on a failed connect** instead of storing `None`. Storing `None` was what
+  made the failure permanent: `publish()` was never reached again, so there was nothing to retry.
+- **`publish()` no longer asserts it is connected.** An assert turns a recoverable broker blip into
+  a 500 on whatever request happened to be publishing, and asserts vanish under `-O`.
+
+**Verified the hard way**: `user_service` was started with RabbitMQ deliberately DOWN (it logged
+`connect_failed`, as expected), the broker was then brought up, and a `PATCH /v1/me` rename
+propagated to the denormalised snapshots **with nothing restarted**. The anonymity guard held
+throughout.
+
+Remaining nuance, not a blocker: a SUBSCRIBER that fails its initial subscribe does not retry —
+only publishers self-heal. `social_service` is the only consumer today and compose now guarantees
+it starts after a healthy broker.
 
 ### Local stack
 - `make up` / `make seed` ignore `docker-compose.ports.yml` (both hardcode one `-f`). On a machine
