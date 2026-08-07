@@ -6,7 +6,20 @@
 // would catch it.
 
 import { screen } from "@testing-library/react-native";
-import { renderWithSafeArea as render } from "@/test/safe-area";
+import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+// ChatThreadScreen now genuinely depends on react-query — it reads a live
+// thread when given a `threadId`. Hooks cannot be conditional, so
+// useQuery/useQueryClient run even on the SEEDED path and the provider is
+// required regardless. The app root already supplies one; these suites did not.
+// A fresh client per render keeps cases isolated, and `retry: false` stops a
+// rejected query burning three attempts.
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), navigate: jest.fn(), canGoBack: () => true },
@@ -18,6 +31,30 @@ jest.mock("expo-router", () => ({
 // through that component, so it inherits the whole expo-audio /
 // expo-document-picker / expo-file-system surface and must stub the same three.
 // The behavioural coverage of the hook itself lives in AiAssistantScreen.test.tsx.
+// ChatThreadScreen now imports `@/hooks/use-current-user` at module scope to
+// resolve message direction against the signed-in id. That reaches
+// `@/store/auth-store` -> `@/lib/api/client` -> `@/lib/config`, whose
+// `readExtra()` THROWS at require time under Jest — the exact landmine
+// AccountMenu.tsx avoids with a lazy require. A lazy require is not available
+// here (the id is needed during render, not on press), and only these two
+// suites render the screen, so the mock is contained rather than imposed on ten.
+jest.mock("@/hooks/use-current-user", () => ({
+  useCurrentUser: () => ({ id: "me", displayName: "Ama Mensah", avatarUrl: null }),
+}));
+
+// ...and `./api` reaches the same `@/lib/config` throw through `@/lib/api/client`.
+// Neither suite exercises a live thread — they render the SEEDED path, which
+// fires no request (the query is `enabled: Boolean(threadId)` and no threadId is
+// pushed here) — so the module is stubbed rather than the config faked.
+jest.mock("../api", () => ({
+  chatApi: {
+    listMessages: jest.fn(async () => []),
+    sendMessage: jest.fn(async () => ({})),
+    markRead: jest.fn(async () => ({})),
+    listThreads: jest.fn(async () => []),
+  },
+}));
+
 jest.mock("expo-document-picker", () => ({
   getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
 }));

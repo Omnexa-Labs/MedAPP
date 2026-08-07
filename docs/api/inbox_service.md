@@ -117,6 +117,41 @@ clinician-only notes explicitly rather than inherit the decision silently.
 | Screen | State |
 | --- | --- |
 | `InboxScreen` | **Wired** — `GET /v1/threads` via `useQuery(["threads"])`, with loading, retryable error and empty states. Passes the real `threadId` onward. |
-| `ChatThreadScreen` | Seeded. Next: `GET /{id}/messages`, `POST /{id}/messages`, `POST /{id}/read`. |
+| `ChatThreadScreen` | **Wired** — `GET /{id}/messages`, `POST /{id}/messages`, `POST /{id}/read`, when a `threadId` is supplied. Falls back to seed when it is not, so untouched callers keep working. |
 | `PractitionerChatScreen` | Seeded. Same migration; also needs the group gaps above. |
 | `AiAssistantScreen` | Not wired. `POST /v1/threads/handoff` is its escalation path. |
+
+---
+
+## Thread wiring notes (`ChatThreadScreen`)
+
+**The query is `enabled: Boolean(threadId)`.** Only `InboxScreen` pushes a real id today.
+`PractitionerChatScreen` and the profile "Message" button do not, so they keep the seeded path and
+fire no request for a thread that does not exist. That is what allows this service to be migrated
+one caller at a time.
+
+**`is_internal` is excluded by default.** `showInternalNotes` must be passed explicitly. A
+clinician-only note leaking into the patient's own thread is a privacy incident, not a cosmetic
+bug, so the safe value is the default and the caller has to opt out of it.
+
+**Direction resolves against the signed-in user id, not a role string.** A clinician reading a
+clinician's thread must still see their own messages on the outgoing side.
+
+**No delivery ticks on live messages.** The seeded path sets `delivered: true` as a local-demo
+convention; the wire reports READ (`last_read_at`), never "delivered", so rendering a tick from a
+live message would invent a guarantee about someone's medical conversation.
+
+**Send refetches rather than trusting the optimistic row.** The server assigns the id and
+timestamp; a divergence between the optimistic bubble and the persisted one is how duplicate
+bubbles appear after a retry. `onSettled` invalidates both `["thread", id, "messages"]` and
+`["threads"]`, so the inbox's ordering updates too.
+
+**Mark-read is fire-and-forget.** A failure must never block reading the thread, and no rendered
+state depends on its response.
+
+### Test-harness consequence, worth knowing before wiring the next service
+Adding react-query to this screen made a `QueryClientProvider` mandatory for every suite that
+renders it, because hooks cannot be conditional — `useQuery` runs even on the seeded path. Two
+existing suites had to be wrapped. Reaching `@/hooks/use-current-user` and `./api` at module scope
+also re-triggered the `@/lib/config` require-time throw that `AccountMenu.tsx` documents; both are
+mocked in those suites. Expect the same three adjustments in every screen migrated from here on.

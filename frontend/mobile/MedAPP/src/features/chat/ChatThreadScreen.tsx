@@ -108,8 +108,9 @@
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -118,6 +119,9 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { chatApi, type ThreadMessage } from "./api";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
 import {
   Card,
@@ -342,6 +346,15 @@ export interface ChatThreadScreenProps {
    * drops the presence dot, which belongs to one identity.
    */
   isGroup?: boolean;
+  /**
+   * Render `is_internal` messages — clinician-only notes.
+   *
+   * DEFAULTS TO FALSE, and that default is the safeguard: `is_internal` is a
+   * note clinicians write about a patient, and leaking one into the patient's
+   * own thread is a privacy incident, not a cosmetic bug. A caller has to ask
+   * for them explicitly.
+   */
+  showInternalNotes?: boolean;
 }
 
 export function ChatThreadScreen({
@@ -351,12 +364,15 @@ export function ChatThreadScreen({
   composerPlaceholder = "Type a message…",
   seedMessages = SEED_MESSAGES,
   isGroup = false,
+  showInternalNotes = false,
 }: ChatThreadScreenProps = {}) {
   // Accept lightweight params from the navigation call for personalisation.
   const params = useLocalSearchParams<{
     name?: string;
     role?: string;
     avatar?: string;
+    /** Real inbox_service thread id, pushed by InboxScreen. */
+    threadId?: string;
   }>();
 
   const contact = {
@@ -366,7 +382,79 @@ export function ChatThreadScreen({
     isOnline: SEED_CONTACT.isOnline,
   };
 
+  // ---------------------------------------------------------------------
+  // LIVE THREAD, when we were given one
+  // ---------------------------------------------------------------------
+  // `threadId` arrives from InboxScreen. Without it — PractitionerChatScreen,
+  // the profile "Message" button, every existing test — the screen keeps its
+  // seeded behaviour rather than firing a request for a thread that does not
+  // exist. That fallback is what lets this migrate one caller at a time.
+  const threadId = params.threadId;
+  const currentUser = useCurrentUser();
+  const queryClient = useQueryClient();
+
+  const { data: wireMessages, isPending: threadPending, isError: threadError } = useQuery({
+    queryKey: ["thread", threadId, "messages"],
+    queryFn: () => chatApi.listMessages(threadId as string),
+    enabled: Boolean(threadId),
+  });
+
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
+
+  // Wire -> the bubble model. Direction is resolved against the SIGNED-IN user
+  // id, not against a role string: a clinician reading a clinician's thread
+  // must still see their own messages on the right.
+  const liveMessages: ChatMessage[] | null = useMemo(() => {
+    if (!threadId || !wireMessages) return null;
+    return wireMessages
+      // `is_internal` is a clinician-only note. Excluded unless the caller
+      // explicitly opted in — see `showInternalNotes`.
+      .filter((m: ThreadMessage) => showInternalNotes || !m.isInternal)
+      .map((m: ThreadMessage): ChatMessage => {
+        const mine = Boolean(currentUser?.id) && m.senderUserId === currentUser?.id;
+        return {
+          id: m.id,
+          direction: mine ? "outgoing" : "incoming",
+          kind: "text",
+          text: m.body,
+          timestamp: new Date(m.createdAtIso).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          // Attribution only in a group, and only from the wire's role — the
+          // service carries no display name for a sender.
+          senderName: !mine && isGroup ? m.senderRole : undefined,
+          // NOT set. The service reports read, never "delivered", so a tick
+          // here would be an invented guarantee about someone's medical
+          // conversation.
+          delivered: undefined,
+        };
+      });
+  }, [threadId, wireMessages, showInternalNotes, currentUser?.id, isGroup]);
+
+  // Adopt the server transcript once it lands. Local sends are appended to
+  // `messages`, so this replaces wholesale only when the query result changes.
+  useEffect(() => {
+    if (liveMessages) setMessages(liveMessages);
+  }, [liveMessages]);
+
+  // Mark read on open. Fire-and-forget: a failure here must never block reading
+  // the thread, and the unread badge is not rendered from this response.
+  useEffect(() => {
+    if (!threadId) return;
+    void chatApi.markRead(threadId).catch(() => {});
+  }, [threadId]);
+
+  const sendMutation = useMutation({
+    mutationFn: (body: string) => chatApi.sendMessage(threadId as string, body),
+    // Refetch rather than trust the optimistic row: the server assigns the id
+    // and timestamp, and a divergence between them is how duplicate bubbles
+    // appear after a retry.
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["thread", threadId, "messages"] });
+      void queryClient.invalidateQueries({ queryKey: ["threads"] });
+    },
+  });
   const [draft, setDraft] = useState("");
   const [clinicalOpen, setClinicalOpen] = useState(false);
   // Attach + mic. See the COMPOSER MEDIA block in the header.
@@ -432,6 +520,9 @@ export function ChatThreadScreen({
     const pending = media.attachment;
     if (!trimmed && !pending) return;
     setClinicalOpen(false);
+    // Live thread: POST it. The optimistic bubble below still renders instantly,
+    // and `onSettled` refetches so the server's id/timestamp win.
+    if (threadId && trimmed) sendMutation.mutate(trimmed);
     setMessages((prev) => [
       ...prev,
       {
@@ -605,6 +696,24 @@ export function ChatThreadScreen({
               details": no message on this screen is pressable, so the divider
               was promising an interaction that does not exist. The frame's
               divider states when the conversation starts and nothing else. */}
+          {/* A live thread that has not answered yet must not look like an
+              empty conversation — on a medical thread "no messages" and "we
+              could not load your messages" are very different claims. */}
+          {threadId && threadPending ? (
+            <View className="items-center py-2xl">
+              <ActivityIndicator color={primary} />
+            </View>
+          ) : threadId && threadError ? (
+            <View className="items-center gap-xs py-2xl">
+              <Text className="font-label-md text-label-md text-on-surface">
+                Couldn't load this conversation
+              </Text>
+              <Text className="text-center font-body-md text-body-md text-on-surface-variant">
+                Pull back and open it again to retry.
+              </Text>
+            </View>
+          ) : null}
+
           <TimelineDivider label={dividerLabel} />
 
           {messages.map((m) =>
