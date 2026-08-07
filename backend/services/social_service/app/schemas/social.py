@@ -30,6 +30,18 @@ class PostOut(BaseModel):
     published_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    # Engagement counts, added 2026-08-07.
+    #
+    # Reactions and comments live in THIS service (PostReaction, PostComment),
+    # so these are a local aggregate, not an integration. The mobile feed card
+    # needs them and previously had no way to get them: reactions and comments
+    # were write-only, with no aggregate and no list route, so a live feed would
+    # have rendered every post with zero engagement.
+    #
+    # Defaulted so any caller that builds a PostOut without the aggregate query
+    # (create_post, the moderation queue) still validates.
+    like_count: int = 0
+    comment_count: int = 0
 
 
 class PostList(BaseModel):

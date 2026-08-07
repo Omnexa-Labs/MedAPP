@@ -34,7 +34,7 @@ x-svc-env: &svc-env
   LAB_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   EHR_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   INBOX_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
-  SOCIAL_SERVICE_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  SOCIAL_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   ANALYTICS_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   ONBOARDING_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   WEARABLE_SYNC_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"

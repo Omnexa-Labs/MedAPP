@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
@@ -79,14 +79,51 @@ async def create_post(db: AsyncSession, principal: Principal, payload: PostCreat
 
 
 async def list_feed(db: AsyncSession) -> list[SocialPost]:
+    """The public blog feed, with engagement counts attached.
+
+    COUNTS ARE CORRELATED SUBQUERIES, not a join with GROUP BY, and not a
+    per-post query. A join against two child tables would multiply rows
+    (a post with 3 likes and 2 comments yields 6) and force a DISTINCT; a
+    per-post count is the N+1 this method exists to avoid. Two scalar
+    subqueries keep it a single round trip and one row per post.
+
+    Only APPROVED comments are counted. This is patient-written health content
+    and the feed card is a public surface: a pending or flagged comment must not
+    inflate a number that implies it was published. Reactions have no moderation
+    state, so all of them count.
+
+    The counts are attached as plain attributes on the ORM instance rather than
+    mapped columns. `PostOut` sets `from_attributes=True`, so `model_validate`
+    picks them up, and nothing is persisted or invalidated by doing so.
+    """
+    like_count = (
+        select(func.count(PostReaction.id))
+        .where(PostReaction.post_id == SocialPost.id)
+        .correlate(SocialPost)
+        .scalar_subquery()
+    )
+    comment_count = (
+        select(func.count(PostComment.id))
+        .where(PostComment.post_id == SocialPost.id)
+        .where(PostComment.moderation_status == ModerationStatus.APPROVED.value)
+        .correlate(SocialPost)
+        .scalar_subquery()
+    )
+
     stmt = (
-        select(SocialPost)
+        select(SocialPost, like_count.label("like_count"), comment_count.label("comment_count"))
         .where(SocialPost.kind == PostKind.BLOG.value)
         .where(SocialPost.moderation_status == ModerationStatus.APPROVED.value)
         .order_by(SocialPost.published_at.desc().nullslast(), SocialPost.created_at.desc())
     )
-    result = await db.scalars(stmt)
-    return list(result.all())
+    rows = (await db.execute(stmt)).all()
+
+    posts: list[SocialPost] = []
+    for post, likes, comments in rows:
+        post.like_count = int(likes or 0)
+        post.comment_count = int(comments or 0)
+        posts.append(post)
+    return posts
 
 
 async def create_comment(db: AsyncSession, principal: Principal, post_id: UUID, payload: CommentCreate) -> PostComment:
