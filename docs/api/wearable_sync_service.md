@@ -47,8 +47,28 @@ only because the service was started.
 | Client (`features/wearables/api.ts`) | Written; devices and summary verified live. |
 | `LifestyleHubScreen` / lifestyle-manage | **Not wired** — screens exist, still on seed data. |
 
-Wiring Lifestyle is a real task rather than a swap. The screens present **step counts and sleep as
-first-class daily figures**, and the contract offers only free-text `kind`/`value` samples plus
-totals — there is no notion of "today's steps" anywhere in it. Deciding how a sample stream becomes
-a daily figure (client-side aggregation? a new server endpoint?) is a product question, and
-guessing it would put invented numbers on a health screen.
+## Daily figures — PO ruling 2026-08-07
+
+The screens present step counts and sleep as daily figures; the contract has no notion of "today's
+steps". **The PO ruled: readings are CUMULATIVE — take the latest per device per day.**
+
+Implemented as `src/features/wearables/daily.ts`, a pure function with 11 tests, rather than inline
+arithmetic in a screen. It is the one calculation in this feature that can be silently wrong: a
+client that SUMS three cumulative snapshots reports 6,240 steps for a watch that walked 1,940, and
+the number looks entirely normal.
+
+Rules encoded, each with a test:
+- **Latest by TIMESTAMP**, not by array position — samples can sync late and arrive out of order.
+- **Local calendar day**, not UTC. A count that resets at the wrong hour is visible to the patient.
+- **Non-numeric values are SKIPPED, not coerced.** `Number("122/80")` is `NaN`; a blood-pressure
+  reading must not corrupt a step total.
+- **No readings returns null, not zero.** Zero steps claims the patient did not move; no data does
+  not.
+
+**Still ambiguous, and surfaced rather than guessed:** "latest per device" then summed is right for
+a watch plus a scale, and WRONG for two devices both counting steps — a phone and a watch would
+double the total. `deviceCount` is returned so a caller can warn. Today the seeded data has one
+device; this needs a decision if that changes.
+
+`LifestyleHubScreen` is still not wired — the aggregation it needed now exists, so that is a
+mechanical next step rather than a blocked one.
