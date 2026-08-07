@@ -29,7 +29,7 @@ Standing rules this register exists to serve:
 | `notification_service` | 5 | ✅ [notification_service.md](notification_service.md) | Client verified live; **no notifications screen exists** |
 | `payment_service` | 6 | ❌ | **not wired** |
 | `wearable_sync_service` | 5 | ✅ [wearable_sync_service.md](wearable_sync_service.md) | Client verified live; **Lifestyle screens not wired** |
-| `onboarding_service` | 8 | ❌ | **not wired** |
+| `onboarding_service` | 8 | ✅ [onboarding_service.md](onboarding_service.md) | Client verified live; **had no container until 2026-08-07** |
 | `analytics_service` | 5 | ❌ | **not wired** |
 | `pms_service` | 47 | ❌ | Medications/scripts — not wired; **now reachable at `/v1/pms/*`** |
 | `hms_service` | 51 | ❌ | Roster/dashboard — not wired; **now reachable at `/v1/hms/*`** (503s, see below) |
@@ -93,6 +93,14 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### One service had no container at all
+`onboarding_service` exists on disk and the gateway routes `/v1/onboarding` to it, but it was the
+only one of the twenty services missing from `docker-compose.yml`. Every call failed at DNS inside
+the compose network. Added 2026-08-07 on host port 8022.
+
+**Standing check worth running:** diff `ls backend/services` against the compose service list. One
+command, and it would have caught this at any point in the last several months.
 
 ### A stale image looks exactly like a broken migration chain
 `telemedicine_service` failed `alembic upgrade head` with

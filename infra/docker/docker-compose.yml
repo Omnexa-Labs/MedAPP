@@ -260,6 +260,26 @@ services:
     environment: *svc-env
     ports: ["8013:8013"]
 
+  # ADDED 2026-08-07. This service exists on disk and IS routed by the gateway
+  # (`/v1/onboarding` -> onboarding_service:8013), but had no container at all,
+  # so every partner-onboarding call failed at DNS inside the compose network.
+  # It was the only one of the 20 services with no compose entry.
+  #
+  # Host port 8022 rather than 8013: inbox_service already publishes 8013, and
+  # they share an INTERNAL port harmlessly because the hostnames differ.
+  onboarding_service:
+    build:
+      <<: *py-build
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: onboarding_service
+        SERVICE_PORT: 8013
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *svc-env
+    ports: ["8022:8013"]
+
   lab_service:
     build:
       <<: *py-build
