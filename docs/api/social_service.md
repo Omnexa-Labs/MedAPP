@@ -165,3 +165,35 @@ and it is not built.
 | comment count | DONE |
 | avatar | initials for v1, by decision |
 | follow state | deferred - no follow graph |
+
+---
+
+## Step 4 done 2026-08-07: `GET /posts/{post_id}/comments`
+
+`{items}`, oldest first, **approved only** — matching the `comment_count` aggregate. A list that
+disagreed with the number that led the user there would be worse than no list, and returning
+pending comments would publish a flagged one by the back door.
+
+Oldest first, unlike the feed: a conversation reads in the order it happened.
+
+An unknown post **404s** rather than returning an empty array — "no comments yet" and "no such post"
+are different answers and must not look the same.
+
+`post_comments` gained the same `author_name` snapshot as posts, resolved at write time through the
+forwarded caller token. Verified live: two comments returned with `Kwabena Osei` on both, and an
+unknown id returned `404 {"detail":"post not found"}`.
+
+Authenticated, like the feed. This is patient-written health discussion, not open web content.
+
+**No pagination**, consistent with the rest of the service. Fine at tens of comments; revisit before
+thousands.
+
+### A DESIGN DEFECT THIS EXPOSED — frame `1066:2025`
+The post-detail frame draws an **anonymous comment**. A comment has no `is_anonymous` field:
+`CommentCreate` is `{body}` only, and comments are always attributed. The frame promises a state the
+backend cannot produce.
+
+Two ways out, and it is a PO call: redraw that row with a real name, or add `is_anonymous` to
+comments to match questions (which default to anonymous). Until then the frame is ahead of the API,
+which is the same class of mismatch as the ICU-group-thread frame — recorded rather than quietly
+built around.

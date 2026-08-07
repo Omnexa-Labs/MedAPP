@@ -74,11 +74,16 @@ interface QAOutWire {
   updated_at: string;
 }
 
+interface CommentListWire {
+  items: CommentOutWire[];
+}
+
 interface CommentOutWire {
   comment_id: string;
   post_id: string;
   author_user_id: string;
   author_role: string;
+  author_name: string | null;
   body: string;
   moderation_status: string;
   created_at: string;
@@ -151,6 +156,12 @@ export interface Comment {
   postId: string;
   authorUserId: string;
   authorRole: string;
+  /**
+   * Resolved at write time. Null ONLY when that lookup failed — unlike a post,
+   * a comment has no anonymous mode, so null never means "withheld". Fall back
+   * to initials; never print `authorUserId`.
+   */
+  authorName: string | null;
   body: string;
   moderationStatus: string;
   createdAtIso: string;
@@ -201,6 +212,7 @@ function toComment(w: CommentOutWire): Comment {
     postId: w.post_id,
     authorUserId: w.author_user_id,
     authorRole: w.author_role,
+    authorName: w.author_name ?? null,
     body: w.body,
     moderationStatus: w.moderation_status,
     createdAtIso: w.created_at,
@@ -236,6 +248,21 @@ export const communityApi = {
         is_anonymous: input.isAnonymous ?? false,
       }),
     );
+  },
+
+  /**
+   * `GET /v1/social/posts/{id}/comments` — `{ items }`, oldest first.
+   *
+   * APPROVED comments only, matching the `commentCount` on the feed card. A
+   * list that disagreed with the number that led the user here would be worse
+   * than no list.
+   *
+   * Oldest first, unlike the feed: a conversation reads in the order it
+   * happened. No pagination yet.
+   */
+  async listComments(postId: string): Promise<Comment[]> {
+    const w = await client.get<CommentListWire>(`${SOCIAL_PATH}/posts/${postId}/comments`);
+    return (w.items ?? []).map(toComment);
   },
 
   async commentOnPost(postId: string, body: string): Promise<Comment> {

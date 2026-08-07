@@ -67,6 +67,14 @@ class PostComment(Base, TimestampMixin):
     post_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("social_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     author_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     author_role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    # Same snapshot as SocialPost.author_name, and for the same reason: identity
+    # lives in user_service, and resolving at read time would be an N+1 across
+    # the network for every comment on a post.
+    #
+    # NOTE: a comment has no `is_anonymous`. Unlike posts and questions, comments
+    # are always attributed, so there is no case where the name is withheld -
+    # only where the lookup failed.
+    author_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     moderation_status: Mapped[str] = mapped_column(String(32), nullable=False, default=ModerationStatus.APPROVED, index=True)
 

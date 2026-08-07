@@ -143,7 +143,7 @@ async def list_feed(db: AsyncSession) -> list[SocialPost]:
     return posts
 
 
-async def create_comment(db: AsyncSession, principal: Principal, post_id: UUID, payload: CommentCreate) -> PostComment:
+async def create_comment(db: AsyncSession, principal: Principal, post_id: UUID, payload: CommentCreate, authorization: str | None = None) -> PostComment:
     post = await db.get(SocialPost, post_id)
     if post is None or post.kind != PostKind.BLOG.value:
         raise SocialError("post not found")
@@ -151,6 +151,9 @@ async def create_comment(db: AsyncSession, principal: Principal, post_id: UUID, 
         post_id=post_id,
         author_user_id=_principal_uuid(principal),
         author_role=principal.role,
+        # Non-fatal: a failed lookup leaves the name null rather than losing
+        # what someone wrote. See services/identity.py.
+        author_name=await resolve_display_name(str(_principal_uuid(principal)), authorization),
         body=payload.body.strip(),
         moderation_status=ModerationStatus.APPROVED.value,
     )
@@ -231,3 +234,31 @@ async def list_moderation_queue(db: AsyncSession, principal: Principal) -> list[
     for comment in comments.all():
         queue.append({"item_type": "comment", "item_id": comment.id, "moderation_status": comment.moderation_status, "title": None, "body": comment.body})
     return queue
+
+async def list_comments(db: AsyncSession, post_id: UUID) -> list[PostComment]:
+    """Approved comments on a post, oldest first.
+
+    ONLY APPROVED, matching the `comment_count` aggregate on the feed card. If
+    this returned pending ones the list would contradict the number that led the
+    user here, and a flagged comment would be published by the back door.
+
+    The post itself is checked first: commenting on a nonexistent post already
+    404s, and listing should not quietly return an empty array for one, which
+    reads as "no comments yet" rather than "no such post".
+
+    Oldest first, unlike the feed. A conversation reads in the order it
+    happened; only the feed is newest-first.
+
+    NO PAGINATION, consistent with the rest of this service. Fine while a post
+    has tens of comments; revisit before it has thousands.
+    """
+    post = await db.get(SocialPost, post_id)
+    if post is None or post.kind != PostKind.BLOG.value:
+        raise SocialError("post not found")
+    stmt = (
+        select(PostComment)
+        .where(PostComment.post_id == post_id)
+        .where(PostComment.moderation_status == ModerationStatus.APPROVED.value)
+        .order_by(PostComment.created_at.asc())
+    )
+    return list((await db.scalars(stmt)).all())

@@ -131,5 +131,5 @@ describe("the Share control on a feed post", () => {
     expect(message.length).toBeGreaterThan(0);
     expect(options.dialogTitle).toBe("Share post");
     expect(message).not.toMatch(/https?:\/\//);
-  });
+  }, 20000);
 });

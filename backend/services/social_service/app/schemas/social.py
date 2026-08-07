@@ -63,6 +63,9 @@ class CommentOut(BaseModel):
     post_id: UUID
     author_user_id: UUID
     author_role: str
+    # Resolved at write time. None only when the lookup failed - a comment is
+    # always attributed, so there is no anonymous case here.
+    author_name: str | None = None
     body: str
     moderation_status: str
     created_at: datetime
@@ -125,3 +128,15 @@ class ModerationItemOut(BaseModel):
     moderation_status: str
     title: str | None = None
     body: str | None = None
+
+
+class CommentList(BaseModel):
+    """`{items}`, matching PostList.
+
+    The QA route returns a bare array and this does not. That asymmetry already
+    exists in this service and in inbox_service; it is documented in
+    docs/api/social_service.md rather than "fixed" here, because changing an
+    envelope a client already parses is a breaking change dressed as tidying.
+    """
+
+    items: list[CommentOut] = Field(default_factory=list)

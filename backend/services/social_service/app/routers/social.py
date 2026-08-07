@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.auth import Principal
 
 from ..deps import DbSession, get_current_principal
-from ..schemas.social import CommentCreate, CommentOut, ModerationItemOut, PostCreate, PostList, PostOut, QAAnswer, QAAnswerCreate, QAOut, QAQuestionCreate, ReactionCreate, ReactionOut
-from ..services import SocialError, answer_question, create_comment, create_post, create_question, create_reaction, list_feed, list_moderation_queue, list_questions
+from ..schemas.social import CommentCreate, CommentList, CommentOut, ModerationItemOut, PostCreate, PostList, PostOut, QAAnswer, QAAnswerCreate, QAOut, QAQuestionCreate, ReactionCreate, ReactionOut
+from ..services import SocialError, answer_question, create_comment, create_post, create_question, create_reaction, list_comments, list_feed, list_moderation_queue, list_questions
 
 router = APIRouter(prefix="/v1/social", tags=["Social"])
 
@@ -90,9 +90,15 @@ async def read_feed(db: AsyncSession = DbSession):
 
 
 @router.post("/posts/{post_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
-async def add_comment(post_id: UUID, payload: CommentCreate, db: AsyncSession = DbSession, principal: Principal = Depends(get_current_principal)):
+async def add_comment(
+    post_id: UUID,
+    payload: CommentCreate,
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+    authorization: str | None = Header(default=None),
+):
     try:
-        comment = await create_comment(db, principal, post_id, payload)
+        comment = await create_comment(db, principal, post_id, payload, authorization)
     except SocialError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     return CommentOut.model_validate(
@@ -197,3 +203,37 @@ async def moderation_queue(db: AsyncSession = DbSession, principal: Principal = 
     except HTTPException:
         raise
     return [ModerationItemOut.model_validate(item) for item in items]
+
+@router.get("/posts/{post_id}/comments", response_model=CommentList)
+async def read_comments(post_id: UUID, db: AsyncSession = DbSession, _principal: Principal = Depends(get_current_principal)):
+    """The comments behind the count on the feed card.
+
+    Authenticated: this is patient-written health discussion, not open web
+    content, and the feed itself is already behind a token.
+    """
+    try:
+        comments = await list_comments(db, post_id)
+    except SocialError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return CommentList(
+        items=[
+            CommentOut.model_validate(
+                {
+                    "comment_id": c.id,
+                    "post_id": c.post_id,
+                    "author_user_id": c.author_user_id,
+                    "author_role": c.author_role,
+                    # Listed explicitly. This service builds its schemas from
+                    # dicts, so `from_attributes` never runs and an omitted
+                    # field takes its default silently - which is how the feed
+                    # counts once shipped reporting 0.
+                    "author_name": c.author_name,
+                    "body": c.body,
+                    "moderation_status": c.moderation_status,
+                    "created_at": c.created_at,
+                    "updated_at": c.updated_at,
+                }
+            )
+            for c in comments
+        ]
+    )

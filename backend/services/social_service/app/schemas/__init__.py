@@ -1,5 +1,6 @@
 from .social import (
     CommentCreate,
+    CommentList,
     CommentOut,
     ModerationItemOut,
     PostCreate,
@@ -15,6 +16,7 @@ from .social import (
 
 __all__ = [
     "CommentCreate",
+    "CommentList",
     "CommentOut",
     "ModerationItemOut",
     "PostCreate",
