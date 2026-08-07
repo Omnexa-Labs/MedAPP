@@ -188,12 +188,21 @@ Authenticated, like the feed. This is patient-written health discussion, not ope
 **No pagination**, consistent with the rest of the service. Fine at tens of comments; revisit before
 thousands.
 
-### A DESIGN DEFECT THIS EXPOSED — frame `1066:2025`
+### ~~A DESIGN DEFECT THIS EXPOSED~~ RESOLVED 2026-08-07 — frame `1066:2025`
 The post-detail frame draws an **anonymous comment**. A comment has no `is_anonymous` field:
 `CommentCreate` is `{body}` only, and comments are always attributed. The frame promises a state the
 backend cannot produce.
 
-Two ways out, and it is a PO call: redraw that row with a real name, or add `is_anonymous` to
-comments to match questions (which default to anonymous). Until then the frame is ahead of the API,
-which is the same class of mismatch as the ICU-group-thread frame — recorded rather than quietly
-built around.
+**PO ruled: redraw with a real name**, rather than adding `is_anonymous` to comments. Questions are
+anonymous because asking about your own symptoms is exposing; commenting on someone else's post is
+not the same act, and inventing an anonymity mode to satisfy a frame would have been the tail
+wagging the dog.
+
+The row is now **Dr. Adjoa Boateng** — in the seeded roster, and the cardiologist, so a
+blood-pressure clarification is hers to give. The copy changed with her: it had been a patient
+asking a question, and leaving a question under a clinician's name would have swapped one wrong
+state for another. The `?` initials disc, which existed so an anonymous commenter would not borrow
+a real person's initials, becomes ordinary initials.
+
+Frame and API now agree: every comment is attributed, and `author_name` is null only when the
+write-time lookup failed.

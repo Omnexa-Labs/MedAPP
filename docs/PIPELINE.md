@@ -2289,8 +2289,11 @@ against a flat slab).
 - **Initials, not avatars**, matching the v1 ruling — nothing in the backend stores an avatar for a
   patient. The `?` disc on the anonymous comment is deliberate: an anonymous commenter must not
   borrow a real person's initials.
-- **An anonymous comment is drawn**, because the API defaults `is_anonymous` to TRUE for questions
-  and the design has to show what that looks like.
+- ~~**An anonymous comment is drawn**~~ **CORRECTED 2026-08-07.** That was my error: I assumed
+  comments inherited the anonymity QUESTIONS have. They do not — `CommentCreate` is `{body}` only
+  and a comment is always attributed, so the frame drew a state the backend cannot produce. The row
+  is now Dr. Adjoa Boateng, from the seeded roster, with copy rewritten to suit a clinician rather
+  than leaving a patient's question under a doctor's name.
 - **The action bar contradicted the frame.** Its instance carried the component default of 48
   comments while the header said 2. A frame that disagrees with itself is one a builder has to
   guess about, and the guess ships. Both now read 2.
