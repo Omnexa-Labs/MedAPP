@@ -32,7 +32,7 @@ Standing rules this register exists to serve:
 | `onboarding_service` | 8 | ✅ [onboarding_service.md](onboarding_service.md) | Client verified live; **had no container until 2026-08-07** |
 | `analytics_service` | 5 | ✅ [analytics_service.md](analytics_service.md) | **No client, by decision** — admin-only, no admin surface in this app |
 | `pms_service` | 47 | ❌ | Medications/scripts — not wired; **now reachable at `/v1/pms/*`** |
-| `hms_service` | 51 | ❌ | Roster/dashboard — not wired; **now reachable at `/v1/hms/*`** (503s, see below) |
+| `hms_service` | 51 | ✅ [hms_service.md](hms_service.md) | DB fixed, schema applied; **blocked on tenant identity** |
 | `api_gateway` | 0 own | ❌ | Proxy only — see gateway gap below |
 
 **"owed"** = the app already calls it, but the contract was never written down. That is a real debt:
@@ -93,6 +93,18 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### A healthcheck can pass while the container is unreachable
+`hms_service` was reported HEALTHY by Docker for hours while it could not resolve `postgres` at all.
+Its healthcheck polls `127.0.0.1/healthz`, which never leaves the container, so it proved only that
+the process was alive.
+
+The container was running and attached to **no network** — `NetworkSettings.Networks` was empty
+while `HostConfig.NetworkMode` read `medapp_default`. A stale container from an earlier failed start
+was reused by `up -d` and never reattached. `docker compose rm -sf <svc>` then `up -d` fixes it.
+
+**Two lessons:** a healthcheck that does not cross the network boundary is not a readiness signal,
+and `up -d` reusing a broken container looks identical to a config bug.
 
 ### Two endpoints are safe ONLY because the gateway does not route them
 `user_service` `GET /users/{id}` and `analytics_service` `POST /v1/internal/events` are both absent
