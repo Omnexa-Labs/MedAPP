@@ -56,9 +56,37 @@ happened to already exist here.
 | Screen | State |
 | --- | --- |
 | Client (`features/notifications/api.ts`) | Written; inbox, get and put preferences all verified live. |
-| Notification bell / list screen | **Not wired** - no notifications screen exists in the app. |
+| Notification bell / list screen | **Designed 2026-08-07** (`1073:1433`, dark proof `1074:17968`, page 548:615). Not built. |
 | Settings > notification toggles | **Not wired** - the Settings page ships Appearance and Sign out only. |
 
 The client is ready. Both consumers need design first: there is no notifications screen, and the
 Settings page has no notifications section (deliberately - see docs/PIPELINE.md 5y, rows were not
 invented for preferences that had no backing).
+
+---
+
+## Screen designed 2026-08-07
+
+`notifications — inbox` `1073:1433`, dark proof `1074:17968`, page `548:615` (Messaging).
+Measured: light 242.9 mean / 94.9% light, dark 37.5 / 91.8% dark, colours 619 -> 562.
+
+### Designed to the contract, not past it
+- **NO unread badge or read/unread styling.** The API has no read state at all - nothing marks a
+  notification seen - so an unread dot would be a promise the backend cannot keep, and a bell badge
+  cannot be built from this contract today. That is the single biggest thing to add server-side if
+  the bell is meant to count anything.
+- **A queued row says "Sending..." instead of a time.** `delivered_at` is NULL while queued or
+  failed, and inventing a timestamp there would state something untrue about whether the patient
+  was actually told.
+- Day grouping is Today / Earlier, which needs only `delivered_at`.
+
+### FLAGGED - glyph contrast on the appointment tile
+The `icon/calendar` instance reads as nearly invisible on `primary-container`: its own fill is dark
+and the tone behind it is dark in light mode. `icon/chrome-mail` on the same tone is fine (light
+glyph), so this is per-icon, not per-tile. Either the calendar glyph needs an `on-primary-container`
+fill binding or the tile needs a lighter tone. Recorded rather than patched blind - the icons are
+shared components and changing one affects every screen that uses it.
+
+### Not designed
+Swipe-to-dismiss, mark-all-read, and per-notification actions. None has an endpoint: there is no
+read state, no delete, and no action payload on `InboxMessageOut`.
