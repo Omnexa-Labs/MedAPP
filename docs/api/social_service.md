@@ -45,8 +45,8 @@ service, not inferred. `inbox_service` has the same split, so treat it as a hous
 | --- | --- |
 | author display name | NO - only `author_user_id` (a UUID) |
 | author avatar | NO |
-| like count | NO - reactions are write-only; there is no aggregate |
-| comment count | NO - comments are write-only; there is no count or list route |
+| like count | **YES since 2026-08-07** - `like_count` on `PostOut` |
+| comment count | **YES since 2026-08-07** - `comment_count` on `PostOut` (approved only) |
 | follow state | NO - there is no follow graph at all |
 
 Wiring the screen today would render a feed of UUID-authored posts with zero likes and zero
@@ -85,3 +85,29 @@ larger product question and the Following tab depends on it.
 | Client (`features/community/api.ts`) | Written, verified live: feed and qa both 200. |
 | `CommunityScreen` (766 lines) | **Not wired** - contract cannot populate `FeedPost`, see above. |
 | `CommunityHubScreen`, `ExploreScreen` | Not wired; groups and follow have no backend at all. |
+
+---
+
+## Step 1 done and verified 2026-08-07: engagement counts
+
+`PostOut` now carries `like_count` and `comment_count`, computed as correlated scalar subqueries in
+`list_feed` - not a join with GROUP BY (which multiplies rows across two child tables) and not a
+per-post query (the N+1 this avoids). Only APPROVED comments count: the feed card is public and a
+pending comment must not inflate a number implying it was published.
+
+**Verified live**: a post with one reaction and one comment reported `likes=1 comments=1`, and a
+second comment moved it to `comments=2`.
+
+### The bug this shipped with, and the lesson
+The first version reported **0 for a post that had one of each**. `list_feed` attaches the counts as
+transient attributes on the ORM instance, but `read_feed` builds `PostOut` from an EXPLICIT DICT,
+so `from_attributes` never runs and the omitted fields fell back to their defaults.
+
+The default for a count is `0` - **indistinguishable from a real answer**. Nothing errored, nothing
+was typed wrong, and the endpoint returned 200 with a plausible payload. Any field added to
+`PostOut` must also be added to that dict in `read_feed`; a default that looks like valid data is
+the worst kind to rely on.
+
+Remaining for the feed screen: `author_name` and `author_avatar_url` (step 2), which are blocked -
+the JWT carries no display name, `Principal` is only subject+role, and `user_service` has no
+lookup-by-id, so denormalising at write needs a new internal endpoint or a name claim in the token.

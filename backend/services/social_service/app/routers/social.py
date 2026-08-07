@@ -59,6 +59,15 @@ async def read_feed(db: AsyncSession = DbSession):
             "published_at": post.published_at,
             "created_at": post.created_at,
             "updated_at": post.updated_at,
+            # `list_feed` attaches these as transient attributes on the ORM
+            # instance. They MUST be listed here: this builds PostOut from an
+            # explicit dict rather than from the object, so `from_attributes`
+            # never runs and anything omitted silently falls back to the field
+            # default - which for a count is 0, indistinguishable from a real
+            # answer. That is exactly how the first version of this shipped
+            # reporting zero likes on a post that had one.
+            "like_count": getattr(post, "like_count", 0),
+            "comment_count": getattr(post, "comment_count", 0),
         }
     ) for post in posts])
 
