@@ -45,7 +45,7 @@ only because the service was started.
 | Screen | State |
 | --- | --- |
 | Client (`features/wearables/api.ts`) | Written; devices and summary verified live. |
-| `LifestyleHubScreen` / lifestyle-manage | **Not wired** — screens exist, still on seed data. |
+| `LifestyleHubScreen` | **Sleep trend wired** 2026-08-07. Water and mood remain seed — no backend exists for manual logs. |
 
 ## Daily figures — PO ruling 2026-08-07
 
@@ -70,5 +70,22 @@ a watch plus a scale, and WRONG for two devices both counting steps — a phone 
 double the total. `deviceCount` is returned so a caller can warn. Today the seeded data has one
 device; this needs a decision if that changes.
 
-`LifestyleHubScreen` is still not wired — the aggregation it needed now exists, so that is a
-mechanical next step rather than a blocked one.
+## Lifestyle sleep trend wired 2026-08-07
+
+The 7-day sleep chart reads `GET /v1/wearables/summary` and collapses `recent_samples` through
+`dailyTotalFor(..., "sleep_minutes", day)` for each of the last seven LOCAL days.
+
+**One request, not N+1.** Fetching samples per device would be a request per device to draw one
+chart; `recent_samples` on the summary exists for exactly this.
+
+**A missing night draws as 0 but is EXCLUDED from the average.** Averaging an absent reading in as
+zero would report that the patient did not sleep, which is a clinical claim rather than a gap.
+
+**Water and mood are NOT wired, and say so on screen.** They are manual logs and nothing in this
+product stores them — there is no endpoint. The chart carries "Sample data — connect a device to
+see your own sleep" when no wearable data exists, so seed figures are never passed off as the
+patient's own.
+
+**Multi-device double-counting is surfaced**: when any day drew on more than one device the card
+says "Combined from more than one device", because latest-per-device summed is wrong for two
+devices that both track sleep.

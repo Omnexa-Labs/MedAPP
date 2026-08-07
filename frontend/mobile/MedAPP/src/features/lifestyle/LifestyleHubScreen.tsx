@@ -49,7 +49,10 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { wearablesApi } from "@/features/wearables/api";
+import { dailyTotalFor, localDayKey } from "@/features/wearables/daily";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, type Href } from "expo-router";
@@ -139,7 +142,51 @@ const SEED_MEDS: Medication[] = [
   { id: "m3", name: "Vitamin D3", time: "9:30 PM", taken: true },
 ];
 
+/** The last seven local days, oldest first, as day keys plus short labels. */
+function lastSevenDays(): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    out.push({ key: localDayKey(d.toISOString()), label: "MTWTFSS"[d.getDay() === 0 ? 6 : d.getDay() - 1] });
+  }
+  return out;
+}
+
 export function LifestyleHubScreen() {
+  // Sleep comes from wearable_sync_service. WATER and MOOD deliberately do NOT:
+  // they are manual logs and nothing in this product stores them, so those
+  // charts stay seed data and say so rather than being dressed up as live.
+  //
+  // ONE request. Fetching samples per device would be an N+1 for a chart, and
+  // `recent_samples` on the summary is what the service offers for this.
+  const { data: wearableSummary } = useQuery({
+    queryKey: ["wearables", "summary"],
+    queryFn: () => wearablesApi.getSummary(),
+  });
+
+  const sleep = useMemo(() => {
+    const samples = wearableSummary?.recentSamples ?? [];
+    const days = lastSevenDays();
+    // PO ruling: cumulative, latest per device per day. That rule lives in
+    // features/wearables/daily.ts with its own tests — never inline.
+    const perDay = days.map((d) => dailyTotalFor(samples, "sleep_minutes", d.key));
+    const present = perDay.filter((t): t is NonNullable<typeof t> => t !== null);
+    if (present.length === 0) return { ...SLEEP, live: false, multiDevice: false };
+
+    // A day with no reading draws as 0, but the AVERAGE is over days that have
+    // data. Averaging a missing night in as zero would report that the patient
+    // did not sleep.
+    return {
+      avg: `${(present.reduce((sum, t) => sum + t.value / 60, 0) / present.length).toFixed(1)}h`,
+      days: days.map((d) => d.label),
+      hours: perDay.map((t) => (t ? t.value / 60 : 0)),
+      todayIndex: 6,
+      live: true,
+      multiDevice: present.some((t) => t.deviceCount > 1),
+    };
+  }, [wearableSummary]);
+
   // Feeds PatientAppBar's AvatarWithFallback. Same store as InboxScreen, reached
   // through the `useCurrentUser` selector rather than `useAuthStore` directly:
   // importing the store pulls in @/lib/api/client -> @/lib/config, which throws
@@ -308,15 +355,28 @@ export function LifestyleHubScreen() {
               </Text>
             </View>
             <View className="rounded-md bg-primary-container/40 px-sm py-xs">
-              <Text className="font-label-md text-label-sm text-primary">Avg: {SLEEP.avg}</Text>
+              <Text className="font-label-md text-label-sm text-primary">Avg: {sleep.avg}</Text>
             </View>
           </View>
           <BarChart
-            labels={SLEEP.days}
-            values={SLEEP.hours}
-            highlightIndex={SLEEP.todayIndex}
+            labels={sleep.days}
+            values={sleep.hours}
+            highlightIndex={sleep.todayIndex}
             height={112}
           />
+          {/* Two devices both reporting sleep would be SUMMED by the
+              latest-per-device rule, which double-counts. Surfaced rather than
+              silently wrong - see docs/api/wearable_sync_service.md. */}
+          {sleep.multiDevice ? (
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">
+              Combined from more than one device.
+            </Text>
+          ) : null}
+          {!sleep.live ? (
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">
+              Sample data — connect a device to see your own sleep.
+            </Text>
+          ) : null}
         </Card>
 
         {/* Mood over time */}

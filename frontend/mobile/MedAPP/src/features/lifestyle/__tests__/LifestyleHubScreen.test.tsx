@@ -8,7 +8,14 @@
 // must stay with the screen.
 
 import { screen, fireEvent } from "@testing-library/react-native";
-import { renderWithSafeArea as render } from "@/test/safe-area";
+import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -28,6 +35,13 @@ jest.mock("expo-router", () => ({
 // throws unless app.config.ts extras are present.
 jest.mock("@/hooks/use-current-user", () => ({
   useCurrentUser: () => null,
+}));
+
+// The sleep trend now reads wearable_sync_service, which pulls `@/lib/api/client`
+// -> `@/lib/config` and its require-time throw, plus a react-query provider.
+// Same trio every migrated screen has needed.
+jest.mock("@/features/wearables/api", () => ({
+  wearablesApi: { getSummary: jest.fn(async () => ({ recentSamples: [] })) },
 }));
 
 import { LifestyleHubScreen } from "../LifestyleHubScreen";
