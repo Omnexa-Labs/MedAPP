@@ -106,6 +106,33 @@ ports MedApp services already publish: `api_gateway` 8010 vs `ehr_service`, `ehr
 were first started together. The file now carries the rule: **an override host port must not be a
 port any base service already publishes** - list every effective host port before changing one.
 
+### The RabbitMQ startup race — FIXED 2026-08-07, and the fix needed two attempts
+Every publisher connects to RabbitMQ **once**, at startup. `connect_failed` is swallowed,
+`app.state.event_bus` stays `None`, and `publish()` then becomes a **silent no-op for the life of
+the process**. No reconnect, no health signal. A service that boots first stops publishing until
+someone restarts it — which is exactly what made the first profile-rename test do nothing.
+
+Two things were wrong, and the first fix alone did not work:
+
+1. **RabbitMQ had no healthcheck at all**, so `condition: service_healthy` had nothing to wait on.
+   The best any service could declare was `service_started`, which means the container process
+   launched — not that AMQP accepts.
+2. **`rabbitmq-diagnostics ping` is not sufficient**, and this was measured rather than assumed.
+   It reports the Erlang node answering, which happens BEFORE the AMQP listener binds. With `ping`
+   compose declared the broker healthy and `user_service` still took `ECONNREFUSED` on a cold
+   start. `check_port_connectivity` tests the listener clients actually dial.
+
+All 12 broker-using services now declare `rabbitmq: condition: service_healthy`. Note that a LIST
+form (`depends_on: [rabbitmq]`) carries no condition and silently means `service_started`, so it is
+the race spelled differently — two services had exactly that and were converted.
+
+**Verified**: containers removed, cold start, **zero** `connect_failed` and zero subscribe failures,
+and a `PATCH /v1/me` rename propagated to the denormalised snapshots with no manual restart.
+
+**STILL OPEN — this is a compose-level fix, not a runtime one.** If the broker restarts while a
+service is up, that service goes silent again with nothing to signal it. A reconnecting bus (or a
+readiness probe that reflects bus health) is the durable answer, and it is not built.
+
 ### Local stack
 - `make up` / `make seed` ignore `docker-compose.ports.yml` (both hardcode one `-f`). On a machine
   where another project holds 5432 they fail, and `make seed` tears down running containers. Pass
