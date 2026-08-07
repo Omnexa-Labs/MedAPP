@@ -24,7 +24,7 @@ Standing rules this register exists to serve:
 | `pharmacy_service` | 7 | ✅ [directory_services.md](directory_services.md) | pharmacy detail wired |
 | `nurse_service` / `pharmacist_service` | 13 | ✅ [directory_services.md](directory_services.md) | discovery lists wired |
 | `social_service` | 9 | ✅ [social_service.md](social_service.md) | Client verified live; **feed screen blocked - PostOut has no author name, avatar or counts** |
-| `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
+| `telemedicine_service` | 9 | ✅ [telemedicine_service.md](telemedicine_service.md) | Client verified live; **screens not wired — no video transport exists** |
 | `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
 | `notification_service` | 5 | ✅ [notification_service.md](notification_service.md) | Client verified live; **no notifications screen exists** |
 | `payment_service` | 6 | ❌ | **not wired** |
@@ -93,6 +93,12 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### A stale image looks exactly like a broken migration chain
+`telemedicine_service` failed `alembic upgrade head` with
+`Can't locate revision identified by '20260805_0003'`. The revision file existed in the repo; the
+running container held only 2 of the 4, because the image predated it. A rebuild fixed it.
+**Check the container's `alembic/versions` before debugging the revisions themselves.**
 
 ### Alembic env.py path assumptions
 `wearable_sync_service` computed `BACKEND_DIR = BASE_DIR.parents[1]`, which raises `IndexError`
