@@ -30,7 +30,7 @@ Standing rules this register exists to serve:
 | `payment_service` | 6 | ❌ | **not wired** |
 | `wearable_sync_service` | 5 | ✅ [wearable_sync_service.md](wearable_sync_service.md) | Client verified live; **Lifestyle screens not wired** |
 | `onboarding_service` | 8 | ✅ [onboarding_service.md](onboarding_service.md) | Client verified live; **had no container until 2026-08-07** |
-| `analytics_service` | 5 | ❌ | **not wired** |
+| `analytics_service` | 5 | ✅ [analytics_service.md](analytics_service.md) | **No client, by decision** — admin-only, no admin surface in this app |
 | `pms_service` | 47 | ❌ | Medications/scripts — not wired; **now reachable at `/v1/pms/*`** |
 | `hms_service` | 51 | ❌ | Roster/dashboard — not wired; **now reachable at `/v1/hms/*`** (503s, see below) |
 | `api_gateway` | 0 own | ❌ | Proxy only — see gateway gap below |
@@ -93,6 +93,14 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### Two endpoints are safe ONLY because the gateway does not route them
+`user_service` `GET /users/{id}` and `analytics_service` `POST /v1/internal/events` are both absent
+from `ROUTES` on purpose. The analytics one takes **no principal at all**, so adding it to the table
+would create a public unauthenticated write into the analytics store — anyone could forge booking
+and payment events, and those numbers are what the business reads.
+
+Treat `ROUTES` as a security boundary, not a convenience list. Adding a line to it is a decision.
 
 ### One service had no container at all
 `onboarding_service` exists on disk and the gateway routes `/v1/onboarding` to it, but it was the
