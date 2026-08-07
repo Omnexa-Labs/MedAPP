@@ -209,3 +209,40 @@ screen that was never wired. Reading **live** from the backend:
 
 Everything else renders designed screens against static data. `docs/PIPELINE.md` §4 has the
 current per-screen state.
+
+---
+
+## Device verification blockers found 2026-08-07
+
+Recorded because each cost real time and none is obvious from the code.
+
+### `API_BASE_URL` defaults to the EMULATOR, on the WRONG PORT
+`app.config.ts::defaultApiBaseUrl` returns `http://10.0.2.2:8000`. On a physical device `10.0.2.2`
+means nothing, and the gateway is on **8010** (per `docker-compose.ports.yml`), not 8000. Its own
+comment says "Physical devices need an explicit API_BASE_URL via env var" — so Metro must be started
+as:
+
+    API_BASE_URL=http://localhost:8010 npx expo start
+
+with `adb reverse tcp:8010 tcp:8010` in place. Without it every API-backed screen fails while the
+app itself looks healthy.
+
+**NOT YET CONFIRMED FIXED.** Restarting Metro with that variable did not immediately restore the
+Community feed. Two untested candidates: Expo Go caching the previous manifest extras (a full
+force-stop plus a fresh launch URL may be needed), or the persisted token having expired so the call
+is a 401 rather than a network error.
+
+### `expo start --localhost` binds IPv6 only
+It listens on `[::1]:8081`. `adb reverse` forwards to **IPv4** loopback, so the phone cannot reach
+it while everything looks fine locally. Plain `npx expo start` binds `0.0.0.0` and works.
+**`scripts/dev-usb.ps1` passes `--localhost`** — that is the first thing to change if the tunnel
+seems dead with Metro apparently running.
+
+### `--clear` can fail with EPERM
+A leftover metro-cache lock from an orphaned Metro makes `--clear` throw
+`EPERM ... metro-cache`. Drop `--clear`, or kill the orphan first — check
+`netstat -ano | findstr :8081`.
+
+### Expo Go replays its last URL
+Launching with no path (or `/--/`) reopens whatever URL Expo Go last held, which strands the app in
+the signup wizard. An explicit route overrides it: `exp://127.0.0.1:8081/--/community`.
