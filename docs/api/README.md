@@ -147,9 +147,31 @@ a service is up. Both halves are now closed:
 propagated to the denormalised snapshots **with nothing restarted**. The anonymity guard held
 throughout.
 
-Remaining nuance, not a blocker: a SUBSCRIBER that fails its initial subscribe does not retry —
-only publishers self-heal. `social_service` is the only consumer today and compose now guarantees
-it starts after a healthy broker.
+### Subscribers retry too — FIXED 2026-08-07
+The publisher self-heals because every `publish()` is a fresh chance to connect. A subscriber has no
+such opportunity: it connects once and then only receives, so one failed attempt meant silence for
+the process lifetime with nothing to signal it.
+
+`social_service` now subscribes in a BACKGROUND task with exponential backoff capped at 30s. Two
+properties worth keeping if this is copied:
+
+- **Startup is never blocked.** Awaiting the retry loop would couple API readiness to the broker —
+  a down broker would hold the service in startup instead of serving a feed that reads from
+  Postgres and needs no RabbitMQ at all.
+- **Backoff caps rather than growing without bound**, so a broker returning after an hour is picked
+  up within the minute.
+
+The task is cancelled on shutdown and `CancelledError` is re-raised, not swallowed — swallowing it
+hangs shutdown.
+
+**Verified**: `social_service` was started with RabbitMQ DOWN. It logged retry attempts, served
+normally, and subscribed unattended on the 6th attempt once the broker came up. A `PATCH /v1/me`
+rename then propagated to the snapshots **with nothing restarted on either side**, anonymity guard
+intact.
+
+**When a second consumer appears, move the retry loop into `shared/events`.** It lives in
+social_service only because it is the codebase's single subscriber; copying it into a second
+service is the moment to promote it.
 
 ### Local stack
 - `make up` / `make seed` ignore `docker-compose.ports.yml` (both hardcode one `-f`). On a machine

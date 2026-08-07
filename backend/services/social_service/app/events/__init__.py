@@ -22,7 +22,9 @@ exact leak `create_post` avoids by never storing it in the first place.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from contextlib import suppress
 from typing import Any
 
 from fastapi import FastAPI
@@ -61,20 +63,71 @@ async def _on_profile_updated(event: DomainEvent) -> None:
     log.info("refreshed author_name snapshots for %s", user_id)
 
 
+async def _subscribe_with_retry(app: FastAPI) -> None:
+    """Keep trying to subscribe until it takes.
+
+    The publisher side self-heals through `EventBus._ensure_connected` — every
+    `publish()` is a fresh chance to connect. A SUBSCRIBER has no such
+    opportunity: it connects once at startup and then only ever receives, so a
+    single failed attempt used to mean silence for the life of the process,
+    with nothing to signal it. Compose now orders startup, but compose ordering
+    does not exist in Kubernetes and does nothing for a broker that dies before
+    this service's first attempt.
+
+    Backoff caps at 30s rather than growing without bound: a broker that comes
+    back after an hour should be picked up within the minute, not eventually.
+
+    Cancelled on shutdown by `close_consumer`. `asyncio.CancelledError` is
+    re-raised rather than swallowed — swallowing it makes shutdown hang.
+
+    WHEN A SECOND CONSUMER APPEARS, this belongs in `shared/events` next to the
+    bus. It lives here while social_service is the only subscriber in the
+    codebase; copying it into a second service would be the moment to move it.
+    """
+    delay = 1.0
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            bus = EventBus(settings.rabbitmq_url)
+            await bus.connect()
+            await bus.subscribe(_QUEUE, _ROUTING_KEYS, _on_profile_updated)
+            app.state.event_bus = bus
+            log.info("subscribed to %s after %d attempt(s)", _ROUTING_KEYS, attempt)
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - a broker outage must not stop the API
+            log.warning(
+                "subscribe attempt %d failed; retrying in %.0fs (names will be stale until then)",
+                attempt,
+                delay,
+                exc_info=attempt == 1,
+            )
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 30.0)
+
+
 async def init_consumer(app: FastAPI) -> None:
-    """Subscribe on startup. Never fatal: the feed must serve if RabbitMQ is down."""
+    """Start subscribing in the BACKGROUND. Never blocks startup.
+
+    Awaiting the subscription here would couple the API's readiness to the
+    broker: with the retry loop in front, a down broker would hold the whole
+    service in startup instead of serving the feed, which reads from Postgres
+    and does not need RabbitMQ at all.
+    """
     if not getattr(settings, "consume_events", True):
         return
-    try:
-        bus = EventBus(settings.rabbitmq_url)
-        await bus.connect()
-        await bus.subscribe(_QUEUE, _ROUTING_KEYS, _on_profile_updated)
-        app.state.event_bus = bus
-    except Exception:  # noqa: BLE001 - a broker outage must not stop the API
-        log.warning("could not subscribe to %s; names will go stale", _ROUTING_KEYS, exc_info=True)
+    app.state.event_bus = None
+    app.state.subscriber_task = asyncio.create_task(_subscribe_with_retry(app))
 
 
 async def close_consumer(app: FastAPI) -> None:
+    task = getattr(app.state, "subscriber_task", None)
+    if task is not None and not task.done():
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
     bus = getattr(app.state, "event_bus", None)
     if bus is not None:
         try:
