@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # Off in tests and anywhere without a broker. Matches the publish_events
     # flag the publishing services carry.
     consume_events: bool = True
+    rabbitmq_url: str = "amqp://medapp:medapp@rabbitmq:5672/"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
 

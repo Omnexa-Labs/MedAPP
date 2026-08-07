@@ -36,7 +36,6 @@ from ..models import PostComment, SocialPost
 
 log = logging.getLogger(__name__)
 
-_SOURCE = "social-service"
 _QUEUE = "social_service.user_profile"
 _ROUTING_KEYS = ["user.profile.updated"]
 
@@ -67,7 +66,7 @@ async def init_consumer(app: FastAPI) -> None:
     if not getattr(settings, "consume_events", True):
         return
     try:
-        bus = EventBus(source=_SOURCE)
+        bus = EventBus(settings.rabbitmq_url)
         await bus.connect()
         await bus.subscribe(_QUEUE, _ROUTING_KEYS, _on_profile_updated)
         app.state.event_bus = bus

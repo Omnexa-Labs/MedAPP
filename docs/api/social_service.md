@@ -166,10 +166,37 @@ author through the back door — the exact leak `create_post` avoids by never st
 Subscription failure is non-fatal: a broker outage must not stop the feed serving. `consume_events`
 turns it off where there is no broker.
 
-**NOT VERIFIED.** Docker Desktop's daemon went down before the rebuild, so neither the publisher nor
-the consumer has been exercised against a running stack. The obvious end-to-end check: rename a
-seeded doctor via `PATCH /v1/me`, then re-read `/v1/social/feed` and confirm the byline changed on
-their existing posts.
+**VERIFIED END TO END 2026-08-07.** Renamed a seeded doctor via `PATCH /v1/me` and watched the
+snapshots follow:
+
+| | before | after |
+| --- | --- | --- |
+| post | `Kwabena Osei` | `Kwabena Boateng-Osei` |
+| comment | `Kwabena Osei` | `Kwabena Boateng-Osei` |
+
+And the anonymity guard holds across a rename — the case that actually matters:
+
+```
+ is_anonymous -> author_name
+ true         -> <NULL>          <- unchanged by the rename
+ false        -> Kwabena Osei
+ false        -> Kwabena Osei
+```
+
+### Two real faults this shook out
+1. **`EventBus(source=...)` does not exist.** The constructor takes the AMQP url positionally. My
+   consumer failed to subscribe and logged "names will go stale" — the non-fatal design worked, the
+   API served throughout, and the failure was visible rather than silent.
+2. **`user_service` had no broker connection.** It starts before RabbitMQ is ready, `connect_failed`
+   is swallowed, `app.state.event_bus` stays `None`, and `publish` becomes a silent no-op **for the
+   life of the process**. The first rename therefore did nothing, and nothing anywhere said so
+   except a startup warning scrolled off the log.
+
+   **That second one is a live operational hazard, not a test artifact.** Any service that boots
+   before RabbitMQ silently stops publishing until someone restarts it. There is no reconnect and
+   no health signal. Restarting `user_service` after the broker was up is what made the rename
+   work. Worth a `depends_on: rabbitmq: condition: service_healthy`, or a reconnecting bus, before
+   anyone relies on events in production.
 
 ### Feed gaps now
 | Field | State |
