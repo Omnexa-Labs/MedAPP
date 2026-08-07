@@ -2268,6 +2268,42 @@ defect this repo keeps fighting, logged rather than half-wired.
 **Inherited flags, unchanged:** member count, presence, join events and delivery receipts are all
 SEEDED. There are no messaging endpoints at all, so none can be live.
 
+## 5t. **DONE 2026-08-07** — post detail designed, closing a promise the feed was already making
+
+`community — post detail` `1066:2025`, dark proof `1067:2069`, page `949:10202`.
+
+**Why it exists:** the feed card renders "read more" and a comment count. Both promise a
+destination and neither had one — the dead-control defect this pipeline has been removing all
+session, except this one was designed in rather than left over.
+
+Instanced, not redrawn: `Detail AppBar` `193:120` (trailing action hidden — nothing to share from a
+leaf), `PostActionBar` `949:11489`, and the SAME `Composer / Chat` the chat screens use, relabelled
+"Add a comment…". Every fill is a bound token.
+
+**Measured:** light 235.3 mean / 91.7% light → dark 31.4 / 90.9% dark, colours 521 → 580 (the guard
+against a flat slab).
+
+### Decisions worth keeping
+- **No clamp and no "read more" in the body.** This screen IS the read-more; repeating the
+  affordance here would loop the user back to where they already are.
+- **Initials, not avatars**, matching the v1 ruling — nothing in the backend stores an avatar for a
+  patient. The `?` disc on the anonymous comment is deliberate: an anonymous commenter must not
+  borrow a real person's initials.
+- **An anonymous comment is drawn**, because the API defaults `is_anonymous` to TRUE for questions
+  and the design has to show what that looks like.
+- **The action bar contradicted the frame.** Its instance carried the component default of 48
+  comments while the header said 2. A frame that disagrees with itself is one a builder has to
+  guess about, and the guess ships. Both now read 2.
+
+### Not designed, and deliberately
+Comment **reply threading**, comment **reactions**, and post **edit/delete**. None has an endpoint —
+`social_service` exposes comment CREATE only, with no list, update or delete route — so designing
+them would draw controls the backend cannot honour.
+
+**Build blocker to know before wiring:** there is no `GET /posts/{id}/comments`. The count is
+available on `PostOut`, the comments themselves are not. This screen cannot be built until that
+route exists.
+
 ## 5w. **DONE 2026-08-06** — the chat_thread frame described the wrong conversation. PO ruled the FRAME wrong.
 
 Raised by the PO: "the chat design doesn't match what is on figma." It did not, and the code had
