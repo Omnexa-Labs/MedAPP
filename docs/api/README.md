@@ -28,7 +28,7 @@ Standing rules this register exists to serve:
 | `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
 | `notification_service` | 5 | ✅ [notification_service.md](notification_service.md) | Client verified live; **no notifications screen exists** |
 | `payment_service` | 6 | ❌ | **not wired** |
-| `wearable_sync_service` | 5 | ❌ | Lifestyle/wearables — **not wired** |
+| `wearable_sync_service` | 5 | ✅ [wearable_sync_service.md](wearable_sync_service.md) | Client verified live; **Lifestyle screens not wired** |
 | `onboarding_service` | 8 | ❌ | **not wired** |
 | `analytics_service` | 5 | ❌ | **not wired** |
 | `pms_service` | 47 | ❌ | Medications/scripts — not wired; **now reachable at `/v1/pms/*`** |
@@ -93,6 +93,14 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### Alembic env.py path assumptions
+`wearable_sync_service` computed `BACKEND_DIR = BASE_DIR.parents[1]`, which raises `IndexError`
+inside the container (the service lives at `/app`, so there is no second parent). Its migrations had
+therefore **never run in Docker** — the service had no tables at all. The repo checkout has enough
+depth, so it only failed where it mattered, and only surfaced when the service was actually started.
+
+Worth grepping the other services' `alembic/env.py` for the same `parents[N]` assumption.
 
 ### Seed coverage
 `scripts/seed_dev_data.py` covers users, doctors and bookings. It does **not** cover EHR content,
