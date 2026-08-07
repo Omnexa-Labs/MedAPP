@@ -17,12 +17,12 @@ Standing rules this register exists to serve:
 | --- | ---: | --- | --- |
 | `inbox_service` | 8 | ✅ [inbox_service.md](inbox_service.md) | Inbox + chat thread wired; practitioner room + AI handoff seeded |
 | `ehr_service` | 7 | ✅ [ehr_service.md](ehr_service.md) | Overview wired; patient-record deliberately not |
-| `user_service` | 17 | ❌ **owed** | auth + `/v1/me` wired |
-| `booking_service` | 8 | ❌ **owed** | booking + appointments wired |
-| `doctor_service` | 9 | ❌ **owed** | Find Care wired |
-| `hospital_service` | 7 | ❌ **owed** | hospital detail wired |
-| `pharmacy_service` | 7 | ❌ **owed** | pharmacy detail wired |
-| `nurse_service` / `pharmacist_service` | 13 | ❌ **owed** | discovery lists wired |
+| `user_service` | 17 | ✅ [user_service.md](user_service.md) | auth + `/v1/me` wired |
+| `booking_service` | 8 | ✅ [booking_service.md](booking_service.md) | booking + appointments wired |
+| `doctor_service` | 9 | ✅ [doctor_service.md](doctor_service.md) | Find Care wired |
+| `hospital_service` | 7 | ✅ [hospital_service.md](hospital_service.md) | hospital detail wired |
+| `pharmacy_service` | 7 | ✅ [directory_services.md](directory_services.md) | pharmacy detail wired |
+| `nurse_service` / `pharmacist_service` | 13 | ✅ [directory_services.md](directory_services.md) | discovery lists wired |
 | `social_service` | 9 | ❌ | Community — **not wired** |
 | `telemedicine_service` | 9 | ❌ | Telehealth — **not wired** |
 | `lab_service` | 4 | ❌ | **not wired** |
@@ -96,8 +96,23 @@ legally weighted, needs a designed flow.
 
 ---
 
-## Undocumented-by-me, and I should say so plainly
-The five "owed" rows above are clients **I did not document**, written before the documentation
-rule landed. Their gaps may exist only as code comments or not at all. They should be
-retro-documented to this template before more services are added, or this register will keep
-drifting from the truth.
+## Debt paid 2026-08-07
+
+The six "owed" rows are now documented. Every service the app talks to has a contract file.
+
+What the retro-documentation pass turned up that was not written down anywhere before:
+
+- **Hardcoded seed ids in a shipped client** — `/v1/hospitals/hosp-1` and `/v1/pharmacies/pharm-1`
+  are real requests pinned to seed rows, and 404 against any other data.
+- **`is_listable` defaults to FALSE** on doctors, nurses, pharmacists and pharmacies, so anything
+  created through the API is invisible until flipped.
+- **Money is in CENTS** on doctors and nurses — a raw render is 100x the price.
+- **Booking has no "completed" state**; it is derived client-side from `ends_at`, and a past
+  cancelled booking renders as completed unless `cancelled` is tested first.
+- **Booking has no reschedule endpoint** — cancel-and-rebook is non-atomic.
+- **Doctor slots are computed, not reserved** — two patients can be offered the same one.
+- **`pms_partner_secret_id`**, a credential reference, sits on the pharmacy read model.
+
+Still genuinely undocumented, because the app does not call them yet: social, telemedicine, lab,
+notification, payment, wearable-sync, onboarding, analytics, pms, hms. Write the contract as part of
+wiring each, not after.
