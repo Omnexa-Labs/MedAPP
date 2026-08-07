@@ -48,3 +48,14 @@ services:
   # gateway. Moved because another project holds 8001.
   user_service:
     ports: !override ["8011:8001"]
+
+  # COLLISION CREATED BY THIS FILE, not by another project: ehr_service already
+  # publishes 8010:8010 in the base compose, and moving api_gateway 8000 -> 8010
+  # above lands squarely on it. Starting the gateway and ehr_service together
+  # failed with "Bind for 0.0.0.0:8010 failed: port is already allocated".
+  #
+  # ehr_service moves rather than the gateway, because the gateway's 8010 is the
+  # one baked into API_BASE_URL, the adb reverse tunnel and this file's own
+  # header. Same +10 convention: 8010 -> 8020.
+  ehr_service:
+    ports: !override ["8020:8010"]
