@@ -49,6 +49,8 @@
 // expo-* APIs here.
 
 import { useMemo, useState } from "react";
+import { ActivityIndicator } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -56,7 +58,8 @@ import { Card, ChoiceChip, ChoiceChipRow, SearchField } from "@/components/ui";
 import { PatientShell } from "@/components/shell";
 import { useAuthStore } from "@/store/auth-store";
 import { useResolvedScheme } from "@/lib/theme";
-import { blendTokens, tokenColor, useTokenShadow } from "@/lib/tokens";
+import { blendTokens, tokenColor, useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { chatApi, type Thread } from "./api";
 
 /**
  * This screen's scroll gutter and BRAND's screen gutter. Named so the
@@ -86,80 +89,48 @@ interface Conversation {
   timestamp: string;
 }
 
-// ---------------------------------------------------------------------------
-// Seed data — mirrors the Stitch comp. Replace with an API call once the
-// messaging service exposes GET /v1/threads.
-//
-// Every clinician here is a doctor scripts/seed_dev_data.py actually creates,
-// because those are the names a tester sees in Find Care. The comp shipped three
-// that exist nowhere — "Sarah Miller", "Dr. James Carter", and a "Dr. Aris"
-// quoted inside the Cardiology Dept. preview — which made the app look like it
-// had a different roster on every screen.
-// ---------------------------------------------------------------------------
+/**
+ * `ThreadOut` -> the row this screen draws.
+ *
+ * WHAT THE SERVICE CANNOT SUPPLY, and is therefore absent rather than faked:
+ *
+ *   * lastMessage   `ThreadOut` carries `last_message_at` but NO preview text.
+ *                   Rendering one would mean a GET /messages per row — an N+1
+ *                   on every inbox paint. The row falls back to the thread's
+ *                   `source`, which is real.
+ *   * unreadCount   Not on the wire. `last_read_at` exists per PARTICIPANT, so
+ *                   a count is derivable server-side but is not exposed.
+ *   * avatar / online / badge
+ *                   `ThreadOut` names no counterparty — it has `assigned_role`
+ *                   and `assigned_user_id`, no display name and no photo. The
+ *                   row shows the SUBJECT, which is what the service models.
+ *
+ * All four want `last_message_preview`, `unread_count` and a resolved
+ * counterparty on `ThreadOut`. Logged in docs/PIPELINE.md.
+ */
+function toConversation(t: Thread): Conversation {
+  return {
+    id: t.id,
+    kind: t.assignedRole ? "support" : "person",
+    name: t.subject,
+    lastMessage: t.source,
+    timestamp: formatWhen(t.lastMessageAtIso),
+    badge: t.assignedRole ? { label: t.assignedRole, tint: "primary" } : undefined,
+  };
+}
 
-const SEED_CONVERSATIONS: Conversation[] = [
-  {
-    id: "c1",
-    kind: "person",
-    avatarUri:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDeJpe2eyE7VBbPwXD7m2u2so2Q3OUNPtsrGrSFmYPgs-ebEdihstJSB8oCR4b47ByY3B_O0tXJvybxrQFcMdbXyy9xqS7U_kZ8nFPNvIRhmjvEdFwtFcHJV0XGrYK9jh0GeoJZ1vPacpmlGzjtsCd5RCBzska_0hXM0ZEU9ysDTcXuwGisPFsqxaJkEiaMkAZ9kics4W18HE6lSAYeAoyEI8J_niTdEBQuVwViQn55GrLPUW-D2piEuATB6NuuoRLh-IK3SrUgmo-b",
-    // Dr. Adjoa Boateng, the seeded cardiologist. This is the SAME thread and
-    // the same avatar URI as ChatThreadScreen's SEED_CONTACT, which renders
-    // "Doctor · Cardiologist" in its bar — so the row now carries the Doctor
-    // badge it was missing. Without it the `doctors` filter hid the app's only
-    // doctor thread while `private` (kind === "person" && !badge) listed her as
-    // a personal contact: a filter bug the rename made impossible to leave.
-    name: "Dr. Adjoa Boateng",
-    badge: { label: "Doctor", tint: "primary" },
-    isOnline: true,
-    unreadCount: 2,
-    lastMessage: "I've attached the new lab results for review.",
-    timestamp: "12:45 PM",
-  },
-  {
-    id: "c2",
-    kind: "group",
-    avatarIcon: "groups",
-    avatarBgClass: "bg-tertiary-container",
-    avatarFgColor: "#fefcff",
-    name: "Cardiology Dept.",
-    badge: { label: "Group", tint: "tertiary" },
-    lastMessage: "Dr. Boateng: Patient #402 is ready for discharge.",
-    timestamp: "11:20 AM",
-  },
-  {
-    id: "c3",
-    kind: "support",
-    avatarIcon: "headset-mic",
-    avatarBgClass: "bg-secondary-container",
-    avatarFgColor: "#57657a",
-    name: "IT Help Desk",
-    badge: { label: "Support", tint: "secondary" },
-    lastMessage: "Your access to the MRI portal has been restored.",
-    timestamp: "Yesterday",
-  },
-  {
-    id: "c4",
-    kind: "person",
-    avatarUri:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuBUTvo_vK-LY786nB9Qm8QiGjqsasFuR2oU7WApcRWvQ0on_UAABBqqsQFdzCINcrdvD58_y1rz0hZ8cwUUbsPKcOA8-Abv6QQ34Sv5Ge7dlq443hA1m6pD16C7g6e7HbIOTqKzNTgjRceQTwRpV_dlXc_d7CF2aHF6eF0LwCMXN1v7csE-m-WyZwzlBqWiTUb3AVMWogTUFh5hZKKDh7HbJKqZ3OSRYbsucTW2N2niIkZK0l0qLP9G2r-tYdezp3iR4TioNqVV2J4h",
-    // The seeded GP. A follow-up booking is primary-care work, and his seed bio
-    // is routine check-ups, chronic disease reviews and first-line referrals.
-    name: "Dr. Kwabena Osei",
-    badge: { label: "Doctor", tint: "primary" },
-    lastMessage: "Let's schedule a follow-up for next Tuesday.",
-    timestamp: "Yesterday",
-  },
-  {
-    id: "c5",
-    kind: "person",
-    avatarUri:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCpQnYgmwJbUk1kc8GBBLGM0SQ8zHoVjaMjhlL8897rN83BcrCivpKpPaRODmJ5mVEdlJsycVW9dHJ-9d1wdtxUfewV-RUevP1FnI5MoNTSPLpQY1GJL9fgYiqqbGPM2vPGUMjJXt6qa5O4cCiZ9Ms-lluB78dSrjxXHD70umRHDUtuS350B2snrOxD2huqHz95c5X-19CDnJp_XJOVA9TZIkfu-2711VGs9Yysu8-omOv8BwVbiDE2PcYzwRzAYs8U-wB1uz0PKBwj",
-    name: "Michael Chen",
-    lastMessage: "Thank you for the prescription refill request.",
-    timestamp: "Oct 24",
-  },
-];
+/** Short relative time. Null means the thread has no messages yet. */
+function formatWhen(iso: string | null): string {
+  if (!iso) return "New";
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return "Now";
+  if (mins < 60) return `${mins}m`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h`;
+  return `${Math.floor(mins / 1440)}d`;
+}
+
 
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
@@ -195,8 +166,30 @@ export function InboxScreen() {
   const onPrimary = tokenColor("on-primary", scheme);
   const fabShadow = useTokenShadow("shadow", FLOATING_SHADOW);
 
+  // `GET /v1/threads`, already scoped to the bearer token. This screen rendered
+  // a seed array until now — and the note promising this call said it was
+  // blocked on "the messaging service", which was never true: inbox_service has
+  // shipped the endpoint all along (see ./api.ts).
+  const { data, isPending, isError, refetch, isRefetching } = useQuery({
+    queryKey: ["threads"],
+    queryFn: () => chatApi.listThreads(),
+  });
+
+  const conversations = useMemo(
+    () =>
+      (data ?? [])
+        // Threads with no messages sort LAST, not first — a null timestamp is
+        // "nothing has happened here", not "happened at epoch".
+        .slice()
+        .sort((a, b) => (b.lastMessageAtIso ?? "").localeCompare(a.lastMessageAtIso ?? ""))
+        .map(toConversation),
+    [data],
+  );
+
+  const spinner = useTokenColor("primary");
+
   const filtered = useMemo(() => {
-    let result = SEED_CONVERSATIONS;
+    let result = conversations;
 
     if (activeFilter === "doctors") {
       result = result.filter((c) => c.badge?.label === "Doctor");
@@ -214,7 +207,7 @@ export function InboxScreen() {
     }
 
     return result;
-  }, [activeFilter, query]);
+  }, [activeFilter, query, conversations]);
 
   return (
     <PatientShell
@@ -291,7 +284,31 @@ export function InboxScreen() {
 
         {/* Conversation list */}
         <View className="gap-base">
-          {filtered.length === 0 ? (
+          {isPending ? (
+            <View className="items-center py-2xl">
+              <ActivityIndicator color={spinner} />
+            </View>
+          ) : isError ? (
+            <Card className="items-center gap-sm py-xl">
+              <Text className="font-headline-md text-headline-md text-on-surface">
+                Couldn't load your messages
+              </Text>
+              <Text className="text-center font-body-md text-body-md text-on-surface-variant">
+                Check your connection and try again.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading messages"
+                onPress={() => refetch()}
+                disabled={isRefetching}
+                className="min-h-[44px] justify-center rounded-full border border-outline px-lg active:opacity-70"
+              >
+                <Text className="font-label-md text-label-md text-on-surface">
+                  {isRefetching ? "Retrying…" : "Try again"}
+                </Text>
+              </Pressable>
+            </Card>
+          ) : filtered.length === 0 ? (
             <EmptyInbox query={query} />
           ) : (
             filtered.map((c) => <ConversationItem key={c.id} conv={c} />)
@@ -356,7 +373,10 @@ function ConversationItem({ conv }: { conv: Conversation }) {
           // Route was added recently — typedRoutes regenerates on dev server start.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pathname: "/(app)/chat-thread" as any,
-          params: { name: conv.name },
+          // `threadId` is the REAL id now, not a display string. ChatThreadScreen
+          // still renders seed messages; wiring it to GET /threads/:id/messages
+          // is the next slice, and it needs this id to do it.
+          params: { name: conv.name, threadId: conv.id },
         });
       }}
     >
