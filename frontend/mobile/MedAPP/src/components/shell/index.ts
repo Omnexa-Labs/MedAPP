@@ -49,7 +49,7 @@ export {
 // PATIENT_TAB_HREFS is the single source of truth for where the five patient
 // tabs go. Exported so a test (or a future `<Tabs>` layout) can assert against
 // the map rather than re-typing the route strings.
-export { PatientShell, PATIENT_TAB_HREFS, SETTINGS_HREF } from "./PatientShell";
+export { PatientShell, PATIENT_TAB_HREFS, SETTINGS_HREF, NOTIFICATIONS_HREF } from "./PatientShell";
 export { PractitionerAppBar, PRACTITIONER_APP_BAR_HEIGHT } from "./PractitionerAppBar";
 // PRACTITIONER_TAB_HREFS is the practitioner counterpart of PATIENT_TAB_HREFS:
 // the single source of truth for where the five practitioner tabs go, exported

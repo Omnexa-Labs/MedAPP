@@ -63,6 +63,16 @@ import { PatientAppBar } from "./PatientAppBar";
  */
 export const SETTINGS_HREF = "/(app)/settings" as Href;
 
+/**
+ * Where the app bar's BELL goes.
+ *
+ * It had no default at all and no caller supplied one, so the bell was a dead
+ * 44pt control on every patient screen — precisely the state the avatar was in
+ * before `SETTINGS_HREF`. Same fix, same reason: five tab roots render this bar
+ * and a screen must not be able to forget shell behaviour.
+ */
+export const NOTIFICATIONS_HREF = "/(app)/notifications" as Href;
+
 export const PATIENT_TAB_HREFS: Record<PatientTab, Href> = {
   home: "/(app)" as Href,
   overview: "/(app)/overview" as Href,
@@ -200,6 +210,11 @@ export function PatientShell({
   // `router.replace`-before-`signOut()` ordering all still live in one file.
   const handleAvatarPress = onAvatarPress ?? (() => router.navigate(SETTINGS_HREF));
 
+  // `navigate`, not `push`, for the same dedupe reason as the avatar: one
+  // destination, and tapping the bell twice must not stack two copies.
+  const handleNotificationsPress =
+    onNotificationsPress ?? (() => router.navigate(NOTIFICATIONS_HREF));
+
   // The shared default. `onTabPress` wins if a screen supplies one.
   const handleTabPress =
     onTabPress ??
@@ -231,7 +246,7 @@ export function PatientShell({
           // panel, and announcing `expanded: false` for a control that opens a
           // screen would be a false disclosure.
           unreadCount={unreadCount}
-          onNotificationsPress={onNotificationsPress}
+          onNotificationsPress={handleNotificationsPress}
         />
         <View className="flex-1">{children}</View>
         {showBottomNav ? <BottomNav active={activeTab} onTabPress={handleTabPress} /> : null}

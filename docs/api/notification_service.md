@@ -56,7 +56,7 @@ happened to already exist here.
 | Screen | State |
 | --- | --- |
 | Client (`features/notifications/api.ts`) | Written; inbox, get and put preferences all verified live. |
-| Notification bell / list screen | **Designed 2026-08-07** (`1073:1433`, dark proof `1074:17968`, page 548:615). Not built. |
+| Notification bell / list screen | **Built 2026-08-07** — `features/notifications/NotificationsScreen.tsx`, route `/(app)/notifications`, reached from the app bar bell. |
 | Settings > notification toggles | **Not wired** - the Settings page ships Appearance and Sign out only. |
 
 The client is ready. Both consumers need design first: there is no notifications screen, and the
@@ -90,3 +90,32 @@ shared components and changing one affects every screen that uses it.
 ### Not designed
 Swipe-to-dismiss, mark-all-read, and per-notification actions. None has an endpoint: there is no
 read state, no delete, and no action payload on `InboxMessageOut`.
+
+---
+
+## Screen BUILT 2026-08-07
+
+`src/features/notifications/NotificationsScreen.tsx`, route `/(app)/notifications`.
+
+**The bell had no handler at all.** `PatientShell` forwarded `onNotificationsPress` and no caller
+ever supplied one, so it was a dead 44pt control on every patient screen — exactly the state the
+avatar was in before `SETTINGS_HREF`. It now defaults to `NOTIFICATIONS_HREF`, with `navigate`
+rather than `push` so a double tap cannot stack two copies.
+
+### Two contract subtleties drive the list, and both are tested
+- **De-duplicated on `eventId`, not `deliveryId`.** One happening delivered over push AND in-app is
+  two rows sharing an event; counting deliveries shows the patient the same thing twice.
+- **`deliveredAtIso === null` renders "Sending…", never a time**, and sorts to the TOP. Null means
+  queued or failed — the service tried, it does not know the patient was told — and burying the one
+  row whose state is still moving under yesterday would be the wrong way round.
+
+### Still no read state, so still no badge
+The screen has no unread styling and no mark-as-read, and there is a test asserting their absence
+so nobody adds them from the design side. **The bell cannot show a count** until the service gains
+read state. That remains the single highest-value addition here.
+
+`eventType` is matched loosely for icon and tint, and an unrecognised type renders with a neutral
+glyph rather than being dropped — it is free text, and a notice we cannot categorise is still a
+notice the patient was sent.
+
+`tsc` clean; 78 suites / 993 tests pass.
