@@ -6,7 +6,7 @@ from shared.observability import configure_logging, instrument_app
 
 from . import events
 from .config import settings
-from .routers import admin, auth, kyc, otp, password, profiles
+from .routers import admin, auth, kyc, otp, password, profiles, users
 
 
 @asynccontextmanager
@@ -35,6 +35,10 @@ def create_app() -> FastAPI:
     app.include_router(profiles.router, prefix="/me", tags=["profile"])
     app.include_router(kyc.router, prefix="/me/kyc", tags=["kyc"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    # Service-to-service identity lookup. NOT in api_gateway ROUTES on purpose -
+    # see the module docstring: a public look-up-any-user-by-id is a patient
+    # enumeration surface.
+    app.include_router(users.router, prefix="/users", tags=["users"])
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:
