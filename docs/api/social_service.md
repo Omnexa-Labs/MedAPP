@@ -206,3 +206,44 @@ a real person's initials, becomes ordinary initials.
 
 Frame and API now agree: every comment is attributed, and `author_name` is null only when the
 write-time lookup failed.
+
+---
+
+## Post detail BUILT 2026-08-07
+
+`src/features/community/PostDetailScreen.tsx`, route `/(app)/post-detail`, frame `1066:2025`.
+The feed card's "Read more" and comment count now both open it — they were the last two
+live-looking controls on that card with no handler.
+
+### THERE IS NO `GET /v1/social/posts/{id}`, and it shapes the screen
+The service exposes the FEED and the COMMENTS, but no single-post read. The post is therefore taken
+from the react-query cache under `["social", "feed"]`, which Community has populated by the time
+anyone can tap through.
+
+A **cold cache** — deep link, process restart, eviction — leaves nothing to render, and that case
+shows an explicit "open it from Community" state rather than a spinner with no exit. A fabricated
+placeholder would be worse than admitting we cannot load it.
+
+Adding a single-post route would make this a `useQuery` and delete the cold-cache branch; nothing
+else in the file would change.
+
+### Byline rules, which carry real weight
+Three states collapse into one nullable `authorName`, and they are not interchangeable:
+
+| State | Renders |
+| --- | --- |
+| anonymous post | `Anonymous` — the name is absent from the DB, not hidden by the client |
+| lookup failed | `MedApp member` — someone real wrote it, we could not resolve who |
+| resolved | the name |
+
+A COMMENT can only ever hit the middle case; comments have no anonymous mode. Calling a failed
+lookup "Anonymous" would tell the reader the author chose to hide, which is a different claim.
+`authorUserId` is **never** a fallback — a UUID byline is worse than none, and on an anonymous post
+it deanonymises outright. Both directions are covered by tests.
+
+### Sending a comment refetches, deliberately
+No optimistic row. The server assigns the id, timestamp and resolved name, and **moderation may hold
+the comment back entirely** — an optimistic append would show the author a comment that never
+publishes. `onSettled` also invalidates the feed, because `comment_count` moved.
+
+77 suites / 986 tests pass.

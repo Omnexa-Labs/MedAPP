@@ -57,6 +57,7 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { AvatarWithFallback } from "@/components/ui";
 import { communityApi, type Post } from "./api";
 import { useTokenColor } from "@/lib/tokens";
@@ -336,6 +337,26 @@ function timeAgo(iso: string): string {
  * `followedByUser` is false for every live post. There is no follow graph, and
  * the tab that consumed it has been removed.
  */
+/**
+ * Open the post detail screen.
+ *
+ * Both the "Read more" link and the comment count land here. They were the two
+ * live-looking controls on this card with no `onPress` at all — the defect this
+ * codebase has been clearing out — and they lead to the same place because
+ * "read the rest" and "read the replies" are the same destination.
+ *
+ * `push`, not `navigate`: a detail screen is a genuine stack entry, and back
+ * must return to the feed at its scroll position.
+ */
+function openPost(id: string) {
+  router.push({
+    // Route added this pass — typedRoutes regenerates on dev server start.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pathname: "/(app)/post-detail" as any,
+    params: { id },
+  });
+}
+
 function toFeedPost(p: Post): FeedPost {
   const author = p.isAnonymous ? "Anonymous" : (p.authorName ?? "MedApp member");
   return {
@@ -729,7 +750,13 @@ function PostCard({ post }: { post: FeedPost }) {
           {post.body}
         </Text>
         {post.readMore ? (
-          <Pressable accessibilityRole="button" hitSlop={6} className="mt-sm self-start">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Read more: ${post.author}`}
+            hitSlop={6}
+            className="mt-sm self-start"
+            onPress={() => openPost(post.id)}
+          >
             <Text className="font-label-sm text-label-sm text-primary">Read more</Text>
           </Pressable>
         ) : null}
@@ -787,6 +814,7 @@ function PostCard({ post }: { post: FeedPost }) {
             accessibilityRole="button"
             accessibilityLabel="Comment"
             className="flex-row items-center gap-xs active:scale-95"
+            onPress={() => openPost(post.id)}
           >
             <MaterialIcons name="chat-bubble-outline" size={22} color="#3d4947" />
             <Text className="font-label-sm text-label-sm text-on-surface-variant">
