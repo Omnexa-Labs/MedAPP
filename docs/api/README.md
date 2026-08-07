@@ -27,7 +27,7 @@ Standing rules this register exists to serve:
 | `telemedicine_service` | 9 | ✅ [telemedicine_service.md](telemedicine_service.md) | Client verified live; **screens not wired — no video transport exists** |
 | `lab_service` | 4 | ✅ [lab_service.md](lab_service.md) | Client written + verified live; **no lab screen exists to wire** |
 | `notification_service` | 5 | ✅ [notification_service.md](notification_service.md) | Client verified live; **no notifications screen exists** |
-| `payment_service` | 6 | ❌ | **not wired** |
+| `payment_service` | 6 | ✅ [payment_service.md](payment_service.md) | **No client, by decision** — payments are SIMULATED, no provider integrated |
 | `wearable_sync_service` | 5 | ✅ [wearable_sync_service.md](wearable_sync_service.md) | Client verified live; **Lifestyle screens not wired** |
 | `onboarding_service` | 8 | ✅ [onboarding_service.md](onboarding_service.md) | Client verified live; **had no container until 2026-08-07** |
 | `analytics_service` | 5 | ✅ [analytics_service.md](analytics_service.md) | **No client, by decision** — admin-only, no admin surface in this app |
@@ -93,6 +93,14 @@ otherwise** — it will not show up until the first write.
 `ehr_service` returned a `dict` from `get_current_principal` while every consumer was annotated
 `Principal`. FastAPI does not check this, and **the suites mock the dependency, so the mismatch only
 existed against the real one**. Worth grepping for in any service before wiring it.
+
+### Payments do not take money
+`payment_service` sets `provider_reference = f"{prefix}_{uuid4().hex}"` and stops. There is no
+Stripe SDK, no M-Pesa call, no provider client in the service at all — so a payment can reach
+`confirmed` without a currency unit moving, and `booking_service` has no payment gate either.
+
+**Nothing in the app should call it until a provider is chosen.** This is the one service where a
+plausible-looking client is actively dangerous rather than merely premature.
 
 ### A healthcheck can pass while the container is unreachable
 `hms_service` was reported HEALTHY by Docker for hours while it could not resolve `postgres` at all.
