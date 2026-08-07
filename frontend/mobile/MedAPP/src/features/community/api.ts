@@ -52,6 +52,8 @@ interface PostOutWire {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  like_count: number;
+  comment_count: number;
 }
 
 interface PostListWire {
@@ -113,6 +115,10 @@ export interface Post {
   moderationStatus: string;
   publishedAtIso: string | null;
   createdAtIso: string;
+  /** Reaction total. Every reaction type counts, not just "like". */
+  likeCount: number;
+  /** APPROVED comments only — a pending one must not inflate a public number. */
+  commentCount: number;
   /**
    * Safe to show in a public list.
    *
@@ -167,6 +173,8 @@ function toPost(w: PostOutWire): Post {
     moderationStatus: w.moderation_status,
     publishedAtIso: w.published_at ?? null,
     createdAtIso: w.created_at,
+    likeCount: w.like_count ?? 0,
+    commentCount: w.comment_count ?? 0,
     isPublished: w.moderation_status === APPROVED && Boolean(w.published_at),
   };
 }

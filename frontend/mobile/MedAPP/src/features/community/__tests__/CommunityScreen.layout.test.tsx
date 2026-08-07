@@ -15,7 +15,14 @@
 
 import { screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
-import { renderWithSafeArea as render } from "@/test/safe-area";
+import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: () => true, push: jest.fn(), replace: jest.fn() },
@@ -25,6 +32,17 @@ jest.mock("expo-router", () => ({
 // @/lib/api/client -> @/lib/config, which throws without app.config.ts extras.
 jest.mock("@/store/auth-store", () => ({
   useAuthStore: () => ({ user: null }),
+}));
+
+// CommunityScreen now reads the live feed, which pulls in the trio every
+// migrated screen has needed: `./api` and `@/store/auth-store` both reach
+// `@/lib/config`, whose readExtra() throws at require time under Jest, and
+// react-query hooks cannot be conditional so a provider is mandatory.
+jest.mock("../api", () => ({
+  communityApi: {
+    listFeed: jest.fn(async () => []),
+    listQA: jest.fn(async () => []),
+  },
 }));
 
 import { CommunityScreen } from "../CommunityScreen";

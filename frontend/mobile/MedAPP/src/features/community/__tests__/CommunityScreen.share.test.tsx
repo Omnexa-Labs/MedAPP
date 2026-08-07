@@ -3,8 +3,15 @@
 // Named `.share` to stay out of the way of `.nav` and `.layout`, per the
 // convention that file set already established.
 
-import { screen, fireEvent } from "@testing-library/react-native";
-import { renderWithSafeArea as render } from "@/test/safe-area";
+import { screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
+
+function render(ui: ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
@@ -21,6 +28,38 @@ jest.mock("@/store/auth-store", () => ({
 const mockShareText = jest.fn(() => Promise.resolve("shared" as const));
 jest.mock("@/lib/share", () => ({
   shareText: (...args: unknown[]) => mockShareText(...(args as [])),
+}));
+
+// CommunityScreen now reads the live feed, which pulls in the trio every
+// migrated screen has needed: `./api` and `@/store/auth-store` both reach
+// `@/lib/config`, whose readExtra() throws at require time under Jest, and
+// react-query hooks cannot be conditional so a provider is mandatory.
+// This suite presses Share ON A POST, so the mocked feed must return one -
+// an empty feed renders <EmptyFeed /> and there is nothing to press.
+jest.mock("../api", () => ({
+  communityApi: {
+    listFeed: jest.fn(async () => [
+      {
+        id: "p-1",
+        kind: "blog",
+        authorUserId: "u-1",
+        authorRole: "doctor",
+        authorName: "Dr. Kwabena Osei",
+        title: "Managing blood pressure",
+        body: "Keep a steady routine and log your readings each morning.",
+        excerpt: null,
+        tags: [],
+        isAnonymous: false,
+        moderationStatus: "approved",
+        publishedAtIso: "2026-08-07T09:00:00Z",
+        createdAtIso: "2026-08-07T09:00:00Z",
+        likeCount: 3,
+        commentCount: 2,
+        isPublished: true,
+      },
+    ]),
+    listQA: jest.fn(async () => []),
+  },
 }));
 
 import { CommunityScreen, buildPostShareText } from "../CommunityScreen";
@@ -73,8 +112,12 @@ describe("post share text", () => {
 });
 
 describe("the Share control on a feed post", () => {
-  it("opens the OS text sheet rather than doing nothing", () => {
+  it("opens the OS text sheet rather than doing nothing", async () => {
     render(<CommunityScreen />);
+
+    // The feed is fetched now, so the first render is a spinner and the posts
+    // arrive a tick later. Without this the press lands on an empty list.
+    await waitFor(() => expect(screen.getAllByLabelText("Share").length).toBeGreaterThan(0));
 
     const shareButtons = screen.getAllByLabelText("Share");
     expect(shareButtons.length).toBeGreaterThan(0);

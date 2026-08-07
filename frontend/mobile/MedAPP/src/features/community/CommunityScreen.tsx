@@ -55,6 +55,11 @@
 // expo-* APIs here.
 
 import { useMemo, useState } from "react";
+import { ActivityIndicator } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { AvatarWithFallback } from "@/components/ui";
+import { communityApi, type Post } from "./api";
+import { useTokenColor } from "@/lib/tokens";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 // No expo-router import: this screen's only navigation was the bottom-nav
@@ -69,7 +74,14 @@ import { CommunityHubScreen } from "@/features/community/CommunityHubScreen";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
-const FEED_TABS = ["For You", "Following", "Explore", "Community"] as const;
+// "Following" is GONE for v1, and its absence is the honest option.
+//
+// The tab filtered the feed to authors the user follows. There is no follow
+// graph anywhere in the backend - no table, no endpoint, no concept - so the
+// tab could only ever show everything (a lie) or nothing (a dead tab). Three
+// tabs that work beat four where one is pretending. It comes back when
+// following is a real feature rather than a tab that needs filling.
+const FEED_TABS = ["For You", "Explore", "Community"] as const;
 type FeedTab = (typeof FEED_TABS)[number];
 
 // ---------------------------------------------------------------------------
@@ -185,7 +197,8 @@ export function formatMembers(n: number): string {
 interface FeedPost {
   id: string;
   author: string;
-  avatarUri: string;
+  /** Absent for a live post: nobody has an avatar yet, so initials render. */
+  avatarUri?: string;
   role: string;
   ago: string;
   body: string;
@@ -298,6 +311,45 @@ const FEED_POSTS: FeedPost[] = [
   },
 ];
 
+/** Short relative time for the byline. */
+function timeAgo(iso: string): string {
+  const mins = Math.floor((Date.now() - Date.parse(iso)) / 60000);
+  if (Number.isNaN(mins)) return "";
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+  return `${Math.floor(mins / 1440)}d ago`;
+}
+
+/**
+ * `Post` (wire) -> `FeedPost` (what this screen draws).
+ *
+ * `authorName` is null in TWO cases that must not be conflated: the post is
+ * anonymous, and the write-time lookup failed. Anonymous gets "Anonymous";
+ * a failed lookup gets "MedApp member". Neither ever falls back to
+ * `authorUserId` - a raw UUID as a byline is worse than no byline, and on an
+ * anonymous post printing it would deanonymise the author outright.
+ *
+ * No avatar: nothing in the backend stores one for a patient, so `avatarUri` is
+ * left undefined and `AvatarWithFallback` renders initials (PO decision, v1).
+ *
+ * `followedByUser` is false for every live post. There is no follow graph, and
+ * the tab that consumed it has been removed.
+ */
+function toFeedPost(p: Post): FeedPost {
+  const author = p.isAnonymous ? "Anonymous" : (p.authorName ?? "MedApp member");
+  return {
+    id: p.id,
+    author,
+    role: p.authorRole,
+    ago: timeAgo(p.createdAtIso),
+    body: p.body,
+    likes: p.likeCount,
+    comments: p.commentCount,
+    followedByUser: false,
+  };
+}
+
 export function CommunityScreen() {
   const user = useAuthStore((s) => s.user);
   const firstName = user?.displayName?.trim().split(/\s+/)[0] || "there";
@@ -329,10 +381,16 @@ export function CommunityScreen() {
   //   Following→ only authors the user follows.
   // Once the social backend lands, each becomes a distinct query
   // (e.g. ?feed=following) rather than a client-side filter.
-  const visiblePosts = useMemo(
-    () => (activeTab === "Following" ? FEED_POSTS.filter((p) => p.followedByUser) : FEED_POSTS),
-    [activeTab],
-  );
+  // `GET /v1/social/feed`. Returns only approved, published posts - moderation
+  // is enforced server-side, so this screen does not filter on it.
+  const { data, isPending, isError, refetch, isRefetching } = useQuery({
+    queryKey: ["social", "feed"],
+    queryFn: () => communityApi.listFeed(),
+  });
+
+  const spinner = useTokenColor("primary");
+
+  const visiblePosts = useMemo(() => (data ?? []).map(toFeedPost), [data]);
 
   return (
     <PatientShell
@@ -473,7 +531,28 @@ export function CommunityScreen() {
 
             {/* Feed — sliced by the active tab. */}
             <View className="mt-lg gap-lg">
-              {visiblePosts.length > 0 ? (
+              {isPending ? (
+                <View className="items-center py-2xl">
+                  <ActivityIndicator color={spinner} />
+                </View>
+              ) : isError ? (
+                <View className="items-center gap-sm py-2xl">
+                  <Text className="font-headline-md text-headline-md text-on-surface">
+                    Couldn&apos;t load the feed
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry loading the feed"
+                    onPress={() => refetch()}
+                    disabled={isRefetching}
+                    className="min-h-[44px] justify-center rounded-full border border-outline px-lg active:opacity-70"
+                  >
+                    <Text className="font-label-md text-label-md text-on-surface">
+                      {isRefetching ? "Retrying…" : "Try again"}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : visiblePosts.length > 0 ? (
                 visiblePosts.map((post) => <PostCard key={post.id} post={post} />)
               ) : (
                 <EmptyFeed />
@@ -610,10 +689,18 @@ function PostCard({ post }: { post: FeedPost }) {
     <View className="overflow-hidden rounded-[20px] border border-outline-variant bg-card-surface">
       {/* Header */}
       <View className="flex-row items-start gap-sm p-md">
-        <Image
-          source={{ uri: post.avatarUri }}
-          className="h-12 w-12 rounded-full border border-surface-variant"
-        />
+        {/* Initials when there is no photo, which for a live post is always:
+            nothing in the backend stores an avatar for a patient. Passing an
+            undefined uri to <Image> renders a broken box, so the fallback is
+            explicit. */}
+        {post.avatarUri ? (
+          <Image
+            source={{ uri: post.avatarUri }}
+            className="h-12 w-12 rounded-full border border-surface-variant"
+          />
+        ) : (
+          <AvatarWithFallback size={48} uri={null} initials={null} label={post.author} />
+        )}
         <View className="flex-1">
           <View className="flex-row items-center gap-xs">
             <Text className="font-label-md text-label-md text-on-surface">{post.author}</Text>
