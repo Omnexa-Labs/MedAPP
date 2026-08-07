@@ -26,15 +26,22 @@
 // ---------------------------------------------------------------------------
 // FLAGGED — SEEDED, NOT LIVE
 // ---------------------------------------------------------------------------
-// There are no messaging endpoints in this product AT ALL (docs/PIPELINE.md's
-// inert-control audit: "New conversation — InboxScreen. No messaging
-// endpoints."). Three things this frame draws therefore cannot be real, and are
-// seeded rather than fabricated from a made-up API:
+// CORRECTION 2026-08-06: an earlier version of this header said "there are no
+// messaging endpoints in this product AT ALL", quoting docs/PIPELINE.md's
+// inert-control audit. THAT WAS WRONG. `inbox_service` ships a full thread API
+// (see ./api.ts) and always did. The messages here are seeded only because this
+// screen has not been migrated to it yet, NOT because no wire exists.
 //
-//   1. "8 members · 3 online now" and the +6 roster behind it. No membership or
-//      presence endpoint exists.
-//   2. "Nii Tetteh joined the shift". Join/leave is a wire concept with no wire.
-//   3. Delivery receipts.
+// What genuinely is NOT modelled by inbox_service, and so stays seeded:
+//
+//   1. PRESENCE — "3 online now". `ThreadParticipantOut.is_active` is
+//      membership, not connectivity. The member COUNT is derivable from
+//      participants; the online count is not.
+//   2. JOIN/LEAVE EVENTS — "Nii Tetteh joined the shift". A participant has
+//      `joined_at`, but there is no event stream to render a timeline row from.
+//   3. DELIVERY RECEIPTS. `last_read_at` gives READ, not "delivered".
+//   4. ATTACHMENTS. `ThreadMessageCreate` is `{ body }` — text only, and there
+//      is no upload endpoint anywhere in the product.
 //
 // The NAMES are from the seeded roster — Ama Mensah (patient) plus doctors
 // Kwabena Osei, Adjoa Boateng, Yaw Darko, Efua Asante, Nii Tetteh and Abena

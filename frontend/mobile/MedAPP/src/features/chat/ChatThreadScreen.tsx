@@ -33,13 +33,19 @@
 // is DATA (`ChatMessage.senderName`, `kind: "system"`) rather than a mode flag.
 // PractitionerChatScreen.tsx is the thin caller.
 //
-// STILL FLAGGED, and inherited by the practitioner room — there are no
-// messaging endpoints AT ALL, so these are seeded and cannot be live:
-//   1. `ThreadContextBar` member count and presence ("8 members - 3 online
-//      now"), including the +6 overflow roster.
-//   2. `SystemEvent / joined` rows. Join/leave is a wire concept with no wire.
-//   3. Delivery receipts. The double tick is seeded per-message.
-// Replace with useQuery(["thread", id]) once GET /v1/threads/:id ships.
+// CORRECTION 2026-08-06: this header previously said "there are no messaging
+// endpoints AT ALL", repeating docs/PIPELINE.md's inert-control audit. THAT WAS
+// WRONG — `inbox_service` ships the full thread API and GET /v1/threads/:id
+// already exists. See ./api.ts. This screen is still on seed data because it
+// has not been migrated yet, which is a TODO, not a blocker.
+//
+// What inbox_service genuinely does NOT model, and so must stay seeded:
+//   1. PRESENCE ("3 online now"). `is_active` is membership, not connectivity.
+//   2. `SystemEvent / joined` rows — a participant has `joined_at`, but there
+//      is no event stream to build a timeline row from.
+//   3. Delivery receipts. `last_read_at` gives READ, not "delivered".
+//   4. Attachments. `ThreadMessageCreate` is `{ body }`; no upload endpoint
+//      exists anywhere in the product.
 //
 // KEPT DESPITE BEING ABSENT FROM THE FRAME (a drop has to be flagged, and so
 // does a keep): the Clinical Actions FAB and its share menu. Neither frame

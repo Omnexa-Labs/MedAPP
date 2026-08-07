@@ -2200,6 +2200,40 @@ Format: `YYYY-MM-DD — <agent> — <what> — <node ids / file paths> — <what
 
   — *Claim stays open through Build and BuildReview per §5c.*
 
+## 5u. **CORRECTION 2026-08-06** — "there are no messaging endpoints" was FALSE, and it propagated
+
+The inert-control audit recorded *"New conversation — InboxScreen. No messaging endpoints."* That
+line is wrong and has been wrong for some time. `inbox_service` ships a complete thread API:
+
+```
+POST   /v1/threads                 GET  /v1/threads              GET  /v1/threads/{id}
+GET    /v1/threads/{id}/messages   POST /v1/threads/{id}/messages
+POST   /v1/threads/{id}/read       POST /v1/threads/handoff
+```
+
+**It was quoted forward four times** — into `ChatThreadScreen`'s header, `PractitionerChatScreen`'s
+header, §5w and §5v — and used to justify building both chat screens on seed constants and flagging
+the care-team room's content as "a wire concept this app has no wire for". All four are corrected.
+
+The lesson is the one this file keeps re-learning: a claim in this document is evidence of what was
+once observed, not a substitute for checking. It was propagated in the same session it was
+disproved.
+
+**`src/features/chat/api.ts` is now the real client** — wire types mirroring
+`app/schemas/thread.py`, mapped to camelCase domain types, following the `appointments/api.ts`
+convention.
+
+**What inbox_service genuinely does NOT model** (so these stay seeded, and the original flags were
+right about *these* four, just not about messages):
+- **Presence** — `is_active` is membership, not connectivity. Member COUNT is derivable; "3 online
+  now" is not.
+- **Join/leave events** — a participant has `joined_at`, but there is no event stream.
+- **Delivery receipts** — `last_read_at` gives READ, not "delivered".
+- **Attachments** — `ThreadMessageCreate` is `{ body }`. No upload endpoint exists anywhere.
+
+`is_internal` on a message is a clinician-only note. It is carried through to `ThreadMessage.isInternal`
+rather than filtered in the client, so a patient-facing caller has to make that decision explicitly.
+
 ## 5v. **DONE 2026-08-06** — practitioner care-team room built
 
 Files: `src/features/chat/PractitionerChatScreen.tsx`, `src/app/(app)/practitioner-chat.tsx`,
