@@ -155,3 +155,57 @@ renders it, because hooks cannot be conditional — `useQuery` runs even on the 
 existing suites had to be wrapped. Reaching `@/hooks/use-current-user` and `./api` at module scope
 also re-triggered the `@/lib/config` require-time throw that `AccountMenu.tsx` documents; both are
 mocked in those suites. Expect the same three adjustments in every screen migrated from here on.
+
+---
+
+## Verified against the live backend — 2026-08-07
+
+Stack: `api_gateway`, `user_service`, `inbox_service`, `postgres`, seeded with
+`scripts/seed_dev_data.py`, authenticated as `ama.mensah@medapp.dev`.
+
+| Call | Result |
+| --- | --- |
+| `GET /v1/threads` (no auth) | `401 {"error":"missing bearer token"}` |
+| `GET /v1/threads` (empty) | `200 {"items":[]}` — envelope as documented |
+| `POST /v1/threads` | `201` full `ThreadOut` |
+| `POST /{id}/messages` | `200` full `ThreadMessageOut` |
+| `GET /{id}/messages` | `200` **bare array**, confirming the envelope asymmetry |
+| `POST /{id}/read` | `200` full `ThreadParticipantOut` |
+| `GET /v1/threads` (populated) | `200`, `last_message_at` advanced to the new message |
+
+Every field name and nesting matched the client's wire types. No mapping changes were needed.
+
+### THE BLOCKER THIS FOUND — the gateway did not route `/v1/threads` at all
+
+`api_gateway`'s `ROUTES` table had no `inbox_service` entry and `Settings` had no
+`inbox_service_url`. Every messaging call the app made returned the gateway's own
+`404 {"error":"unknown route"}` while `inbox_service` sat healthy and complete behind it.
+
+**No test could have caught this.** The suites mock `./api`, and the client is correct — the
+break was one layer below, in routing the app never exercises under Jest. It is also, in
+hindsight, the likely origin of the "no messaging endpoints" claim: from the app's side the
+endpoints genuinely did not answer.
+
+Fixed by adding `inbox_service_url` and `"/v1/threads": settings.inbox_service_url`. **No new
+endpoint was created** — this maps a route that already existed.
+
+### Two live observations that change UI assumptions
+
+1. **`last_message_at` is set at CREATION**, not on first message — a brand-new empty thread came
+   back with a timestamp, not `null`. The client's `"New"` fallback for a null value is therefore
+   nearly unreachable in practice. Harmless, but the sort rule is doing less work than assumed.
+2. **`sender_role` is a coarse string** — the seeded patient posted as `"user"`, not a display
+   name or a clinical title. `PractitionerChatScreen` renders `senderRole` as the group attribution
+   line, so a live room would read "user" where the frame shows "Dr. Kwabena Osei · Attending
+   Physician". That attribution needs the proposed `counterparty` resolution before the room can
+   go live.
+
+### Local-stack gotchas worth writing down
+- **`make up` / `make seed` ignore `docker-compose.ports.yml`.** The Makefile's `COMPOSE` and
+  `scripts/seed.sh` both hardcode a single `-f`, so on a box where another project holds 5432 they
+  fail with "port is already allocated" — and `make seed` tears down running containers on the way.
+  Pass both files explicitly instead:
+  `docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.ports.yml …`
+- **The `COMPOSE_FILE=a:b` form in the override's header is POSIX-only.** On Windows the colon is
+  read as part of the drive path and compose fails with "cannot find the path specified";
+  `COMPOSE_PATH_SEPARATOR=";"` did not rescue it either.

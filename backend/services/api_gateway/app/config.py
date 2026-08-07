@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     onboarding_service_url: str = "http://onboarding_service:8013"
     pharmacy_service_url: str = "http://pharmacy_service:8015"
     pharmacist_service_url: str = "http://pharmacist_service:8016"
+    # inbox_service listens on 8013 inside its own container (compose
+    # SERVICE_PORT). It shares that number with onboarding_service, which is
+    # fine — they are different hostnames on the compose network.
+    inbox_service_url: str = "http://inbox_service:8013"
 
     # Agents
     concierge_agent_url: str = "http://concierge_agent:9001"
@@ -76,6 +80,11 @@ ROUTES: dict[str, str] = {
     "/v1/onboarding": settings.onboarding_service_url,
     "/v1/pharmacies": settings.pharmacy_service_url,
     "/v1/pharmacists": settings.pharmacist_service_url,
+    # MESSAGING. Absent until 2026-08-06, which meant every /v1/threads call the
+    # mobile app made returned the gateway's {"error":"unknown route"} 404 — the
+    # service itself was healthy and complete the whole time. No new endpoint was
+    # created here; this maps a route that already existed.
+    "/v1/threads": settings.inbox_service_url,
     "/agents/concierge": settings.concierge_agent_url,
     "/agents/recommend": settings.smart_recommend_agent_url,
     "/agents/chat": settings.medical_chat_agent_url,
