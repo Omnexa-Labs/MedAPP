@@ -25,6 +25,10 @@
 //                         Explore in the same feature, one bordered-flat and one
 //                         borderless-with-shadow. Two hand-rolls of one control,
 //                         two different controls.
+//                         (Both Community panels were deleted on 2026-08-07 as
+//                         unbacked group/follow UI. They stay in this list
+//                         because the divergence they document is the reason
+//                         this component exists.)
 //   InboxScreen           same, "#6d7a77".
 //   PhoneField            the country-picker's own search row.
 //

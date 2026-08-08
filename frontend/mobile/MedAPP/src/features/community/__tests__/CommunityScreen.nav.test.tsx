@@ -34,19 +34,26 @@ jest.mock("expo-router", () => ({
 // for real pulls in `@/lib/api/client` -> `@/lib/config`, which throws unless
 // app.config.ts extras are present. Same reason LifestyleHubScreen's test
 // mocks `useCurrentUser`.
-jest.mock("@/store/auth-store", () => ({
-  useAuthStore: () => ({ user: null }),
+jest.mock("@/hooks/use-current-user", () => ({
+  useCurrentUser: () => null,
+  useIsAuthenticated: () => true,
 }));
 
-// CommunityScreen now reads the live feed, which pulls in the trio every
-// migrated screen has needed: `./api` and `@/store/auth-store` both reach
-// `@/lib/config`, whose readExtra() throws at require time under Jest, and
-// react-query hooks cannot be conditional so a provider is mandatory.
-jest.mock("../api", () => ({
-  communityApi: {
-    listFeed: jest.fn(async () => []),
-    listQA: jest.fn(async () => []),
+// The seam is the HTTP client, not `../api`. That module now exports the query
+// keys and the ownership predicate as well as the methods, and a module mock
+// would have to restate every one of them — a restated copy being exactly the
+// thing that silently stops matching. Mocking one level down leaves the real
+// mapper, the real keys and the real page envelope in the test.
+jest.mock("@/lib/api/client", () => ({
+  client: {
+    get: jest.fn(async () => ({ items: [], next_offset: null })),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
   },
+  registerAuthTokenProvider: jest.fn(),
+  registerDeviceIdProvider: jest.fn(),
 }));
 
 import { CommunityScreen } from "../CommunityScreen";
