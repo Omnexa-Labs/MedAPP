@@ -269,3 +269,88 @@ describe("checkStock", () => {
     expect(s.source).toBe("unknown");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The people half — two facts the adapters used to invent, and one they dropped
+// ---------------------------------------------------------------------------
+// Same reason this file exists at all: a screen suite renders whatever the hook
+// hands it, so an adapter that substitutes a value has nothing above it that can
+// notice. All three of these are adapter-level and were invisible from a screen.
+
+describe("adaptDoctor / getDoctor — nothing invented, nothing dropped", () => {
+  const DOCTOR_WIRE = {
+    doctor_id: "doc-7",
+    user_id: "u-7",
+    first_name: "Sarah",
+    last_name: "Chen",
+    specialty: "cardiology",
+    bio: null,
+    languages: ["English"],
+    consultation_fee_cents: 12000,
+    photo_url: null,
+    is_listable: true,
+    is_active: true,
+  };
+
+  it("leaves avatarUri EMPTY rather than substituting a stranger's photograph", async () => {
+    mockGet.mockResolvedValue({ items: [DOCTOR_WIRE] });
+    const [entry] = await careApi.listDoctors();
+
+    // `PLACEHOLDER_AVATAR` was one Stitch-CDN portrait of a real person,
+    // returned for every clinician with no `photo_url` — which on the seeded
+    // roster is most of them, so the same stranger's face appeared down the
+    // whole directory over other people's names. `AvatarWithFallback` draws the
+    // clinician's own initials for "".
+    expect(entry.kind).toBe("person");
+    if (entry.kind !== "person") throw new Error("expected a person entry");
+    expect(entry.avatarUri).toBe("");
+    expect(entry.avatarUri).not.toMatch(/googleusercontent/);
+  });
+
+  it("keeps a real photo_url untouched", async () => {
+    mockGet.mockResolvedValue({
+      items: [{ ...DOCTOR_WIRE, photo_url: "https://cdn.test/sarah.png" }],
+    });
+    const [entry] = await careApi.listDoctors();
+    if (entry.kind !== "person") throw new Error("expected a person entry");
+    expect(entry.avatarUri).toBe("https://cdn.test/sarah.png");
+  });
+
+  it("makes no presence claim — there is no presence data in this system", async () => {
+    mockGet.mockResolvedValue({ items: [DOCTOR_WIRE] });
+    const [entry] = await careApi.listDoctors();
+
+    // Every adapter set `availability: "online"` from a constant, and the card
+    // rendered a green dot labelled "<name> is online" for it.
+    expect(entry).not.toHaveProperty("availability");
+  });
+
+  it("carries consultation_fee_cents through, unconverted", async () => {
+    mockGet.mockResolvedValue({ items: [DOCTOR_WIRE] });
+    const [entry] = await careApi.listDoctors();
+    if (entry.kind !== "person") throw new Error("expected a person entry");
+
+    // Dropped on the floor until this pass, so the booking funnel had no price
+    // to show. MINOR UNITS — the adapter must not divide; exactly one place
+    // does, and it is the screen that prints it.
+    expect(entry.consultationFeeCents).toBe(12000);
+  });
+
+  it("keeps null as null — 'no fee recorded' is not a free consultation", async () => {
+    mockGet.mockResolvedValue({ items: [{ ...DOCTOR_WIRE, consultation_fee_cents: null }] });
+    const [entry] = await careApi.listDoctors();
+    if (entry.kind !== "person") throw new Error("expected a person entry");
+    expect(entry.consultationFeeCents).toBeNull();
+  });
+
+  it("carries the fee and the empty avatar on the single-resource GET too", async () => {
+    // `getDoctor` is what hydrates a stored `doctor_id` on the appointments
+    // list, and it had the same placeholder.
+    mockGet.mockResolvedValue(DOCTOR_WIRE);
+    const d = await careApi.getDoctor("doc-7");
+
+    expect(mockGet).toHaveBeenCalledWith("/v1/doctors/doc-7");
+    expect(d.avatarUri).toBe("");
+    expect(d.consultationFeeCents).toBe(12000);
+  });
+});

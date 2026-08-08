@@ -58,7 +58,19 @@ jest.mock("@/lib/api/client", () => ({
 }));
 
 const mockShareText = jest.fn(() => Promise.resolve("shared"));
-jest.mock("@/lib/share", () => ({ shareText: () => mockShareText() }));
+jest.mock("@/lib/share", () => ({
+  shareText: (...a: unknown[]) => mockShareText(...(a as [])),
+}));
+
+// Stood in for a real build. Under Jest there is no manifest, so the real
+// builder correctly returns null and any URL assertion would pass vacuously;
+// its own rules are locked in src/lib/__tests__/share-links.test.ts.
+const mockShareLinkLine = jest.fn(
+  (t: { kind: string; id: string }) => `Open in MedApp: medapp://${t.kind}-detail?hospitalId=${t.id}`,
+);
+jest.mock("@/lib/share-links", () => ({
+  shareLinkLine: (...a: unknown[]) => mockShareLinkLine(...(a as [{ kind: string; id: string }])),
+}));
 
 const mockUseHospital = jest.fn();
 const mockUseHospitalReviews = jest.fn();
@@ -174,6 +186,19 @@ describe("chrome", () => {
     fireEvent.press(screen.getByLabelText("Go back"));
     // "/(app)" would land a deep-linked user on a tab they were never on.
     expect(mockReplace).toHaveBeenCalledWith("/(app)/find-care");
+  });
+
+  it("shares a link to THIS hospital, keyed on the id the screen loaded from", () => {
+    render(<HospitalDetailScreen />);
+    fireEvent.press(screen.getByLabelText("Share Ridge Hospital"));
+
+    expect(mockShareLinkLine).toHaveBeenCalledWith({ kind: "hospital", id: "hosp-1" });
+    const [message] = mockShareText.mock.calls[0] as unknown as [string];
+    // Safe to link because this screen is `GET /v1/hospitals/{id}` — it opens
+    // cold on the id alone, or shows its own not-found panel. Nothing about the
+    // person sharing is in the URL.
+    expect(message).toContain("medapp://hospital-detail?hospitalId=hosp-1");
+    expect(message).not.toMatch(/token|session|jwt|bearer|patient/i);
   });
 });
 

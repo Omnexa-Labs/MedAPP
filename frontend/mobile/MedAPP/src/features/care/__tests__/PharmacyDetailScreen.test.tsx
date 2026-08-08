@@ -54,7 +54,20 @@ jest.mock("@/lib/api/client", () => ({
   registerDeviceIdProvider: jest.fn(),
 }));
 
-jest.mock("@/lib/share", () => ({ shareText: jest.fn(() => Promise.resolve("shared")) }));
+const mockShareText = jest.fn(() => Promise.resolve("shared"));
+jest.mock("@/lib/share", () => ({
+  shareText: (...a: unknown[]) => mockShareText(...(a as [])),
+}));
+
+// Stood in for a real build — under Jest there is no manifest, so the real
+// builder returns null and a URL assertion would pass vacuously. Its own rules
+// are locked in src/lib/__tests__/share-links.test.ts.
+const mockShareLinkLine = jest.fn(
+  (t: { kind: string; id: string }) => `Open in MedApp: medapp://${t.kind}-detail?pharmacyId=${t.id}`,
+);
+jest.mock("@/lib/share-links", () => ({
+  shareLinkLine: (...a: unknown[]) => mockShareLinkLine(...(a as [{ kind: string; id: string }])),
+}));
 
 const mockUsePharmacy = jest.fn();
 const mockUsePharmacists = jest.fn();
@@ -156,6 +169,18 @@ describe("chrome", () => {
       expect(screen.queryByLabelText(tab)).toBeNull();
     }
     expect(screen.queryByLabelText("MedApp")).toBeNull();
+  });
+
+  it("shares a link to THIS pharmacy, keyed on the id the screen loaded from", () => {
+    render(<PharmacyDetailScreen />);
+    fireEvent.press(screen.getByLabelText("Share Cedar Pharmacy"));
+
+    expect(mockShareLinkLine).toHaveBeenCalledWith({ kind: "pharmacy", id: "pharm-1" });
+    const [message] = mockShareText.mock.calls[0] as unknown as [string];
+    // `GET /v1/pharmacies/{id}` — the screen opens cold on the id alone. The
+    // URL names the shop, never the person who sent it.
+    expect(message).toContain("medapp://pharmacy-detail?pharmacyId=pharm-1");
+    expect(message).not.toMatch(/token|session|jwt|bearer|patient/i);
   });
 });
 
@@ -330,7 +355,6 @@ describe("pharmacists", () => {
       name: "Naa Adjeley",
       title: "Community Pharmacist",
       avatarUri: "https://example.test/a.png",
-      availability: "online",
       badges: [{ label: "English", tone: "secondary" }],
     };
     mockUsePharmacists.mockReturnValue(settled([p]));

@@ -21,7 +21,14 @@
 //     queryFn: () => bookingApi.listSlots(practitionerId, dateIso),
 //   });
 //   return { slots: q.data?.slots ?? [], isLoading: q.isLoading,
+//            isProvisional: false,
 //            timezoneLabel: q.data?.timezoneLabel, location: q.data?.location };
+//
+// `isProvisional` is the flag that carries the honesty across that swap: true
+// while the grid is the seed below, false the moment a clinician's own calendar
+// is answering. The screen renders its "not confirmed with the clinician" notice
+// off it, so the notice is deleted by the endpoint landing rather than by
+// somebody remembering.
 //
 // What is deliberately NOT done here: a `setTimeout` that flips `isLoading` for
 // 800ms so the skeleton "can be seen" in the emulator. That would make the screen
@@ -115,6 +122,17 @@ export type SlotsResult = {
   slots: Slot[];
   isLoading: boolean;
   /**
+   * True while the grid is the SEED and not a clinician's calendar.
+   *
+   * `POST /v1/bookings` is real, so a patient who taps one of these times books
+   * a slot nobody offered. The screen renders a notice off this flag rather than
+   * presenting the seed as availability; when `/v1/slots` lands, the real
+   * `useSlots` returns it false (or drops it) and the notice disappears with the
+   * fabrication. Optional so a payload that never had a seed does not have to
+   * say so.
+   */
+  isProvisional?: boolean;
+  /**
    * The HUMAN label screen 2 puts in its badge — "EDT · Boston". Not an IANA id
    * and not usable as one: see the `composeLocal` note in ../api.ts for why the
    * wire offset is never parsed out of this string.
@@ -159,13 +177,14 @@ const MONTH_SHORT = [
 /** 756:4384 draws Mon 12 … Sat 17 — six tiles. The COUNT is the frame's; the dates are not. */
 const STRIP_LENGTH = 6;
 
-/**
- * 756:4384 draws the fourth tile (Thu 15) dashed, so the seed closes the fourth
- * DAY OF THE STRIP rather than a calendar date that has since gone by. Server-
- * owned once /v1/slots ships; until then this is what keeps 757:5597 reachable
- * from the product instead of only from a test.
- */
-const SEED_CLOSED_STRIP_INDEX = 3;
+// `SEED_CLOSED_STRIP_INDEX = 3` IS DELETED, and it is not coming back as data.
+// It closed the fourth day of every strip, for every clinician, forever —
+// 756:4384 draws Thu 15 dashed, and the frame's drawing of one clinic's diary was
+// typed out as if it were every clinic's. That is an invented day off: a patient
+// was told a doctor does not work on a day nobody asked the doctor about. The
+// no-slots frame (757:5597) is still reachable without it, from the one closure
+// this app can DERIVE rather than assert — a today whose every slot has already
+// started (see `seedSlotsFor`).
 
 /** 756:4384's grid. `available: false` is the frame's 09:30 AM and 02:00 PM. */
 const SEED_SLOTS: Slot[] = [
@@ -241,13 +260,12 @@ function stripIsos(now: Date): string[] {
  * Two things make a slot unbookable and both come from the service's rules, not
  * from taste: the seed marks 09:30/02:00 taken (756:4384), and any start that
  * has already passed on TODAY is unbookable because `starts_at` must be in the
- * future. Returns `[]` for a day the seed closes, and for a day whose every slot
- * has gone by — the 757:5597 branch, rather than a grid of eleven dashed chips.
+ * future. Returns `[]` only for a day whose every slot has gone by — the
+ * 757:5597 branch, rather than a grid of eleven dashed chips. NO day is closed
+ * by assertion any more; see the deleted `SEED_CLOSED_STRIP_INDEX` above.
  */
 function seedSlotsFor(dateIso: string, now: Date): Slot[] {
   const isos = stripIsos(now);
-  const index = isos.indexOf(dateIso);
-  if (index === SEED_CLOSED_STRIP_INDEX) return [];
   // A date outside the strip still answers: the screen can be rehydrated onto
   // one, and refusing to answer would render the no-slots frame for a day the
   // provider may well be open.
@@ -309,6 +327,10 @@ export function useSlots(practitionerId: string | undefined, dateIso: string): S
       slots: seedSlotsFor(dateIso, new Date()),
       // Honestly false: there is no request. See the FLAGGED block at the top.
       isLoading: false,
+      // And honestly TRUE: this grid is the seed, not the clinician's calendar.
+      // The screen says so on the grid itself, because the POST behind it is
+      // real and a patient can book one of these times for good.
+      isProvisional: true,
       timezoneLabel: undefined,
       location: undefined,
     }),

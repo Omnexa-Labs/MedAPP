@@ -86,9 +86,9 @@
 // assert attendance that did not happen.
 
 import { useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   appointmentsApi,
   type Appointment,
@@ -618,6 +618,38 @@ function UpcomingCard({
   appointment: UpcomingAppointment;
 }) {
   const statusStyle = STATUS_STYLES[appointment.status];
+  const queryClient = useQueryClient();
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+
+  // ========================================================================
+  // CANCEL — a real call, replacing an empty handler over a working endpoint.
+  // ========================================================================
+  // The old `onPress` was `() => { /* TODO: hook into DELETE /v1/appointments/
+  // :id once ready. */ }`. The TODO named a route that does not exist and never
+  // did — while `appointmentsApi.cancelAppointment` sat two files away, fully
+  // written against the route that does (`POST /v1/bookings/{id}/cancel`), and
+  // had never been called by anything. So a patient pressed Cancel, saw the
+  // press state, got no feedback of any kind, and reasonably concluded it had
+  // worked. It had not: the booking stayed `booked`, and a clinician held a slot
+  // for someone who was never coming.
+  //
+  // Three things this needs and a bare mutation would not give it:
+  //   - a CONFIRMATION, because cancelling a medical appointment is destructive
+  //     and the button sits inches from Reschedule (the dialog is the same
+  //     pattern ReviewAppointmentScreen's discard uses);
+  //   - `invalidateQueries(["appointments"])`, so the row leaves Upcoming and
+  //     reappears under Past as cancelled rather than the list silently lying
+  //     until the next cold start;
+  //   - a VISIBLE FAILURE. A silent failure here is the exact defect being
+  //     fixed — it would leave the patient believing they had cancelled twice
+  //     over. The error keeps the dialog open with the server's own message.
+  const cancelMutation = useMutation({
+    mutationFn: () => appointmentsApi.cancelAppointment(appointment.id),
+    onSuccess: () => {
+      setConfirmCancelOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    },
+  });
   // Icon `color` and a Pressable's style-callback background are the two things
   // that cannot be a class, so they resolve by TOKEN NAME for the current mode
   // (src/lib/tokens.ts) instead of carrying a hex.
@@ -870,9 +902,23 @@ function UpcomingCard({
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               pathname: "/(app)/select-time-slot" as any,
               params: {
+                // THE ID, WHICH THIS PUSH USED TO OMIT. Without it screen 1
+                // forwarded nothing (expo-router drops an undefined value), and
+                // screen 2's required-params guard fired: the patient picked a
+                // date, a time, a mode and a type and was then told "This
+                // booking session has expired". `doctorId` has been on this
+                // object all along for the telehealth handoff — the reschedule
+                // funnel simply never read it. `practitionerId` becomes
+                // `doctor_id` on the wire, so nothing downstream works without
+                // it and everything downstream looks fine until the last screen.
+                practitionerId: appointment.doctorId,
                 practitionerName: appointment.doctorName,
                 practitionerSpecialty: appointment.specialty,
                 practitionerAvatar: appointment.avatarUri,
+                // What makes this a RESCHEDULE and not a second booking. Review
+                // cancels this id after its POST succeeds — book first, then
+                // cancel; the order and its failure modes are argued there.
+                rescheduleOfId: appointment.id,
               },
             })
           }
@@ -908,15 +954,94 @@ function UpcomingCard({
             backgroundColor: pressed ? dangerPressed : "transparent",
             alignItems: "center",
           })}
-          onPress={() => {
-            // TODO: hook into DELETE /v1/appointments/:id once ready.
-          }}
+          onPress={() => setConfirmCancelOpen(true)}
         >
           <Text style={{ color: danger, fontSize: 14, fontWeight: "600" }}>
             Cancel
           </Text>
         </Pressable>
       </View>
+
+      {/* The confirmation. `transparent` + `animationType="fade"` matches the
+          discard dialog in ReviewAppointmentScreen, which is this codebase's
+          established pattern for "this is destructive, say so first". */}
+      <Modal
+        visible={confirmCancelOpen}
+        transparent
+        animationType="fade"
+        // Hardware back dismisses the DIALOG, never the cancellation — and it is
+        // a no-op mid-request, because a request already in flight cannot be
+        // taken back by closing the sheet over it.
+        onRequestClose={() => {
+          if (!cancelMutation.isPending) setConfirmCancelOpen(false);
+        }}
+      >
+        <View className="flex-1 items-center justify-center bg-scrim/40 px-4">
+          <View
+            accessibilityViewIsModal
+            className="w-full rounded-xl bg-card-surface p-lg"
+            style={{ maxWidth: 313 }}
+          >
+            <Text
+              accessibilityRole="header"
+              className="text-on-surface"
+              style={{ fontSize: 18, fontWeight: "600" }}
+            >
+              Cancel this appointment?
+            </Text>
+            <Text className="text-on-surface-variant mt-sm" style={{ fontSize: 14 }}>
+              {`Your ${appointment.dateLabel} appointment with ${appointment.doctorName} will be cancelled. You'll need to book again to see them.`}
+            </Text>
+
+            {/* The failure, in words the patient can act on. Without this the
+                mutation could reject and the dialog would just sit there — the
+                same "pressed it, nothing happened" the empty handler produced,
+                only with an extra step. `error.message` rather than a generic
+                apology, for the same reason the list's error branch does it: it
+                is how someone tells an offline phone from a server fault. */}
+            {cancelMutation.isError ? (
+              <View className="mt-sm" accessibilityLiveRegion="polite">
+                <Text className="text-error" style={{ fontSize: 13, fontWeight: "600" }}>
+                  We couldn&rsquo;t cancel this appointment
+                </Text>
+                <Text className="text-on-surface-variant mt-xs" style={{ fontSize: 13 }}>
+                  {cancelMutation.error instanceof Error && cancelMutation.error.message
+                    ? cancelMutation.error.message
+                    : "Check your connection and try again."}
+                  {" It is still booked."}
+                </Text>
+              </View>
+            ) : null}
+
+            <View className="mt-lg gap-sm">
+              {/* "Yes, cancel appointment", not "Cancel appointment": the card
+                  control behind this dialog already carries that exact label, so
+                  reusing it would give the screen two different actions under
+                  one name — ambiguous to a screen reader moving between them,
+                  and to anyone reading the two aloud. */}
+              <Button
+                label={cancelMutation.isPending ? "Cancelling…" : "Yes, cancel appointment"}
+                variant="primary"
+                shadow={false}
+                fullWidth
+                loading={cancelMutation.isPending}
+                onPress={() => cancelMutation.mutate()}
+              />
+              <Button
+                label="Keep appointment"
+                variant="outline"
+                shadow={false}
+                fullWidth
+                disabled={cancelMutation.isPending}
+                onPress={() => {
+                  cancelMutation.reset();
+                  setConfirmCancelOpen(false);
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -975,7 +1100,11 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
             <Text
               className="text-outline mt-xs"
               style={{
-                fontSize: 10,
+                // 12, BRAND's floor. It was 10 — an uppercase, letterspaced
+                // eyebrow set below the minimum legible size, on a clinician's
+                // specialty. Uppercase at 10 is the worst case for the ramp:
+                // no descenders to anchor the shape and no x-height to read.
+                fontSize: 12,
                 fontWeight: "700",
                 textTransform: "uppercase",
                 letterSpacing: 0.6,
@@ -1012,16 +1141,20 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
         >
           <Text
             className="text-on-surface-variant"
-            style={{ fontSize: 11, fontWeight: "700" }}
+            // 12, matching the Confirmed and modality pills on the upcoming
+            // card. It was 11 — under BRAND's floor, on a status label.
+            style={{ fontSize: 12, fontWeight: "700" }}
           >
             Completed
           </Text>
         </View>
       </View>
 
+      {/* 12, not 11: this line is the WHEN of a past appointment, which is the
+          single fact a patient scans this card for. */}
       <Text
         className="text-on-surface-variant"
-        style={{ fontSize: 11, marginBottom: 12 }}
+        style={{ fontSize: 12, marginBottom: 12 }}
       >
         {appointment.completedLabel}
       </Text>
@@ -1046,7 +1179,7 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
         {/* `#171d1c` is `on-surface`'s light value, and here it genuinely IS
             on-surface — the label of a tonal surface, not a filled accent. It
             flips to #DEE4E1 on the dark plate. */}
-        <Text className="text-on-surface" style={{ fontSize: 13, fontWeight: "600" }}>
+        <Text className="text-on-surface" style={{ fontSize: 14, fontWeight: "600" }}>
           View Summary
         </Text>
       </Pressable>
@@ -1088,11 +1221,14 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
 //     components' tokens. Adopting them takes the card radius 12 -> 24 and the
 //     pill to uppercase 10px, i.e. a layout change. UpcomingCard and PastCard
 //     are a matched pair in one list and must move together, in one job.
-//  2. TYPE. This screen sets 10, 11, 13 and 15px inline and none of it is on
-//     the BRAND ramp; 10 and 11 are under the 12sp floor outright (the status
-//     pills, the two uppercase eyebrows, "Completed on …", "View Summary").
-//     Out of scope for a colour pass — resizing type reflows all four cards —
-//     but it is a live accessibility defect, not a preference.
-//  3. AVATARS. `UpcomingCard` still <Image>s a Google-CDN URI with no fallback,
-//     which docs/BRAND.md §App shell forbids ("photo -> initials -> person
-//     silhouette"). `AvatarWithFallback` is the fix and belongs with (1).
+//  2. TYPE — the sub-floor half is DONE. Every 10 and 11 is gone: the PastCard
+//     specialty eyebrow (10, uppercase and letterspaced, which is the worst case
+//     for a small ramp), the "Completed" pill (11) and the completed-on line
+//     (11) are all 12 now, and "View Summary" went 13 -> 14 to match the other
+//     card's action labels. What is still flagged is the WHOLE ramp: 13, 14, 15
+//     and 20 remain inline literals rather than BRAND type classes. That is a
+//     consistency debt, not an accessibility one, and it belongs with (1) —
+//     `Card`/`Badge` adoption brings the ramp with it.
+//  3. AVATARS — DONE. `UpcomingCard` uses `AvatarWithFallback` (photo ->
+//     initials -> silhouette), which is what docs/BRAND.md §App shell requires;
+//     the raw `<Image>` on a Google-CDN URI is gone, and so is its import.

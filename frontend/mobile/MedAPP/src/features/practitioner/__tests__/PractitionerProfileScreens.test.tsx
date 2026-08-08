@@ -13,11 +13,21 @@ import { join } from "path";
 import { render, screen } from "@testing-library/react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+// `mock`-prefixed so Jest's factory hoisting allows the reference.
+//
+// It used to be a fixed `() => ({})`, on the reasoning that the no-params path
+// "is what these shell/CTA assertions care about". That was true for the shell
+// assertions and exactly wrong for the CTA one: with no params the telehealth
+// profile used to fall back to a hardcoded `DEFAULT_PROVIDER` — a named,
+// fictional cardiologist — so "keeps the Book Appointment CTA reachable" was
+// asserting that a booking dock stayed live over a clinician who does not exist.
+// The screen now renders a no-data state instead, and the CTA test supplies a
+// real provider, which is the only condition under which that CTA is correct.
+let mockParams: Record<string, string> = {};
+
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn() },
-  // The telehealth profile reads route params to build the waiting-room hand-off. Returning
-  // {} exercises the no-params path, which is what these shell/CTA assertions care about.
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => mockParams,
 }));
 
 jest.mock("nativewind", () => ({
@@ -35,6 +45,11 @@ const METRICS = {
   frame: { x: 0, y: 0, width: 393, height: 852 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
+
+/** Params are per-test state; reset so one suite cannot leak into the next. */
+beforeEach(() => {
+  mockParams = {};
+});
 
 const renderScreen = (Screen: () => React.JSX.Element) =>
   render(
@@ -140,9 +155,19 @@ describe("PractitionerTelehealthProfileScreen", () => {
     expect(source("PractitionerTelehealthProfileScreen.tsx")).not.toMatch(/zIndex: 30/);
   });
 
-  it("keeps the Book Appointment CTA reachable", () => {
+  it("keeps the Book Appointment CTA reachable for a real provider", () => {
+    mockParams = { providerId: "doc-7", providerName: "Dr. Sarah Chen" };
     renderScreen(PractitionerTelehealthProfileScreen);
     expect(screen.getByLabelText("Book appointment")).toBeTruthy();
+  });
+
+  it("hides the dock entirely when there is no provider — the shell rule", () => {
+    // The geometry above reserves 112px for this dock. With no provider there is
+    // no dock, so the reserve must not be paid either; the full no-data
+    // behaviour is asserted in PractitionerTelehealthProfileScreen.booking.test.
+    mockParams = {};
+    renderScreen(PractitionerTelehealthProfileScreen);
+    expect(screen.queryByTestId("provider-booking-dock")).toBeNull();
   });
 });
 

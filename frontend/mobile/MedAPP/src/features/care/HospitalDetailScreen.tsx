@@ -76,6 +76,7 @@ import {
 } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import { shareText } from "@/lib/share";
+import { shareLinkLine } from "@/lib/share-links";
 import type { HospitalDetail, HospitalStaffMember } from "@/features/care/api";
 import {
   useHospital,
@@ -201,6 +202,13 @@ export function HospitalDetailScreen() {
     ? composeAddress(hospital.addressLine1, hospital.city, hospital.country)
     : null;
 
+  // The last line is a deep link back to THIS screen, keyed on the hospital id
+  // and nothing else. It is safe to point at because this screen resolves from
+  // the id alone — `useHospital` is `GET /v1/hospitals/{id}`, not a lookup
+  // through the list adapter (see the header), so a recipient opening it cold
+  // gets the record or an honest not-found panel, never a half-populated page.
+  // `shareLinkLine` returns null wherever the URL would not resolve, and the
+  // share then goes out as the text it always was.
   const onShare = useCallback(() => {
     if (!hospital) return;
     const lines = [
@@ -208,6 +216,7 @@ export function HospitalDetailScreen() {
       address,
       hospital.contactPhone,
       hospital.websiteUrl,
+      shareLinkLine({ kind: "hospital", id: hospital.hospitalId }),
     ].filter((l): l is string => !!l);
     void shareText(lines.join("\n"), { subject: hospital.name, dialogTitle: hospital.name });
   }, [hospital, address]);

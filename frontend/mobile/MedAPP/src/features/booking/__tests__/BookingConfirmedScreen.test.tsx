@@ -240,6 +240,37 @@ describe("booking reference", () => {
     expect(message).toContain("Tuesday, 13 May 2025");
     expect(message).not.toMatch(/Reference/);
   });
+
+  it("shares NO link — there is no appointment route a link could open", async () => {
+    // The post and facility shares carry `medapp://` deep links now. This one
+    // deliberately does not, and the difference is not effort:
+    //   * `/(app)/appointments` is a LIST of the signed-in user's bookings. It
+    //     takes no id, so there is nothing for a link to select.
+    //   * this screen renders entirely from params — practitioner, date, time,
+    //     location — so an addressable version would have to put a named
+    //     patient's appointment in a query string that ends up in someone
+    //     else's chat log.
+    //   * and a booking is scoped to the account that made it, so even with an
+    //     id the link would 403 for every recipient.
+    // A link that opens a dead screen is worse than no link.
+    const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" } as never);
+    mockParams = { ...IN_PERSON };
+    render(<BookingConfirmedScreen />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Share appointment"));
+    });
+
+    const [{ message }] = share.mock.calls[0] as [{ message: string }];
+    expect(message).not.toMatch(/medapp:|exp:|https?:\/\//);
+  });
+
+  it("never puts a source file near a link builder", () => {
+    // The source guard, same shape as the reference one above: a rendering
+    // assertion passes just as happily against a link nobody pressed.
+    const src = readFileSync(join(__dirname, "..", "BookingConfirmedScreen.tsx"), "utf8");
+    expect(src).not.toMatch(/shareLinkLine|shareLinkFor|Linking\.createURL/);
+  });
 });
 
 // ---------------------------------------------------------------------------

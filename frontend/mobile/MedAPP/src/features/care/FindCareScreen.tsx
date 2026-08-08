@@ -163,12 +163,7 @@ import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor } from "@/lib/tokens";
 import { useDebouncedValue } from "@/features/care/hooks/use-debounced-value";
 import { useDirectory, type DirectoryChip } from "@/features/care/hooks/use-directory";
-import type {
-  AvailabilityTone,
-  FacilityEntry,
-  IconName,
-  PersonEntry,
-} from "@/features/care/types";
+import type { FacilityEntry, IconName, PersonEntry } from "@/features/care/types";
 
 // Main chip taxonomy — de-duped from the Stitch dump. The `value` is
 // what the filter state uses; the label is what the user sees. Typed
@@ -183,10 +178,29 @@ const MAIN_CHIPS: { value: DirectoryChip; label: string; icon?: IconName }[] = [
   { value: "pharmacists", label: "Pharmacists", icon: "medication" },
 ];
 
-// Sub-row facets. Specialty is a dropdown trigger (no menu yet — that's
-// a follow-up once specialties exist in the backend); the rest are
-// togglable filter chips.
-const SUB_FACETS: string[] = ["Available Now", "Home Service", "Nearest"];
+// ===========================================================================
+// Sub-row facets — ONE survives, and the other two were worse than dead.
+// ===========================================================================
+// `filteredEntries` below matches a facet label against the concatenated BADGE
+// text of each entry. "Home Service" works because `adaptNurse` emits exactly
+// that badge for a nurse with a `home_visit_fee_cents`. The other two matched
+// nothing any adapter has ever emitted:
+//
+//   "Available Now"  no presence data exists anywhere in this system, and the
+//                    field that stood in for it (`availability: "online"`) was a
+//                    hardcoded constant, not a badge — see features/care/api.ts.
+//   "Nearest"        a sort, not a filter, and there is no distance to sort by:
+//                    only `/v1/nurses` takes lat/lng at all and no adapter
+//                    returns a distance.
+//
+// So selecting either emptied the directory to zero rows and rendered
+// `EmptyState hasActiveFilters` — "No matches / Try a different filter" — which
+// blames the user's choice for a filter that could never match. A control that
+// silently deletes the whole directory and then implies you asked for it is a
+// worse defect than a button that does nothing. Both are removed rather than
+// disabled; they come back with a presence signal and a distance field
+// respectively. Logged in docs/api/README.md's gap register.
+const SUB_FACETS: string[] = ["Home Service"];
 
 /**
  * This screen's scroll gutter and BRAND's screen gutter.
@@ -401,59 +415,35 @@ export function FindCareScreen() {
           </ChoiceChipRow>
         </View>
 
-        {/* Sub-row facets. The three TOGGLES are now the shared ChoiceChip —
-            multi-select, so `role` stays the default "filter" (a `button` with a
-            selected state), not "radio".
+        {/* Sub-row facets — one chip, and the row is a row of what works.
 
-            "Specialty" is deliberately NOT a ChoiceChip and is FLAGGED instead
-            of forced: its trailing chevron means "opens a picker", so it is a
-            PICKER TRIGGER, not a choice. It never holds a selected state and its
-            tap opens a menu. Giving ChoiceChip a `trailing` slot to absorb it
-            would let any screen hang arbitrary chrome off a chip, which is the
-            drift the extraction removed. It needs either a `SelectField`-style
-            trigger primitive or a `trailing` property added to 11:104 — a
-            design-system decision. Until then it keeps a local component,
-            renamed from `FacetChip` to `PickerTrigger` so nobody mistakes it for
-            a second chip, and narrowed to the one job it actually does.
+            "Home Service" is the shared ChoiceChip, `role` left at the default
+            "filter" (a `button` with a selected state) rather than "radio",
+            because it is a toggle and would still be one if a second real facet
+            joined it. It filters on the provider BADGES
+            (`badgeText.includes(f)`), and `features/care/api.ts` emits that
+            badge as the literal "Home Service" — so the label is not free to
+            rename without desynchronising the chip from the badge it matches.
 
-            WRAPS TOO, and for the same reason as the row above — this row was
-            the worse of the two at 360dp. Four items, measured on device:
+            WHAT LEFT THIS ROW, and why the 360dp wrap arithmetic that used to
+            live in this comment is moot: "Available Now" and "Nearest" are gone
+            (see SUB_FACETS — both matched a badge no adapter emits, so either
+            one silently emptied the directory into "No matches"), and
+            "Specialty" is gone with them. That last one was a `PickerTrigger`
+            with a chevron promising a menu and an empty `onPress`: there is no
+            specialty list to open, because `/v1/doctors/specialties` does not
+            exist. A chevron is a promise about what a tap does, and this one had
+            nothing behind it. The trigger COMPONENT is deleted too rather than
+            left orphaned — it had exactly one caller, and a stranded primitive
+            is how the control gets wired back to nothing. All three return with
+            the data behind them; logged in docs/api/README.md's gap register.
 
-              Specialty (trigger, 20px chevron + 4px gap)  107
-              Available Now                                111
-              Home Service                                 108
-              Nearest                                       76
-
-            402 + 3x8 = 426dp into a 328dp column. At rest "Home Service" ended
-            at x=360 — its right hairline exactly ON the screen edge, so the chip
-            read as whole while being clipped, which is the second failure BRAND
-            names ("never a near-complete item that reads as whole") — and
-            "Nearest" was not on screen at all. Wrapped at 328:
-
-              line 1  107 + 8 + 111  = 226   (+108 -> 342 X)
-              line 2  108 + 8 + 76   = 192
-              height  2x44 + 8        = 96dp
-
-            ON THE COPY: shortening "Home Service" was considered and rejected,
-            because the arithmetic says it buys nothing. The row is four items
-            over by 98dp; the longest sensible abbreviation ("Home visits",
-            ~98dp) saves 10. Even "Available Now" -> "Available" (-29) only moves
-            the split from 2+2 to 3+1 — still two lines, still 96dp tall. And the
-            label is not free to change: `filteredEntries` matches these strings
-            against the provider BADGES (`badgeText.includes(f)`, and
-            features/care/api.ts emits the badge as the literal "Home Service"),
-            so a rename means decoupling value from label to buy zero pixels and
-            desynchronise the filter chip from the badge it filters on. Left
-            verbatim, deliberately. */}
+            One chip fits any width, so nothing here can clip. The row stays a
+            wrapping `ChoiceChipRow` rather than becoming a bare View: that is
+            the seam FindCareScreen.layout.test.tsx asserts on, and a second
+            facet must land in a row that already re-flows. */}
         <View style={{ marginTop: 8 }}>
           <ChoiceChipRow testID="find-care-facet-chips">
-            <PickerTrigger
-              label="Specialty"
-              onPress={() => {
-                // TODO: open specialty picker. Needs the specialty list
-                // from /v1/doctors/specialties (not exposed yet).
-              }}
-            />
             {SUB_FACETS.map((f) => (
               <ChoiceChip
                 key={f}
@@ -531,21 +521,23 @@ const PERSON_BADGE_STYLES: Record<
   warn: { bg: "bg-error/10", fg: "text-error" },
 };
 
-// Presence dot. Green/red/grey rather than the old Tailwind green-500 /
-// red-500 / orange-400, which froze the light-mode values of a palette that
-// isn't ours: `success` and `error` both have dark-mode steps tuned to sit on
-// #0E1514, and the ring around the dot is `border-card-surface`, which flips.
+// ===========================================================================
+// THE PRESENCE DOT IS DELETED, and `AVAILABILITY_DOT` with it.
+// ===========================================================================
+// A green dot in the corner of every provider's avatar, wrapped in
+// `accessibilityLabel="<name> is online"`. It was driven by
+// `entry.availability`, which every adapter in features/care/api.ts set to the
+// literal `"online"` — so the app told a patient that a specific, named
+// clinician was available right now, about every clinician in the directory,
+// always, sourced from a constant. The `busy` and `away` branches were
+// unreachable by construction, which is the tell: a status indicator with one
+// reachable state is not indicating anything.
 //
-// FLAGGED (`away`): same missing-amber gap as `warn`. `outline` is the honest
-// choice — a neutral grey is the conventional "absent" presence colour and it
-// stays distinguishable from the other two in both modes. The dot is never the
-// only signal: the wrapper carries `accessibilityLabel="<name> is <tone>"`.
-// Also currently unreachable — every adapter hardcodes `availability: "online"`.
-const AVAILABILITY_DOT: Record<AvailabilityTone, string> = {
-  online: "bg-success",
-  busy: "bg-error",
-  away: "bg-outline",
-};
+// Nothing in this system has presence data — no service, no column, no field on
+// any of the five list responses. So the dot is removed rather than recoloured
+// or greyed: a neutral "unknown" dot would still assert that presence is a thing
+// this app tracks. See the deleted `AvailabilityTone` in ./types.ts; the whole
+// treatment comes back together when a signal exists.
 
 // Two-letter fallback for AvatarWithFallback when avatarUri is missing/broken
 // — "Dr. Sarah Chen" -> "SC". Falls back to the silhouette glyph if there's
@@ -595,37 +587,29 @@ function initialsFor(name: string): string | null {
 // withholds.
 
 function PersonCard({ entry }: { entry: PersonEntry }) {
-  // Two glyphs that can't be classes (Icon takes a colour string):
-  //  - the Home Service badge glyph sits inside the `tertiary` badge tint, so it
-  //    takes `tertiary` — the same token its sibling label already uses;
-  //  - the message button's glyph sits ON `bg-primary`, so it takes `on-primary`.
-  //    Its old `#ffffff` is on-primary's LIGHT value; in dark mode that put white
-  //    on #6BD8CB.
+  // The Home Service badge glyph sits inside the `tertiary` badge tint, so it
+  // takes `tertiary` — the same token its sibling label already uses. It is the
+  // only glyph here that cannot be a class (Icon takes a colour string); the
+  // `on-primary` one went with the message button below.
   const tertiary = useTokenColor("tertiary");
-  const onPrimary = useTokenColor("on-primary");
   return (
     <Card>
       <View className="flex-row gap-sm">
-        <View className="relative">
-          {/* AvatarWithFallback replaces the raw <Image> (brief §5, §7) —
-              guards a broken/empty avatarUri with an initials/silhouette
-              fallback instead of a blank box. */}
-          <AvatarWithFallback
-            uri={entry.avatarUri}
-            initials={initialsFor(entry.name)}
-            label={entry.name}
-            size={64}
-            className="rounded-xl"
-            style={{ borderRadius: 12 }}
-          />
-          <View
-            accessibilityLabel={`${entry.name} is ${entry.availability}`}
-            // `border-card-surface`, not the old fixed `surface-container-lowest`:
-            // the separation ring has to match the CARD's fill, and the card now
-            // takes the `card-surface` role, which is a different step in dark mode.
-            className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-card-surface ${AVAILABILITY_DOT[entry.availability]}`}
-          />
-        </View>
+        {/* No `relative` wrapper any more — it existed only to position the
+            presence dot. The avatar is the whole of this column now. */}
+        {/* AvatarWithFallback replaces the raw <Image> (brief §5, §7) — guards a
+            broken/empty avatarUri with an initials/silhouette fallback instead
+            of a blank box. `avatarUri` is `""` for a clinician with no photo,
+            which is exactly the case this chain is for; the adapter used to hand
+            it a stock photograph of a stranger instead. */}
+        <AvatarWithFallback
+          uri={entry.avatarUri || null}
+          initials={initialsFor(entry.name)}
+          label={entry.name}
+          size={64}
+          className="rounded-xl"
+          style={{ borderRadius: 12 }}
+        />
         <View className="flex-1 justify-center">
           <Text className="font-headline-md text-on-surface" style={{ fontSize: 18 }}>
             {entry.name}
@@ -677,22 +661,33 @@ function PersonCard({ entry }: { entry: PersonEntry }) {
                 providerSpecialty: entry.title,
                 providerAvatar: entry.avatarUri,
                 providerKind: entry.category,
+                // The fee, carried into the funnel so screen 2 can show a price
+                // before the patient commits. Numbers do not survive a route
+                // param, so it travels as its own string and exactly one place
+                // (the review screen) divides by 100. Omitted when the record
+                // has no fee — `undefined` here is dropped by expo-router, and
+                // "no fee recorded" is not "free".
+                ...(entry.consultationFeeCents !== null &&
+                entry.consultationFeeCents !== undefined
+                  ? { providerFeeCents: String(entry.consultationFeeCents) }
+                  : null),
               },
             } as unknown as Href)
           }
         >
           <Text className="font-label-md text-label-md text-primary">View Profile</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Message ${entry.name}`}
-          className="items-center justify-center rounded-lg bg-primary px-md py-sm active:scale-95"
-          onPress={() => {
-            // TODO: open chat thread. Wires to /v1/social once exposed.
-          }}
-        >
-          <Icon chrome="chat-bubble" size={20} color={onPrimary} />
-        </Pressable>
+        {/* THE MESSAGE BUTTON IS DELETED. A filled primary square with a
+            chat-bubble glyph and `onPress={() => {}}` under a "Message <name>"
+            label — the loudest control on the card, and the only one that did
+            nothing. It is also not a small wiring job: `inbox_service` threads
+            are keyed on a user id and a directory entry carries a doctor /
+            nurse / pharmacist PROFILE id, which is a different identifier with
+            no resolution path from here. Removed rather than disabled, because a
+            greyed control on every card reads as a temporary outage rather than
+            a feature that does not exist. Logged in docs/api/README.md's gap
+            register; "View Profile" now takes the row's full width, which is the
+            action that works. */}
       </View>
     </Card>
   );
@@ -1015,36 +1010,17 @@ function ErrorPanel({ onRetry }: { onRetry: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Picker trigger
+// Picker trigger — DELETED, along with the "Specialty" control it existed for.
 //
-// All that survives of the two local chip components (`MainChip`, `FacetChip`),
-// both of which are now the shared ChoiceChip. See the FLAG at the facet row:
-// this is a PICKER TRIGGER, not a chip — it holds no selected state and its
-// chevron means "opens a menu". It is kept local, and deliberately visible as an
-// anomaly, until the design system has a real trigger primitive (or 11:104 gains
-// a `trailing` property).
-//
-// Tokenised on the way past, since the copy it came from is gone: the chevron
-// was `#6d7a77` / `#00685f`, both light-mode literals. Height now clears the
-// 44pt floor, which `py-xs` did not.
+// It was the last survivor of the two local chip components (`MainChip`,
+// `FacetChip`), kept as a deliberate anomaly while the design system lacked a
+// trigger primitive. That argument is now moot: its one caller is gone, because
+// the chevron it drew promised a specialty menu and `/v1/doctors/specialties`
+// does not exist, so the tap opened nothing. A component with no caller is not a
+// primitive in waiting — it is the thing the next person wires back up to the
+// same absent endpoint. It comes back with the endpoint, as part of the same
+// job. See the facet-row comment above.
 // ---------------------------------------------------------------------------
-
-function PickerTrigger({ label, onPress }: { label: string; onPress: () => void }) {
-  const glyph = useTokenColor("on-surface-variant");
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint="Opens a picker"
-      onPress={onPress}
-      className="flex-row items-center gap-xs self-start rounded-md border border-outline-variant px-4 py-3 active:scale-[0.98]"
-      style={{ minHeight: 44, minWidth: 44 }}
-    >
-      <Text className="font-label-md text-label-md text-on-surface">{label}</Text>
-      <Icon chrome="arrow-drop-down" size={20} color={glyph} />
-    </Pressable>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Shadows — there are none, and there is nothing here to reintroduce them with.

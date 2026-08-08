@@ -81,6 +81,89 @@ describe("Book appointment — the push into the slot picker", () => {
     expect(screen.queryByText("Dr. Julian Sterling")).toBeNull();
   });
 
+  it("carries the consultation fee into the funnel, in minor units", () => {
+    // The price has to reach the screen the patient commits on. `adaptDoctor`
+    // dropped `consultation_fee_cents` entirely until this pass, so nothing in
+    // the funnel had a fee to show and a booking was confirmed without one.
+    // CENTS, unconverted: exactly one place divides by 100 (the review screen),
+    // and it is not this one.
+    mockParams = { ...DOCTOR_PARAMS, providerFeeCents: "12000" };
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText("Book appointment"));
+
+    expect(lastPush().params.practitionerFeeCents).toBe("12000");
+    // And it is not RENDERED here: this screen fetches nothing, so a price on
+    // this page would be a number with no request behind it.
+    expect(screen.queryByText(/120/)).toBeNull();
+  });
+
+  it("omits the fee param when the clinician has no fee recorded", () => {
+    mockParams = { ...DOCTOR_PARAMS };
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText("Book appointment"));
+
+    // "No fee recorded" is not "free", so nothing is forwarded and screen 2
+    // omits the row rather than printing a zero.
+    expect(lastPush().params).not.toHaveProperty("practitionerFeeCents");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The deleted DEFAULT_PROVIDER
+// ---------------------------------------------------------------------------
+// `DEFAULT_PROVIDER = { id: "julian-sterling", name: "Dr. Julian Sterling",
+// specialty: "Cardiologist" }` answered for every param this screen was not
+// given. So any arrival without params — a deep link, a notification tap, a
+// param dropped upstream — drew a named clinician who does not exist, with an
+// "About" line placing him in the MedApp directory, under a LIVE booking dock.
+// Pressing it pushed `practitionerId: "julian-sterling"` three screens along,
+// where it becomes `doctor_id` on a real `POST /v1/bookings`.
+
+describe("no provider, no profile", () => {
+  it("renders a no-data state and offers no Book action at all", () => {
+    mockParams = {};
+    renderScreen();
+
+    expect(screen.queryByLabelText("Book appointment")).toBeNull();
+    expect(screen.queryByTestId("provider-booking-dock")).toBeNull();
+    expect(screen.getByText(/don't have a provider to show/)).toBeTruthy();
+  });
+
+  it("invents no clinician to fill the hole", () => {
+    mockParams = {};
+    renderScreen();
+
+    expect(screen.queryByText(/Julian Sterling/)).toBeNull();
+    expect(screen.queryByText(/Cardiologist/)).toBeNull();
+    // The About card is gated on a real specialty too — "Listed in the MedApp
+    // care directory as ." is not a sentence and a filler word would be the
+    // same defect at one field's scale.
+    expect(screen.queryByText(/Listed in the MedApp care directory/)).toBeNull();
+  });
+
+  it("refuses a name with no id — that Book button could only ever fail", () => {
+    // `BookingCreate.doctor_id` is a required UUID. A profile that knows who the
+    // clinician is but not which record they are cannot produce a booking.
+    mockParams = { providerName: "Dr. Sarah Chen", providerKind: "doctors" };
+    renderScreen();
+
+    expect(screen.queryByLabelText("Book appointment")).toBeNull();
+    expect(screen.getByText(/don't have a provider to show/)).toBeTruthy();
+  });
+
+  it('treats the literal string "undefined" as absent, not as a name', () => {
+    // expo-router serialises a missing param as the four-letter string, which
+    // would otherwise sail straight past the guard and title the page
+    // "undefined".
+    mockParams = { providerId: "undefined", providerName: "undefined" };
+    renderScreen();
+
+    expect(screen.getByText(/don't have a provider to show/)).toBeTruthy();
+    expect(screen.queryByText("undefined")).toBeNull();
+  });
+
   it("omits an absent avatar instead of sending the string \"undefined\"", () => {
     // expo-router serialises `undefined` as the literal "undefined", which the
     // slot picker would hand to <Image> as a URI.
@@ -164,5 +247,23 @@ describe("No provider fact is invented", () => {
     expect(source).not.toMatch(/128 patient reviews/);
     expect(source).not.toMatch(/20-minute/);
     expect(source).not.toMatch(/Board-certified/);
+  });
+
+  it("names no fallback clinician, and keeps no constant to hold one", () => {
+    // The strongest form of this guard: not "the default is unused" but "there
+    // is nothing in the file for a default to be read out of". A fabricated
+    // provider cannot come back by someone re-reading a constant that survived.
+    expect(source).not.toMatch(/DEFAULT_PROVIDER/);
+    expect(source).not.toMatch(/julian-sterling/);
+    expect(source).not.toMatch(/Julian Sterling/);
+  });
+
+  it("keeps no retry on a screen that issues no request", () => {
+    // "Try again" called `setState("default")`. Nothing here fetches, so there
+    // was nothing to retry — pressing it swapped the error copy for the profile
+    // already in hand, which reads as a successful recovery from a failure that
+    // never happened.
+    expect(source).not.toMatch(/Try again/);
+    expect(source).not.toMatch(/setState/);
   });
 });

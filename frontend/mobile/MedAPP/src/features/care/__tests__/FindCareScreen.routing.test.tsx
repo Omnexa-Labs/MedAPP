@@ -61,7 +61,10 @@ const doctor: PersonEntry = {
   name: "Dr. Sarah Chen",
   title: "Cardiology Specialist",
   avatarUri: "https://example.test/sarah.png",
-  availability: "online",
+  // No `availability`: the field is gone from PersonEntry. Every adapter set it
+  // to the literal "online", which drew a green presence dot on every clinician
+  // in the directory with no presence data behind it.
+  consultationFeeCents: 12000,
   badges: [{ label: "Cardiology", tone: "secondary" }],
 };
 
@@ -138,7 +141,9 @@ describe("FindCareScreen — a provider card opens that provider's profile", () 
 
     // `providerId` is the one that becomes `practitionerId` and then
     // `doctor_id`; the rest are what the profile and the slot picker draw.
-    // Without them the profile silently renders DEFAULT_PROVIDER.
+    // Without the id and the name the profile now renders a no-data state — it
+    // used to render `DEFAULT_PROVIDER`, a named fictional cardiologist, under a
+    // live Book dock.
     expect(lastPush().params).toEqual({
       id: "doc-7",
       providerId: "doc-7",
@@ -146,7 +151,44 @@ describe("FindCareScreen — a provider card opens that provider's profile", () 
       providerSpecialty: "Cardiology Specialist",
       providerAvatar: "https://example.test/sarah.png",
       providerKind: "doctors",
+      // The price, entering the funnel. `adaptDoctor` dropped
+      // `consultation_fee_cents` entirely until this pass, so the review screen
+      // had nothing to show and a patient committed without seeing a cost.
+      // MINOR UNITS all the way to the screen that prints it.
+      providerFeeCents: "12000",
     });
+  });
+
+  it("omits the fee param when the clinician records no fee", () => {
+    mockEntries = [{ ...doctor, consultationFeeCents: null }];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Dr. Sarah Chen's profile"));
+
+    // Null means "no fee set", which is not "free" — so nothing is forwarded
+    // and the review screen omits the row rather than printing a zero.
+    expect(lastPush().params).not.toHaveProperty("providerFeeCents");
+  });
+
+  it("offers no message control on a provider card", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    // It was a filled primary square with a chat glyph and an empty `onPress` —
+    // the loudest control on the card and the only one that did nothing.
+    // `inbox_service` keys threads on a USER id; a directory entry carries a
+    // doctor PROFILE id, and there is no resolution between them from here.
+    expect(screen.queryByLabelText("Message Dr. Sarah Chen")).toBeNull();
+  });
+
+  it("makes no presence claim about a clinician", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    // Every adapter hardcoded `availability: "online"`, so this label was
+    // attached to every person in the directory, always, with no presence
+    // service, column or field behind it.
+    expect(screen.queryByLabelText(/is online/)).toBeNull();
   });
 
   it("tags the entry's kind so the profile can decide about booking", () => {

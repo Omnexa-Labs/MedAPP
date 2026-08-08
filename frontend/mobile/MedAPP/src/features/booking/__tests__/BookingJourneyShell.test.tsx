@@ -134,7 +134,18 @@ describe("ReviewAppointmentScreen", () => {
   it("carries exactly one commit action, in the docked bar", () => {
     renderReview();
     expect(screen.getAllByLabelText("Confirm Booking")).toHaveLength(1);
-    expect(screen.getByLabelText("Secure encrypted checkout")).toBeTruthy();
+  });
+
+  it("makes no checkout claim under a bar that takes no money", () => {
+    // The footnote read "Secure encrypted checkout" beside a padlock. There is
+    // no payment step in this flow — no amount, no card, no `payment_service`
+    // call — and the service behind it has no provider integrated at all, so
+    // there is nothing to encrypt and no checkout to secure. A padlock is the
+    // thing a patient looks for before committing money, which makes it the
+    // worst possible place for decoration.
+    renderReview();
+    expect(screen.queryByLabelText("Secure encrypted checkout")).toBeNull();
+    expect(screen.queryByText(/checkout/i)).toBeNull();
   });
 });
 

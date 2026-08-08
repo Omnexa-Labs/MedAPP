@@ -464,16 +464,28 @@ describe("missing params", () => {
 // ---------------------------------------------------------------------------
 
 describe("provider-supplied values", () => {
-  it('renders Duration with "From provider" only when a duration was supplied', () => {
+  it('renders Duration WITHOUT a "From provider" badge — no provider supplied it', () => {
     withParams({ duration: "45 Minutes" });
     renderScreen();
     expect(screen.getByText("45 Minutes")).toBeTruthy();
-    expect(screen.getByText("From provider")).toBeTruthy();
+    // The badge is a PROVENANCE claim and the value has no provenance: screen 1
+    // derives the duration from `SEED_SLOTS`, eleven times typed into a bundled
+    // file, because `/v1/slots` does not exist. This file's header already
+    // records deleting the badge once, when it sat over a hardcoded "45
+    // Minutes"; the hardcoding then moved one module away and the badge came
+    // back with it. The row stays — the duration is a real consequence of the
+    // slot picked — the certificate does not.
+    expect(screen.queryByText("From provider")).toBeNull();
   });
 
-  it("omits the whole Duration row when it was not", () => {
+  it("omits the whole Duration row when no duration was supplied", () => {
     renderScreen();
     expect(screen.queryByText("Duration")).toBeNull();
+  });
+
+  it("carries no provenance badge anywhere in the tree", () => {
+    withParams({ duration: "45 Minutes", timezone: "EDT · Boston", feeCents: "12000" });
+    renderScreen();
     expect(screen.queryByText("From provider")).toBeNull();
   });
 
@@ -620,6 +632,172 @@ describe("practitioner identity", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The checkout theatre, and the price that was actually available all along
+// ---------------------------------------------------------------------------
+// The screen asserted "a $10 processing fee may apply" and labelled its commit
+// bar "Secure encrypted checkout" — over a flow with no payment step, no amount,
+// no card and no `payment_service` call, against a backend where payments are
+// simulated and no provider is integrated. Meanwhile the one real money fact in
+// the system, `consultation_fee_cents`, was on the doctor wire and dropped by
+// `adaptDoctor`, so a patient confirmed a medical appointment having been shown
+// an invented fee in the wrong currency and never the actual price.
+
+describe("money", () => {
+  it("states no fee amount of its own, in any currency", () => {
+    renderScreen();
+    expect(screen.queryByText(/\$10/)).toBeNull();
+    expect(screen.queryByText(/processing fee/i)).toBeNull();
+    // `$` at all: the seeded roster bills in Ghana, so a dollar sign was wrong
+    // even before the amount was.
+    expect(screen.queryByText(/\$/)).toBeNull();
+  });
+
+  it("keeps the cancellation window, which is the part that is not a charge", () => {
+    renderScreen();
+    expect(screen.getByText(/Free cancellation until 24 hours before/)).toBeTruthy();
+  });
+
+  it("advertises no checkout", () => {
+    renderScreen();
+    expect(screen.queryByText(/checkout/i)).toBeNull();
+    expect(screen.queryByText(/encrypted/i)).toBeNull();
+  });
+
+  it("renders the consultation fee in MAJOR units — the wire is cents", () => {
+    withParams({ feeCents: "12000" });
+    renderScreen();
+
+    // 12000 cents is 120.00, not 12,000. docs/api/README.md lists "Money is in
+    // CENTS on doctors and nurses — a raw render is 100x the price" as a known
+    // trap on this exact column.
+    expect(screen.getByText("GHS 120.00")).toBeTruthy();
+    expect(screen.queryByText(/12000/)).toBeNull();
+    expect(screen.getByText("Consultation fee")).toBeTruthy();
+  });
+
+  it("always shows two minor digits, so 12050 is not 120.5", () => {
+    withParams({ feeCents: "12050" });
+    renderScreen();
+    expect(screen.getByText("GHS 120.50")).toBeTruthy();
+  });
+
+  it("omits the row entirely when no fee was recorded", () => {
+    renderScreen();
+    // Null on the column means "no fee set", which is NOT a free consultation —
+    // so nothing is rendered rather than "GHS 0.00".
+    expect(screen.queryByText("Consultation fee")).toBeNull();
+  });
+
+  it("treats an unreadable amount as absent rather than rounding it into a price", () => {
+    for (const bad of ["", "  ", "abc", "-500", "120.5"]) {
+      withParams({ feeCents: bad });
+      const { unmount } = renderScreen();
+      expect(screen.queryByText("Consultation fee")).toBeNull();
+      unmount();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reschedule — two calls, in an order chosen for how each one fails
+// ---------------------------------------------------------------------------
+// `booking_service` has no reschedule endpoint, so this screen books the new
+// time and then cancels the old one. Book-first is deliberate: a failed create
+// leaves the original appointment standing, while cancel-first can leave the
+// patient with nothing at all when the new slot is taken while they review.
+
+describe("rescheduling an existing booking", () => {
+  const BOOKING_RESPONSE = {
+    booking_id: "b-new",
+    user_id: "u-1",
+    status: "booked",
+    doctor_id: "prac-1",
+    starts_at: "2025-05-13T10:00:00-04:00",
+    ends_at: "2025-05-13T10:45:00-04:00",
+    mode: "in_person",
+  };
+
+  it("says what confirming will do, before it does it", () => {
+    withParams({ rescheduleOfId: "b-old" });
+    renderScreen();
+    expect(screen.getByText(/books this new time first, then cancels your original/)).toBeTruthy();
+  });
+
+  it("makes no reschedule claim on an ordinary new booking", () => {
+    renderScreen();
+    expect(screen.queryByText(/cancels your original/)).toBeNull();
+  });
+
+  it("creates the new booking BEFORE cancelling the old one", async () => {
+    withParams({ rescheduleOfId: "b-old" });
+    post.mockResolvedValue(BOOKING_RESPONSE);
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+
+    // Two calls, and the ORDER is the assertion: create, then cancel.
+    expect(post.mock.calls[0][0]).toBe("/v1/bookings");
+    expect(post.mock.calls[1][0]).toBe("/v1/bookings/b-old/cancel");
+  });
+
+  it("leaves the original booking alone when the new one fails", async () => {
+    withParams({ rescheduleOfId: "b-old" });
+    post.mockRejectedValue(Object.assign(new Error("taken"), { status: 409 }));
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+
+    await waitFor(() => expect(screen.getByText("That slot was just taken")).toBeTruthy());
+    // The whole reason for booking first. Cancel-first here would have left the
+    // patient with no appointment at all and no way back to the slot they lost.
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toBe("/v1/bookings");
+  });
+
+  it("TELLS the patient when the old booking could not be cancelled", async () => {
+    withParams({ rescheduleOfId: "b-old" });
+    post
+      .mockResolvedValueOnce(BOOKING_RESPONSE)
+      .mockRejectedValueOnce(new Error("cancel failed"));
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+
+    // The new booking is real, so the flow continues — but the duplicate is
+    // carried forward as a fact, never swallowed. An unsurfaced duplicate is a
+    // clinician holding a slot for nobody and a patient who may turn up twice.
+    const params = (router.replace as jest.Mock).mock.calls[0][0].params;
+    expect(params.rescheduleCancelFailed).toBe("1");
+  });
+
+  it("forwards no such flag when the cancellation succeeded", async () => {
+    withParams({ rescheduleOfId: "b-old" });
+    post.mockResolvedValue(BOOKING_RESPONSE);
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    const params = (router.replace as jest.Mock).mock.calls[0][0].params;
+    expect(params).not.toHaveProperty("rescheduleCancelFailed");
+  });
+
+  it("cancels nothing at all on a plain new booking", async () => {
+    post.mockResolvedValue(BOOKING_RESPONSE);
+
+    renderScreen();
+    fireEvent.press(screen.getByLabelText("Confirm Booking"));
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The contract with screen 1 — what a REAL user currently reaches
 //
 // Every test above hands this screen params that screen 1 does not yet push.
@@ -674,8 +852,8 @@ describe("what screen 1 actually sends today", () => {
     renderScreen();
     // Location card + Directions  — needs locationName / locationAddress
     expect(screen.queryByLabelText("Directions")).toBeNull();
-    // Duration + "From provider"  — needs duration
-    expect(screen.queryByText("From provider")).toBeNull();
+    // Duration                    — needs duration
+    expect(screen.queryByText("Duration")).toBeNull();
     // Time range and zone badge   — needs endTime / timezone
     expect(screen.queryByText(/–/)).toBeNull();
     expect(screen.queryByText(/EDT/)).toBeNull();

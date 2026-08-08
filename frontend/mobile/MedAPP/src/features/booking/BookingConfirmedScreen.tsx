@@ -296,6 +296,16 @@ export function BookingConfirmedScreen() {
     endsAtIso?: string;
     locationName?: string;
     locationAddress?: string;
+    /**
+     * `"1"` when this booking was a RESCHEDULE whose second call failed.
+     *
+     * There is no reschedule endpoint (docs/api/README.md), so Review books the
+     * new time and then cancels the old one. When that cancel fails the patient
+     * holds two appointments, and the only place they can still be told is here
+     * — Review has already been replaced off the stack. Absent on every other
+     * path, including a successful reschedule.
+     */
+    rescheduleCancelFailed?: string;
   }>();
 
   // The one derived value, and it is a branch rather than a fabrication. The
@@ -439,6 +449,27 @@ export function BookingConfirmedScreen() {
    * rendered as a Pressable with no `onPress` — a control that looks live and
    * does nothing. `Share` is React Native's own sheet, so no new dependency and
    * no second icon set.
+   *
+   * NO LINK, WHILE THE POST AND FACILITY SHARES NOW CARRY ONE. That is not an
+   * oversight and it is not a smaller effort — it is the rule in
+   * @/lib/share-links applied honestly:
+   *
+   *   * There is no appointment DETAIL route. `/(app)/appointments` is
+   *     AppointmentManagementScreen, a list of the signed-in user's own
+   *     bookings; it takes no id and there is nothing for a link to select.
+   *   * This screen is not addressable either. It is the terminal frame of the
+   *     booking flow and it renders entirely from the ten params Review handed
+   *     it — practitioner, date, time, mode, location. There is no id in them
+   *     to refetch from, so a deep link would have to carry the whole
+   *     appointment in its query string, which is the one thing a link must
+   *     never do: those params name a clinician, a clinic and a time for a
+   *     named patient, in a URL that ends up in somebody else's chat log.
+   *   * And even given an id, a booking is not readable by the recipient. It is
+   *     scoped to the account that made it, so the link would open a 403 for
+   *     everyone it was ever sent to.
+   *
+   * A link that opens a dead screen is worse than no link, so this share stays
+   * exactly what it was: the summary, as text.
    */
   const shareAppointment = useCallback(() => {
     const summary = [
@@ -514,6 +545,24 @@ export function BookingConfirmedScreen() {
             look up. GAP — flagged to the designer and logged as backend request
             §5.1. The margin below absorbs the space rather than leaving a hole.
         ------------------------------------------------------------ */}
+
+        {/* ------------------------------------------------------------
+            The half of a reschedule that did not happen.
+            ------------------------------------------------------------
+            The new booking is real — that is what this screen is announcing —
+            but the original is still standing, and only the patient can clear
+            it now. Stated here because Review has already been replaced off the
+            stack, and an unsurfaced duplicate is a clinician holding a slot for
+            someone who will not arrive plus a patient who may turn up twice.
+        ------------------------------------------------------------ */}
+        {params.rescheduleCancelFailed === "1" ? (
+          <View className="mt-6 w-full" accessibilityLiveRegion="polite">
+            <InfoCallout tone="error" icon="error-outline">
+              We couldn&rsquo;t cancel your original appointment. This new one is booked — please
+              cancel the old one from My Appointments so the clinic isn&rsquo;t holding both.
+            </InfoCallout>
+          </View>
+        ) : null}
 
         {/* ------------------------------------------------------------
             Appointment card (756:4760)

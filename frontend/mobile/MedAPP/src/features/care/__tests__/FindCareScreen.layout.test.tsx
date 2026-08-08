@@ -58,12 +58,32 @@ describe("FindCareScreen filter rows at 360dp", () => {
       "Hospitals",
       "Pharmacies",
       "Pharmacists",
-      "Specialty",
-      "Available Now",
       "Home Service",
-      "Nearest",
     ]) {
       expect(screen.getByLabelText(label)).toBeTruthy();
     }
+  });
+
+  it("offers no facet that can only ever empty the directory", () => {
+    render(<FindCareScreen />);
+
+    // `filteredEntries` matches a facet label against each entry's BADGE text.
+    // "Home Service" works — `adaptNurse` emits exactly that badge. These two
+    // matched a badge no adapter has ever emitted, so selecting either filtered
+    // every provider out and rendered "No matches / Try a different filter":
+    // the screen blamed the user's choice for a filter that could not match.
+    //
+    //   "Available Now"  no presence data exists in this system at all
+    //   "Nearest"        a sort with no distance to sort by
+    expect(screen.queryByLabelText("Available Now")).toBeNull();
+    expect(screen.queryByLabelText("Nearest")).toBeNull();
+  });
+
+  it("offers no Specialty picker — there is no specialty list to open", () => {
+    render(<FindCareScreen />);
+
+    // A trailing chevron is a promise that a tap opens a menu. `onPress` was
+    // empty because `/v1/doctors/specialties` does not exist.
+    expect(screen.queryByLabelText("Specialty")).toBeNull();
   });
 });

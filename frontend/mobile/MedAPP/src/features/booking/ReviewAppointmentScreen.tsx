@@ -20,10 +20,19 @@
 // no-data frame (756:4813) unreachable. Missing required params now render that
 // frame instead: an expired session, stated as one.
 //
-// The same rule applies per row, not just per screen. Duration (756:4356 carries
-// a "From provider" badge — a provenance claim), the clinic name and its address
-// are rendered ONLY when the params carry them. A provenance badge over a
-// hardcoded string is a lie with a certificate attached.
+// The same rule applies per row, not just per screen. Duration, the clinic name
+// and its address are rendered ONLY when the params carry them. A provenance
+// badge over a hardcoded string is a lie with a certificate attached — and that
+// is why the Duration row's "From provider" badge is now GONE too: the value
+// reaching it is derived from `SEED_SLOTS`, so the badge had moved one module
+// away from the hardcoding rather than stopped certifying it.
+//
+// THE CHECKOUT IS DELETED. This screen advertised a "$10 processing fee" and a
+// "Secure encrypted checkout" over a flow with no payment step, no amount, no
+// card and no `payment_service` call — against a backend with no payment
+// provider at all. Both are gone; what replaces them is the consultation fee the
+// wire has carried all along and the adapter used to drop. See POLICY and
+// `feeLabel`.
 //
 // CANCEL IS DELETED. `Edit` and `Cancel` were both `router.back()` — the same
 // function under two labels, one of which promised to abandon the booking and
@@ -81,8 +90,10 @@
 //     tags                  NOT YET      the badge row (756:4213)
 //     endTime               NOT YET      "10:00 AM – 10:45 AM" instead of a start
 //     timezone              NOT YET      the zone badge beside Time
-//     duration              NOT YET      Duration + its "From provider" badge
+//     duration              NOT YET      the Duration row (the badge is gone)
 //     locationName/Address  NOT YET      the whole Location card and Directions
+//     feeCents              forwarded    the Consultation fee row — MINOR UNITS
+//     rescheduleOfId        forwarded    present only on a reschedule; see confirm
 //
 // The six NOT YETs are the live gap: their branches are exercised by
 // ReviewAppointmentScreen.test.tsx, but no user reaches them, because screen 1's
@@ -122,7 +133,7 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DetailShell } from "@/components/shell";
 import {
   Button,
@@ -136,6 +147,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { bookingApi } from "@/features/booking/api";
+import { consultationFee } from "@/features/practitioner/format";
 import { useTokenColor, useTokenShadow } from "@/lib/tokens";
 
 /** Non-empty strings only; `null`, `""` and absent all collapse to `undefined`. */
@@ -268,8 +280,42 @@ function defined(params: Record<string, string | undefined>): Record<string, str
 // Copy
 // ---------------------------------------------------------------------------
 
-const POLICY =
-  "Free cancellation until 24 hours before the appointment. After that, a $10 processing fee may apply.";
+/**
+ * THE "$10 PROCESSING FEE" IS DELETED, and the sentence it lived in is the only
+ * part that survives.
+ *
+ * It read "After that, a $10 processing fee may apply." Three things were wrong
+ * with it and any one of them is enough: there is no payment step anywhere in
+ * this flow, `payment_service` has no provider integrated at all (docs/api §
+ * "Payments do not take money"), and `$` is not this product's currency — the
+ * seeded roster bills in Ghana. A financial term stated to a patient is a term
+ * of the contract they are about to enter, and it has to come from the backend
+ * that will enforce it, not from a string constant in a screen. Logged in
+ * docs/api/README.md's gap register: the cancellation window has no source
+ * either, but a free-cancellation promise errs toward the patient, which a fee
+ * does not.
+ */
+const POLICY = "Free cancellation until 24 hours before the appointment.";
+
+/**
+ * `12000` -> "GHS 120.00" — reused from the practitioner surface, NOT reimplemented.
+ *
+ * That helper carries the flag this row inherits and must not lose: **the
+ * currency is assumed, not read**. `DoctorProfileOut` has `consultation_fee_cents`
+ * and no currency column anywhere in doctor_service, so "GHS" is a design
+ * constant taken from the frame and the Accra/Kumasi roster. Two treatments of
+ * one unsourced currency would be worse than one, so this screen takes the
+ * existing one rather than minting a second. The real fix is a `currency` column;
+ * it is in docs/api/README.md's gap register.
+ */
+function feeLabel(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  const cents = Number(value.trim());
+  // A non-integer or negative amount is treated as ABSENT, never rounded into a
+  // plausible price — the same rule `parseRating` applies to a score.
+  if (!Number.isInteger(cents) || cents < 0) return null;
+  return consultationFee(cents);
+}
 
 /** 756:4586. The "nothing has been charged" clause is load-bearing, not padding. */
 function failureCopy(status: number | undefined, time: string, practitioner: string) {
@@ -324,6 +370,10 @@ export function ReviewAppointmentScreen() {
     duration?: string;
     locationName?: string;
     locationAddress?: string;
+    /** `consultation_fee_cents`, verbatim. MINOR UNITS — see `feeLabel`. */
+    feeCents?: string;
+    /** The booking this one replaces — see `confirm`. */
+    rescheduleOfId?: string;
   }>();
 
   const practitionerName = text(params.practitionerName);
@@ -340,12 +390,56 @@ export function ReviewAppointmentScreen() {
   const mode = readMode(params.mode);
   const rating = parseRating(text(params.rating), text(params.reviewCount));
   const tags = parseTags(text(params.tags));
+  const fee = feeLabel(text(params.feeCents));
+  const rescheduleOfId = text(params.rescheduleOfId);
 
   const [discardOpen, setDiscardOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const confirmMutation = useMutation({
     mutationFn: bookingApi.createBooking,
-    onSuccess: (booking) => {
+    // ---------------------------------------------------------------------
+    // RESCHEDULE IS BOOK-THEN-CANCEL, IN THAT ORDER, AND THE ORDER IS THE
+    // WHOLE DECISION.
+    // ---------------------------------------------------------------------
+    // `booking_service` has EIGHT routes and none of them is a reschedule
+    // (docs/api/README.md: "Booking has no reschedule endpoint — cancel-and-
+    // rebook is non-atomic"). So a reschedule is two calls and one of them can
+    // fail between the two. The two orders fail differently, and they are not
+    // close:
+    //
+    //   cancel first   the cancel succeeds, the new POST 409s on a slot taken
+    //                  while the patient was reviewing, and they now have NO
+    //                  appointment. They came here to move one. That loss is
+    //                  silent, immediate and, for a slot in demand,
+    //                  unrecoverable.
+    //   book first     the POST succeeds, the cancel fails, and the patient has
+    //                  TWO appointments. Visible on the very next screen, in a
+    //                  list with a working Cancel button on every row, and
+    //                  costing a clinician one held slot rather than a patient
+    //                  their care.
+    //
+    // So: book, then cancel. A failed create leaves the original untouched and
+    // falls into this screen's existing confirm-failed branch, which is exactly
+    // right — nothing has changed and "pick another time" is the true advice. A
+    // failed cancel is carried to the confirmation screen as a fact and stated
+    // there, never swallowed: an unsurfaced duplicate is a patient who turns up
+    // twice and a clinician who blocks a slot for nobody.
+    //
+    // This is NOT presented as atomic anywhere, because it is not.
+    onSuccess: async (booking) => {
+      let rescheduleCancelFailed: string | undefined;
+      if (rescheduleOfId) {
+        try {
+          await bookingApi.cancelBooking(rescheduleOfId, "Rescheduled by the patient");
+        } catch {
+          rescheduleCancelFailed = "1";
+        }
+      }
+      // The appointments list is now wrong in cache — a new row, and (usually)
+      // one fewer. Invalidated rather than refetched here: the screen that owns
+      // that query is the one being navigated to.
+      void queryClient.invalidateQueries({ queryKey: ["appointments"] });
       router.replace({
         // Route added in an earlier iteration — typedRoutes regenerates on dev
         // server start.
@@ -392,6 +486,8 @@ export function ReviewAppointmentScreen() {
           // confirmation that no clinic can look up. Logged in PIPELINE §5.
           startsAtIso: booking.startsAtIso,
           endsAtIso: booking.endsAtIso,
+          // Only ever set when a reschedule's second call failed. See above.
+          rescheduleCancelFailed,
         }),
       });
     },
@@ -629,17 +725,34 @@ export function ReviewAppointmentScreen() {
               <IconTile icon="stethoscope" />
               <KeyValueRow label="Consultation type" value={type} />
             </View>
-            {/* "From provider" is a provenance badge: the value must actually
-                come from the provider. It used to be a hardcoded "45 Minutes"
-                wearing that badge. */}
+            {/* THE "From provider" BADGE IS GONE (and the row is not).
+                It is a PROVENANCE claim, and the value it certifies is derived
+                from `SEED_SLOTS` — a bundle constant, not a provider. Screen 1
+                computes the duration off the seed grid's own start and end, so
+                the badge said "the clinician told us this" about eleven times
+                typed into a file. That is precisely the defect this file's
+                header records fixing when the badge sat over a hardcoded "45
+                Minutes"; it survived because the hardcoding moved one module
+                away. The duration is still shown — it is a real consequence of
+                the slot the user picked — it just no longer wears a certificate
+                nothing issued. The badge returns when /v1/slots does. */}
             {duration ? (
               <View className="flex-row items-start gap-4">
                 <IconTile icon="schedule" />
-                <KeyValueRow
-                  label="Duration"
-                  value={duration}
-                  badge={{ label: "From provider", tone: "success" }}
-                />
+                <KeyValueRow label="Duration" value={duration} />
+              </View>
+            ) : null}
+            {/* THE PRICE, BEFORE THE COMMIT. `consultation_fee_cents` has been
+                on the wire the whole time and `adaptDoctor` dropped it on the
+                floor, so a patient confirmed a medical appointment without ever
+                being shown what it costs. CENTS — `feeLabel` divides by 100;
+                a raw render is 100x the price, which docs/api/README.md already
+                lists as a known trap on this exact column. The currency is
+                assumed, not sourced — see `feeLabel`. */}
+            {fee ? (
+              <View className="flex-row items-start gap-4">
+                <IconTile icon="payments" />
+                <KeyValueRow label="Consultation fee" value={fee} />
               </View>
             ) : null}
             {reason ? (
@@ -685,6 +798,17 @@ export function ReviewAppointmentScreen() {
                 />
               </View>
             </Card>
+          </View>
+        ) : null}
+
+        {/* -- Reschedule, stated in the order it actually happens ---------- */}
+        {rescheduleOfId ? (
+          <View className="mt-6">
+            <InfoCallout tone="info">
+              Confirming books this new time first, then cancels your original appointment. If the
+              cancellation doesn&rsquo;t go through we&rsquo;ll tell you, so you can cancel it from
+              My Appointments.
+            </InfoCallout>
           </View>
         ) : null}
 
@@ -735,7 +859,16 @@ export function ReviewAppointmentScreen() {
           loading: isPending,
           onPress: confirm,
         }}
-        footnote={{ label: "Secure encrypted checkout", icon: "lock" }}
+        // NO FOOTNOTE. It read "Secure encrypted checkout" under a padlock, and
+        // there is no checkout: no payment step, no amount collected, no card,
+        // no `payment_service` call in this flow — and nothing to integrate with
+        // if there were, since that service has no provider and settles nothing
+        // (docs/api/README.md § "Payments do not take money"). A padlock and the
+        // word "encrypted" over a screen that takes no money is a security claim
+        // made about a transaction that does not happen, which is worse than
+        // decoration: it is the reassurance a patient checks for before
+        // committing. The consultation fee above says what this costs; the clinic
+        // collects it, not this app.
       />
 
       {/* -- 756:4765 discard -------------------------------------------- */}

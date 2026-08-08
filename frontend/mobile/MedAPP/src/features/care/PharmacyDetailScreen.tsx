@@ -62,6 +62,7 @@ import {
 } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import { shareText } from "@/lib/share";
+import { shareLinkLine } from "@/lib/share-links";
 import type { StockCheck } from "@/features/care/api";
 import type { PersonEntry } from "@/features/care/types";
 import {
@@ -175,9 +176,18 @@ export function PharmacyDetailScreen() {
     ? composeAddress(pharmacy.addressLine1, pharmacy.city, pharmacy.country)
     : null;
 
+  // Same as hospital-detail: the last line is a deep link keyed on the pharmacy
+  // id alone, and it is only offered because `usePharmacy` is a single-resource
+  // `GET /v1/pharmacies/{id}` — this screen already renders its own not-found
+  // panel for a stale id, so a cold open cannot land on a half-filled page.
   const onShare = useCallback(() => {
     if (!pharmacy) return;
-    const lines = [pharmacy.name, address, pharmacy.phone].filter((l): l is string => !!l);
+    const lines = [
+      pharmacy.name,
+      address,
+      pharmacy.phone,
+      shareLinkLine({ kind: "pharmacy", id: pharmacy.pharmacyId }),
+    ].filter((l): l is string => !!l);
     void shareText(lines.join("\n"), { subject: pharmacy.name, dialogTitle: pharmacy.name });
   }, [pharmacy, address]);
 

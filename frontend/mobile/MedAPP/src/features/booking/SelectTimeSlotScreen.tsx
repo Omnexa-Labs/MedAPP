@@ -100,11 +100,23 @@
 //                                  sweep; the reasoning holds and nothing here
 //                                  floats, so nothing came back.
 //
-// STILL FLAGGED FOR THE DESIGNER (unresolved, not invented):
-//   "See Calendar" (756:4413's action slot) and the no-slots "See calendar"
-//   button (757:5597) both point at a full-month calendar picker that has no
-//   frame and no route. The control is drawn in two frames so it is kept, but
-//   `openCalendar` is a documented no-op — see the handler.
+// THE TWO CALENDAR CONTROLS ARE DELETED (this pass). "See Calendar" (756:4413's
+// action slot) and the no-slots "See calendar" button (757:5597) both pointed at
+// a full-month picker that has no frame and no route, and `openCalendar` was
+// `() => {}`. Keeping a drawn-but-dead control was defensible for the header
+// action, which is a shortcut past a control that works; it was not defensible
+// for the no-slots one, because that button was the ONLY escape the empty state
+// offered and pressing it did nothing at all. A user on a day with no times had
+// one affordance and it was inert. The empty state now points at the date strip
+// directly above it, which is a control that exists. Logged in
+// docs/api/README.md's gap register; both come back when the picker is designed.
+//
+// AVAILABILITY IS NOT CONFIRMED, AND THE SCREEN SAYS SO (this pass). The grid is
+// `SEED_SLOTS`, `/v1/slots` does not exist, and `POST /v1/bookings` is real — so
+// this screen takes real bookings against times no clinician published. The
+// notice above the grid is the honest form of that until the endpoint lands; it
+// is driven by `isProvisional` off the payload, so it deletes itself when the
+// grid becomes real rather than needing to be remembered.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API here.
 // This file uses none.
@@ -114,13 +126,13 @@ import { Platform, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { DetailShell } from "@/components/shell";
 import {
-  Button,
   Card,
   ChoiceChip,
   ChoiceChipRow,
   DatePill,
   DockedActionBar,
   Icon,
+  InfoCallout,
   Input,
   PractitionerSummaryRow,
   SectionHeader,
@@ -187,6 +199,20 @@ type Params = {
    */
   practitionerRating?: string;
   practitionerReviewCount?: string;
+  /**
+   * The clinician's consultation fee in MINOR UNITS, as `DoctorProfileOut`
+   * states it (`consultation_fee_cents`). Carried, never rendered here — screen
+   * 2 is where a price belongs, immediately above the commit. Passed through as
+   * the raw integer string so exactly one place divides by 100.
+   */
+  practitionerFeeCents?: string;
+  /**
+   * The booking this journey REPLACES, when the user arrived from Appointments →
+   * Reschedule. Carried untouched to screen 2, which is the only screen that can
+   * act on it (there is no reschedule endpoint — see its `confirm`). Absent on a
+   * new booking.
+   */
+  rescheduleOfId?: string;
   /** The five rehydrated choices. */
   date?: string;
   time?: string;
@@ -301,7 +327,7 @@ export function SelectTimeSlotScreen() {
    * and its "Directions" action from; they were never threaded, so all three
    * rendered `null` in every real run while the frame drew them.
    */
-  const { slots, isLoading, timezoneLabel, location } = useSlots(
+  const { slots, isLoading, isProvisional, timezoneLabel, location } = useSlots(
     params.practitionerId,
     selectedDateId,
   );
@@ -338,15 +364,6 @@ export function SelectTimeSlotScreen() {
    */
   const canProceed =
     !isLoading && !isEmpty && Boolean(selectedDate) && selectedSlot !== "" && selectedType !== "";
-
-  /**
-   * FLAGGED, and kept rather than deleted or faked. 756:4413's action slot and
-   * 757:5597's button both point at a full-month calendar picker; there is no
-   * frame for that picker and no route to it. Navigating somewhere plausible
-   * would be inventing a screen, and hiding the control would drop something two
-   * frames draw. So it is a documented no-op until the picker is designed.
-   */
-  const openCalendar = () => {};
 
   const proceedToReview = () => {
     if (!canProceed || !selectedDate) return;
@@ -389,6 +406,11 @@ export function SelectTimeSlotScreen() {
         mode,
         type: selectedType,
         reason,
+        // Carried, not consumed. The fee is the doctor payload's and screen 2
+        // renders it beside the commit; this screen has no place for a price.
+        feeCents: params.practitionerFeeCents,
+        // And the booking this one replaces, when there is one.
+        rescheduleOfId: params.rescheduleOfId,
       }),
     });
   };
@@ -442,11 +464,10 @@ export function SelectTimeSlotScreen() {
               Select Date
           ---------------------------------------------------------- */}
           <View className="mt-6">
+            {/* No action slot. 756:4413 draws "See Calendar" here; the picker it
+                opens has no frame and no route, so the control was a no-op. */}
             <View className="px-4">
-              <SectionHeader
-                title="Select Date"
-                action={{ label: "See Calendar", onPress: openCalendar }}
-              />
+              <SectionHeader title="Select Date" />
             </View>
             {/* Full-bleed: BRAND §Horizontal strips wants the items to scroll
                 edge to edge with a TRAILING inset matching the leading gutter,
@@ -485,6 +506,23 @@ export function SelectTimeSlotScreen() {
           <View className="mt-6 px-4">
             <SectionHeader title="Available Slots" />
 
+            {/* THE GRID IS NOT THE CLINICIAN'S DIARY, and the patient is told so
+                before they pick from it. `/v1/slots` does not exist (see the hook
+                header) while `POST /v1/bookings` does, so every time below is a
+                bookable request against a calendar nobody has read. Stating that
+                is the only honest option available: hiding the grid removes the
+                only way to book at all, and dressing it up as availability is the
+                defect. Rendered above the chips, not below, because a caveat
+                after the choice is a caveat after the decision. */}
+            {isProvisional && !isLoading ? (
+              <View className="mb-4">
+                <InfoCallout tone="info">
+                  These times aren&apos;t confirmed with the clinician yet. We&apos;ll send your
+                  request and the clinic will confirm or offer another time.
+                </InfoCallout>
+              </View>
+            ) : null}
+
             {isLoading ? (
               <SlotGridSkeleton />
             ) : isEmpty ? (
@@ -492,7 +530,6 @@ export function SelectTimeSlotScreen() {
                 dateLabel={
                   selectedDate ? `${selectedDate.day} ${selectedDate.date} ${selectedDate.month}` : ""
                 }
-                onSeeCalendar={openCalendar}
               />
             ) : (
               groups.map(([period, periodSlots]) => (
@@ -666,7 +703,7 @@ function SlotGroup({
 // this block. A full-screen empty state would take it away.
 // ---------------------------------------------------------------------------
 
-function NoSlots({ dateLabel, onSeeCalendar }: { dateLabel: string; onSeeCalendar: () => void }) {
+function NoSlots({ dateLabel }: { dateLabel: string }) {
   const glyphColor = useTokenColor("primary");
 
   return (
@@ -681,20 +718,13 @@ function NoSlots({ dateLabel, onSeeCalendar }: { dateLabel: string; onSeeCalenda
       <Text className="mt-4 text-center font-body-md text-body-md text-on-surface">
         No slots on {dateLabel}
       </Text>
+      {/* The date strip, which is a control that exists and is directly above
+          this block. The "See calendar" button that used to sit here opened
+          nothing — and it was the ONLY affordance this state offered, so the one
+          way out of an empty day was a button that did not work. */}
       <Text className="mt-2 text-center font-label-sm text-label-sm text-on-surface-variant">
-        Try another date in the strip above, or open the calendar to see this
-        practitioner&apos;s next availability.
+        Pick another date in the strip above.
       </Text>
-      <View className="mt-4 w-full">
-        <Button
-          label="See calendar"
-          variant="outline"
-          size="docked"
-          pill={false}
-          fullWidth
-          onPress={onSeeCalendar}
-        />
-      </View>
     </View>
   );
 }

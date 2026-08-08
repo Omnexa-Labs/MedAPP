@@ -21,10 +21,12 @@
 //
 // Adapter philosophy mirrors `src/features/auth/api.ts:adaptUser`:
 // wire-only types live here, app-facing types are imported by the
-// hook + screen. Photos default to a placeholder PNG bundled in
-// assets when the backend returns null. Availability tone is a
-// best-effort derivation from the data we have; it'll be exact once
-// presence service lands.
+// hook + screen.
+//
+// TWO THINGS THIS FILE USED TO INVENT AND NO LONGER DOES, both because the
+// backend has no field behind them and both detailed at their sites below:
+// a stock photograph substituted for an absent `photo_url`, and a hardcoded
+// `availability: "online"` on every person in the directory.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // Expo-specific code here. None today.
@@ -212,11 +214,23 @@ interface PaginatedWire<T> { items: T[]; total: number; limit: number; offset: n
 
 // ---- Helpers -------------------------------------------------------------
 
-// Placeholder avatar — used when the backend returns a null photo_url.
-// Hosted on the same Stitch CDN the mocks already used so design
-// review still sees a real face, not a broken-image icon.
-const PLACEHOLDER_AVATAR =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuB18IjKJ9pWnzbeHRjM4ZUOVXSZTfnjY43r7HgHPIFgQlzNLz3dyVzSJokCmLO0RudVzbkPUquMRqvWXuaRItP8Jv94heS_2XT3ta5dMd-ae8ignM9lwNHppN5owfCxTdh1N6lYuGdb62O5VIEt2MNI6Dr9gyddG26sX6o9wCa66V0mcwuuD9wzmYT6QLhWvKWE0bQRyMr8wgHnozaiPn7PNhhK2MbJRzD4WwxAK-XfF9oq_4DyNsrLtHL61anzfhXDlVVthUsbvyDh";
+// ===========================================================================
+// `PLACEHOLDER_AVATAR` IS DELETED. It was a photograph of a real person.
+// ===========================================================================
+// A single Stitch-CDN portrait, substituted for `photo_url` on every doctor,
+// nurse and pharmacist whose record has no photo — which, on the seeded roster,
+// is most of them. Its own comment said the quiet part: "so design review still
+// sees a real face". Design review is not the audience; a patient choosing a
+// clinician is, and they were shown a stranger's face over a named clinician's
+// record, repeated identically down the list. That is worse than a missing
+// photo in both directions — it misrepresents the clinician, and it uses
+// somebody's likeness who never agreed to appear in a medical product.
+//
+// It is not replaced with another image. `avatarUri` is `""` when there is no
+// photo, and `AvatarWithFallback` — the chain docs/BRAND.md §App shell already
+// mandates, photo -> initials -> silhouette — draws the clinician's own
+// initials. The codebase had the right answer at the call sites and was feeding
+// it a wrong one from here.
 
 function titleCase(s: string | null | undefined): string {
   if (!s) return "";
@@ -232,9 +246,9 @@ function pushBadge<T>(arr: T[], value: T | null | undefined): void {
 
 function adaptDoctor(d: DoctorWire): PersonEntry {
   const badges: PersonEntry["badges"] = [];
-  // Until presence service lands, surface "Available now" only when we
-  // can prove it; for now we omit it. Specialty is the most useful
-  // single-line context to a patient.
+  // Specialty is the most useful single-line context to a patient. There is no
+  // "Available now" badge and no presence field — see the deleted
+  // `AvailabilityTone` in ./types.ts.
   pushBadge(badges, d.specialty ? { label: titleCase(d.specialty), tone: "secondary" } : null);
   if (d.languages.length > 0) {
     pushBadge(badges, { label: d.languages.slice(0, 2).join(", "), tone: "tertiary" });
@@ -245,10 +259,13 @@ function adaptDoctor(d: DoctorWire): PersonEntry {
     id: d.doctor_id,
     name: `Dr. ${d.first_name} ${d.last_name}`.trim(),
     title: d.specialty ? `${titleCase(d.specialty)} Specialist` : "Doctor",
-    avatarUri: d.photo_url ?? PLACEHOLDER_AVATAR,
-    // Without a presence signal, "online" is the safe neutral default;
-    // the dot color still varies by data when we wire telepresence.
-    availability: "online",
+    avatarUri: d.photo_url ?? "",
+    // CARRIED, not dropped. `consultation_fee_cents` has been on this wire the
+    // whole time and this adapter silently discarded it, so the funnel had no
+    // price to show and a patient confirmed a medical appointment without ever
+    // seeing what it costs. It travels to the review screen, which is where the
+    // commit happens. MINOR UNITS — nothing on this path may render it raw.
+    consultationFeeCents: d.consultation_fee_cents,
     badges,
   };
 }
@@ -268,8 +285,11 @@ function adaptNurse(n: NurseWire): PersonEntry {
     id: n.nurse_id,
     name: `${n.first_name} ${n.last_name}`.trim(),
     title: n.specialty ? `${titleCase(n.specialty)} Nurse` : "Nurse",
-    avatarUri: n.photo_url ?? PLACEHOLDER_AVATAR,
-    availability: "online",
+    avatarUri: n.photo_url ?? "",
+    // `home_visit_fee_cents` is NOT mapped to `consultationFeeCents`. It is a
+    // different fee for a different service, and nurses are not bookable through
+    // this app at all (`BookingCreate.doctor_id`), so there is no commit screen
+    // for it to inform.
     badges,
   };
 }
@@ -353,8 +373,7 @@ function adaptPharmacist(p: PharmacistWire): PersonEntry {
     title: p.specialties.length > 0
       ? `${titleCase(p.specialties[0])} Pharmacist`
       : "Pharmacist",
-    avatarUri: p.photo_url ?? PLACEHOLDER_AVATAR,
-    availability: "online",
+    avatarUri: p.photo_url ?? "",
     badges,
   };
 }
@@ -543,7 +562,11 @@ export const careApi = {
       // exactly one place so it cannot drift between screens.
       name: `Dr. ${d.first_name} ${d.last_name}`.trim(),
       specialty: d.specialty ? titleCase(d.specialty) : null,
-      avatarUri: d.photo_url ?? PLACEHOLDER_AVATAR,
+      // `""` when the record has no photo. Consumers pass this to
+      // `AvatarWithFallback`, which draws initials — see the deleted
+      // PLACEHOLDER_AVATAR note.
+      avatarUri: d.photo_url ?? "",
+      consultationFeeCents: d.consultation_fee_cents,
     };
   },
 
@@ -636,14 +659,16 @@ export const careApi = {
 /**
  * The subset of a doctor other features need to render a reference to one.
  * Deliberately not `PersonEntry`: that type carries directory-only concerns
- * (badges, distance, availability tone) which mean nothing on an appointment
- * card and would invite a screen to render a stale "Available now".
+ * (badges, distance) which mean nothing on an appointment card.
  */
 export interface DoctorSummary {
   doctorId: string;
   name: string;
   specialty: string | null;
+  /** `""` when the record has no photo — never a substitute image. */
   avatarUri: string;
+  /** MINOR UNITS, or null when no fee is recorded. See `PersonEntry`. */
+  consultationFeeCents?: number | null;
 }
 
 /**

@@ -35,6 +35,7 @@ import { appointmentsApi } from "@/features/appointments/api";
 import { AppointmentManagementScreen } from "../AppointmentManagementScreen";
 
 const listAppointments = appointmentsApi.listAppointments as jest.Mock;
+const cancelAppointment = appointmentsApi.cancelAppointment as jest.Mock;
 
 const doctor = (name: string, specialty: string) => ({
   doctorId: `d-${name}`,
@@ -127,6 +128,7 @@ const renderLoaded = async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   listAppointments.mockResolvedValue({ upcoming: [UPCOMING], past: [COMPLETED] });
+  cancelAppointment.mockResolvedValue(undefined);
 });
 
 it("wears exactly one detail bar and neither tab set", async () => {
@@ -177,18 +179,173 @@ describe("Book new", () => {
   });
 });
 
-it("still passes the practitioner through when RESCHEDULING a known appointment", async () => {
-  await renderLoaded();
+// ---------------------------------------------------------------------------
+// Reschedule
+// ---------------------------------------------------------------------------
+// THIS TEST IS WHY THE DEFECT SHIPPED GREEN. It was called "still passes the
+// practitioner through when RESCHEDULING", and it asserted name, specialty and
+// avatar — the three params that only decorate the next screen — while never
+// asserting `practitionerId`, the one that is load-bearing. So the push omitted
+// the id, screen 1 forwarded nothing (expo-router drops an undefined value),
+// and screen 2's required-params guard fired: a patient who had just chosen a
+// date, a time, a mode and a type was told "This booking session has expired".
+// The suite was pinning the decoration and ignoring the payload.
 
-  fireEvent.press(screen.getAllByLabelText("Reschedule appointment")[0]);
+describe("Reschedule", () => {
+  it("passes practitionerId — without it the funnel dead-ends two screens later", async () => {
+    await renderLoaded();
 
-  expect(router.push).toHaveBeenCalledWith({
-    pathname: "/(app)/select-time-slot",
-    params: {
-      practitionerName: "Dr. Julian Sterling",
-      practitionerSpecialty: "Senior Cardiologist",
-      practitionerAvatar: expect.any(String),
-    },
+    fireEvent.press(screen.getAllByLabelText("Reschedule appointment")[0]);
+
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/(app)/select-time-slot",
+      params: {
+        // `doctor_id` on the wire. Asserted FIRST and by value, because this is
+        // the param whose absence the old assertion could not see.
+        practitionerId: "d-1",
+        practitionerName: "Dr. Julian Sterling",
+        practitionerSpecialty: "Senior Cardiologist",
+        practitionerAvatar: expect.any(String),
+        // And which booking this replaces — see the reschedule note below.
+        rescheduleOfId: "b1",
+      },
+    });
+  });
+
+  it("carries an id that reaches the review screen without the expired state", async () => {
+    await renderLoaded();
+    fireEvent.press(screen.getAllByLabelText("Reschedule appointment")[0]);
+
+    // ReviewAppointmentScreen's guard is
+    // `!practitionerId || !name || !date || !time || !type || !mode` -> expired.
+    // The two facts this screen owns are the id and the name; the other four are
+    // the user's choices on screen 1. Restating the guard's own condition here
+    // is what ties this push to the screen that consumes it — the id being
+    // present at all is the entire fix.
+    const params = (router.push as jest.Mock).mock.calls[0][0].params;
+    expect(params.practitionerId).toBeTruthy();
+    expect(params.practitionerId).not.toBe("undefined");
+    expect(params.practitionerName).toBeTruthy();
+  });
+
+  // A RESCHEDULE IS A REPLACEMENT, NOT A SECOND BOOKING. `booking_service` has
+  // no reschedule route, so Review does it in two calls: create the new booking,
+  // then cancel this one. Book-first is deliberate — a failed create leaves the
+  // original standing, whereas cancel-first can leave a patient with nothing at
+  // all when the new slot is taken while they review. This screen's job is only
+  // to say WHICH booking is being replaced.
+  it("names the booking being replaced, so the old one is not left standing", async () => {
+    await renderLoaded();
+    fireEvent.press(screen.getAllByLabelText("Reschedule appointment")[0]);
+
+    expect((router.push as jest.Mock).mock.calls[0][0].params.rescheduleOfId).toBe("b1");
+  });
+
+  it("sends no rescheduleOfId from the NEW-booking entry point", async () => {
+    await renderLoaded();
+    fireEvent.press(screen.getByLabelText("Book new appointment"));
+
+    // "Book new" goes to the directory with no params at all — nothing is being
+    // replaced, and a stray id here would cancel an unrelated appointment.
+    expect(router.push).toHaveBeenCalledWith("/(app)/find-care");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cancel
+// ---------------------------------------------------------------------------
+// The defect: `onPress={() => { /* TODO: hook into DELETE /v1/appointments/:id
+// once ready. */ }}`. The route in that TODO does not exist and never did, while
+// `appointmentsApi.cancelAppointment` — written, correct, against the real
+// `POST /v1/bookings/{id}/cancel` — had never been called by anything. A patient
+// pressed Cancel, saw the press state, was told nothing, and reasonably assumed
+// it had worked. The booking stayed `booked` and a clinician held the slot.
+//
+// Note the module mock at the top of this file already stubbed
+// `cancelAppointment` — the seam was there, and nothing exercised it.
+
+describe("Cancel", () => {
+  const openCancelDialog = async () => {
+    await renderLoaded();
+    fireEvent.press(screen.getAllByLabelText("Cancel appointment")[0]);
+  };
+
+  it("asks before cancelling — it does not fire on the first press", async () => {
+    await openCancelDialog();
+
+    expect(screen.getByText("Cancel this appointment?")).toBeTruthy();
+    // Destructive and one finger-width from Reschedule, so the first press opens
+    // a confirmation rather than cancelling a real medical appointment.
+    expect(cancelAppointment).not.toHaveBeenCalled();
+  });
+
+  it("calls cancelAppointment with the booking id when confirmed", async () => {
+    await openCancelDialog();
+
+    fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
+
+    await waitFor(() => expect(cancelAppointment).toHaveBeenCalledTimes(1));
+    expect(cancelAppointment).toHaveBeenCalledWith(UPCOMING.id);
+  });
+
+  it("backs out without calling anything", async () => {
+    await openCancelDialog();
+
+    fireEvent.press(screen.getByLabelText("Keep appointment"));
+
+    expect(screen.queryByText("Cancel this appointment?")).toBeNull();
+    expect(cancelAppointment).not.toHaveBeenCalled();
+  });
+
+  it("refetches the list once the cancellation lands", async () => {
+    await openCancelDialog();
+    fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
+
+    // Without the invalidation the row sits in Upcoming looking confirmed until
+    // the next cold start — which is the same "did that work?" the empty handler
+    // produced, only after a real state change.
+    await waitFor(() => expect(listAppointments).toHaveBeenCalledTimes(2));
+  });
+
+  it("SHOWS the failure instead of failing silently", async () => {
+    // A silent failure here is the exact defect being fixed: the patient would
+    // believe they had cancelled, twice over.
+    cancelAppointment.mockRejectedValue(new Error("Network request failed"));
+    await openCancelDialog();
+
+    fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
+
+    expect(await screen.findByText("We couldn’t cancel this appointment")).toBeTruthy();
+    // The real message, not a generic apology — it is how a patient tells an
+    // offline phone from a server fault.
+    expect(screen.getByText(/Network request failed/)).toBeTruthy();
+    // And the standing truth, stated: the appointment is still booked.
+    expect(screen.getByText(/It is still booked\./)).toBeTruthy();
+  });
+
+  it("keeps the dialog open on failure so the patient can retry", async () => {
+    cancelAppointment.mockRejectedValue(new Error("nope"));
+    await openCancelDialog();
+    fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
+    await screen.findByText("We couldn’t cancel this appointment");
+
+    // Dismissing the sheet on an error would leave the failure unread and the
+    // list unchanged — indistinguishable from the old dead button.
+    expect(screen.getByText("Cancel this appointment?")).toBeTruthy();
+
+    cancelAppointment.mockResolvedValue(undefined);
+    fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
+    await waitFor(() => expect(cancelAppointment).toHaveBeenCalledTimes(2));
+  });
+
+  it("offers no cancel control on a PAST appointment", async () => {
+    await renderLoaded();
+    fireEvent.press(screen.getByLabelText("Past"));
+
+    // Cancelling something that already happened is not a thing, and the past
+    // card has never drawn the control. Locked so the wiring above does not
+    // spread to it.
+    expect(screen.queryByLabelText("Cancel appointment")).toBeNull();
   });
 });
 
