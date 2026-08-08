@@ -59,6 +59,24 @@ async def _on_profile_updated(event: DomainEvent) -> None:
                 .where(model.author_name.is_not(None))
                 .values(author_name=display_name)
             )
+        # `reply_to_name` is a SECOND snapshot of the same identity, living on a
+        # different row: every reply that renders "@Kwabena" holds its own copy.
+        # Refreshing only `author_name` would leave a renamed user correctly
+        # named on everything they wrote and deadnamed on every reply addressed
+        # TO them — the same harm this consumer exists to prevent, one column
+        # over.
+        #
+        # The SAME `IS NOT NULL` guard, and it carries the same weight: a null
+        # `reply_to_name` means the target was not to be named (anonymous, or an
+        # unresolved lookup). Writing a name into that null would deanonymise
+        # through the back door of a rename — exactly what `_reply_to_name`
+        # refuses to do at write time.
+        await db.execute(
+            update(PostComment)
+            .where(PostComment.reply_to_user_id == user_id)
+            .where(PostComment.reply_to_name.is_not(None))
+            .values(reply_to_name=display_name)
+        )
         await db.commit()
     log.info("refreshed author_name snapshots for %s", user_id)
 
