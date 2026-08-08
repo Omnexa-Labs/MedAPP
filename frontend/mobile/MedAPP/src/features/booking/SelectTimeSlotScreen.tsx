@@ -131,6 +131,7 @@ import {
   ChoiceChipRow,
   DatePill,
   DockedActionBar,
+  EmptyState,
   Icon,
   InfoCallout,
   Input,
@@ -704,28 +705,21 @@ function SlotGroup({
 // ---------------------------------------------------------------------------
 
 function NoSlots({ dateLabel }: { dateLabel: string }) {
-  const glyphColor = useTokenColor("primary");
-
   return (
-    <View className="items-center py-4">
-      <View
-        className="items-center justify-center rounded-full bg-primary-tint"
-        style={{ width: 40, height: 40 }}
-      >
-        {/* Decorative — the sentence below is the message. */}
-        <Icon chrome="search-off" size={GLYPH} color={glyphColor} />
-      </View>
-      <Text className="mt-4 text-center font-body-md text-body-md text-on-surface">
-        No slots on {dateLabel}
-      </Text>
-      {/* The date strip, which is a control that exists and is directly above
-          this block. The "See calendar" button that used to sit here opened
-          nothing — and it was the ONLY affordance this state offered, so the one
-          way out of an empty day was a button that did not work. */}
-      <Text className="mt-2 text-center font-label-sm text-label-sm text-on-surface-variant">
-        Pick another date in the strip above.
-      </Text>
-    </View>
+    // Container=Inline, which is the axis this section-scoping needs: it sits
+    // under a section that is still on screen, so a Card here would draw a card
+    // inside the page's own rhythm and read as the whole screen having failed.
+    // Its 16/12 ramp is what this block was already hand-typed to.
+    <EmptyState
+      container="inline"
+      icon="search-off"
+      title={`No slots on ${dateLabel}`}
+      // The date strip is a control that exists and is directly above this
+      // block. The "See calendar" button that used to sit here opened nothing —
+      // and it was the ONLY affordance this state offered, so the one way out of
+      // an empty day was a button that did not work. Hence no `action`.
+      body="Pick another date in the strip above."
+    />
   );
 }
 

@@ -66,6 +66,8 @@ import {
   Badge,
   Card,
   DockedActionBar,
+  EmptyState,
+  ErrorPanel,
   Icon,
   IconTile,
   InfoCallout,
@@ -84,10 +86,6 @@ import {
   useHospitalStaff,
 } from "@/features/care/hooks/use-hospital-detail";
 import { HospitalReviewCard } from "@/features/care/components/HospitalReviewCard";
-import {
-  FacilityEmptyCard,
-  FacilityErrorPanel,
-} from "@/features/care/components/FacilityStatePanels";
 import {
   composeAddress,
   dialPhone,
@@ -251,7 +249,8 @@ export function HospitalDetailScreen() {
   if (!hospitalId) {
     return (
       <FacilityShell title={title} onBack={onBack}>
-        <FacilityErrorPanel
+        <ErrorPanel
+          unrecoverable="no-identifier"
           title="We couldn't load this hospital"
           body="No hospital was selected. Go back to Find Care and choose one."
           testID="hospital-detail-error"
@@ -270,20 +269,31 @@ export function HospitalDetailScreen() {
 
   if (hospitalQuery.isError || !hospital) {
     const status = (hospitalQuery.error as { status?: number } | null)?.status;
+    // Two panels, not one with a retry: re-issuing the request behind a 404
+    // returns the same 404, and the "Try again" the old shared panel drew there
+    // refetched a failure the user could do nothing about.
+    //
+    // 1022:17260's body ended "GET /v1/hospitals/{id} returned 404." — a
+    // designer's annotation that landed in the copy layer. Dropped, and kept
+    // dropped: a route template is not patient-facing, and it is wrong for the
+    // non-404 branch below, which also renders for a dropped connection.
     return (
       <FacilityShell title={title} onBack={onBack}>
-        <FacilityErrorPanel
-          title="We couldn't load this hospital"
-          body={
-            status === 404
-              ? "It may no longer be listed. Go back to Find Care and try another."
-              : "It may no longer be listed, or the connection dropped."
-          }
-          onRetry={() => {
-            void hospitalQuery.refetch();
-          }}
-          testID="hospital-detail-error"
-        />
+        {status === 404 ? (
+          <ErrorPanel
+            unrecoverable="not-found"
+            title="We couldn't load this hospital"
+            body="It may no longer be listed. Go back to Find Care and try another."
+            testID="hospital-detail-error"
+          />
+        ) : (
+          <ErrorPanel
+            title="We couldn't load this hospital"
+            body="It may no longer be listed, or the connection dropped."
+            retry={() => hospitalQuery.refetch()}
+            testID="hospital-detail-error"
+          />
+        )}
       </FacilityShell>
     );
   }
@@ -482,7 +492,8 @@ function CareTeam({
     // the reviews (public at the service) still render. Saying so beats an
     // empty section that reads as "this hospital has no staff".
     return (
-      <FacilityEmptyCard
+      <ErrorPanel
+        unrecoverable="section-unavailable"
         title="Care team unavailable"
         body={`We couldn't load ${hospitalName}'s care team just now. The rest of this page is up to date.`}
         icon="info-outline"
@@ -495,7 +506,8 @@ function CareTeam({
     // `EmptyState / Staff directory not published` 1020:16283, kept for the case
     // it actually describes. See the header: it is no longer the loaded state.
     return (
-      <FacilityEmptyCard
+      <EmptyState
+        icon="person-search"
         title="Staff directory not published"
         body={`${hospitalName} has not published its clinician list, so there is nobody to show here yet. Use the Doctors or Nurses tabs in Find Care to search by name or specialty.`}
         testID="hospital-care-team-empty"

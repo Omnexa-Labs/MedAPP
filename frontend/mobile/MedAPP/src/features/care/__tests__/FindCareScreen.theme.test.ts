@@ -51,8 +51,17 @@ describe("FindCareScreen — no literal colours survive", () => {
   it("resolves every JS-side colour by token name", () => {
     const source = code();
     expect(source).toMatch(/from "@\/lib\/tokens"/);
-    // The two derived values that replaced hand-picked pressed hexes.
+    // The derived value that replaced a hand-picked pressed hex on the CTA.
     expect(source).toMatch(/blendTokens\("tertiary", "on-tertiary", 0\.12/);
-    expect(source).toMatch(/blendTokens\("primary", "on-primary", 0\.12/);
+    // The `primary`/`on-primary` pair that used to be asserted here is GONE, and
+    // its absence is the point: it belonged to a hand-rolled <Pressable> inside
+    // this screen's private ErrorPanel, which drew a filled CTA without using
+    // Button. The three panels are now the shared components (Figma 517:1773 /
+    // 517:2111 / 517:2291), so their pressed state layer is Button's — one
+    // definition instead of a re-derived copy per screen. What is asserted
+    // instead is that they cannot come back: this screen no longer DEFINES a
+    // panel, it imports one.
+    expect(source).toMatch(/EmptyState,\s*\n?\s*ErrorPanel,/);
+    expect(source).not.toMatch(/function (EmptyState|ErrorPanel|SkeletonCard)\(/);
   });
 });

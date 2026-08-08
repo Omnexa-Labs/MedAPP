@@ -29,6 +29,39 @@ replaces a private copy that had already drifted across 2+ screens.
 | `SuccessMedallion` | 96px confirmation mark (756:4753). No shadow | `label` |
 | `DatePill` | One day in the date strip (756:4424). **Three** lines — the month is real data | `day`, `date`, `month`, `selected`, `unavailable`, `onPress` |
 
+Async states (Figma Design System page 26:84). Approved and never coded, so a
+dozen screens hand-rolled one each — `docs/PIPELINE.md` §5.
+
+| Primitive | Purpose | Key props |
+|---|---|---|
+| `EmptyState` | The one empty state (517:1773). An empty list and an empty search result are different COPY, same anatomy | `container` (`card`\|`inline`), `title`, `body?`, `icon?`, `action?` |
+| `ErrorPanel` | The one error state (517:2111) | `container`, `title`, `body` (**mandatory**), `icon?`, and **exactly one of** `retry` \| `unrecoverable` |
+| `SkeletonCard` | Loading placeholder (517:2291) | `shape` (**required**, no default), `count?` |
+
+Three rules in this set are structural rather than conventional:
+
+- **`ErrorPanel`'s `retry` returns `Promise<unknown>`**, so it must hand back the
+  promise of the request it re-issues (`() => query.refetch()`). This app shipped
+  two "Try again" buttons that flipped a local enum and refetched nothing; a
+  required `onRetry: () => void` makes the *button* mandatory and does nothing
+  about the *refetch*. `() => void q.refetch()` and `() => setState(x)` are both
+  type errors, and a cast past the type throws in `__DEV__`.
+- **A failure with nothing to retry must NAME its reason** — `unrecoverable` is a
+  closed union (`no-identifier` | `not-found` | `forbidden` | `section-unavailable`),
+  not a boolean, so `grep unrecoverable` lists every dead end in the app.
+  `section-unavailable` is the per-section isolation case: one section failed and
+  the rest of the page is live, so a retry there would compete with valid content.
+- **`SkeletonCard`'s height is keyed to `shape` and cannot be passed in**, and
+  there is no `style` prop. `docs/PIPELINE.md`:106 — a skeleton must reserve the
+  EXACT layout of what it replaces or it causes the shift it exists to prevent.
+  222:333 shipped 118px against `VitalStatCard`'s real 127. Each shape is measured
+  to a real component; if that component's height changes, `SKELETON_HEIGHTS` and
+  the Figma variant change with it, and the test re-checks the arithmetic.
+
+`Container=Inline` on the first two exists so a section can report its own state
+without drawing a card inside a card. Reach for it whenever the panel sits inside
+an existing `Card`.
+
 Two states in this set are deliberately **not colour-only** (`docs/BRAND.md`
 §Colour rules): `ChoiceChip unavailable` and `DatePill unavailable` both draw a
 **dashed** hairline at full strength, drop their *content* to 38%, refuse the

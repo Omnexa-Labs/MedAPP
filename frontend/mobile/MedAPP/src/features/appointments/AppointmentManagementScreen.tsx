@@ -95,7 +95,7 @@ import {
   type AppointmentMode,
 } from "@/features/appointments/api";
 import { DetailShell } from "@/components/shell";
-import { AvatarWithFallback, Button, Icon } from "@/components/ui";
+import { AvatarWithFallback, Button, EmptyState, ErrorPanel, Icon } from "@/components/ui";
 import { blendTokens, useTokenColor } from "@/lib/tokens";
 import { useResolvedScheme } from "@/lib/theme";
 
@@ -281,10 +281,10 @@ export function AppointmentManagementScreen() {
   const past = (data?.past ?? []).map(toPast);
   const rows = tab === "upcoming" ? upcoming : past;
 
-  // Resolved in JS because RN has no `currentColor` for a glyph or a spinner.
+  // Resolved in JS because RN has no `currentColor` for a spinner. The two
+  // state-panel glyph colours are gone with the hand-rolled panels — the shared
+  // panels pair each plate with its own `on-` colour internally.
   const spinner = useTokenColor("primary");
-  const dangerGlyph = useTokenColor("error");
-  const mutedGlyph = useTokenColor("on-surface-variant");
 
   return (
     /* DetailShell owns the safe area, the StatusBar and the bar (Figma 193:120).
@@ -402,12 +402,16 @@ export function AppointmentManagementScreen() {
 
         {/* List.
 
-            The three async states are inline rather than shared components:
-            `EmptyState 517:1773` and `ErrorPanel 517:2111` are approved in
-            Figma and have no code counterpart yet. Building both here would
-            make this screen their unreviewed first draft. Logged in
-            docs/PIPELINE.md §5; when they land, these three blocks collapse
-            into instances. */}
+            The error and empty branches are now `ErrorPanel` (517:2111) and
+            `EmptyState` (517:1773). The private copies they replace wrapped
+            themselves in `bg-surface-container-lowest`, which is DARKER than
+            the page in dark mode — so both panels read as a hole punched in
+            the screen rather than as the card the frames draw. The retry's
+            "Retrying…" label is the panel's now, derived from the refetch
+            promise instead of a flag this screen had to remember to read.
+
+            The spinner stays inline: a skeleton needs a measured shape for an
+            appointment card, and there is none. */}
         <View className="gap-md">
           {isPending ? (
             <View
@@ -421,60 +425,43 @@ export function AppointmentManagementScreen() {
               </Text>
             </View>
           ) : isError ? (
-            <View className="items-center gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
-              <Icon chrome="error-outline" size={24} color={dangerGlyph} />
-              <Text
-                className="text-center text-on-surface"
-                style={{ fontSize: 15, fontWeight: "600" }}
-              >
-                We couldn&rsquo;t load your appointments
-              </Text>
-              {/* The message, not just "something went wrong": a patient who
-                  can tell an offline phone from a server fault knows whether
-                  retrying is worth anything. */}
-              <Text
-                className="text-center text-on-surface-variant"
-                style={{ fontSize: 13 }}
-              >
-                {error instanceof Error && error.message
+            <ErrorPanel
+              title="We couldn’t load your appointments"
+              // The message, not just "something went wrong": a patient who
+              // can tell an offline phone from a server fault knows whether
+              // retrying is worth anything.
+              body={
+                error instanceof Error && error.message
                   ? error.message
-                  : "Check your connection and try again."}
-              </Text>
-              <Button
-                label={isRefetching ? "Retrying…" : "Try again"}
-                variant="secondary"
-                onPress={() => void refetch()}
-                disabled={isRefetching}
-                accessibilityLabel="Retry loading appointments"
-              />
-            </View>
+                  : "Check your connection and try again."
+              }
+              icon="error-outline"
+              retry={() => refetch()}
+              retryAccessibilityLabel="Retry loading appointments"
+              // A refetch can also be in flight from outside this panel, so the
+              // query's own flag is OR-ed into the pending label.
+              retrying={isRefetching}
+            />
           ) : rows.length === 0 ? (
-            <View className="items-center gap-sm rounded-xl border border-outline-variant bg-surface-container-lowest p-lg">
-              <Icon chrome="calendar-today" size={24} color={mutedGlyph} />
-              <Text
-                className="text-center text-on-surface"
-                style={{ fontSize: 15, fontWeight: "600" }}
-              >
-                {tab === "upcoming" ? "No upcoming appointments" : "No past appointments"}
-              </Text>
-              <Text
-                className="text-center text-on-surface-variant"
-                style={{ fontSize: 13 }}
-              >
-                {tab === "upcoming"
+            <EmptyState
+              icon="calendar-today"
+              title={tab === "upcoming" ? "No upcoming appointments" : "No past appointments"}
+              body={
+                tab === "upcoming"
                   ? "When you book with a clinician, it will appear here."
-                  : "Appointments you have attended will be listed here."}
-              </Text>
-              {/* Only on Upcoming: offering "Book" under the history tab
-                  answers a question the user did not ask. */}
-              {tab === "upcoming" ? (
-                <Button
-                  label="Find a clinician"
-                  variant="primary"
-                  onPress={() => router.push("/(app)/find-care" as never)}
-                />
-              ) : null}
-            </View>
+                  : "Appointments you have attended will be listed here."
+              }
+              // Only on Upcoming: offering "Book" under the history tab
+              // answers a question the user did not ask.
+              action={
+                tab === "upcoming"
+                  ? {
+                      label: "Find a clinician",
+                      onPress: () => router.push("/(app)/find-care" as never),
+                    }
+                  : undefined
+              }
+            />
           ) : tab === "upcoming" ? (
             upcoming.map((a) => <UpcomingCard key={a.id} appointment={a} />)
           ) : (

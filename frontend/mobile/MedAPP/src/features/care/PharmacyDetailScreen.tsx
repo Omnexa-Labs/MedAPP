@@ -52,6 +52,8 @@ import {
   Button,
   Card,
   DockedActionBar,
+  EmptyState,
+  ErrorPanel,
   Icon,
   IconTile,
   InfoCallout,
@@ -71,10 +73,6 @@ import {
   usePharmacyStockCheck,
 } from "@/features/care/hooks/use-pharmacy-detail";
 import { HoursRow } from "@/features/care/components/HoursRow";
-import {
-  FacilityEmptyCard,
-  FacilityErrorPanel,
-} from "@/features/care/components/FacilityStatePanels";
 import {
   composeAddress,
   dialPhone,
@@ -231,7 +229,8 @@ export function PharmacyDetailScreen() {
   if (!pharmacyId) {
     return (
       <PharmacyShell title={title} onBack={onBack}>
-        <FacilityErrorPanel
+        <ErrorPanel
+          unrecoverable="no-identifier"
           title="We couldn't load this pharmacy"
           body="No pharmacy was selected. Go back to Find Care and choose one."
           testID="pharmacy-detail-error"
@@ -250,20 +249,26 @@ export function PharmacyDetailScreen() {
 
   if (pharmacyQuery.isError || !pharmacy) {
     const status = (pharmacyQuery.error as { status?: number } | null)?.status;
+    // Split for the same reason as HospitalDetailScreen's: a 404 has nothing to
+    // retry, so drawing "Try again" there refetches the same 404. Only the
+    // connection branch keeps a retry.
     return (
       <PharmacyShell title={title} onBack={onBack}>
-        <FacilityErrorPanel
-          title="We couldn't load this pharmacy"
-          body={
-            status === 404
-              ? "It may no longer be listed. Go back to Find Care and try another."
-              : "It may no longer be listed, or the connection dropped."
-          }
-          onRetry={() => {
-            void pharmacyQuery.refetch();
-          }}
-          testID="pharmacy-detail-error"
-        />
+        {status === 404 ? (
+          <ErrorPanel
+            unrecoverable="not-found"
+            title="We couldn't load this pharmacy"
+            body="It may no longer be listed. Go back to Find Care and try another."
+            testID="pharmacy-detail-error"
+          />
+        ) : (
+          <ErrorPanel
+            title="We couldn't load this pharmacy"
+            body="It may no longer be listed, or the connection dropped."
+            retry={() => pharmacyQuery.refetch()}
+            testID="pharmacy-detail-error"
+          />
+        )}
       </PharmacyShell>
     );
   }
@@ -606,8 +611,12 @@ function Pharmacists({
   }
 
   if (isError) {
+    // Deliberately no retry: the roster is one section of a page whose record is
+    // live and correct, and a per-section spinner competing with valid content
+    // is worse than the section saying so.
     return (
-      <FacilityEmptyCard
+      <ErrorPanel
+        unrecoverable="section-unavailable"
         title="Pharmacists unavailable"
         body={`We couldn't load ${pharmacyName}'s pharmacists just now. The rest of this page is up to date.`}
         icon="info-outline"
@@ -623,7 +632,8 @@ function Pharmacists({
     // also covers "they exist but are unpublished", which is the same sentence
     // from the reader's side.
     return (
-      <FacilityEmptyCard
+      <EmptyState
+        icon="person-search"
         title="No pharmacists listed"
         body={`${pharmacyName} has not listed any pharmacists yet. You can still call the counter for dispensing advice.`}
         testID="pharmacy-pharmacists-empty"

@@ -156,8 +156,11 @@ import {
   Card,
   ChoiceChip,
   ChoiceChipRow,
+  EmptyState,
+  ErrorPanel,
   Icon,
   SearchField,
+  SkeletonCard,
 } from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor } from "@/lib/tokens";
@@ -468,18 +471,47 @@ export function FindCareScreen() {
                 - default                         → list
               The "and no entries" guards mean a refetch on an
               already-loaded list keeps the old data on screen instead
-              of flashing back to skeletons. */}
+              of flashing back to skeletons.
+
+              All three panels are the SHARED components now (Figma 517:1773 /
+              517:2111 / 517:2291). The three that used to live at the foot of
+              this file are deleted: they re-typed the plate, the ramp and the
+              inset, landed on `fontSize: 18` — a step the ramp has no entry for
+              — and hand-rolled two Pressables where the design says Button. The
+              skeleton reserved 122px too little for a ProviderCard; `shape=
+              "provider-card"` is measured to ProviderCard 407:529 row for row. */}
         <View className="mt-md gap-md">
           {error && filteredEntries.length === 0 ? (
-            <ErrorPanel onRetry={refetch} />
+            <ErrorPanel
+              title="Unable to load directory"
+              body="Check your connection and try again. We'll pick up where we left off."
+              icon="cloud-off"
+              retry={refetch}
+              retryAccessibilityLabel="Retry loading directory"
+            />
           ) : isLoading && filteredEntries.length === 0 ? (
-            <>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-            </>
+            <SkeletonCard shape="provider-card" count={3} />
           ) : filteredEntries.length === 0 ? (
-            <EmptyState hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
+            <EmptyState
+              icon={hasActiveFilters ? "filter-list-off" : "search-off"}
+              title={hasActiveFilters ? "No matches" : "Nothing here yet"}
+              body={
+                hasActiveFilters
+                  ? "Try a different filter or clear them all to see everyone available."
+                  : "We couldn't find anyone in this directory right now. Check back soon."
+              }
+              action={
+                hasActiveFilters
+                  ? {
+                      label: "Clear filters",
+                      accessibilityLabel: "Clear all filters",
+                      onPress: clearFilters,
+                      // No arrow: clearing filters stays on this screen.
+                      trailingIcon: undefined,
+                    }
+                  : undefined
+              }
+            />
           ) : (
             filteredEntries.map((entry) =>
               entry.kind === "person" ? (
@@ -859,155 +891,6 @@ function FacilityCard({ entry }: { entry: FacilityEntry }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Empty state
-// ---------------------------------------------------------------------------
-
-function EmptyState({
-  hasActiveFilters,
-  onClear,
-}: {
-  hasActiveFilters: boolean;
-  onClear: () => void;
-}) {
-  const { scheme } = useResolvedScheme();
-  // Muted glyph on the neutral `surface-container-low` plate. `#6d7a77` was
-  // light `outline` — a HAIRLINE token; BRAND scopes `outline` to dividers and
-  // borders, and a 26px glyph is content, so it takes `on-surface-variant`.
-  const glyph = tokenColor("on-surface-variant", scheme);
-  // Outline button: the border and the label are one piece and must share a
-  // token. Pressed is the 8% `primary` state layer, expressed with the alpha
-  // form of the SAME token rather than a second literal rgba().
-  const primary = tokenColor("primary", scheme);
-  const primaryPressed = tokenColor("primary", scheme, 0.08);
-  return (
-    // The taller `py-lg` inset goes through `style` rather than a class:
-    // Card's own `p-md` is in its base className and `cn` has no tailwind-merge,
-    // so a `py-lg` class would be a coin-flip. The inline value always wins.
-    <Card className="items-center" style={{ paddingVertical: 48 }}>
-      <View className="h-12 w-12 items-center justify-center rounded-full bg-surface-container-low">
-        <Icon chrome={hasActiveFilters ? "filter-list-off" : "search-off"} size={26} color={glyph} />
-      </View>
-      <Text className="mt-sm font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-        {hasActiveFilters ? "No matches" : "Nothing here yet"}
-      </Text>
-      <Text className="mt-xs text-center font-body-md text-body-md text-on-surface-variant">
-        {hasActiveFilters
-          ? "Try a different filter or clear them all to see everyone available."
-          : "We couldn't find anyone in this directory right now. Check back soon."}
-      </Text>
-      {hasActiveFilters ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Clear all filters"
-          onPress={onClear}
-          style={({ pressed }) => ({
-            marginTop: 16,
-            paddingHorizontal: 24,
-            paddingVertical: 10,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: primary,
-            backgroundColor: pressed ? primaryPressed : "transparent",
-          })}
-        >
-          <Text
-            style={{
-              color: primary,
-              fontFamily: "Inter",
-              fontSize: 14,
-              fontWeight: "600",
-            }}
-          >
-            Clear filters
-          </Text>
-        </Pressable>
-      ) : null}
-    </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Skeleton + error states
-// ---------------------------------------------------------------------------
-
-// A static skeleton card. No shimmer animation — first-paint
-// perceived latency on a SDK 55 / RN 0.76 device is already ~250ms
-// and the React Query 60s staleTime means most navigations show
-// cached data anyway. If the skeleton ends up visible for >1s in
-// practice, layer a Reanimated opacity loop on top.
-function SkeletonCard() {
-  return (
-    <Card
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <View className="flex-row gap-sm">
-        <View className="h-16 w-16 rounded-xl bg-surface-container-low" />
-        <View className="flex-1 justify-center gap-xs">
-          <View className="h-4 w-2/3 rounded bg-surface-container-low" />
-          <View className="h-3 w-1/2 rounded bg-surface-container-low" />
-        </View>
-      </View>
-      <View className="mt-sm flex-row gap-xs">
-        <View className="h-5 w-20 rounded-full bg-surface-container-low" />
-        <View className="h-5 w-16 rounded-full bg-surface-container-low" />
-      </View>
-    </Card>
-  );
-}
-
-// Shown when useDirectory returns an error AND we have no cached
-// entries to fall back to. The retry button calls refetch() which
-// React Query handles — no manual state to reset.
-function ErrorPanel({ onRetry }: { onRetry: () => void }) {
-  const { scheme } = useResolvedScheme();
-  // Same reasoning as EmptyState's glyph.
-  const glyph = tokenColor("on-surface-variant", scheme);
-  // Filled primary button. `#00685f`/`#005049` were light `primary` and light
-  // `on-primary-fixed-variant` — a hand-picked "darker teal" that has no
-  // meaning in dark mode, where `primary` is already light. Pressed is now M3's
-  // state layer, matching the shared <Button />.
-  const fill = tokenColor("primary", scheme);
-  const fillPressed = blendTokens("primary", "on-primary", 0.12, scheme);
-  const onFill = tokenColor("on-primary", scheme);
-  return (
-    <Card className="items-center" style={{ paddingVertical: 48 }}>
-      <View className="h-12 w-12 items-center justify-center rounded-full bg-surface-container-low">
-        <Icon chrome="cloud-off" size={26} color={glyph} />
-      </View>
-      <Text className="mt-sm font-headline-md text-on-surface" style={{ fontSize: 18 }}>
-        Unable to load directory
-      </Text>
-      <Text className="mt-xs text-center font-body-md text-body-md text-on-surface-variant">
-        Check your connection and try again. We'll pick up where we left off.
-      </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Retry loading directory"
-        onPress={onRetry}
-        style={({ pressed }) => ({
-          marginTop: 16,
-          paddingHorizontal: 24,
-          paddingVertical: 10,
-          borderRadius: 8,
-          backgroundColor: pressed ? fillPressed : fill,
-        })}
-      >
-        <Text
-          style={{
-            color: onFill,
-            fontFamily: "Inter",
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          Try again
-        </Text>
-      </Pressable>
-    </Card>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Picker trigger — DELETED, along with the "Specialty" control it existed for.

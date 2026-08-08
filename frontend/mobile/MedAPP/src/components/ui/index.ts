@@ -65,6 +65,29 @@ export { SuccessMedallion, type SuccessMedallionProps } from "./SuccessMedallion
 // One day in the date strip (Figma 756:4424), THREE lines — the third is the
 // month, as real data, which removes a hardcoded "May" from the booking params.
 export { DatePill, type DatePillProps } from "./DatePill";
+// -- Async states (Figma 517:1773 / 517:2111 / 517:2291). Approved and never
+// coded, so roughly a dozen screens hand-rolled one each — the drift is logged
+// in docs/PIPELINE.md §5. The `StatePanelShell` these two compose is
+// deliberately NOT exported: screens use a panel, never assemble one.
+export { EmptyState, type EmptyStateProps } from "./EmptyState";
+export { type StatePanelContainer } from "./StatePanelShell";
+// `retry` returns the request's PROMISE and the dead-end case is a named
+// `unrecoverable` reason, so a "Try again" that refetches nothing — which this
+// app shipped twice — no longer type-checks. See the file header.
+export {
+  ErrorPanel,
+  type ErrorPanelProps,
+  type RetryHandler,
+  type UnrecoverableReason,
+} from "./ErrorPanel";
+// The height is keyed to `shape` and cannot be passed in: a skeleton that can be
+// resized at the call site is how 222:333 shipped 118px against a real 127.
+export {
+  SkeletonCard,
+  SKELETON_HEIGHTS,
+  type SkeletonCardProps,
+  type SkeletonShape,
+} from "./SkeletonCard";
 export {
   Icon,
   HEALTH_ICONS,
