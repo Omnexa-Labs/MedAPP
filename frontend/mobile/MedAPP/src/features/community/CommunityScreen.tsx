@@ -82,6 +82,10 @@ export type { FeedPost } from "./PostCard";
 
 /** Where the Saved list lives. Named so the entry point is assertable. */
 export const SAVED_POSTS_HREF = "/(app)/saved-posts";
+// Declared here rather than imported from `features/qa`, matching the line
+// above: importing the constant would pull that screen's whole module graph
+// into the feed for the sake of a string.
+export const ASK_A_DOCTOR_HREF = "/(app)/ask-a-doctor";
 
 /**
  * The feed's shared infinite-query options.
@@ -177,6 +181,21 @@ export function CommunityScreen() {
                   Posts from health professionals and other members.
                 </Text>
               </View>
+              {/* Ask a doctor sits HERE, beside the feed it belongs to, because
+                  a route nothing links to is a screen nobody can use — this
+                  codebase already carries several. The QA backend has worked
+                  since before the feed did and had no surface at all. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Ask a doctor"
+                onPress={() =>
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  router.push(ASK_A_DOCTOR_HREF as any)
+                }
+                className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+              >
+                <Icon chrome="help" size={22} color={muted} />
+              </Pressable>
               {/* The Saved entry point — see the header for why it is here and
                   not in Settings. */}
               <Pressable

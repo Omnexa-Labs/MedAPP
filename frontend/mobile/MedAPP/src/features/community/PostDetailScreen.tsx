@@ -42,6 +42,28 @@
 // earlier"-style jump is not needed: new comments land at the END and the next
 // page is simply more of them.
 //
+// ---------------------------------------------------------------------------
+// THAT LIST IS TOP-LEVEL ONLY, AND THE HEADER COUNT IS NOT ITS LENGTH
+// ---------------------------------------------------------------------------
+// Since 2026-08-08 the route returns top-level comments with a `replyCount` each;
+// replies come from `GET /comments/{id}/replies` when a reader opens a thread.
+// `Post.commentCount` counts replies, so it LEGITIMATELY exceeds the number of
+// visible threads, and the header shows the post's total because that is what the
+// card the reader tapped showed them. A reader who counts will find the numbers
+// only add up once every thread is expanded; there is no label short enough to
+// explain that, and quietly showing the smaller number instead would misreport
+// how much discussion is on the post.
+//
+// ---------------------------------------------------------------------------
+// THE COMPOSER HAS TWO MODES AND THE SERVER OWNS WHERE A REPLY LANDS
+// ---------------------------------------------------------------------------
+// Reply mode is stated twice — a bar above the composer names the target, and the
+// target's own bubble is tinted — because one signal that scrolls out of view is
+// no signal. See `CommentThread` for the two-level rule; the part that matters
+// HERE is that the `parentCommentId` on the created comment is not always the id
+// this screen sent, so which thread gets refreshed and opened is read off the
+// RESPONSE.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
 // Only expo-router is used.
 
@@ -57,7 +79,6 @@ import { shareText } from "@/lib/share";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   communityApi,
-  isOwnComment,
   isOwnPost,
   socialKeys,
   PAGE_LIMIT,
@@ -67,35 +88,15 @@ import {
 } from "./api";
 import {
   useBookmarkToggle,
-  useDeleteComment,
   useDeletePost,
   useDropPostFromLists,
   useLikeToggle,
-  useReportComment,
   useReportPost,
 } from "./postActions";
-import { CommentOverflowSheet, PostOverflowSheet } from "./PostOverflowSheet";
+import { PostOverflowSheet } from "./PostOverflowSheet";
 import { buildPostShareText, timeAgo, toFeedPost } from "./PostCard";
-
-/**
- * The byline for a post or comment.
- *
- * Three cases, and they are NOT the same:
- *   - anonymous post      -> "Anonymous". The name is absent from the database,
- *                            not hidden by the client.
- *   - lookup failed       -> "MedApp member". Someone real wrote it; we just
- *                            could not resolve who at write time.
- *   - resolved            -> the name.
- *
- * A comment can only ever hit the middle case: comments have no anonymous mode.
- *
- * `authorUserId` is NEVER used as a fallback. A raw UUID is a worse byline than
- * none, and on an anonymous post it would deanonymise the author outright.
- */
-export function bylineFor(authorName: string | null, isAnonymous: boolean): string {
-  if (isAnonymous) return "Anonymous";
-  return authorName ?? "MedApp member";
-}
+import { CommentThread, type ReplyTarget } from "./CommentThread";
+import { bylineFor, initialsFor } from "./bylines";
 
 export function PostDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
@@ -106,6 +107,18 @@ export function PostDetailScreen() {
   const viewerId = user?.id ?? null;
   const [draft, setDraft] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Null = the composer writes a top-level comment. */
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
+  /**
+   * Which threads are open, keyed on the TOP-LEVEL comment id.
+   *
+   * Held here rather than inside each thread so that posting a reply can open the
+   * thread the SERVER filed it under — which is not always the one the reader was
+   * looking at, since replying to a reply lands on that reply's parent.
+   */
+  const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({});
+  const toggleThread = (commentId: string) =>
+    setOpenThreads((open) => ({ ...open, [commentId]: !open[commentId] }));
 
   const spinner = useTokenColor("primary");
   const primary = useTokenColor("primary");
@@ -172,15 +185,31 @@ export function PostDetailScreen() {
   };
 
   const addComment = useMutation({
-    mutationFn: (body: string) => communityApi.commentOnPost(postId as string, body),
-    onSuccess: () => {
+    mutationFn: ({ body, target }: { body: string; target: ReplyTarget | null }) =>
+      // The id sent is the comment the reader ANSWERED, which is not necessarily
+      // where the row will live. See `onSuccess`.
+      communityApi.commentOnPost(postId as string, body, target?.commentId),
+    onSuccess: (created: Comment) => {
       setDraft("");
+      setReplyTarget(null);
+      // THE PARENT ID CAME BACK FROM THE SERVER AND MAY NOT BE THE ONE WE SENT.
+      //
+      // A reply to a reply is filed against that reply's own top-level parent, so
+      // `created.parentCommentId` is the only trustworthy answer to "which thread
+      // did this land in". Opening the thread we SENT would leave the reader
+      // staring at a closed thread, or an open one their reply is not in.
+      if (created.parentCommentId) {
+        setOpenThreads((open) => ({ ...open, [created.parentCommentId as string]: true }));
+      }
       // Refetch rather than append: the server assigns the id, the timestamp
       // and the resolved author name, and a moderation rule could hold the
       // comment back entirely. An optimistic row would show a comment that may
-      // never be published.
+      // never be published — and for a reply it would also have to guess
+      // `replyToName`, which is snapshotted server-side.
       void queryClient.invalidateQueries({ queryKey: socialKeys.comments(postId) });
-      // The card's comment_count changed too — every list this post is in.
+      // The card's comment_count changed too — every list this post is in — and
+      // every open thread's replies plus the parent's replyCount hang under the
+      // same root.
       void queryClient.invalidateQueries({ queryKey: socialKeys.all });
     },
     onError: () => onError("Couldn't post your comment. Check your connection and try again."),
@@ -258,7 +287,18 @@ export function PostDetailScreen() {
         <ScrollView className="flex-1" contentContainerClassName="gap-lg px-md py-md">
           {/* Author. Initials, not an avatar — nothing in the backend stores one. */}
           <View className="flex-row items-center gap-3">
-            <AvatarWithFallback size={48} uri={null} initials={null} label={byline} />
+            {/* 56, the post-author size on `Avatar`'s ramp — it was a hand-rolled
+                48. Initials from the stored NAME only: an anonymous post and a
+                failed lookup both yield null and fall to the silhouette, which is
+                correct for both, because "Anonymous" is not a name to abbreviate.
+                `tint` rather than `primary` is the documented initials plate. */}
+            <AvatarWithFallback
+              size={56}
+              uri={null}
+              initials={initialsFor(post.authorName)}
+              tone={post.authorName ? "tint" : "neutral"}
+              label={byline}
+            />
             <View className="flex-1">
               <Text className="font-label-md text-label-md text-on-surface" numberOfLines={1}>
                 {byline}
@@ -345,10 +385,18 @@ export function PostDetailScreen() {
 
           <View className="h-px bg-outline-variant" />
 
-          <View className="flex-row items-center gap-sm">
+          <View className="flex-row items-center gap-2">
             <Text className="font-headline-md text-headline-md text-on-surface">Comments</Text>
-            <Text className="font-label-md text-label-md text-on-surface-variant">
-              {commentsPending ? post.commentCount : comments.length}
+            {/* The POST's total, replies included — deliberately not the number of
+                threads below it. `comment_count` is what the feed card the reader
+                tapped showed them, and it counts replies; the list is top-level
+                only. Substituting `comments.length` would make the two screens
+                disagree and would under-report the discussion. */}
+            <Text
+              testID="comments-count"
+              className="font-label-md text-label-md text-on-surface-variant"
+            >
+              {post.commentCount}
             </Text>
           </View>
 
@@ -375,13 +423,17 @@ export function PostDetailScreen() {
               No comments yet. Be the first to reply.
             </Text>
           ) : (
-            <View className="gap-md">
+            <View className="gap-4">
               {comments.map((c: Comment) => (
-                <CommentRow
+                <CommentThread
                   key={c.id}
                   comment={c}
                   postId={post.id}
-                  isOwn={isOwnComment(c, viewerId)}
+                  viewerId={viewerId}
+                  expanded={Boolean(openThreads[c.id])}
+                  onToggleExpanded={toggleThread}
+                  replyTarget={replyTarget}
+                  onReply={setReplyTarget}
                   onError={onError}
                 />
               ))}
@@ -405,22 +457,88 @@ export function PostDetailScreen() {
 
         {/* Composer, docked. `claimsBottomInset={false}` above because this
             claims the inset itself, the same contract the chat screens use. */}
-        <View className="border-t border-outline-variant bg-surface px-md py-sm">
-          <View className="flex-row items-center gap-sm rounded-full bg-field-surface px-base py-xs">
-            <View className="flex-1">
-              <CommentInput value={draft} onChange={setDraft} />
+        <View>
+          {/* Reply mode, signal 2 of 2 — the target's own bubble is tinted up in
+              the thread, and this bar names them. Two signals because the tinted
+              bubble scrolls away and the bar does not, and because meaning must
+              never rest on a tint alone.
+
+              `primary-tint` with a 1px TOP hairline and no shadow, the same chrome
+              rule the docked composer below already follows. */}
+          {replyTarget ? (
+            <View className="flex-row items-center gap-2 border-t border-outline-variant bg-primary-tint px-md py-2">
+              {/* A null name gets a POINTER, not an invented identity: no "@", no
+                  "member", and never `replyToUserId`. The WORD changes as well as
+                  the emphasis, so the two cases are distinguishable without
+                  reading a font weight.
+
+                  Two sibling <Text>s rather than one with a nested run: only the
+                  name may truncate, and a nested run would take the whole
+                  sentence's `numberOfLines` with it and clip "Replying to" first
+                  on a long name. */}
+              {replyTarget.name ? (
+                <View className="min-w-0 flex-1 flex-row items-center gap-1">
+                  <Text className="shrink-0 font-body-md text-body-md text-on-surface">
+                    Replying to
+                  </Text>
+                  <Text
+                    className="min-w-0 flex-1 font-inter-semibold text-body-md text-on-surface"
+                    numberOfLines={1}
+                  >
+                    {replyTarget.name}
+                  </Text>
+                </View>
+              ) : (
+                <Text className="min-w-0 flex-1 font-body-md text-body-md text-on-surface">
+                  Replying to this comment
+                </Text>
+              )}
+              {/* A 44pt TEXT control, not an X: the icon registry has no close
+                  glyph for this and "Cancel" needs no asset to be unambiguous. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel reply"
+                accessibilityHint="Returns the composer to a top-level comment"
+                onPress={() => setReplyTarget(null)}
+                className="h-11 shrink-0 justify-center px-2 active:opacity-70"
+              >
+                <Text className="font-label-md text-label-md text-primary">Cancel</Text>
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Post comment"
-              accessibilityState={{ disabled: !canSend, busy: addComment.isPending }}
-              disabled={!canSend}
-              onPress={() => addComment.mutate(draft.trim())}
-              className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-              style={{ opacity: canSend ? 1 : 0.4 }}
-            >
-              <Icon chrome="send" size={22} color={spinner} />
-            </Pressable>
+          ) : null}
+          <View className="border-t border-outline-variant bg-surface px-md py-sm">
+            <View className="flex-row items-center gap-sm rounded-full bg-field-surface px-base py-xs">
+              <View className="flex-1">
+                <CommentInput
+                  value={draft}
+                  onChange={setDraft}
+                  // The placeholder names the target too, so reply mode stays
+                  // legible when the bar above has scrolled out of view on a small
+                  // screen. It carries no "@" — that prefix is written
+                  // server-side from the target's stored name, and pre-filling it
+                  // into an editable field would let the reader change it until
+                  // what is rendered disagrees with what is stored.
+                  placeholder={
+                    replyTarget
+                      ? replyTarget.name
+                        ? `Reply to ${replyTarget.name}…`
+                        : "Write a reply…"
+                      : "Add a comment…"
+                  }
+                />
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={replyTarget ? "Post reply" : "Post comment"}
+                accessibilityState={{ disabled: !canSend, busy: addComment.isPending }}
+                disabled={!canSend}
+                onPress={() => addComment.mutate({ body: draft.trim(), target: replyTarget })}
+                className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
+                style={{ opacity: canSend ? 1 : 0.4 }}
+              >
+                <Icon chrome="send" size={22} color={spinner} />
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardInset>
@@ -463,88 +581,28 @@ export function PostDetailScreen() {
   );
 }
 
-/** One comment, with the action its OWNERSHIP allows. */
-function CommentRow({
-  comment,
-  postId,
-  isOwn,
-  onError,
+function CommentInput({
+  value,
+  onChange,
+  placeholder,
 }: {
-  comment: Comment;
-  postId: string;
-  isOwn: boolean;
-  onError: (message: string) => void;
+  value: string;
+  onChange: (v: string) => void;
+  /** Names the reply target when there is one — see the call site. */
+  placeholder: string;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const muted = useTokenColor("on-surface-variant");
-  const report = useReportComment({ onError });
-  const remove = useDeleteComment({ onError });
-
-  // A comment is always attributed, so a null name here only ever means the
-  // write-time lookup failed.
-  const byline = bylineFor(comment.authorName, false);
-
-  return (
-    <View className="flex-row gap-3">
-      <AvatarWithFallback size={36} uri={null} initials={null} label={byline} />
-      <View className="flex-1 gap-xs">
-        <View className="flex-row items-center gap-xs">
-          <Text className="font-label-md text-label-md text-on-surface">{byline}</Text>
-          <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 12 }}>
-            {timeAgo(comment.createdAtIso)}
-          </Text>
-          <View className="flex-1" />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isOwn ? "Comment options: delete" : "Comment options: report"}
-            hitSlop={8}
-            onPress={() => setMenuOpen(true)}
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-          >
-            <Icon chrome="more-horiz" size={18} color={muted} />
-          </Pressable>
-        </View>
-        <View className="rounded-md bg-surface-container-low px-3 py-2">
-          <Text className="font-body-md text-on-surface" style={{ fontSize: 15, lineHeight: 22 }}>
-            {comment.body}
-          </Text>
-        </View>
-      </View>
-
-      <CommentOverflowSheet
-        visible={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        isOwn={isOwn}
-        onReport={async (reason) => {
-          try {
-            await report.mutateAsync({ commentId: comment.id, postId, reason });
-            return true;
-          } catch {
-            return false;
-          }
-        }}
-        onDelete={async () => {
-          try {
-            await remove.mutateAsync({ postId, commentId: comment.id });
-            return true;
-          } catch {
-            return false;
-          }
-        }}
-      />
-    </View>
-  );
-}
-
-function CommentInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const placeholder = useTokenColor("outline");
+  const placeholderColor = useTokenColor("outline");
   return (
     <TextInput
+      // Deliberately stable across both modes. It is the same field and the same
+      // draft either way, and a label that renamed itself would break every
+      // existing reference to it for no gain — the mode is announced by the bar
+      // above and by the placeholder.
       accessibilityLabel="Comment input"
       value={value}
       onChangeText={onChange}
-      placeholder="Add a comment…"
-      placeholderTextColor={placeholder}
+      placeholder={placeholder}
+      placeholderTextColor={placeholderColor}
       multiline
       className="font-body-md text-body-md text-on-surface"
       style={{ maxHeight: 96 }}

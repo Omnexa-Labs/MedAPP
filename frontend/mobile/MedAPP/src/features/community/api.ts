@@ -260,6 +260,49 @@ export interface Comment {
   body: string;
   moderationStatus: string;
   createdAtIso: string;
+  /**
+   * Null on a top-level comment. Set on a reply — and ALWAYS a top-level id.
+   *
+   * The thread is exactly two levels deep and the server enforces it: replying
+   * to a reply attaches the new row to that reply's own parent
+   * (`parent_comment_id = target.parent_comment_id or target.id`). So this is
+   * NOT always the id the client sent, and a caller that assumes it is will
+   * refresh the wrong thread. Read the RESPONSE, never the request.
+   */
+  parentCommentId: string | null;
+  /**
+   * The author of the comment actually answered — a SIBLING when this is a
+   * reply-to-a-reply, which the flattened `parentCommentId` cannot express.
+   *
+   * Returned, and safe to hold: comments have no anonymous mode, so this is no
+   * more revealing than the `authorUserId` already on the parent row. It is
+   * still NOT a byline and NOT a fallback for `replyToName` — see below.
+   */
+  replyToUserId: string | null;
+  /**
+   * The name for the "@name" prefix, copied verbatim from the target's stored
+   * `authorName` and never re-resolved.
+   *
+   * NULL MEANS RENDER NO PREFIX. Not "@unknown", not "@member", and above all
+   * never `replyToUserId` — a UUID in an "@" prefix, against content whose
+   * author is not to be named, is a deanonymisation rather than a fallback.
+   * Null collapses two states on purpose (the target was un-named, and the
+   * write-time lookup failed) because both mean the same thing to a renderer:
+   * we cannot name this person.
+   */
+  replyToName: string | null;
+  /**
+   * Approved replies under this comment, recomputed server-side from the rows
+   * rather than stored, so it cannot drift.
+   *
+   * Always 0 on a reply — the one-level rule means a reply can have no
+   * children. It is the ONLY input to "View N replies": the replies themselves
+   * are a separate request and must not be fetched to decide whether to offer
+   * the expander.
+   */
+  replyCount: number;
+  /** Derived. A reply is a comment with a parent; there is no third level. */
+  isReply: boolean;
 }
 
 const APPROVED = "approved";
@@ -335,6 +378,18 @@ export const socialKeys = {
   post: (viewerId: string | null | undefined, postId: string | undefined) =>
     ["social", viewerId ?? "anon", "post", postId] as const,
   comments: (postId: string | undefined) => ["social", "comments", postId] as const,
+  /**
+   * Replies of ONE parent, keyed on the comment rather than the post.
+   *
+   * A separate cache per thread, not a slice of the comment list, because the
+   * replies are a separate paged request that is only issued when a reader opens
+   * that thread — keying them under the post would make one thread's page
+   * invalidate every other thread's.
+   *
+   * Viewer-free for the same reason as `comments`: `CommentOut` carries no
+   * per-viewer field.
+   */
+  replies: (commentId: string | undefined) => ["social", "replies", commentId] as const,
 };
 
 /**
@@ -391,6 +446,15 @@ function toComment(w: CommentOutWire): Comment {
     body: w.body,
     moderationStatus: w.moderation_status,
     createdAtIso: w.created_at,
+    parentCommentId: w.parent_comment_id ?? null,
+    replyToUserId: w.reply_to_user_id ?? null,
+    replyToName: w.reply_to_name ?? null,
+    // `?? 0` is safe here in a way it was NOT for `like_count` on the feed: an
+    // absent field means the response predates the threading migration, and
+    // every comment written before it is top-level with no replies. 0 is the
+    // truth for those rows rather than a default standing in for an unknown.
+    replyCount: w.reply_count ?? 0,
+    isReply: Boolean(w.parent_comment_id),
   };
 }
 
@@ -455,9 +519,13 @@ export const communityApi = {
   /**
    * `GET /v1/social/posts/{id}/comments` — `{ items }`, oldest first.
    *
-   * APPROVED comments only, matching the `commentCount` on the feed card. A
-   * list that disagreed with the number that led the user here would be worse
-   * than no list.
+   * TOP-LEVEL ONLY since 2026-08-08. Each item carries `replyCount`, and its
+   * replies come from `listReplies` when a reader opens the thread.
+   *
+   * APPROVED comments only. It therefore does NOT match `Post.commentCount`,
+   * which counts replies as well — the two numbers disagree BY DESIGN and are
+   * both correct: the card reports how much discussion is on the post, and a
+   * reply is discussion. Do not "reconcile" them by filtering either one.
    *
    * Oldest first, unlike the feed: a conversation reads in the order it
    * happened. Paged like everything else — `next_offset`, null on the last
@@ -471,9 +539,49 @@ export const communityApi = {
     return { items: (w.items ?? []).map(toComment), nextOffset: w.next_offset ?? null };
   },
 
-  async commentOnPost(postId: string, body: string): Promise<Comment> {
+  /**
+   * `GET /v1/social/comments/{commentId}/replies` — the replies of ONE parent.
+   *
+   * The same envelope, the same bounds and the same oldest-first ordering as the
+   * top-level list, so `toComment` and the pager are reused verbatim.
+   *
+   * Fetched PER PARENT and ON DEMAND. Replies are deliberately not inlined into
+   * the top-level list: inlining would make a page of 20 mean an unbounded
+   * number of rows, and would download an entire argument nobody asked to read.
+   * `replyCount` is all the "View N replies" expander needs.
+   *
+   * 404 for an unknown comment, never an empty array — "no replies yet" and "no
+   * such comment" are different answers. Passing a REPLY's id resolves to the
+   * thread it belongs to rather than returning empty, mirroring the write path.
+   */
+  async listReplies(commentId: string, params?: PageParams): Promise<Page<Comment>> {
+    const w = await client.get<CommentListWire>(
+      `${SOCIAL_PATH}/comments/${commentId}/replies${pageQuery(params)}`,
+    );
+    return { items: (w.items ?? []).map(toComment), nextOffset: w.next_offset ?? null };
+  },
+
+  /**
+   * `POST /v1/social/posts/{postId}/comments`, optionally as a REPLY.
+   *
+   * `parentCommentId` is the comment being ANSWERED, which is not necessarily
+   * where the row lands: a thread is exactly two levels deep, so the server
+   * re-points a reply-to-a-reply at that reply's own parent and records the
+   * sibling who was answered in `replyToName`. The returned
+   * `Comment.parentCommentId` is therefore the authority on which thread the new
+   * row belongs to, and the caller must refresh off that rather than off what it
+   * sent.
+   *
+   * The field is OMITTED, not sent as null, for a top-level comment — the server
+   * treats absent and null the same, and omitting keeps the top-level request
+   * byte-identical to what it was before threading shipped.
+   */
+  async commentOnPost(postId: string, body: string, parentCommentId?: string): Promise<Comment> {
     return toComment(
-      await client.post<CommentOutWire>(`${SOCIAL_PATH}/posts/${postId}/comments`, { body }),
+      await client.post<CommentOutWire>(`${SOCIAL_PATH}/posts/${postId}/comments`, {
+        body,
+        ...(parentCommentId ? { parent_comment_id: parentCommentId } : {}),
+      }),
     );
   },
 

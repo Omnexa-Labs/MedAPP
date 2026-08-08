@@ -263,7 +263,16 @@ export function useDropPostFromLists({ viewerId }: Pick<PostActionOptions, "view
   );
 }
 
-/** Report a comment. Flags it, which drops it from the list AND from `commentCount`. */
+/**
+ * Report a comment. Flags it, which drops it from the list AND from
+ * `commentCount`.
+ *
+ * Works unchanged on a REPLY, and the blanket `socialKeys.all` invalidate is why:
+ * flagging a reply removes it from `GET /comments/{parent}/replies` and
+ * decrements the parent's `replyCount` in the same breath, and every reply cache
+ * is keyed under that root. A narrower key would leave a thread showing "View 3
+ * replies" over two rows.
+ */
 export function useReportComment({ onError }: Pick<PostActionOptions, "onError">) {
   const qc = useQueryClient();
   return useMutation({
@@ -305,7 +314,14 @@ export function useDeletePost({ viewerId, onError }: PostActionOptions) {
   });
 }
 
-/** Delete your own comment. */
+/**
+ * Delete your own comment.
+ *
+ * HARD, and on a top-level comment it takes every reply with it — other people's
+ * writing included. There is no tombstone and no "[deleted]" placeholder, so the
+ * thread simply becomes shorter; the `socialKeys.all` invalidate is what makes
+ * the open thread and both counts agree about that afterwards.
+ */
 export function useDeleteComment({ onError }: Pick<PostActionOptions, "onError">) {
   const qc = useQueryClient();
   return useMutation({

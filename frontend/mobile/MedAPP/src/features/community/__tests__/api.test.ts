@@ -30,6 +30,7 @@ jest.mock("@/lib/api/client", () => ({
 }));
 
 import { communityApi, isOwnComment, isOwnPost, socialKeys, type Comment, type Post } from "../api";
+import { bylineFor, commentByline, initialsFor } from "../bylines";
 
 const POST_WIRE = {
   post_id: "p-1",
@@ -147,6 +148,157 @@ describe("the routes added in the completion pass", () => {
     const page = await communityApi.listComments("p-1", { limit: 20, offset: 40 });
     expect(mockGet).toHaveBeenCalledWith("/v1/social/posts/p-1/comments?limit=20&offset=40");
     expect(page.nextOffset).toBeNull();
+  });
+});
+
+describe("threaded replies", () => {
+  const COMMENT_WIRE = {
+    comment_id: "c-1",
+    post_id: "p-1",
+    author_user_id: "u-2",
+    author_role: "user",
+    author_name: "Ama Mensah",
+    body: "This helped.",
+    moderation_status: "approved",
+    created_at: "2026-08-08T10:00:00Z",
+    updated_at: "2026-08-08T10:00:00Z",
+    parent_comment_id: null,
+    reply_to_user_id: null,
+    reply_to_name: null,
+    reply_count: 2,
+  };
+
+  it("reads one parent's replies from /comments/{id}/replies, paged", async () => {
+    mockGet.mockResolvedValue({ items: [COMMENT_WIRE], next_offset: 20 });
+    const page = await communityApi.listReplies("c-1", { limit: 20, offset: 20 });
+    // NOT nested under the post: a comment id is globally unique here.
+    expect(mockGet).toHaveBeenCalledWith("/v1/social/comments/c-1/replies?limit=20&offset=20");
+    expect(page.nextOffset).toBe(20);
+    expect(page.items[0].id).toBe("c-1");
+  });
+
+  it("keeps a null next_offset as null on the replies pager too", async () => {
+    mockGet.mockResolvedValue({ items: [], next_offset: null });
+    expect((await communityApi.listReplies("c-1")).nextOffset).toBeNull();
+  });
+
+  it("maps the four threading fields, and derives isReply from the parent link", async () => {
+    mockGet.mockResolvedValue({
+      items: [
+        {
+          ...COMMENT_WIRE,
+          comment_id: "r-1",
+          parent_comment_id: "c-1",
+          reply_to_user_id: "u-3",
+          reply_to_name: "Dr. Adjoa Boateng",
+          reply_count: 0,
+        },
+      ],
+      next_offset: null,
+    });
+    const reply = (await communityApi.listReplies("c-1")).items[0];
+    expect(reply.parentCommentId).toBe("c-1");
+    expect(reply.replyToUserId).toBe("u-3");
+    expect(reply.replyToName).toBe("Dr. Adjoa Boateng");
+    expect(reply.replyCount).toBe(0);
+    expect(reply.isReply).toBe(true);
+  });
+
+  it("keeps a null reply_to_name NULL — there is no fallback to the id", async () => {
+    // The renderer keys the "@" prefix off this field being non-null. Defaulting
+    // it to the user id, or to a placeholder name, would mint the very identity
+    // the null exists to withhold.
+    mockGet.mockResolvedValue({
+      items: [{ ...COMMENT_WIRE, parent_comment_id: "c-1", reply_to_user_id: "u-3" }],
+      next_offset: null,
+    });
+    const reply = (await communityApi.listReplies("c-1")).items[0];
+    expect(reply.replyToName).toBeNull();
+    expect(reply.replyToUserId).toBe("u-3");
+  });
+
+  it("treats a pre-threading comment as top-level rather than as unknown", async () => {
+    // A cached response or a fixture written before the migration has none of the
+    // four fields. Every such row IS top-level with no replies, so these defaults
+    // are the truth for them rather than a stand-in.
+    const { parent_comment_id: _p, reply_to_user_id: _u, reply_to_name: _n, reply_count: _c, ...bare } =
+      COMMENT_WIRE;
+    mockGet.mockResolvedValue({ items: [bare], next_offset: null });
+    const comment = (await communityApi.listComments("p-1")).items[0];
+    expect(comment.parentCommentId).toBeNull();
+    expect(comment.replyCount).toBe(0);
+    expect(comment.isReply).toBe(false);
+  });
+
+  it("sends parent_comment_id only when there is one", async () => {
+    mockPost.mockResolvedValue(COMMENT_WIRE);
+    await communityApi.commentOnPost("p-1", "Top level");
+    // OMITTED, not null: the top-level request stays exactly what it was before
+    // threading shipped.
+    expect(mockPost).toHaveBeenCalledWith("/v1/social/posts/p-1/comments", { body: "Top level" });
+
+    await communityApi.commentOnPost("p-1", "A reply", "c-1");
+    expect(mockPost).toHaveBeenCalledWith("/v1/social/posts/p-1/comments", {
+      body: "A reply",
+      parent_comment_id: "c-1",
+    });
+  });
+
+  it("returns the parent the SERVER chose, which is not always the one sent", async () => {
+    // The one-level rule is enforced in the service: a reply to a reply is filed
+    // against that reply's own parent. A client that trusted its own request would
+    // refresh the wrong thread.
+    mockPost.mockResolvedValue({
+      ...COMMENT_WIRE,
+      comment_id: "r-2",
+      parent_comment_id: "c-1",
+      reply_to_user_id: "u-3",
+      reply_to_name: "Dr. Adjoa Boateng",
+      reply_count: 0,
+    });
+    const created = await communityApi.commentOnPost("p-1", "Agreed", "r-1");
+    expect(mockPost).toHaveBeenCalledWith("/v1/social/posts/p-1/comments", {
+      body: "Agreed",
+      parent_comment_id: "r-1",
+    });
+    expect(created.parentCommentId).toBe("c-1");
+    expect(created.replyToName).toBe("Dr. Adjoa Boateng");
+  });
+
+  it("keys each thread's replies separately from the comment list", () => {
+    // One paged request per open thread. Keying them under the post would make one
+    // thread's page invalidate every other thread's.
+    expect(socialKeys.replies("c-1")).not.toEqual(socialKeys.replies("c-2"));
+    expect(socialKeys.replies("c-1")).not.toEqual(socialKeys.comments("c-1"));
+    // Still under the feature root, so the blanket invalidate that follows a report
+    // or a delete reaches every open thread.
+    expect(socialKeys.replies("c-1")[0]).toBe(socialKeys.all[0]);
+  });
+});
+
+describe("bylines and initials", () => {
+  it("does not call a failed comment lookup Anonymous, or MedApp member", () => {
+    // A comment has no anonymous mode, so there is one un-named state — and it is
+    // a ROLE rather than a name-shaped string, per the replies design notes.
+    expect(commentByline("Ama Mensah")).toBe("Ama Mensah");
+    expect(commentByline(null)).toBe("Community member");
+    // The POST byline is a different claim and keeps its own wording.
+    expect(bylineFor(null, false)).toBe("MedApp member");
+    expect(bylineFor(null, true)).toBe("Anonymous");
+  });
+
+  it("derives initials from the stored name only, and strips an honorific", () => {
+    expect(initialsFor("Ama Mensah")).toBe("AM");
+    // Every clinician in the roster would otherwise share a "DR" disc.
+    expect(initialsFor("Dr. Adjoa Boateng")).toBe("AB");
+    expect(initialsFor("Kwabena")).toBe("K");
+  });
+
+  it("has NO initials for a null name, so the avatar falls to the silhouette", () => {
+    // Initials cannot be derived from a null, and they must not be derived from the
+    // byline fallback either — "CM" would dress a missing identity up as a present
+    // one, and an empty coloured circle reads as a broken image.
+    expect(initialsFor(null)).toBeNull();
   });
 });
 
