@@ -38,7 +38,13 @@ describe("PatientProfileOverviewScreen — no literal colours survive", () => {
     );
   });
 
-  it("takes the camera FAB's glyph from `on-primary`, its fill's pair", () => {
-    expect(code()).toMatch(/useTokenColor\("on-primary"\)/);
+  // The camera FAB this suite was written for is DELETED — it had no `onPress`
+  // and sat on a profile card that was not the user's record (2026-08-08). The
+  // rule it proved still holds for every glyph left on the screen, so what is
+  // asserted now is the rule and not that one control: every colour on this
+  // screen is resolved by TOKEN NAME.
+  it("resolves its glyph colours by token name, never by value", () => {
+    expect(code()).toMatch(/useTokenColor\("/);
+    expect(code()).not.toMatch(/color=\{"/);
   });
 });

@@ -1,54 +1,67 @@
-// Lifestyle Management screen — the daily logging + AI meal planner form.
-// Translated from the Stitch "Lifestyle Management" HTML. This is the
-// second of the two Lifestyle screens (the first is LifestyleHubScreen).
+// Lifestyle Management screen — the daily logging form. Translated from the
+// Stitch "Lifestyle Management" HTML. This is the second of the two Lifestyle
+// screens (the first is LifestyleHubScreen).
 //
-// Reached from the Hub's "Go to Log" and "View Full Schedule" CTAs, which
-// push /(app)/lifestyle-manage. It is a modal-style task screen: the comp
-// has a close (✕) in the app bar and a sticky "Save & Close" — so this is
-// a focused editing flow, opened over the Hub and dismissed with back.
-// Like the AI chat screen, a task flow like this drops the BottomNav in
-// favour of the close affordance (the comp keeps a nav bar, but on a phone
-// a Save/Close task sheet reads better without it; back returns to the Hub).
+// Reached from the Hub's "Go to Log" CTA, which pushes /(app)/lifestyle-manage.
+// It is a modal-style task screen: the comp has a close (✕) in the app bar, so
+// this is a focused flow opened over the Hub and dismissed with back. Like the
+// AI chat screen, a task flow drops the BottomNav in favour of the close
+// affordance.
 //
 // Translation rules (same as the sibling screens):
 //   - bento 12-col grid → single-column stack on a phone.
 //   - glass-card / shadow-sm → the shared <Card />, which casts NO shadow
-//     (docs/BRAND.md §Elevation). This screen's private `Card` wrapper — a
-//     hand-rolled twin of the primitive that also carried a `cardShadow` — is
-//     deleted in favour of it. The sticky "Save & Close" is the ONE surface
-//     here that genuinely floats, so it keeps a shadow, retokenised to the
-//     sanctioned tight pair.
-//   - <textarea> → multiline TextInput; <select> → tap-to-open Modal
-//     picker (no @react-native-picker dep); <input type=range> → a
-//     dependency-free segmented tap track (no slider dep).
-//   - hover:* / cursor-grab / focus:ring / drag-scroll JS → dropped or
-//     mapped to active:scale; horizontal ingredient row → ScrollView.
-//   - "Generate with AI" / photo upload / "Add" are interactive but LOCAL:
-//     ingredients append to a chip list; Generate reveals the canned
-//     recommendation card. No backend — design-only pass.
+//     (docs/BRAND.md §Elevation).
+//   - <select> → tap-to-open Modal picker (no @react-native-picker dep);
+//     <input type=range> → a dependency-free segmented tap track (no slider dep).
+//   - hover:* / cursor-grab / focus:ring → dropped or mapped to active:scale.
+//
+// ============================================================================
+// "SAVE & CLOSE" SAVED NOTHING (2026-08-08)
+// ============================================================================
+// The sticky extended FAB read "Save & Close" over a `task-alt` tick, and its
+// entire implementation was `onPress={() => router.back()}`. Sleep, water,
+// workout, mood, stress and meals lived in component `useState` and were
+// discarded on dismiss. There is no lifestyle API in this repo, no
+// device-storage write, and the Hub's charts could never reflect an entry.
+//
+// A control that is shaped like a save, labelled like a save and tick-glyphed
+// like a save IS a claim that the data was recorded — and a patient logging
+// symptoms daily under that impression is building a record that does not
+// exist. So the FAB is DELETED rather than relabelled: DetailShell already
+// carries a ✕ dismiss, and a second bottom-right button reading "Close" would
+// only be a quieter version of the same affordance. In its place, one plain
+// sentence at the top of the form saying what happens to what you type.
+//
+// The AI MEAL PLANNER card went with it, and that deletion is the larger one:
+//
+//   * "Generate with AI" revealed a hardcoded RECOMMENDATION — "Grilled Salmon
+//     & Quinoa", 45g protein, and an "AI Reasoning" paragraph reading "Based on
+//     your intense morning workout, your muscles require high-quality protein…"
+//     There was no model, no request, and no workout: the app has never
+//     recorded one. That is fabricated dietary advice attributed to an analysis
+//     of the patient, which is a stronger claim than any chart on these
+//     screens made.
+//   * "Upload Food Photo" — a Pressable with NO `onPress`, under the caption
+//     "AI will identify ingredients automatically". No image picker is a
+//     dependency of this project.
+//   * the prompt field and the ingredient chips, which fed the above and
+//     nothing else.
+//
+// Recorded in docs/api/README.md's gap register.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
 import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { router } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { DetailShell } from "@/components/shell";
-import { Card, ChoiceChip, ChoiceChipRow } from "@/components/ui";
+import { Card, InfoCallout } from "@/components/ui";
 import { Icon } from "@/components/ui/icons/Icon";
-import { useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { useTokenColor } from "@/lib/tokens";
+import { MaterialIcons } from "@expo/vector-icons";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
-
-const SUGGESTED_INGREDIENTS = [
-  "Avocado",
-  "Quinoa",
-  "Salmon",
-  "Sweet Potato",
-  "Kale",
-  "Blueberries",
-];
 
 const WORKOUT_OPTIONS = [
   "Active Recovery (Walk/Yoga)",
@@ -70,20 +83,6 @@ const MOODS = [
   { icon: "mood-great", label: "Great" },
 ] as const;
 
-const RECOMMENDATION = {
-  title: "Grilled Salmon & Quinoa",
-  tagline: '"High protein, omega-3 rich dinner for muscular recovery."',
-  macros: [
-    { label: "Protein", value: "45g" },
-    { label: "Carbs", value: "30g" },
-    { label: "Fats", value: "18g" },
-  ],
-  reasoning:
-    "Based on your intense morning workout, your muscles require high-quality protein and complex carbohydrates for glycogen replenishment. Salmon provides essential DHA for cardiovascular health.",
-  imageUri:
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuBnHEFuNHtnQDzxBBuwRAslqPoQR1RoO2UeI4A6xoy4NbFgbOcALRiBnmXOoh8UFBT58u2LhC7KW_itP-znuEI9e2Bhj4cdlfBCZKsLBlVMto5a6tCRuYKweB4FObgkRxR8dDp4XSOw5iPtsECooncA9ailipFAxmyVthrVlIh4fh2XZJYarmHyF_JuZOhiDaHD0_u4SdjuWioYWR9OP_ub1dIotY3Ukf-7mdanEXb9payPNaVA9wUpDt7zoyAy48Eul2f23kI9kwfd",
-};
-
 function stressLabel(v: number): string {
   if (v < 4) return "Low";
   if (v < 7) return "Moderate";
@@ -94,29 +93,13 @@ export function LifestyleManageScreen() {
   // Mood glyph colours. Resolved through the token map rather than a Tailwind
   // class, because no cssInterop is registered for icon components.
   const onPrimaryContainer = useTokenColor("on-primary-container");
-  // `on-surface-variant` does triple duty here, all three the same role —
-  // secondary content on a neutral surface: the unselected mood glyph, the two
-  // TextInput placeholders (BRAND: "`on-surface-variant` for placeholders") and
-  // the select's chevron. All three were frozen literals (`#6d7a77`, which is
-  // light `outline`, and `#3d4947`, which is light `on-surface-variant`).
+  // `on-surface-variant` does double duty here, both the same role — secondary
+  // content on a neutral surface: the unselected mood glyph and the select's
+  // chevron. Both were frozen literals (`#6d7a77`, which is light `outline`,
+  // and `#3d4947`, which is light `on-surface-variant`).
   const onSurfaceVariant = useTokenColor("on-surface-variant");
   // Brand-accent glyphs that can't be classes (MaterialIcons takes a string).
   const primary = useTokenColor("primary");
-  // Glyphs ON the `primary` fill — the "Generate with AI" bolt and the FAB's
-  // check. Their `#ffffff` is `on-primary`'s LIGHT value; in dark mode that
-  // painted white on #6BD8CB, which is what the capture shows.
-  const onPrimary = useTokenColor("on-primary");
-  const onSecondaryContainer = useTokenColor("on-secondary-container");
-  // The extended FAB's elevation — see FAB_SHADOW at the foot of this file.
-  const fabShadow = useTokenShadow("shadow", FAB_SHADOW);
-  // AI meal planner
-  const [prompt, setPrompt] = useState("");
-  const [showRecommendation, setShowRecommendation] = useState(false);
-
-  // Ingredient chips: which suggested ones are selected + manual additions.
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [manualIngredient, setManualIngredient] = useState("");
-  const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
 
   // Daily vitality log
   const [sleepHours, setSleepHours] = useState(7.5); // 0.5h steps
@@ -128,193 +111,38 @@ export function LifestyleManageScreen() {
   const [mood, setMood] = useState(2); // index into MOODS — 2 is "Neutral"
   const [stress, setStress] = useState(4); // 1..10
 
-  const toggleIngredient = (name: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-
-  const addManual = () => {
-    const v = manualIngredient.trim();
-    if (!v) return;
-    setExtraIngredients((prev) => (prev.includes(v) ? prev : [...prev, v]));
-    setManualIngredient("");
-  };
-
   const waterPct = Math.min(100, Math.round((water / 2.8) * 100));
 
   return (
     // ------------------------------------------------------------------
-    // DetailShell (safe area + DetailAppBar + body), replacing this screen's
-    // hand-rolled `View > StatusBar style="dark" > SafeAreaView` wrapper —
-    // one of the eleven screens that froze the status bar to light mode.
+    // DetailShell (safe area + DetailAppBar + body).
     //
     // `backIcon="close"` preserves this screen's task/modal affordance; the
-    // dismiss still pops, so no `onBack` override is needed.
-    //
-    // The bottom inset is left to the SHELL (the default). The sticky
-    // "Save & Close" FAB is absolutely positioned inside the body and does
-    // NOT render its own `<SafeAreaView edges={["bottom"]}>`, so under the
-    // old ["top","left","right"] wrapper its `bottom-6` measured from the
-    // raw screen edge and sat in the gesture bar. It now measures from the
-    // inset edge, which is the bug the shell's default exists to fix.
+    // dismiss still pops, so no `onBack` override is needed. It is now the ONLY
+    // dismiss on the screen — see the note at the head of the file for why the
+    // sticky "Save & Close" FAB is gone.
     // ------------------------------------------------------------------
     <DetailShell title="Lifestyle Management" backIcon="close">
-      {/* `paddingBottom: 120` is KEPT: it reserves room for the sticky
-            "Save & Close" FAB below, not for a bottom nav (this screen never
-            had one), so nothing about the shell makes it wrong. */}
+      {/* `paddingBottom: 32`, down from the 120 that reserved room for the
+          deleted FAB. Keeping 120 would leave ~90px of dead space under the
+          last card. */}
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingTop: 16,
-          paddingBottom: 120,
+          paddingBottom: 32,
           gap: 24,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* AI Meal Planner */}
-        <Card>
-          <View className="mb-md flex-row items-center gap-xs">
-            <MaterialIcons name="auto-awesome" size={22} color={primary} />
-            <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
-              AI Meal Planner
-            </Text>
-          </View>
-
-          {/* Prompt */}
-          <View className="mb-md">
-            <TextInput
-              value={prompt}
-              onChangeText={setPrompt}
-              placeholder="Ask AI to plan a meal (e.g., 'High protein dinner for post-workout')"
-              placeholderTextColor={onSurfaceVariant}
-              multiline
-              className="rounded-xl border-2 border-transparent bg-surface-container-low p-md font-body-md text-body-md text-on-surface"
-              style={{ minHeight: 96, textAlignVertical: "top" }}
-              accessibilityLabel="Meal planning prompt"
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Generate meal with AI"
-              onPress={() => setShowRecommendation(true)}
-              className="mt-sm flex-row items-center justify-center gap-xs self-end rounded-full bg-primary px-md py-sm active:scale-95"
-            >
-              <Text className="font-label-md text-label-md text-on-primary">Generate with AI</Text>
-              <MaterialIcons name="bolt" size={18} color={onPrimary} />
-            </Pressable>
-          </View>
-
-          {/* Photo upload */}
-          <View className="mb-md">
-            <Text className="mb-sm font-label-md text-label-md text-on-surface-variant">
-              Analyze Meal via Photo:
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Upload food photo"
-              className="items-center gap-sm rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low p-md active:bg-surface-container"
-            >
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-container/20">
-                <MaterialIcons name="photo-camera" size={26} color={primary} />
-              </View>
-              <View className="items-center">
-                <Text className="font-label-md text-label-md text-on-surface">
-                  Upload Food Photo
-                </Text>
-                <Text className="text-outline" style={{ fontSize: 12 }}>
-                  AI will identify ingredients automatically
-                </Text>
-              </View>
-            </Pressable>
-          </View>
-
-          {/* Ingredient chips */}
-          <View className="mb-md">
-            <Text className="mb-sm font-label-md text-label-md text-on-surface-variant">
-              Add ingredients to your meal:
-            </Text>
-            {/* The shared ChoiceChip (Figma 11:104), replacing a private pill.
-                  TWO disclosed changes, neither of them cosmetic:
-
-                  1. EMPHASIS. This screen selected with `bg-primary-container`
-                     (low emphasis) while CommunityHub and Explore used
-                     `bg-primary` (high emphasis) for the same control. 11:104
-                     draws `color/primary`, so high emphasis wins and THIS
-                     SCREEN CHANGES VISUALLY. Worth confirming with the product
-                     owner rather than landing silently.
-                  2. WRAP, not scroll. The row was a horizontal ScrollView, but
-                     it sits inside a padded Card. A scrollable ChoiceChipRow
-                     applies BRAND's 16px gutter as its own content inset and so
-                     must be full-bleed (BRAND §"Horizontal strips and
-                     carousels"); nested in a card's 24px padding it would start
-                     the chips 40px in. A wrapping row is the correct in-card
-                     treatment, and it is the component's safe default.
-
-                  The 44pt floor now holds too — `py-sm` + `label-md` measured
-                  ~38pt. */}
-            <ChoiceChipRow>
-              {SUGGESTED_INGREDIENTS.map((ing) => (
-                <ChoiceChip
-                  key={ing}
-                  label={ing}
-                  selected={selected.has(ing)}
-                  onPress={() => toggleIngredient(ing)}
-                />
-              ))}
-            </ChoiceChipRow>
-
-            {/* Manual add */}
-            <View className="mt-md flex-row gap-sm">
-              <TextInput
-                value={manualIngredient}
-                onChangeText={setManualIngredient}
-                placeholder="Add specific ingredients manually..."
-                placeholderTextColor={onSurfaceVariant}
-                onSubmitEditing={addManual}
-                returnKeyType="done"
-                className="flex-1 rounded-lg border border-outline-variant bg-surface-container-low px-md font-body-md text-body-md text-on-surface"
-                style={{ paddingVertical: 8 }}
-                accessibilityLabel="Add ingredient manually"
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Add ingredient"
-                onPress={addManual}
-                className="flex-row items-center gap-xs rounded-lg bg-secondary-container px-md active:scale-95"
-              >
-                <MaterialIcons name="add" size={20} color={onSecondaryContainer} />
-                <Text className="font-label-md text-label-md text-on-secondary-container">Add</Text>
-              </Pressable>
-            </View>
-
-            {/* Manually-added chips */}
-            {extraIngredients.length > 0 ? (
-              <View className="mt-sm flex-row flex-wrap gap-sm">
-                {extraIngredients.map((ing) => (
-                  <View
-                    key={ing}
-                    className="flex-row items-center gap-xs rounded-full bg-primary-container/20 px-sm py-xs"
-                  >
-                    <Text className="font-label-sm text-label-sm text-primary">{ing}</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${ing}`}
-                      hitSlop={6}
-                      onPress={() => setExtraIngredients((prev) => prev.filter((x) => x !== ing))}
-                    >
-                      <MaterialIcons name="close" size={14} color={primary} />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-
-          {/* Recommendation (revealed by Generate) */}
-          {showRecommendation ? <RecommendationCard onSave={() => router.back()} /> : null}
-        </Card>
+        {/* The one thing the user has to know before they type anything. It is
+            first, not a footnote, and it does not promise a future release —
+            "coming soon" is a claim too. */}
+        <InfoCallout icon="info-outline" testID="lifestyle-not-stored">
+          Nothing you enter here is stored yet. These controls work, but the
+          values are cleared when you leave this screen — MedApp has nowhere to
+          keep a daily log.
+        </InfoCallout>
 
         {/* Daily Vitality Log */}
         <Card>
@@ -339,10 +167,7 @@ export function LifestyleManageScreen() {
                 onInc={() => setWater((v) => Math.min(5, +(v + 0.1).toFixed(1)))}
               />
               <View className="h-1.5 overflow-hidden rounded-full bg-surface-container-highest">
-                <View
-                  className="h-full bg-primary"
-                  style={{ width: `${waterPct}%` }}
-                />
+                <View className="h-full bg-primary" style={{ width: `${waterPct}%` }} />
               </View>
             </View>
 
@@ -441,36 +266,8 @@ export function LifestyleManageScreen() {
         </Card>
       </ScrollView>
 
-      {/* Sticky Save & Close — an extended FAB.
-            CLASSIFIED FLOATING, and the only such surface on this screen. It is
-            absolutely positioned over a ScrollView, content passes underneath
-            it, and it is not attached to any surface — so it is the FAB role
-            docs/BRAND.md §Elevation explicitly permits an effect on, not a
-            card. It therefore KEEPS a shadow, but a retokenised one: the
-            sanctioned tight `0 2px 6px` at 8%, tinted with the `shadow` token
-            through `useTokenShadow`. What went is the literal — `#00685f` at
-            35% over a 14px radius was a brand-teal glow, both a hardcoded hex
-            (frozen in light mode) and roughly four times the permitted
-            strength. */}
-      <View className="absolute bottom-6 right-6">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Save and close"
-          onPress={() => router.back()}
-          className="flex-row items-center gap-sm rounded-full bg-primary px-lg py-md active:scale-95"
-          style={fabShadow}
-        >
-          <MaterialIcons name="task-alt" size={22} color={onPrimary} />
-          <Text className="font-headline-md text-on-primary" style={{ fontSize: 16 }}>
-            Save & Close
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Workout picker modal. It used to sit OUTSIDE the SafeAreaView, beside
-          it in the root view; it is now inside the shell's body. A <Modal>
-          renders into its own native host window, so its position in the tree
-          does not affect its layout — the visible result is identical. */}
+      {/* Workout picker modal. A <Modal> renders into its own native host
+          window, so its position in the tree does not affect its layout. */}
       <Modal
         visible={workoutPickerOpen}
         transparent
@@ -528,6 +325,8 @@ export function LifestyleManageScreen() {
 // of the shared primitive (same hairline, same inset) that additionally carried
 // a `cardShadow`. Call sites now use `Card` imported from "@/components/ui",
 // which cannot take a shadow even through `style`.
+//
+// `RecommendationCard` went with the AI meal planner — see the head of the file.
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -598,80 +397,6 @@ function StepBtn({ icon, label, onPress }: { icon: IconName; label: string; onPr
   );
 }
 
-function RecommendationCard({ onSave }: { onSave: () => void }) {
-  const primary = useTokenColor("primary");
-  const onPrimary = useTokenColor("on-primary");
-  return (
-    <View className="overflow-hidden rounded-xl border border-primary/20 bg-primary-container/10">
-      <Image source={{ uri: RECOMMENDATION.imageUri }} className="h-48 w-full" resizeMode="cover" />
-      <View className="gap-md p-md">
-        <View>
-          <View className="flex-row items-start justify-between gap-sm">
-            <Text className="flex-1 font-headline-md text-primary" style={{ fontSize: 20 }}>
-              {RECOMMENDATION.title}
-            </Text>
-            <View className="rounded bg-primary-container px-sm py-xs">
-              <Text
-                className="font-label-sm uppercase text-on-primary-container"
-                style={{ fontSize: 10, letterSpacing: 0.5, fontWeight: "700" }}
-              >
-                Optimal Choice
-              </Text>
-            </View>
-          </View>
-          <Text
-            className="mt-xs font-body-md text-on-surface-variant"
-            style={{ fontStyle: "italic" }}
-          >
-            {RECOMMENDATION.tagline}
-          </Text>
-        </View>
-
-        <View className="flex-row gap-sm">
-          {RECOMMENDATION.macros.map((m) => (
-            <View key={m.label} className="flex-1 items-center rounded-lg bg-surface/50 p-sm">
-              <Text className="uppercase text-outline" style={{ fontSize: 10, fontWeight: "700" }}>
-                {m.label}
-              </Text>
-              <Text className="font-headline-md text-primary" style={{ fontSize: 18 }}>
-                {m.value}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/* `border-white/60` was a literal, and the one on this screen that a
-            find-and-replace would have got wrong: it is a HAIRLINE on a tinted
-            inner panel, not a surface and not label-on-a-fill, so it takes
-            `outline-variant` — which is the light hairline BRAND specifies and
-            flips to #3D4947 in dark, instead of staying a 60% white edge over a
-            dark panel. */}
-        <View className="rounded-lg border border-outline-variant bg-surface/40 p-sm">
-          <View className="mb-xs flex-row items-center gap-xs">
-            <MaterialIcons name="psychology" size={16} color={primary} />
-            <Text className="font-label-md text-label-md text-primary">AI Reasoning</Text>
-          </View>
-          <Text className="text-on-surface-variant" style={{ fontSize: 13, lineHeight: 19 }}>
-            {RECOMMENDATION.reasoning}
-          </Text>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Save meal and close"
-          onPress={onSave}
-          className="flex-row items-center justify-center gap-xs rounded-lg bg-primary py-sm active:scale-[0.98]"
-        >
-          <MaterialIcons name="save" size={20} color={onPrimary} />
-          <Text className="font-headline-md text-on-primary" style={{ fontSize: 16 }}>
-            Save & Close
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 function formatHrs(h: number): string {
   const whole = Math.floor(h);
   const mins = Math.round((h - whole) * 60);
@@ -682,14 +407,8 @@ function formatHrs(h: number): string {
 // Elevation
 // ---------------------------------------------------------------------------
 //
-// `cardShadow` was deleted with the private `Card` wrapper, and `appBarShadow`
-// with the hand-rolled app bar — DetailAppBar (Figma 193:120) carries no
-// effects. Only the extended FAB remains elevated.
-
-/**
- * Figma's sanctioned `elevation/floating` effect: `0 2px 6px` of the `shadow`
- * token at 8% — the heavier half of BRAND's `0 1px 2px` / `0 2px 6px` pair,
- * since an extended FAB sits furthest from the page. Expressed in design space
- * (CSS blur) and converted to RN's props by `tokenShadow`.
- */
-const FAB_SHADOW = { y: 2, blur: 6, opacity: 0.08 } as const;
+// Nothing on this screen floats any more. `cardShadow` was deleted with the
+// private `Card` wrapper and `appBarShadow` with the hand-rolled app bar —
+// DetailAppBar (Figma 193:120) carries no effects. `FAB_SHADOW`, the sanctioned
+// `0 2px 6px` @8% pair, went with the extended FAB itself: the one genuinely
+// floating surface here was the control that claimed a save, and it is gone.

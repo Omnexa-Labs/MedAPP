@@ -22,16 +22,26 @@
 // stub into a clinical claim about a specific drug, in a document someone else
 // reads. When the record API supplies real fill dates this is where they go.
 //
-// OUT — `refillLabel` ("Refill available in 6 days", "Added by you"). It is the
-// list card's own display copy, keyed to a UI state, and `refillsRemaining` is
-// the underlying fact. Exporting both invites them to disagree. `source` is
-// stated instead, in words, because "who says you take this" is the part that
-// changes how a clinician reads the line.
+// OUT — `refillLabel` ("Refill available in 6 days", "Added by you"). It was the
+// list card's own display copy keyed to a UI state, `refillsRemaining` is the
+// underlying fact, and the field has since been deleted from the type along
+// with the refill control it fed. `source` is stated instead, in words, because
+// "who says you take this" is the part that changes how a clinician reads the
+// line.
 //
 // OUT — any invented total, adherence figure, or "as of" clinical status. There
-// is no medication endpoint (see ./mock-data.ts); nothing here may read as a
-// record that arrived from a provider, which is what the closing note says in
-// so many words.
+// is no medication endpoint (see ./sample-data.ts); nothing here may read as a
+// record that arrived from a provider.
+//
+// ---------------------------------------------------------------------------
+// THE SAMPLE-DATA STATEMENT GOES IN THE FILE, NOT BESIDE IT
+// ---------------------------------------------------------------------------
+// The screen's callout stays on the screen. This document is the one artefact
+// that LEAVES the app — it is written to disk, handed to a share sheet, and may
+// be printed or attached to a referral by somebody who never saw the screen. So
+// `sample` puts the statement on the FIRST line, before any drug name, and
+// repeats it in the footer. A reader who sees only the top of the file, and a
+// reader who reads only the end, both get it.
 
 import type { ActiveMedication } from "./types";
 
@@ -40,24 +50,26 @@ function formatExportDate(at: Date): string {
   return at.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
+/** The one sentence, repeated at both ends of the document. */
+const SAMPLE_STATEMENT =
+  "SAMPLE DATA — this is not a patient's medication record. The entries below are fixed demonstration data and describe nobody.";
+
 export function buildMedicationListText(args: {
   medications: readonly ActiveMedication[];
   /** Injected so the output is deterministic under test. */
   at: Date;
   /**
-   * True when the screen is showing its last saved copy rather than a fresh
-   * read. The export says so: a list dated today that is actually days old is
-   * exactly the kind of thing a recipient acts on.
+   * True when the list is the local sample rather than a patient's record. See
+   * the note in the header — this puts the statement inside the file.
    */
-  offline?: boolean;
+  sample?: boolean;
 }): string {
-  const { medications, at, offline = false } = args;
+  const { medications, at, sample = false } = args;
 
   const header = [
-    "MedApp — active medications",
-    offline
-      ? `Last saved copy, exported ${formatExportDate(at)} while offline`
-      : `Exported ${formatExportDate(at)}`,
+    ...(sample ? [SAMPLE_STATEMENT, ""] : []),
+    "MedApp — medication list",
+    `Exported ${formatExportDate(at)}`,
   ].join("\n");
 
   const entries = medications.map((m) => {
@@ -73,8 +85,9 @@ export function buildMedicationListText(args: {
     return lines.join("\n");
   });
 
-  const footer =
-    "Shared from MedApp by the patient. This list is patient-maintained and is not a clinical record issued by a provider.";
+  const footer = sample
+    ? SAMPLE_STATEMENT
+    : "Shared from MedApp by the patient. This list is patient-maintained and is not a clinical record issued by a provider.";
 
   return [header, ...entries, footer].join("\n\n");
 }

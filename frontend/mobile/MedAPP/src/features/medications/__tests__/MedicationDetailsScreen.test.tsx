@@ -49,14 +49,14 @@ jest.mock("@/lib/api/client", () => ({
 
 import { router, useLocalSearchParams } from "expo-router";
 import { MedicationDetailsScreen } from "../MedicationDetailsScreen";
-import { ACTIVE_MEDICATIONS } from "../mock-data";
+import { SAMPLE_MEDICATIONS } from "../sample-data";
 
 const params = useLocalSearchParams as unknown as jest.Mock;
 
 /** The canon record the frame is drawn against. */
-const METFORMIN = ACTIVE_MEDICATIONS.find((m) => m.id === "metformin-500")!;
-const VITAMIN = ACTIVE_MEDICATIONS.find((m) => m.id === "vitamin-d3")!;
-const AMLODIPINE = ACTIVE_MEDICATIONS.find((m) => m.id === "amlodipine-5")!;
+const METFORMIN = SAMPLE_MEDICATIONS.find((m) => m.id === "metformin-500")!;
+const VITAMIN = SAMPLE_MEDICATIONS.find((m) => m.id === "vitamin-d3")!;
+const AMLODIPINE = SAMPLE_MEDICATIONS.find((m) => m.id === "amlodipine-5")!;
 
 /** Labels that are static chrome — present whether or not the values have arrived. */
 const STATIC_CHROME = ["How to take it", "Prescription", "Directions", "Form and strength", "Prescribed by", "Refills"];
@@ -136,13 +136,41 @@ it("omits the whole prescription section for a self-reported medication", () => 
   expect(screen.queryByText("Refills")).toBeNull();
   expect(screen.queryByText(/remaining/)).toBeNull();
 
-  // The record still says where it came from — in words, not by colour alone.
-  expect(screen.getByText(/You added this record yourself/)).toBeTruthy();
+  // The provenance line is the sample statement now — see the test below.
+  expect(screen.getByTestId("medication-provenance")).toBeTruthy();
 });
 
-it("states provenance for a prescribed medication", () => {
+// -- Provenance -----------------------------------------------------------
+//
+// This screen used to tell a patient "This record came from your prescriber."
+// for any entry whose `source` was `prescribed`. That was the exact opposite of
+// true: there is no medication endpoint, nothing here came from a prescriber,
+// and `source` is a field on a fixture. It is the single most direct false
+// clinical claim the screen could make, so it is pinned in both directions.
+it("never claims a sample record came from a prescriber", () => {
   render(<MedicationDetailsScreen />);
-  expect(screen.getByText(/came from your prescriber/)).toBeTruthy();
+  expect(screen.queryByText(/came from your prescriber/i)).toBeNull();
+  expect(screen.queryByText(/from your (doctor|clinician|provider)/i)).toBeNull();
+});
+
+it("states, on the record itself, that the record is sample data", () => {
+  render(<MedicationDetailsScreen />);
+  expect(screen.getByText(/Sample data — these are not your medications/)).toBeTruthy();
+  expect(screen.getByText(/identical for every account/)).toBeTruthy();
+});
+
+it("makes the same statement for a self-reported entry as for a prescribed one", () => {
+  // Both come from the same file. A provenance line that varied between them
+  // would re-introduce the idea that one of them has a real source.
+  render(<MedicationDetailsScreen />);
+  const prescribed = screen.getByTestId("medication-provenance");
+  screen.unmount();
+
+  params.mockReturnValue({ id: "vitamin-d3" });
+  render(<MedicationDetailsScreen />);
+  expect(screen.getByTestId("medication-provenance")).toBeTruthy();
+  expect(screen.getByText(/Sample data — these are not your medications/)).toBeTruthy();
+  expect(prescribed).toBeTruthy();
 });
 
 // -- Stale deep link ------------------------------------------------------
@@ -232,8 +260,15 @@ it("invents no endpoint: the screen issues no request and names no path", () => 
   expect(CODE).not.toMatch(/\bclient\.(get|post|put|patch|delete)\b/);
   expect(CODE).not.toMatch(/\buseQuery\b|\bfetch\(/);
   // ...and it says where the data does come from, in code and in the header.
-  expect(CODE).toMatch(/from "\.\/mock-data"/);
+  expect(CODE).toMatch(/from "\.\/sample-data"/);
   expect(SOURCE).toMatch(/WHERE THE DATA COMES FROM: local mock data/);
+});
+
+it("gates the ?state= preview hatch on __DEV__", () => {
+  // The hatch is worth keeping for device review of the designed loading frame,
+  // but a URL parameter must not be able to drive a clinical screen's state in
+  // a shipped build. The guard is the FIRST thing the reader does.
+  expect(CODE).toMatch(/function wantsLoadingPreview[\s\S]{0,120}if \(!__DEV__\) return false;/);
 });
 
 it("keeps the skeleton's line boxes derived from the type ramp, not hardcoded", () => {

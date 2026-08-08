@@ -8,6 +8,13 @@
 // animation and wrote nothing, and the "Download PDF" row on the share screen had
 // no `onPress` at all. Both now produce a real file — so the tests assert the
 // FILE, and assert that no control anywhere still says PDF.
+//
+// Every value below is supplied BY THIS SUITE as route params. That is the
+// second thing being guarded: the screens used to fall back to clinical
+// constants, so an earlier version of this file asserted that the written
+// document contained "Quantity: 30 Tablets" and "Indication: Hypertension
+// management" — a test pinning fabricated clinical data into a persisted file.
+// The file may now contain only what the caller passed.
 
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -16,9 +23,12 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 jest.mock("expo-file-system", () => require("@/test/document-mocks").fileSystemMock());
 jest.mock("expo-sharing", () => require("@/test/document-mocks").sharingMock());
 
+/** Mutable so a case can vary the script; reset in `beforeEach`. */
+const searchParams: Record<string, string> = {};
+
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn() },
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => searchParams,
 }));
 
 jest.mock("nativewind", () => ({
@@ -31,8 +41,36 @@ import { ActiveScriptViewScreen } from "../ActiveScriptViewScreen";
 
 const DOWNLOAD_LABEL = "Download a text copy of this prescription";
 
+/** The five core fields both screens require. */
+const CORE = {
+  drug: "Amlodipine 5mg",
+  patient: "Ama Mensah",
+  scriptId: "#4471-B",
+  prescriber: "Dr. Adjoa Boateng",
+  issuedDate: "3 Aug 2026",
+};
+
+/** The optional clinical fields, which only a caller can supply. */
+const RICH = {
+  ...CORE,
+  quantity: "28 Tablets",
+  refills: "1 Remaining",
+  indication: "Blood pressure control",
+  dob: "14 Feb 1979",
+  license: "GH-MDC-4410",
+  clinic: "Korle Bu Cardiology",
+  instructions: "One tablet each morning",
+  rxNumber: "#RX-4471",
+};
+
+function setParams(values: Record<string, string>) {
+  for (const key of Object.keys(searchParams)) delete searchParams[key];
+  Object.assign(searchParams, values);
+}
+
 beforeEach(() => {
   resetDocumentMocks();
+  setParams(CORE);
 });
 
 /**
@@ -53,44 +91,56 @@ async function pressDownload() {
   // reacted to it". On the synchronous-throw branches (file-write, and the
   // sharing-unavailable refusal) the mock flips the flag BEFORE the value
   // propagates, so the catch has not run and the toast state is not applied
-  // yet. The success path only passes without this because shareAsync resolves
-  // asynchronously and hands over a spare microtask. One flush makes every
-  // branch wait for the same thing: the app having reacted.
-  //
-  // Still not a tree query - the reason the helper waits on a recorded side
-  // effect at all is that <Toast> runs an Animated loop, so a waitFor whose
-  // predicate queries the tree hangs to the jest timeout instead of failing.
+  // yet. One flush makes every branch wait for the same thing: the app having
+  // reacted.
   await act(async () => {});
 }
 
 describe("ActiveScriptViewScreen download", () => {
   it("writes the prescription it is displaying and offers it to the share sheet", async () => {
+    setParams(RICH);
     render(<ActiveScriptViewScreen />);
     await pressDownload();
 
     const file = onlyWrittenFile();
     // Persistent storage, named for the record.
-    expect(file.path).toBe(
-      "DOCUMENT_DIR/MedAppDocuments/prescription-lisinopril-10mg-8829-x.txt",
-    );
-    // Every value in the file is one the screen renders above.
-    expect(file.body).toContain("Lisinopril 10mg");
+    expect(file.path).toBe("DOCUMENT_DIR/MedAppDocuments/prescription-amlodipine-5mg-4471-b.txt");
+    // Every value in the file is one the CALLER passed and the screen renders.
+    expect(file.body).toContain("Amlodipine 5mg");
     expect(file.body).toContain("Dr. Adjoa Boateng");
-    expect(file.body).toContain("Quantity: 30 Tablets");
-    expect(file.body).toContain("Indication: Hypertension management");
+    expect(file.body).toContain("Quantity: 28 Tablets");
+    expect(file.body).toContain("Indication: Blood pressure control");
     expect(file.body).toContain("Patient-exported copy");
 
     expect(documentMockState.shareCalls).toHaveLength(1);
     expect(documentMockState.shareCalls[0].uri).toBe(`file:///${file.path}`);
+    // 20s, not the default 5s. This is the FIRST render in the suite and the
+    // work is real, not a hang — the same case passes well inside the budget on
+    // its own, but under the full suite's parallel workers it crossed 5s and
+    // failed as a timeout rather than an assertion.
+  }, 20000);
+
+  it("omits the clinical fields the caller did not pass, rather than inventing them", async () => {
+    // CORE only — no quantity, refills, indication, DOB or licence anywhere.
+    render(<ActiveScriptViewScreen />);
+    await pressDownload();
+
+    const body = onlyWrittenFile().body;
+    expect(body).toContain("Amlodipine 5mg");
+    expect(body).not.toMatch(/Quantity/);
+    expect(body).not.toMatch(/Refills/);
+    expect(body).not.toMatch(/Indication/);
+    expect(body).not.toMatch(/License/);
+    expect(body).not.toMatch(/Date of birth/);
+    // And specifically none of the deleted constants.
+    expect(body).not.toMatch(/30 Tablets|Hypertension management|MD-99283-A|Alex Rivers/);
   });
 
   it("tells the user the filename instead of a bare 'downloaded successfully'", async () => {
     render(<ActiveScriptViewScreen />);
     await pressDownload();
 
-    expect(
-      screen.getByText("Saved prescription-lisinopril-10mg-8829-x.txt to your device"),
-    ).toBeTruthy();
+    expect(screen.getByText("Saved prescription-amlodipine-5mg-4471-b.txt to your device")).toBeTruthy();
     // The stub's wording, which was true of nothing.
     expect(screen.queryByText("Document downloaded successfully")).toBeNull();
   });
@@ -114,7 +164,7 @@ describe("ActiveScriptViewScreen download", () => {
 
     expect(screen.getByText(/can't share it out/)).toBeTruthy();
     // The file is real even though the hand-off never happened — so it is named.
-    expect(onlyWrittenFile().body).toContain("Lisinopril 10mg");
+    expect(onlyWrittenFile().body).toContain("Amlodipine 5mg");
   });
 
   it("ignores a second tap while the first write is in flight", async () => {
@@ -130,6 +180,12 @@ describe("ActiveScriptViewScreen download", () => {
     expect(documentMockState.shareCalls).toHaveLength(1);
     expect(documentMockState.written).toHaveLength(1);
   });
+
+  it("offers no download at all when there is no script to download", () => {
+    setParams({});
+    render(<ActiveScriptViewScreen />);
+    expect(screen.queryByLabelText(DOWNLOAD_LABEL)).toBeNull();
+  });
 });
 
 describe("ActiveScriptShareScreen download", () => {
@@ -138,7 +194,7 @@ describe("ActiveScriptShareScreen download", () => {
     await pressDownload();
 
     const body = onlyWrittenFile().body;
-    expect(body).toContain("Lisinopril 10mg");
+    expect(body).toContain("Amlodipine 5mg");
     expect(body).toContain("Dr. Adjoa Boateng");
     // This screen has no quantity/refills in its params, and the document must be
     // shorter rather than invent them.
@@ -151,6 +207,12 @@ describe("ActiveScriptShareScreen download", () => {
     await pressDownload();
 
     expect(screen.getByText(/^Saved prescription-.*\.txt to your device$/)).toBeTruthy();
+  });
+
+  it("offers no download at all when there is no script to share", () => {
+    setParams({});
+    render(<ActiveScriptShareScreen />);
+    expect(screen.queryByLabelText(DOWNLOAD_LABEL)).toBeNull();
   });
 });
 

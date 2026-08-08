@@ -4,12 +4,10 @@
 //   1. The `close` affordance. This is a task/modal flow, so the bar's left
 //      button is a ✕, not a chevron — `backIcon="close"` must reach the bar
 //      through the shell, and its label must stay "Close".
-//   2. The bottom reserve. `paddingBottom: 120` exists for the sticky
-//      "Save & Close" FAB, NOT for a bottom nav (this screen never had one), so
-//      it must survive — dropping it hides the Mindset card behind the FAB.
-//   3. The FAB's inset. It is absolutely positioned and renders no
-//      `<SafeAreaView edges={["bottom"]}>` of its own, so it must NOT ask the
-//      shell to release the bottom inset.
+//   2. The bottom reserve, which went from 120 to 32 when the sticky FAB was
+//      deleted (see below) — 120 over no FAB is ~90px of dead space.
+//   3. The bottom inset, which the SHELL claims. Nothing on this screen is
+//      pinned to the bottom edge any more.
 //
 // Plus the frozen `<StatusBar style="dark" />`, asserted across both modes
 // because a single-mode render cannot tell a resolved value from a frozen one.
@@ -110,32 +108,58 @@ describe("LifestyleManageScreen — status bar follows the scheme", () => {
   });
 });
 
-describe("LifestyleManageScreen — the sticky FAB and its reserve", () => {
-  it("lets the SHELL claim the bottom inset, because the FAB does not", () => {
+describe("LifestyleManageScreen — the bottom edge", () => {
+  it("lets the SHELL claim the bottom inset", () => {
     render(<LifestyleManageScreen />);
     const areas = screen.UNSAFE_queryAllByType(SafeAreaView);
     expect(areas).toHaveLength(1);
     // The old wrapper passed ["top","left","right"] with no bottom nav in that
-    // space, so `bottom-6` measured from the raw screen edge and the FAB sat in
-    // the gesture bar. Nothing here claims the inset itself.
+    // space, so the FAB's `bottom-6` measured from the raw screen edge and sat
+    // in the gesture bar. The FAB is gone and nothing claims the inset itself.
     expect(areas[0].props.edges).toEqual(["top", "left", "right", "bottom"]);
     expect(code()).not.toMatch(/claimsBottomInset/);
   });
 
-  it("keeps the 120px reserve the sticky FAB needs", () => {
+  it("drops the 120px reserve along with the FAB it was reserved for", () => {
     render(<LifestyleManageScreen />);
     const scroll = screen.UNSAFE_getByType(ScrollView);
     expect(scroll.props.contentContainerStyle).toEqual({
       paddingHorizontal: 16,
       paddingTop: 16,
-      paddingBottom: 120,
+      paddingBottom: 32,
       gap: 24,
     });
   });
 
-  it("still saves and closes", () => {
+  // ---------------------------------------------------------------------
+  // "Save & Close" saved nothing (2026-08-08)
+  // ---------------------------------------------------------------------
+  // The sticky extended FAB read "Save & Close" over a `task-alt` tick and its
+  // whole implementation was `router.back()`. Sleep, water, workout, mood and
+  // stress lived in `useState` and were discarded on dismiss; there is no
+  // lifestyle API and no device-storage write anywhere in the repo. A control
+  // shaped, labelled and glyphed like a save IS a claim that the data was
+  // recorded.
+  it("offers no control that claims to save", () => {
     render(<LifestyleManageScreen />);
-    fireEvent.press(screen.getByLabelText("Save and close"));
+    expect(screen.queryByLabelText("Save and close")).toBeNull();
+    expect(screen.queryByText("Save & Close")).toBeNull();
+    expect(screen.queryByLabelText("Save meal and close")).toBeNull();
+
+    const src = code();
+    expect(src).not.toMatch(/Save/);
+    expect(src).not.toMatch(/task-alt/);
+  });
+
+  it("says plainly that nothing is stored, before the user types anything", () => {
+    render(<LifestyleManageScreen />);
+    expect(screen.getByTestId("lifestyle-not-stored")).toBeTruthy();
+    expect(screen.getByText(/Nothing you enter here is stored yet/)).toBeTruthy();
+  });
+
+  it("still dismisses — the bar's close is the only exit, and it works", () => {
+    render(<LifestyleManageScreen />);
+    fireEvent.press(screen.getByLabelText("Close"));
     expect(mockBack).toHaveBeenCalled();
   });
 });
@@ -155,11 +179,6 @@ describe("LifestyleManageScreen — body behaviour is untouched", () => {
     fireEvent.press(screen.getByLabelText("Set stress to 9"));
     expect(screen.getByText("High")).toBeTruthy();
 
-    // Manual ingredient
-    fireEvent.changeText(screen.getByLabelText("Add ingredient manually"), "Lentils");
-    fireEvent.press(screen.getByLabelText("Add ingredient"));
-    expect(screen.getByText("Lentils")).toBeTruthy();
-
     // The workout picker Modal still opens (it moved inside the shell body; a
     // Modal renders into its own host window, so the tree position is inert).
     expect(screen.getAllByText("Workout Plan")).toHaveLength(1); // the field label only
@@ -172,13 +191,28 @@ describe("LifestyleManageScreen — body behaviour is untouched", () => {
     expect(screen.getByText("Rest Day")).toBeTruthy();
   });
 
-  it("reveals the AI recommendation and saves from it", () => {
+  // -------------------------------------------------------------------------
+  // The AI meal planner fabricated dietary advice about a workout that never
+  // happened (2026-08-08)
+  // -------------------------------------------------------------------------
+  // "Generate with AI" revealed a hardcoded recommendation whose "AI Reasoning"
+  // read "Based on your intense morning workout, your muscles require
+  // high-quality protein…". There was no model, no request, and no workout —
+  // this app has never recorded one. "Upload Food Photo" beneath it had no
+  // `onPress` at all, under the caption "AI will identify ingredients
+  // automatically".
+  it("generates no meal, and claims no analysis of the patient", () => {
     render(<LifestyleManageScreen />);
+    expect(screen.queryByLabelText("Generate meal with AI")).toBeNull();
     expect(screen.queryByText("Grilled Salmon & Quinoa")).toBeNull();
-    fireEvent.press(screen.getByLabelText("Generate meal with AI"));
-    expect(screen.getByText("Grilled Salmon & Quinoa")).toBeTruthy();
-    fireEvent.press(screen.getByLabelText("Save meal and close"));
-    expect(mockBack).toHaveBeenCalled();
+    expect(screen.queryByLabelText("Upload food photo")).toBeNull();
+
+    const src = code();
+    expect(src).not.toMatch(/RECOMMENDATION/);
+    expect(src).not.toMatch(/AI Reasoning/);
+    expect(src).not.toMatch(/intense morning workout/);
+    expect(src).not.toMatch(/Generate with AI/);
+    expect(src).not.toMatch(/Upload Food Photo/);
   });
 });
 
@@ -212,7 +246,10 @@ describe("LifestyleManageScreen — no literal colours survive", () => {
     );
   });
 
-  it("gives the glyphs that sit ON `bg-primary` the `on-primary` pair", () => {
-    expect(code()).toMatch(/useTokenColor\("on-primary"\)/);
+  // The two `#ffffff` glyphs this case was written for — the "Generate with AI"
+  // bolt and the FAB's check — went with the controls themselves. What is left
+  // to assert is the rule: every colour here comes from the token map.
+  it("resolves every glyph colour by token name", () => {
+    expect(code()).toMatch(/useTokenColor\("/);
   });
 });

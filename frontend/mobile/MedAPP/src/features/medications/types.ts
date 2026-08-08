@@ -4,9 +4,18 @@ export type ActiveMedication = {
   name: string;
   formAndStrength: string;
   instructions: string;
-  refillLabel: string;
-  refillAvailable: boolean;
   source: "prescribed" | "self-reported";
+
+  // `refillLabel` and `refillAvailable` are GONE. They existed to drive the
+  // "Request refill" control, which added an id to a `useState` Set and
+  // announced "Request sent · Pending review · We'll notify you once it's
+  // ready." Nothing was sent, nothing was stored, no notification could ever
+  // arrive, and navigating away erased it. There is no prescription endpoint
+  // this app can reach (see ./state.ts), so the control is removed rather than
+  // disabled — and with it the two fields whose only reader it was.
+  //
+  // `refillsRemaining` below survives because it is a FACT about the record
+  // rather than an affordance, and the detail screen renders it as one.
 
   // ---- Detail-only facts (MedicationDetailsScreen) ----------------------
   //
@@ -38,4 +47,8 @@ export type ActiveMedication = {
   refillsRemaining?: number;
 };
 
-export type MedicationScreenState = "ready" | "loading" | "empty" | "error" | "offline";
+// `MedicationScreenState` (the "ready" | "loading" | "empty" | "error" |
+// "offline" string union) is gone. It was a flat enum a URL parameter could set
+// to any value, which is how a screen with no network at all had five async
+// states. State is now a discriminated union derived from one query object —
+// see ./state.ts, and read its header before wiring anything.

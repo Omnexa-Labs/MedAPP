@@ -36,16 +36,60 @@
 // toast names the file rather than asserting a vague success. If a PDF pipeline
 // lands later, the label moves back with it — not before.
 //
+// ============================================================================
+// THE SECURITY AND VERIFICATION CLAIMS ARE GONE, AND SO ARE THE SAMPLE VALUES
+// ============================================================================
+// Everything this screen asserted about the provenance of the document was
+// decoration:
+//   * a "Verified" chip in the app-bar action slot, rendered UNCONDITIONALLY.
+//     Nothing is verified — there is no signing service, and a pharmacist
+//     reading that chip would be reading a claim the backend never made.
+//   * a "Signature QR code" that was a remote PNG on lh3.googleusercontent.com.
+//     Identical bytes for every user and every script, and an outbound request
+//     to a Google CDN from a screen displaying prescription data.
+//   * "Digitally signed, timestamped, and end-to-end encrypted for your safety."
+//     None of the three is true of this document.
+//   * `SHA-256: f1e2d3c4b5a6…` — a hash of nothing, truncated so it could not be
+//     checked.
+//   * the rotated "MEDAPP SECURE" watermark, which is the same assertion in
+//     typography.
+// `lib/documents/builders.ts` had already made exactly this call for the
+// EXPORTED file ("copying a truncated fake integrity check into a file that
+// claims to be a record is the same lie in a new container"). The screen now
+// agrees with its own export.
+//
+// The "Send to Pharmacy — Directly integrate with local CVS or Walgreens" and
+// "One-Time QR" option cards went with them: there is no pharmacy integration
+// (and CVS/Walgreens are US chains in a Ghana-seeded product), and the QR they
+// advertised was a static image. "Print Script" had no `onPress` at all, so the
+// whole bento is gone rather than left as one dead control in a row of two
+// removed ones. Recorded in docs/api/README.md.
+//
+// ============================================================================
+// PARAMS ARE READ, NOT INVENTED
+// ============================================================================
+// Thirteen `params.X ?? "<clinical constant>"` fallbacks used to sit here —
+// patient "Alex Rivers", DOB 12/05/1988, licence MD-99283-A, "Hypertension
+// management", 30 Tablets, 3 refills. A partial deep link therefore rendered a
+// coherent-looking prescription that blended whatever the caller passed with
+// fabricated clinical values, with nothing on screen to tell them apart.
+//
+// The five core fields are now REQUIRED and the screen renders a not-found
+// state without them — the treatment ReviewAppointmentScreen already uses for
+// "this session cannot be reconstructed". The eight optional clinical fields
+// render only when passed; a missing one is omitted, exactly as
+// `buildPrescriptionDocument` omits it from the file.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
 import { useCallback, useState } from "react";
-import { Image, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell } from "@/components/shell";
 import { Toast, useToast } from "@/components/feedback";
-import { Icon } from "@/components/ui";
+import { Card, Icon } from "@/components/ui";
 import {
   buildPrescriptionDocument,
   describeSaveResult,
@@ -55,8 +99,6 @@ import {
 } from "@/lib/documents";
 import { useResolvedScheme } from "@/lib/theme";
 import { blendTokens, tokenColor, useTokenColor } from "@/lib/tokens";
-
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
 /**
  * The scroll reserve, after the forbidden `<BottomNav>` was deleted.
@@ -75,6 +117,22 @@ const SCROLL_RESERVE = 60;
  */
 const TOAST_BOTTOM = 30;
 
+/** The not-found plate, same 56 the booking-expired frame draws. */
+const ERROR_PLATE = 56;
+
+/**
+ * A route param that is actually there.
+ *
+ * `useLocalSearchParams` hands back `undefined` for an absent key and `""` for
+ * a key present but empty, and neither is a value to render a prescription
+ * from. Returns `undefined` so the result drops straight into the document
+ * builders, which omit what they are not given.
+ */
+function text(value: string | undefined): string | undefined {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || undefined;
+}
+
 export function ActiveScriptViewScreen() {
   const params = useLocalSearchParams<{
     drug?: string;
@@ -82,8 +140,8 @@ export function ActiveScriptViewScreen() {
     scriptId?: string;
     prescriber?: string;
     issuedDate?: string;
-    // Optional richer clinical fields. Fall back to the comp's sample
-    // values when the caller only passes the core set.
+    // Optional richer clinical fields. Nothing in the app passes these today,
+    // so each section below renders only when its param actually arrives.
     rxNumber?: string;
     dob?: string;
     clinic?: string;
@@ -94,24 +152,22 @@ export function ActiveScriptViewScreen() {
     indication?: string;
   }>();
 
-  const drug = params.drug ?? "Lisinopril 10mg";
-  const patient = params.patient ?? "Alex Rivers";
-  const scriptId = params.scriptId ?? "#8829-X";
-  // The seeded cardiologist (scripts/seed_dev_data.py), not the invented
-  // "Dr. Sarah Jenkins" this screen used to fall back to. Find Care lists the
-  // seeded doctors, so any other name reads as a bug to a tester. Adjoa Boateng
-  // is the right one of the six: this script is Lisinopril for hypertension
-  // management, and her seed bio is hypertension and heart-failure follow-up.
-  const prescriber = params.prescriber ?? "Dr. Adjoa Boateng";
-  const issuedDate = params.issuedDate ?? "Oct 12, 2023";
-  const rxNumber = params.rxNumber ?? "#RX-992-Rivers";
-  const dob = params.dob ?? "12/05/1988";
-  const clinic = params.clinic ?? "Central Cardiology Center";
-  const license = params.license ?? "MD-99283-A";
-  const quantity = params.quantity ?? "30 Tablets";
-  const refills = params.refills ?? "3 Remaining";
-  const instructions = params.instructions ?? "Once daily in the morning";
-  const indication = params.indication ?? "Hypertension management";
+  // The five the document cannot be drawn without. See the PARAMS note above:
+  // these had clinical constants behind them, which is how a link missing the
+  // patient rendered someone else's name over the caller's drug.
+  const drug = text(params.drug);
+  const patient = text(params.patient);
+  const scriptId = text(params.scriptId);
+  const prescriber = text(params.prescriber);
+  const issuedDate = text(params.issuedDate);
+  const rxNumber = text(params.rxNumber);
+  const dob = text(params.dob);
+  const clinic = text(params.clinic);
+  const license = text(params.license);
+  const quantity = text(params.quantity);
+  const refills = text(params.refills);
+  const instructions = text(params.instructions);
+  const indication = text(params.indication);
 
   // The toast's Animated plumbing moved into the shared <Toast>
   // (src/components/feedback) when the Overview screen's download needed the
@@ -183,9 +239,6 @@ export function ActiveScriptViewScreen() {
     showToast,
   ]);
 
-  // The "Verified" tag that used to live inside the hand-rolled bar. Its glyph
-  // was frozen at `#00685f` (the LIGHT value of color/primary) — resolved by
-  // token name now, so it follows the mode.
   const primary = useTokenColor("primary");
   // Every remaining colour on this screen, by ROLE. The document treatment had
   // kept a pocket of literals that the AppearanceSelector could not reach:
@@ -197,11 +250,11 @@ export function ActiveScriptViewScreen() {
   //            and the QR plate SURFACE (`surface-container-lowest`)
   //   #2c3130 / #edf2f0 / #89f5e7 — the toast, which is M3's inverse pair
   const { scheme } = useResolvedScheme();
-  // Decorative brand tints. The watermark is drawn at 4% and the pill-bottle
-  // glyph at 10%, so they take `primary` with the alpha composed in rather than
-  // a second, frozen "faint teal".
-  const watermarkTint = useTokenColor("primary");
+  // The pill-bottle glyph behind the medication box, drawn at 10% — `primary`
+  // with the alpha composed in rather than a second, frozen "faint teal". The
+  // watermark tint that used to sit beside it went with "MEDAPP SECURE".
   const glyphTint = useTokenColor("primary", 0.1);
+  const errorPlate = useTokenColor("on-error-container");
   const onSurface = useTokenColor("on-surface");
   // Filled CTA, exactly as the shared Button resolves it: `primary` fill,
   // `on-primary` content, pressed = the M3 state layer of one over the other.
@@ -213,6 +266,49 @@ export function ActiveScriptViewScreen() {
   // trio) moved into the shared <Toast> with the chip itself. They are resolved
   // by the same token names there — this screen no longer names them.
 
+  // -------------------------------------------------------------------------
+  // Nothing to draw a prescription from
+  // -------------------------------------------------------------------------
+  // A WHOLE-SCREEN replacement, not a banner, and the same shape
+  // ReviewAppointmentScreen uses for a booking session it cannot reconstruct:
+  // there is no prescription here, so displaying one is not something this
+  // screen can offer. Hooks above run first, unconditionally.
+  if (!drug || !patient || !scriptId || !prescriber || !issuedDate) {
+    return (
+      <DetailShell title="Digital Prescription">
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 24,
+            paddingTop: 24,
+            paddingBottom: SCROLL_RESERVE,
+            flexGrow: 1,
+            justifyContent: "center",
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card className="items-center" testID="script-not-found">
+            <View
+              className="items-center justify-center rounded-full bg-error-container"
+              style={{ width: ERROR_PLATE, height: ERROR_PLATE }}
+            >
+              <Icon chrome="error-outline" size={28} color={errorPlate} />
+            </View>
+            <Text className="mt-4 text-center font-headline-md text-headline-md text-on-surface">
+              We can&apos;t show this prescription
+            </Text>
+            <Text className="mt-2 text-center font-body-md text-body-md text-on-surface-variant">
+              The link you followed is missing the details of the script. Open it again from your
+              medications so the right record is loaded.
+            </Text>
+            {/* No button. The app bar's back chevron is the exit, and a second
+                control saying the same thing under a different name is two
+                affordances for one action. */}
+          </Card>
+        </ScrollView>
+      </DetailShell>
+    );
+  }
+
   const goShare = () => {
     router.push({
       pathname: "/(app)/active-script-share",
@@ -221,15 +317,9 @@ export function ActiveScriptViewScreen() {
   };
 
   return (
-    <DetailShell
-      title="Digital Prescription"
-      actions={
-        <View className="flex-row items-center gap-xs rounded-full bg-primary-container/10 px-sm py-xs">
-          <Icon chrome="verified" size={16} color={primary} />
-          <Text className="font-label-md text-label-md text-primary">Verified</Text>
-        </View>
-      }
-    >
+    // No app-bar action slot. It held an unconditional "Verified" chip — see the
+    // note at the head of this file.
+    <DetailShell title="Digital Prescription">
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 24,
@@ -246,27 +336,9 @@ export function ActiveScriptViewScreen() {
             the full-strength `outline-variant` hairline it already had is the
             separation, per docs/BRAND.md §Elevation. */}
         <View className="overflow-hidden rounded-card border border-outline-variant bg-card-surface">
-          {/* Watermark — rotated, very faint. Behind content (zIndex 0). */}
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              top: "44%",
-              left: -40,
-              right: -40,
-              alignItems: "center",
-              transform: [{ rotate: "-45deg" }],
-              opacity: 0.04,
-            }}
-          >
-            <Text
-              className="font-headline-xl"
-              style={{ fontSize: 64, fontWeight: "800", color: watermarkTint }}
-            >
-              MEDAPP SECURE
-            </Text>
-          </View>
-
+          {/* The rotated "MEDAPP SECURE" watermark is gone. It read as
+              decoration but it is a claim, and nothing about this document is
+              secured. */}
           <View style={{ position: "relative", zIndex: 10, padding: 24 }}>
             {/* Document header */}
             <View className="flex-row items-start justify-between border-b border-outline-variant pb-md">
@@ -285,9 +357,13 @@ export function ActiveScriptViewScreen() {
                 </Text>
               </View>
               <View className="items-end gap-xs">
-                <View className="rounded-lg bg-surface-container px-sm py-xs">
-                  <Text className="font-label-md text-label-md text-outline">No. {rxNumber}</Text>
-                </View>
+                {/* The Rx number is optional and no caller passes one, so the
+                    chip is dropped rather than filled with `#RX-992-Rivers`. */}
+                {rxNumber ? (
+                  <View className="rounded-lg bg-surface-container px-sm py-xs">
+                    <Text className="font-label-md text-label-md text-outline">No. {rxNumber}</Text>
+                  </View>
+                ) : null}
                 <Text className="font-body-md text-body-md text-on-surface-variant">
                   Issued: {issuedDate}
                 </Text>
@@ -301,7 +377,8 @@ export function ActiveScriptViewScreen() {
                   {patient}
                 </Text>
                 <Text className="font-body-md text-body-md text-on-surface-variant">
-                  ID: {scriptId} • DOB: {dob}
+                  ID: {scriptId}
+                  {dob ? ` • DOB: ${dob}` : ""}
                 </Text>
               </View>
             </Section>
@@ -311,12 +388,19 @@ export function ActiveScriptViewScreen() {
               <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
                 {prescriber}
               </Text>
-              <Text className="font-body-md text-body-md font-semibold text-primary">
-                {clinic}
-              </Text>
-              <Text className="font-body-md text-body-md text-on-surface-variant">
-                License: {license}
-              </Text>
+              {clinic ? (
+                <Text className="font-body-md text-body-md font-semibold text-primary">
+                  {clinic}
+                </Text>
+              ) : null}
+              {/* A licence number is a credential. Printing `MD-99283-A` under a
+                  real prescriber's name attributes a registration to them that
+                  nothing issued. */}
+              {license ? (
+                <Text className="font-body-md text-body-md text-on-surface-variant">
+                  License: {license}
+                </Text>
+              ) : null}
             </Section>
 
             {/* Medication details — bordered tinted box */}
@@ -338,83 +422,66 @@ export function ActiveScriptViewScreen() {
                 <Text className="font-headline-md text-primary" style={{ fontSize: 22 }}>
                   {drug}
                 </Text>
-                <View className="mt-sm flex-row gap-md">
-                  <View className="flex-1">
-                    <Text className="font-label-sm text-label-sm text-outline">Quantity</Text>
-                    <Text className="font-body-md text-body-md font-bold text-on-surface">
-                      {quantity}
-                    </Text>
+                {quantity || refills ? (
+                  <View className="mt-sm flex-row gap-md">
+                    {quantity ? (
+                      <View className="flex-1">
+                        <Text className="font-label-sm text-label-sm text-outline">Quantity</Text>
+                        <Text className="font-body-md text-body-md font-bold text-on-surface">
+                          {quantity}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {refills ? (
+                      <View className="flex-1">
+                        <Text className="font-label-sm text-label-sm text-outline">Refills</Text>
+                        <Text className="font-body-md text-body-md font-bold text-on-surface">
+                          {refills}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                  <View className="flex-1">
-                    <Text className="font-label-sm text-label-sm text-outline">Refills</Text>
-                    <Text className="font-body-md text-body-md font-bold text-on-surface">
-                      {refills}
-                    </Text>
-                  </View>
-                </View>
+                ) : null}
               </View>
             </Section>
 
             {/* Instructions */}
-            <Section label="Instructions">
-              <View className="flex-row items-start gap-sm rounded-lg bg-surface-container-low p-md">
-                <MaterialIcons name="schedule" size={22} color={primary} />
-                <Text
-                  className="font-body-md text-body-md flex-1 text-on-surface"
-                  style={{ fontStyle: "italic" }}
-                >
-                  "{instructions}"
-                </Text>
-              </View>
-            </Section>
-
-            {/* Indication + Pharmacy instructions */}
-            <View className="mt-md border-t border-outline-variant pt-md">
-              <Text className="font-label-md text-label-md mb-xs text-outline">Indication</Text>
-              <Text className="font-body-md text-body-md text-on-surface">{indication}</Text>
-
-              <View className="mt-md rounded-lg bg-surface-container p-md">
-                <Text className="font-label-md text-label-md mb-sm text-outline">
-                  Pharmacy Instructions
-                </Text>
-                <Bullet>Dispense as written</Bullet>
-                <Bullet>Patient to monitor BP weekly</Bullet>
-              </View>
-            </View>
-
-            {/* Digital sign & integrity */}
-            <View className="mt-md flex-row items-center justify-between gap-md rounded-xl border border-outline-variant/30 bg-surface-container-high/30 p-md">
-              <View className="flex-1 flex-row items-center gap-md">
-                {/* The QR plate is a SURFACE, not a white label — one tone
-                    recessed from the document card it sits in. `#ffffff` here
-                    was the same literal the CTA used for its LABEL two
-                    elements down; they are different roles. */}
-                <View className="h-16 w-16 items-center justify-center rounded-lg bg-surface-container-lowest">
-                  <Image
-                    source={{
-                      uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuCO7czg_wrLN_fFOUZ-uRsXB6r-pnVQXduveqA4uuGvIaRtUgS71tbhh3ABZp3E_VFF6xODnsJKM8blNMnx0eFLovUf2ZVxcmWzpeqAHpkzngcKwx0gyCvE_s315tnn8JyBPVoX3K_xzi_XGTBUpmEo2pYMEXZ2eTUCckqZqPWZOpFNw-yq6_yfA-gK7-DzPw7YqNKZSecjL-UzRhgMOV9oKRNrqpOCK9rx0O76h0o80QGuTseZX4Sv3kl9iIBl8MEMgESnt1LQJFk6",
-                    }}
-                    style={{ width: 48, height: 48 }}
-                    accessibilityLabel="Signature QR code"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="font-label-md text-label-md text-on-surface">
-                    Security & Integrity
-                  </Text>
-                  <Text className="font-label-sm text-label-sm text-outline">
-                    Digitally signed, timestamped, and end-to-end encrypted for your safety.
+            {instructions ? (
+              <Section label="Instructions">
+                <View className="flex-row items-start gap-sm rounded-lg bg-surface-container-low p-md">
+                  <MaterialIcons name="schedule" size={22} color={primary} />
+                  <Text
+                    className="font-body-md text-body-md flex-1 text-on-surface"
+                    style={{ fontStyle: "italic" }}
+                  >
+                    "{instructions}"
                   </Text>
                 </View>
+              </Section>
+            ) : null}
+
+            {/* Indication.
+                The "Pharmacy Instructions" box that used to close this section
+                went with the fallbacks: "Dispense as written" and "Patient to
+                monitor BP weekly" were literal JSX, not fields — dispensing
+                directions and a monitoring instruction attributed to a
+                prescriber who never wrote them. */}
+            {indication ? (
+              <View className="mt-md border-t border-outline-variant pt-md">
+                <Text className="font-label-md text-label-md mb-xs text-outline">Indication</Text>
+                <Text className="font-body-md text-body-md text-on-surface">{indication}</Text>
               </View>
-            </View>
-            <View className="mt-sm items-start">
-              <Text className="font-label-sm text-label-sm mb-xs text-outline">Signature Hash</Text>
-              <Text
-                className="rounded bg-surface-container-highest px-xs py-xs text-on-surface-variant"
-                style={{ fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }), fontSize: 10 }}
-              >
-                SHA-256: f1e2d3c4b5a6…
+            ) : null}
+
+            {/* What stood here — the QR "signature", the "digitally signed,
+                timestamped, end-to-end encrypted" line and the SHA-256 stub —
+                is documented at the head of this file. In its place, the same
+                thing the exported file's footer says, because it is the one
+                statement about this document that is true. */}
+            <View className="mt-md rounded-xl border border-outline-variant/30 bg-surface-container-high/30 p-md">
+              <Text className="font-label-sm text-label-sm text-outline">
+                This is a patient copy for your reference. It is not signed, and a pharmacy will
+                dispense against the prescription your prescriber issued.
               </Text>
             </View>
           </View>
@@ -459,26 +526,9 @@ export function ActiveScriptViewScreen() {
           </Pressable>
         </View>
 
-        {/* Options bento */}
-        <View className="mt-lg gap-md">
-          <OptionCard
-            icon="local-pharmacy"
-            title="Send to Pharmacy"
-            body="Directly integrate with local CVS or Walgreens."
-            onPress={goShare}
-          />
-          <OptionCard
-            icon="qr-code-2"
-            title="One-Time QR"
-            body="Generate a temporary code for physical scanning."
-            onPress={goShare}
-          />
-          <OptionCard
-            icon="print"
-            title="Print Script"
-            body="Standard format for physical pharmacy copies."
-          />
-        </View>
+        {/* The three-card "Other options" bento is deleted — see the head of
+            this file. Two advertised capabilities that do not exist and the
+            third had no `onPress`. */}
       </ScrollView>
 
       {/* Download outcome toast. The copy is no longer a hardcoded
@@ -512,40 +562,10 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function Bullet({ children }: { children: React.ReactNode }) {
-  return (
-    <View className="mb-xs flex-row items-center gap-sm">
-      <View className="h-1.5 w-1.5 rounded-full bg-primary" />
-      <Text className="font-label-md text-label-md text-on-surface-variant">{children}</Text>
-    </View>
-  );
-}
-
-function OptionCard({
-  icon,
-  title,
-  body,
-  onPress,
-}: {
-  icon: IconName;
-  title: string;
-  body: string;
-  onPress?: () => void;
-}) {
-  const primary = useTokenColor("primary");
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      onPress={onPress}
-      className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-md active:bg-surface-container"
-    >
-      <MaterialIcons name={icon} size={24} color={primary} />
-      <Text className="font-label-md text-label-md mt-sm text-on-surface">{title}</Text>
-      <Text className="font-label-sm text-label-sm mt-xs text-outline">{body}</Text>
-    </Pressable>
-  );
-}
+// `Bullet` and `OptionCard` went with their only call sites — the hardcoded
+// "Pharmacy Instructions" list and the options bento. Leaving unreferenced
+// components behind is how the next reader concludes the deletion was
+// abandoned halfway.
 
 // ---------------------------------------------------------------------------
 // Elevation — nothing on this screen casts a shadow.

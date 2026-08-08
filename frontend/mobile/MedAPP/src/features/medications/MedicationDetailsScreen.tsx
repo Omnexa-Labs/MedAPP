@@ -7,7 +7,7 @@
 // WHERE THE DATA COMES FROM: local mock data. There is NO medication endpoint.
 // ===========================================================================
 //
-// This screen renders `./mock-data.ts` and issues no network request. That is a
+// This screen renders `./sample-data.ts` and issues no network request. That is a
 // deliberate, evidenced conclusion, not a placeholder left for later — and it is
 // stated here because the last time this question went unanswered on this
 // project a fabricated `/v1/appointments` shipped past 595 mocked tests and
@@ -39,7 +39,7 @@
 //
 // So the honest options were mock data or a fabricated endpoint. This is the
 // former. When a patient-scoped medication endpoint ships, this file changes in
-// one place — swap the `useMedication` lookup for a query and follow the shape
+// one place — swap the `SAMPLE_MEDICATIONS` lookup for a query and follow the shape
 // of features/appointments/api.ts (a typed adapter module, wire names at the
 // module edge, no endpoint literal in the screen). The gap belongs in
 // docs/PIPELINE.md §5 alongside the "In Review" status gap.
@@ -56,7 +56,8 @@
 // supplied with the task. It needs a visual gate against 828:5944 and 828:7564
 // before it is called done; nothing here should be treated as frame-verified
 // pixel geometry. No value on screen is invented: every one traces to
-// mock-data.ts.
+// sample-data.ts, and the screen now says so in words rather than claiming the
+// record "came from your prescriber" — see the provenance callout below.
 //
 // ---------------------------------------------------------------------------
 // 360dp, NOT 393dp
@@ -117,9 +118,11 @@
 // ---------------------------------------------------------------------------
 // DELIBERATELY ABSENT
 // ---------------------------------------------------------------------------
-// No "Request refill" or "Share" action. Refill requests are ActiveMedications-
-// Screen's flow and its state lives there; adding a second, non-communicating
-// entry point without the frame to specify it would be inventing behaviour. No
+// No "Request refill" action — and the list screen's has since been DELETED
+// rather than copied here, because it reported "Request sent · Pending review"
+// without sending anything. No "Share" action either: sharing is the list's
+// flow, and a second entry point without a frame to specify it would be
+// inventing behaviour. No
 // <Badge>: Badge.tsx sets its caption at `text-[10px]`, under docs/BRAND.md's
 // 12sp floor, so refill count is a KeyValueRow value at `label-sm` 12 instead.
 // Flagged, not worked around silently.
@@ -137,8 +140,8 @@ import {
   SectionHeader,
   type AnyIconName,
 } from "@/components/ui";
-import { ACTIVE_MEDICATIONS } from "./mock-data";
-import type { ActiveMedication, MedicationScreenState } from "./types";
+import { SAMPLE_MEDICATIONS, SAMPLE_NOTICE } from "./sample-data";
+import type { ActiveMedication } from "./types";
 
 /**
  * Line boxes off the type ramp in tailwind.config.js, as the multiplication that
@@ -152,23 +155,23 @@ const RAMP = {
 } as const;
 
 /**
- * The `?state=` preview hatch, matching ActiveMedicationsScreen's convention so
- * the designed loading frame (828:7118) is reachable on device without faking a
- * slow network.
+ * The `?state=` preview hatch — NOW GATED ON `__DEV__`.
  *
- * Only two of `MedicationScreenState`'s five values mean anything to a single
- * record: `empty` is a property of a LIST, and `error`/`offline` are properties
- * of a request this screen does not make. Anything unrecognised — including those
- * three — resolves to `ready`, so a bad param can never strand the screen in a
- * state it has no design for.
+ * It exists so the designed loading frame (828:7118) is reachable on device
+ * without faking a slow network, and that is still worth having. What it must
+ * not be is a lever a link can pull in a shipped build: on the LIST screen its
+ * sibling could force `ready` over a failed fetch and force `error`/`offline`
+ * states no data path could produce, so both hatches are now development-only.
+ * ActiveMedicationsScreen's is gone outright — its states come from a real
+ * derivation now (see ./state.ts) and it had nothing left to preview.
+ *
+ * In a production build this returns false for every input, so `?state=loading`
+ * is inert rather than merely unusual.
  */
-const PREVIEWABLE = ["ready", "loading"] as const satisfies readonly MedicationScreenState[];
-
-type PreviewableState = (typeof PREVIEWABLE)[number];
-
-function requestedState(value: string | string[] | undefined): PreviewableState {
+function wantsLoadingPreview(value: string | string[] | undefined): boolean {
+  if (!__DEV__) return false;
   const state = Array.isArray(value) ? value[0] : value;
-  return PREVIEWABLE.includes(state as PreviewableState) ? (state as PreviewableState) : "ready";
+  return state === "loading";
 }
 
 /** One placeholder line box, sized to the ramp entry it stands in for. */
@@ -223,8 +226,8 @@ function DetailField({
 
 export function MedicationDetailsScreen() {
   const { id, state } = useLocalSearchParams<{ id?: string; state?: string }>();
-  const medication = ACTIVE_MEDICATIONS.find((item) => item.id === id);
-  const loading = requestedState(state) === "loading";
+  const medication = SAMPLE_MEDICATIONS.find((item) => item.id === id);
+  const loading = wantsLoadingPreview(state);
 
   return (
     <DetailShell
@@ -357,12 +360,23 @@ function MedicationRecord({
 
       {/* -- Provenance ------------------------------------------------------ */}
       {/* Where the record came from, in words. Not colour-only: docs/BRAND.md
-          forbids colour as the sole signal for clinical meaning. */}
+          forbids colour as the sole signal for clinical meaning.
+
+          This said "This record came from your prescriber." for a `prescribed`
+          entry, which was the exact opposite of true: nothing here came from a
+          prescriber, there is no medication endpoint, and `source` is a field on
+          a fixture. `source` still distinguishes the two entries — a
+          `self-reported` sample has no prescriber and no refill count, and the
+          sections above correctly render that absence — but it can no longer
+          make a claim about provenance, because the provenance of every entry on
+          this screen is the same and it is not a clinician.
+
+          `tone="error"` rather than the default `info`: this is a qualification
+          of everything above it, not a footnote, and the tone renders a glyph
+          beside the words so it is never colour-only. */}
       {!loading && medication ? (
-        <InfoCallout icon={medication.source === "prescribed" ? "verified-user" : "person"}>
-          {medication.source === "prescribed"
-            ? "This record came from your prescriber."
-            : "You added this record yourself. Ask your clinician to confirm it."}
+        <InfoCallout tone="error" testID="medication-provenance">
+          {`${SAMPLE_NOTICE} This is fixed demonstration data, identical for every account. No prescription record has been loaded.`}
         </InfoCallout>
       ) : null}
     </View>
