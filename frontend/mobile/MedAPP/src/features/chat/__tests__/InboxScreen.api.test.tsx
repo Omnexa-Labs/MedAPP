@@ -5,13 +5,24 @@
 // shipped all along. These cases lock the three states a real request has, and
 // the one ordering rule that is easy to get backwards.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { screen, fireEvent, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithSafeArea } from "@/test/safe-area";
 
+const mockPush = jest.fn();
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn(), replace: jest.fn(), back: jest.fn(), navigate: jest.fn(), canGoBack: () => true },
+  router: {
+    push: (...a: unknown[]) => mockPush(...a),
+    replace: jest.fn(),
+    back: jest.fn(),
+    navigate: jest.fn(),
+    canGoBack: () => true,
+  },
   useLocalSearchParams: () => ({}),
+  // The inbox polls only while focused. Under test it is always on top.
+  useIsFocused: () => true,
 }));
 
 jest.mock("@/store/auth-store", () => ({
@@ -23,16 +34,29 @@ jest.mock("@/store/auth-store", () => ({
 // only permits a factory to close over a variable whose name starts with
 // "mock". ChatThreadScreen's suite carries the same note.
 const mockListThreads = jest.fn();
+const mockCreateThread = jest.fn();
 jest.mock("../api", () => ({
-  chatApi: { listThreads: (...a: unknown[]) => mockListThreads(...a) },
+  chatApi: {
+    listThreads: (...a: unknown[]) => mockListThreads(...a),
+    createThread: (...a: unknown[]) => mockCreateThread(...a),
+  },
 }));
 
 import { InboxScreen } from "../InboxScreen";
+
+// The threads query carries a `refetchInterval`, so an abandoned client keeps a
+// live timer after the test that made it — which jest reports as a worker that
+// "failed to exit gracefully". Clearing the cache cancels it.
+const clients: QueryClient[] = [];
+afterEach(() => {
+  for (const c of clients.splice(0)) c.clear();
+});
 
 function render() {
   // `retry: false` so the error case fails on the FIRST rejection instead of
   // burning the default three attempts and timing the test out.
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  clients.push(qc);
   return renderWithSafeArea(
     <QueryClientProvider client={qc}>
       <InboxScreen />
@@ -54,7 +78,11 @@ const thread = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("InboxScreen — live threads", () => {
-  beforeEach(() => mockListThreads.mockReset());
+  beforeEach(() => {
+    mockListThreads.mockReset();
+    mockCreateThread.mockReset();
+    mockPush.mockReset();
+  });
 
   it("renders threads returned by the service", async () => {
     mockListThreads.mockResolvedValue([thread()]);
@@ -96,5 +124,140 @@ describe("InboxScreen — live threads", () => {
     mockListThreads.mockResolvedValue([]);
     render();
     await waitFor(() => expect(screen.queryByText("Couldn't load your messages")).toBeNull());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DEAD CONTROLS
+//
+// Both of these passed a green suite while doing nothing, because the old cases
+// asserted that a chip and a FAB were on screen — which they were.
+// ---------------------------------------------------------------------------
+
+describe("InboxScreen — the compose FAB actually creates a thread", () => {
+  beforeEach(() => {
+    mockListThreads.mockReset().mockResolvedValue([]);
+    mockCreateThread.mockReset().mockResolvedValue(thread({ id: "t-new", subject: "Sore throat" }));
+    mockPush.mockReset();
+  });
+
+  it("POSTs /v1/threads and opens what it created", async () => {
+    // The FAB's `onPress` was an empty body with a TODO reading "once the
+    // messaging service exposes POST /v1/threads". It has exposed it all along.
+    render();
+    await waitFor(() => expect(mockListThreads).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByLabelText("Compose new message"));
+    fireEvent.changeText(screen.getByLabelText("Conversation subject"), "Sore throat");
+    fireEvent.press(screen.getByLabelText("Start conversation"));
+
+    await waitFor(() =>
+      expect(mockCreateThread).toHaveBeenCalledWith({
+        subject: "Sore throat",
+        source: "direct",
+        // Assigned to a role, so a clinician picks it up. A thread with no
+        // assignee and no participants reaches nobody.
+        assignedRole: "doctor",
+      }),
+    );
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({ params: expect.objectContaining({ threadId: "t-new" }) }),
+      ),
+    );
+  });
+
+  it("will not POST an empty subject", async () => {
+    render();
+    await waitFor(() => expect(mockListThreads).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByLabelText("Compose new message"));
+    fireEvent.press(screen.getByLabelText("Start conversation"));
+
+    expect(mockCreateThread).not.toHaveBeenCalled();
+  });
+
+  it("says so when creating fails, instead of closing as though it worked", async () => {
+    mockCreateThread.mockRejectedValue(new Error("offline"));
+    render();
+    await waitFor(() => expect(mockListThreads).toHaveBeenCalled());
+
+    fireEvent.press(screen.getByLabelText("Compose new message"));
+    fireEvent.changeText(screen.getByLabelText("Conversation subject"), "Sore throat");
+    fireEvent.press(screen.getByLabelText("Start conversation"));
+
+    await waitFor(() => expect(screen.getByText(/Couldn't start that conversation/)).toBeTruthy());
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+describe("InboxScreen — every filter chip can match a row", () => {
+  // WAS: All / Doctors / Groups / Private over a `kind` union whose "group"
+  // member `toConversation` never produces, and a `badge.label === "Doctor"`
+  // comparison against a service that stores the role lowercase. Three of the
+  // four selected nothing, permanently, on a screen for finding a conversation.
+  const rows = [
+    thread({ id: "t-doc", subject: "With a doctor", assignedRole: "doctor" }),
+    thread({ id: "t-nurse", subject: "With a nurse", assignedRole: "nurse" }),
+    thread({ id: "t-direct", subject: "Unassigned", assignedRole: null }),
+  ];
+
+  beforeEach(() => {
+    mockListThreads.mockReset().mockResolvedValue(rows);
+    mockCreateThread.mockReset();
+    mockPush.mockReset();
+  });
+
+  it("Doctors matches the LOWERCASE role the service actually stores", async () => {
+    render();
+    await waitFor(() => expect(screen.getByText("With a doctor")).toBeTruthy());
+
+    fireEvent.press(screen.getByText("Doctors"));
+    expect(screen.getByText("With a doctor")).toBeTruthy();
+    expect(screen.queryByText("With a nurse")).toBeNull();
+    expect(screen.queryByText("Unassigned")).toBeNull();
+  });
+
+  it("Care team matches every other assigned role", async () => {
+    render();
+    await waitFor(() => expect(screen.getByText("With a nurse")).toBeTruthy());
+
+    fireEvent.press(screen.getByText("Care team"));
+    expect(screen.getByText("With a nurse")).toBeTruthy();
+    expect(screen.queryByText("With a doctor")).toBeNull();
+  });
+
+  it("Direct matches the threads assigned to nobody", async () => {
+    render();
+    await waitFor(() => expect(screen.getByText("Unassigned")).toBeTruthy());
+
+    fireEvent.press(screen.getByText("Direct"));
+    expect(screen.getByText("Unassigned")).toBeTruthy();
+    expect(screen.queryByText("With a doctor")).toBeNull();
+  });
+
+  it("offers no Groups chip — the mapper cannot produce a group", async () => {
+    render();
+    await waitFor(() => expect(screen.getByText("With a doctor")).toBeTruthy());
+    expect(screen.queryByText("Groups")).toBeNull();
+  });
+});
+
+describe("InboxScreen — BRAND compliance", () => {
+  const src = () =>
+    readFileSync(join(__dirname, "..", "InboxScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+      .replace(/\/\/.*$/gm, "");
+
+  it("imports no icon library — the icon gate is the only file allowed to", () => {
+    expect(src()).not.toMatch(/@expo\/vector-icons/);
+    expect(src()).not.toMatch(/MaterialIcons/);
+  });
+
+  it("carries no raw colour literals, including white", () => {
+    expect(src()).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(src()).not.toMatch(/\brgba?\(/);
+    expect(src()).not.toMatch(/\btext-white\b/);
   });
 });

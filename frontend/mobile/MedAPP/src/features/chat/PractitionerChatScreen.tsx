@@ -104,7 +104,7 @@ const SEED_CARE_TEAM_MESSAGES: ChatMessage[] = [
     kind: "attachment" as const,
     text: "On it. Uploading the lab panel now — flagging the potassium result.",
     timestamp: "19:45",
-    delivered: true,
+    status: "sent",
     attachment: {
       name: "Lab_Panel_May2026.pdf",
       meta: "PDF · 2.4 MB",
@@ -117,7 +117,7 @@ const SEED_CARE_TEAM_MESSAGES: ChatMessage[] = [
     kind: "text" as const,
     text: "Chart updated. Bed 12 was slightly hypertensive an hour ago; recheck is logged.",
     timestamp: "19:47",
-    delivered: true,
+    status: "sent",
   },
   {
     id: "ct-6",

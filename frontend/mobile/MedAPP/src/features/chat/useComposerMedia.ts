@@ -49,17 +49,34 @@
 // WHAT IS REAL AND WHAT IS NOT — read this before trusting the UI
 // ---------------------------------------------------------------------------
 // The file picker, the microphone permission grant, the recording, and the
-// on-device file are ALL REAL. What does not exist is an UPLOAD: there is no
-// endpoint in this project that accepts composer media, so an "attached" file
-// never leaves the handset. The message the composer appends carries the local
-// `file://` uri and the metadata, and the bubble renders from that.
+// on-device file are ALL REAL. What this hook still does not do is UPLOAD, so an
+// "attached" file never leaves the handset. The message the composer appends
+// carries the local `file://` uri and the metadata, and the bubble renders from
+// that. `ComposerAttachment.uploaded` is hardcoded `false` and every consumer
+// must treat the uri as device-local.
 //
-// FLAGGED FOR THE BACKEND: this needs `POST /v1/threads/:id/attachments`
-// (multipart, returning a durable id + url) before any of this is shippable.
-// The deliberate choice was to render the picked file LOCALLY rather than fake a
-// POST to an invented route, because a faked upload reads as working software
-// and would be discovered only in QA. `ComposerAttachment.uploaded` is therefore
-// hardcoded `false` and every consumer must treat the uri as device-local.
+// THE ENDPOINT THIS FILE ASKED FOR NOW EXISTS (backend, 2026-08-08):
+//
+//   POST /v1/threads/:id/attachments        multipart `file` + optional
+//                                           `duration_ms` -> 201 AttachmentOut
+//   POST /v1/threads/:id/messages           { body, attachment_ids: [id] }
+//   GET  /v1/threads/:id/attachments/:aid/content
+//
+// See `docs/api/inbox_service.md`. Two things to know before wiring it:
+//   • Upload is a SEPARATE call from send. The attachment is staged
+//     (`message_id: null`) and adopted by the message that references it, so
+//     the upload can start the moment the file is picked.
+//   • There is NO url on the response, on purpose — a link that grants access
+//     is a bearer credential for PHI. Build the content path from the ids and
+//     send the normal bearer token.
+//
+// Limits the UI has to respect: 8 MiB (413 over), and an allowlist of audio,
+// image and PDF types (415 otherwise). `duration_ms` should be passed for a
+// recording — the server persists it so the player renders without a download.
+//
+// Still hardcoding `uploaded: false` until that wiring lands. The original
+// judgement stands: render the picked file LOCALLY rather than fake a POST,
+// because a faked upload reads as working software and is discovered only in QA.
 //
 // ---------------------------------------------------------------------------
 // STATE DELIBERATELY NOT MODELLED

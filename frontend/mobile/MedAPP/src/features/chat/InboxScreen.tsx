@@ -45,16 +45,47 @@
 //   - support_agent icon → headset-mic (nearest MaterialIcons equivalent).
 //   - edit_square icon → edit (compose new message).
 //
+// ---------------------------------------------------------------------------
+// PATIENT-SAFETY / DEAD-CONTROL PASS 2026-08-07
+// ---------------------------------------------------------------------------
+//   * The compose FAB was an empty `onPress` with a TODO reading "once the
+//     messaging service exposes POST /v1/threads". It has exposed it all along
+//     (./api.ts). The FAB now opens a subject prompt and calls
+//     `chatApi.createThread` with `assignedRole: "doctor"` — the only shape of
+//     new conversation a patient can start that anybody is on the other end of.
+//   * THREE OF THE FOUR FILTER CHIPS COULD NEVER MATCH A ROW. `toConversation`
+//     emits `kind: "support" | "person"` and never `"group"`, so the Groups chip
+//     was filtering on a value the mapper cannot produce; and "Doctors"
+//     compared `badge.label === "Doctor"` against `assigned_role`, which the
+//     service stores lowercase. The tabs are rebuilt from what the wire
+//     actually carries — see FILTER_TABS.
+//   * There is no push channel, so the inbox polls every 30s WHILE FOCUSED.
+//   * MaterialIcons was imported directly, which docs/BRAND.md forbids
+//     outright ("Screens must never import an icon library directly"); every
+//     glyph goes through the `<Icon chrome=… />` gate. Six frozen light-mode
+//     literals went with it: the three BADGE_STYLES pairs (now the shared
+//     `Badge`, which is that component), the avatar glyph's `#3d4947`, the
+//     unread count's `#ffffff` and the empty state's `#bcc9c6`.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
 import { useMemo, useState } from "react";
-import { ActivityIndicator } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { ActivityIndicator, TextInput } from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
-import { router, type Href } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-import { Card, ChoiceChip, ChoiceChipRow, SearchField } from "@/components/ui";
+import { router, useIsFocused } from "expo-router";
+import {
+  Badge,
+  Button,
+  Card,
+  ChoiceChip,
+  ChoiceChipRow,
+  Icon,
+  SearchField,
+  type ChromeIconName,
+} from "@/components/ui";
+import { Toast, useToast } from "@/components/feedback";
 import { PatientShell } from "@/components/shell";
 import { useAuthStore } from "@/store/auth-store";
 import { useResolvedScheme } from "@/lib/theme";
@@ -67,22 +98,26 @@ import { chatApi, type Thread } from "./api";
  */
 const GUTTER = 16;
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
-type FilterTab = "all" | "doctors" | "groups" | "private";
-type ConversationKind = "person" | "group" | "support";
-type BadgeTint = "primary" | "tertiary" | "secondary";
+// `ChromeIconName` comes from the icon GATE, not from @expo/vector-icons —
+// src/components/ui/icons is the only file allowed to import a library.
+type IconName = ChromeIconName;
+type FilterTab = "all" | "doctors" | "care-team" | "private";
+// `"group"` is GONE from this union. `toConversation` never emitted one — it
+// only ever produces "support" or "person" — so a member of the type that no
+// mapper can produce is how the Groups filter came to select nothing.
+type ConversationKind = "person" | "support";
 
 interface Conversation {
   id: string;
   kind: ConversationKind;
   // person kind
   avatarUri?: string;
-  // group / support kind
+  // support kind
   avatarIcon?: IconName;
   avatarBgClass?: string; // NativeWind class for the icon bg
-  avatarFgColor?: string; // hex for the icon color
   name: string;
-  badge?: { label: string; tint: BadgeTint };
+  /** The thread's `assigned_role`, as stored. Normalise before comparing. */
+  assignedRole?: string;
   isOnline?: boolean;
   unreadCount?: number;
   lastMessage: string;
@@ -115,8 +150,23 @@ function toConversation(t: Thread): Conversation {
     name: t.subject,
     lastMessage: t.source,
     timestamp: formatWhen(t.lastMessageAtIso),
-    badge: t.assignedRole ? { label: t.assignedRole, tint: "primary" } : undefined,
+    // The RAW role, not a display string. The badge title-cases it for the eye;
+    // the filter compares the normalised value. The two used to be the same
+    // field, which is how `badge.label === "Doctor"` came to be compared against
+    // a service that stores "doctor".
+    assignedRole: t.assignedRole ?? undefined,
   };
+}
+
+/** Roles are stored as written (`"doctor"`, `"care_team"`). Compare on this. */
+function normaliseRole(role: string | undefined): string {
+  return (role ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+/** …and read it back out for a human. */
+function formatRole(role: string): string {
+  const cleaned = role.replace(/[_-]+/g, " ").trim();
+  return cleaned ? cleaned[0].toUpperCase() + cleaned.slice(1) : cleaned;
 }
 
 /** Short relative time. Null means the thread has no messages yet. */
@@ -132,20 +182,34 @@ function formatWhen(iso: string | null): string {
 }
 
 
+/**
+ * The tabs, rebuilt from what `ThreadOut` actually carries.
+ *
+ * WAS: All / Doctors / Groups / Private, over a `kind` union whose `"group"`
+ * member no mapper produced and a `badge.label === "Doctor"` comparison against
+ * a lowercase wire value. Three of the four selected nothing, for ever, on a
+ * screen whose whole job is finding a conversation.
+ *
+ * `assigned_role` is the ONLY axis the service gives us, so these are its three
+ * meaningful values: assigned to a doctor, assigned to anyone else, assigned to
+ * nobody (a direct thread). Every one of them can match a real row.
+ */
 const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: "all", label: "All" },
   { key: "doctors", label: "Doctors" },
-  { key: "groups", label: "Groups" },
-  { key: "private", label: "Private" },
+  { key: "care-team", label: "Care team" },
+  { key: "private", label: "Direct" },
 ];
 
-// Badge background colours are semi-transparent and can't be expressed as
-// NativeWind classes with dynamic opacity, so use inline hex + alpha.
-const BADGE_STYLES: Record<BadgeTint, { bg: string; text: string }> = {
-  primary: { bg: "rgba(0,131,120,0.15)", text: "#00685f" },
-  tertiary: { bg: "rgba(33,112,228,0.15)", text: "#0058be" },
-  secondary: { bg: "rgba(213,227,252,0.6)", text: "#515f74" },
-};
+/** The role a patient-initiated thread is assigned to. See `startThread`. */
+const NEW_THREAD_ROLE = "doctor";
+
+/** No socket, no SSE. The list is only as fresh as its last poll. */
+const INBOX_POLL_MS = 30_000;
+
+// `BADGE_STYLES` is deleted. It was three frozen light-mode pairs
+// (`rgba(0,131,120,0.15)`/`#00685f`, `#0058be`, `#515f74`) hand-rolling the
+// shared `Badge`, which is that component and themes for both modes.
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -157,6 +221,10 @@ export function InboxScreen() {
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const [query, setQuery] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [subject, setSubject] = useState("");
+  const toast = useToast();
+  const queryClient = useQueryClient();
 
   // FAB colours, by token name rather than the `#00685f` / `#005049` / `#ffffff`
   // this screen froze — all three were LIGHT-mode values baked into JS.
@@ -170,9 +238,15 @@ export function InboxScreen() {
   // a seed array until now — and the note promising this call said it was
   // blocked on "the messaging service", which was never true: inbox_service has
   // shipped the endpoint all along (see ./api.ts).
+  // Polling, because nothing pushes: without it a clinician's reply — and a new
+  // thread opened on the patient's behalf — was invisible until the tab was
+  // re-entered. Paused off-screen so the app is not re-reading an inbox in the
+  // background.
+  const isFocused = useIsFocused();
   const { data, isPending, isError, refetch, isRefetching } = useQuery({
     queryKey: ["threads"],
     queryFn: () => chatApi.listThreads(),
+    refetchInterval: isFocused ? INBOX_POLL_MS : false,
   });
 
   const conversations = useMemo(
@@ -187,16 +261,43 @@ export function InboxScreen() {
   );
 
   const spinner = useTokenColor("primary");
+  const composerText = useTokenColor("on-surface");
+  const composerPlaceholder = useTokenColor("outline");
+
+  // `POST /v1/threads`, the call the FAB's TODO said was missing.
+  //
+  // `assignedRole` rather than a participant id, because there is no recipient
+  // picker anywhere in this app and inventing one here would be a bigger
+  // decision than this fix. A thread assigned to a role is the shape
+  // inbox_service already routes to a clinician — the same shape the AI
+  // escalation uses — so the message reaches a human rather than an empty room.
+  const createMutation = useMutation({
+    mutationFn: (nextSubject: string) =>
+      chatApi.createThread({ subject: nextSubject, source: "direct", assignedRole: NEW_THREAD_ROLE }),
+    onSuccess: (thread) => {
+      void queryClient.invalidateQueries({ queryKey: ["threads"] });
+      setComposeOpen(false);
+      setSubject("");
+      router.push({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pathname: "/(app)/chat-thread" as any,
+        params: { name: thread.subject, threadId: thread.id },
+      });
+    },
+    onError: () => toast.show("error", "Couldn't start that conversation. Try again."),
+  });
 
   const filtered = useMemo(() => {
     let result = conversations;
 
     if (activeFilter === "doctors") {
-      result = result.filter((c) => c.badge?.label === "Doctor");
-    } else if (activeFilter === "groups") {
-      result = result.filter((c) => c.kind === "group" || c.kind === "support");
+      result = result.filter((c) => normaliseRole(c.assignedRole) === "doctor");
+    } else if (activeFilter === "care-team") {
+      result = result.filter(
+        (c) => c.assignedRole != null && normaliseRole(c.assignedRole) !== "doctor",
+      );
     } else if (activeFilter === "private") {
-      result = result.filter((c) => c.kind === "person" && !c.badge);
+      result = result.filter((c) => c.assignedRole == null);
     }
 
     if (query.trim()) {
@@ -344,14 +445,62 @@ export function InboxScreen() {
             },
             fabShadow,
           ]}
-          onPress={() => {
-            // TODO: open new conversation composer once the messaging
-            // service exposes POST /v1/threads.
-          }}
+          onPress={() => setComposeOpen(true)}
         >
-          <MaterialIcons name="edit" size={28} color={onPrimary} />
+          <Icon chrome="edit" size={28} color={onPrimary} />
         </Pressable>
       </View>
+
+      {/* -----------------------------------------------------------------
+          New conversation.
+          A subject and nothing else, because a subject is all `ThreadCreate`
+          requires that the patient can supply — there is no recipient picker
+          in this product and `participant_user_ids` would need one. Deliberately
+          a small in-place sheet rather than a pushed screen: it is one field.
+          ----------------------------------------------------------------- */}
+      {composeOpen ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close new conversation"
+            onPress={() => setComposeOpen(false)}
+            style={{ position: "absolute", inset: 0, zIndex: 45 }}
+            className="bg-scrim/40"
+          />
+          <View
+            style={{ position: "absolute", left: 16, right: 16, bottom: 96, zIndex: 50 }}
+            className="gap-sm rounded-card border border-outline-variant bg-card-surface p-md"
+          >
+            <Text className="font-headline-md text-headline-md text-on-surface">
+              New conversation
+            </Text>
+            <Text className="font-body-md text-body-md text-on-surface-variant">
+              A clinician picks this up from the shared queue. For an emergency, call your local
+              emergency number instead.
+            </Text>
+            <TextInput
+              value={subject}
+              onChangeText={setSubject}
+              placeholder="What is it about?"
+              placeholderTextColor={composerPlaceholder}
+              accessibilityLabel="Conversation subject"
+              maxLength={255}
+              className="min-h-[52px] rounded-md border border-outline-variant bg-field-surface px-md"
+              style={{ color: composerText, fontSize: 16 }}
+            />
+            <Button
+              label={createMutation.isPending ? "Starting…" : "Start conversation"}
+              onPress={() => createMutation.mutate(subject.trim())}
+              disabled={!subject.trim() || createMutation.isPending}
+              loading={createMutation.isPending}
+            />
+          </View>
+        </>
+      ) : null}
+
+      {/* BottomNav floats `absolute bottom-0` over an ~80px band, so the chip
+          clears that rather than Toast's detail-screen default of 30. */}
+      <Toast message={toast.message} tone={toast.tone} onDismiss={toast.clear} bottom={96} />
     </PatientShell>
   );
 }
@@ -362,6 +511,9 @@ export function InboxScreen() {
 
 function ConversationItem({ conv }: { conv: Conversation }) {
   const isUnread = (conv.unreadCount ?? 0) > 0;
+  // Was a frozen `#3d4947` — the LIGHT value of `on-surface-variant`, so the
+  // fallback avatar glyph stayed dark on a dark-mode surface.
+  const avatarGlyph = useTokenColor("on-surface-variant");
 
   return (
     <Pressable
@@ -405,11 +557,7 @@ function ConversationItem({ conv }: { conv: Conversation }) {
             <View
               className={`h-14 w-14 items-center justify-center rounded-full ${conv.avatarBgClass ?? "bg-surface-container"}`}
             >
-              <MaterialIcons
-                name={conv.avatarIcon ?? "person"}
-                size={32}
-                color={conv.avatarFgColor ?? "#3d4947"}
-              />
+              <Icon chrome={conv.avatarIcon ?? "person"} size={32} color={avatarGlyph} />
             </View>
           )}
           {/* Online status dot */}
@@ -434,23 +582,10 @@ function ConversationItem({ conv }: { conv: Conversation }) {
               >
                 {conv.name}
               </Text>
-              {conv.badge ? (
-                <View
-                  className="shrink-0 rounded px-xs py-xs"
-                  style={{ backgroundColor: BADGE_STYLES[conv.badge.tint].bg }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "700",
-                      color: BADGE_STYLES[conv.badge.tint].text,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.4,
-                    }}
-                  >
-                    {conv.badge.label}
-                  </Text>
-                </View>
+              {/* The shared Badge (10px/600/uppercase is its own ramp), not a
+                  private pill on two frozen light-mode hexes. */}
+              {conv.assignedRole ? (
+                <Badge label={formatRole(conv.assignedRole)} tone="primary" className="shrink-0" />
               ) : null}
             </View>
             <Text
@@ -474,8 +609,13 @@ function ConversationItem({ conv }: { conv: Conversation }) {
               {conv.lastMessage}
             </Text>
             {conv.unreadCount ? (
+              // `#ffffff` was frozen here: in dark mode `primary` is the pale
+              // end of the ramp and white-on-pale-teal is unreadable.
               <View className="h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary">
-                <Text style={{ color: "#ffffff", fontSize: 10, fontWeight: "700" }}>
+                <Text
+                  className="text-on-primary"
+                  style={{ fontSize: 10, fontWeight: "700" }}
+                >
                   {conv.unreadCount}
                 </Text>
               </View>
@@ -492,9 +632,13 @@ function ConversationItem({ conv }: { conv: Conversation }) {
 // ---------------------------------------------------------------------------
 
 function EmptyInbox({ query }: { query: string }) {
+  // Was `#bcc9c6` — the LIGHT `outline-variant`, frozen, so the empty state's
+  // one glyph was near-invisible on a dark background.
+  const glyph = useTokenColor("outline");
+
   return (
     <View className="items-center justify-center gap-sm py-xl">
-      <MaterialIcons name="mark-chat-unread" size={40} color="#bcc9c6" />
+      <Icon chrome="mark-chat-unread" size={40} color={glyph} />
       <Text className="font-label-md text-label-md text-on-surface-variant">
         {query.trim() ? "No conversations match your search" : "No messages yet"}
       </Text>

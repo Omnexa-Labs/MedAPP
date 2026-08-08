@@ -177,6 +177,33 @@ export interface CreateThreadInput {
   bookingId?: string | null;
 }
 
+/**
+ * `POST /v1/threads/handoff` — AI -> human escalation.
+ *
+ * WRAPPED, BUT NOT CALLABLE FROM THIS APP, and the distinction matters enough to
+ * state here rather than let someone discover it as a 403 in the field:
+ * `create_handoff_thread` (inbox_service/app/services/thread_service.py:66)
+ * rejects any principal whose role is not `service` or `admin`. A patient's
+ * bearer token carries neither, so a handoff can only ever be filed BY the
+ * assistant service on the user's behalf — which is why it takes `user_id`
+ * rather than reading the caller's subject.
+ *
+ * It is wrapped because the escalation belongs to `medical_chat_agent` and that
+ * service does not exist yet; when it ships, this is the call it makes. The
+ * patient-initiated escalation the app CAN make is `createThread` with an
+ * `assignedRole` — see AiAssistantScreen.
+ */
+export interface HandoffInput {
+  /** The patient the thread is about. NOT the caller — see above. */
+  userId: string;
+  assignedRole: string;
+  subject: string;
+  /** Filed as the thread's first message, `is_internal: true`. */
+  summary: string;
+  bookingId?: string | null;
+  locale?: string;
+}
+
 export const chatApi = {
   /** The inbox. `GET /v1/threads` is already scoped to the principal. */
   async listThreads(): Promise<Thread[]> {
@@ -217,6 +244,20 @@ export const chatApi = {
         participant_roles: input.participantRoles ?? [],
         assigned_role: input.assignedRole ?? null,
         booking_id: input.bookingId ?? null,
+      }),
+    );
+  },
+
+  /** See `HandoffInput` — service/admin principals only. */
+  async handoff(input: HandoffInput): Promise<Thread> {
+    return toThread(
+      await client.post<ThreadOutWire>(`${THREADS_PATH}/handoff`, {
+        user_id: input.userId,
+        assigned_role: input.assignedRole,
+        subject: input.subject,
+        summary: input.summary,
+        booking_id: input.bookingId ?? null,
+        locale: input.locale ?? "en",
       }),
     );
   },

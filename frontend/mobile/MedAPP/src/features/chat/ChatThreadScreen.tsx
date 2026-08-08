@@ -47,12 +47,14 @@
 //   4. Attachments. `ThreadMessageCreate` is `{ body }`; no upload endpoint
 //      exists anywhere in the product.
 //
-// KEPT DESPITE BEING ABSENT FROM THE FRAME (a drop has to be flagged, and so
-// does a keep): the Clinical Actions FAB and its share menu. Neither frame
-// draws them, but they are the only route to sharing clinical data into a
-// thread and they work. The composer's duplicate `apps` toggle IS removed — it
-// opened the same menu as the FAB, and dropping it is what gets the composer
-// down to the frame's three controls.
+// ~~KEPT DESPITE BEING ABSENT FROM THE FRAME~~ REVERSED 2026-08-07. That keep
+// argued the Clinical Actions FAB and its share menu were "the only route to
+// sharing clinical data into a thread and they work". They did not work: each
+// row called `send("[Shared: Medical History]")`, i.e. it put a square-bracketed
+// English sentence in the message body and attached nothing. A clinician reading
+// that thread sees a claim that a record was shared, and no record. The wire has
+// no attachment concept at all (`ThreadMessageCreate` is `{ body }`), so there is
+// nothing to attach it to — the menu and the FAB are removed.
 //
 // ---------------------------------------------------------------------------
 // COMPOSER MEDIA (attach + mic)
@@ -106,9 +108,61 @@
 // every bubble and that is a design call. 552:1403 / 552:1496 bind `body-md`,
 // so the design call is made and the bubbles are on the ramp.
 //
+// ---------------------------------------------------------------------------
+// PATIENT-SAFETY PASS 2026-08-07 — five things this screen asserted and could not
+// ---------------------------------------------------------------------------
+// Every item below rendered clinical content, or a guarantee about clinical
+// content, that no part of the system stood behind. They are listed because each
+// one shipped past a green suite: the old cases asserted LAYOUT, and a fabricated
+// bubble lays out exactly like a real one.
+//
+//   1. THE CANNED REPLY IS DELETED, not gated. A `setTimeout` after every send
+//      appended an INCOMING bubble — "Understood. I'll review that and get back
+//      to you shortly" — attributed by the app bar to the named clinician, on
+//      EVERY thread including a live one. A patient could stand down on a
+//      symptom because of it. It was reviewed for a `seedMode` prop instead and
+//      the answer was that no caller genuinely needs it: PractitionerChatScreen
+//      is a design demo of a room, and a fabricated care-team reply is the same
+//      defect wearing a different name. There is nothing left to gate.
+//
+//   2. SEEDS NEVER RENDER ON A LIVE THREAD. `messages` used to initialise to
+//      SEED_MESSAGES and the error branch returned `null`, so six invented
+//      messages — including "Continue as prescribed for now" and a 122/80 vitals
+//      card drawn through the real clinical VitalStatCard — showed during load
+//      and then PERMANENTLY under a "Couldn't load this conversation" banner.
+//      The transcript is now derived, not stored: `baseMessages` is the server's
+//      rows when there is a `threadId` and the seed only when there is not.
+//
+//   3. `delivered: true` IS GONE. It was a literal, set before the mutation
+//      resolved and set even when no mutation fired — so a message that was
+//      never POSTed at all (an attachment-only send, any send without a
+//      `threadId`) rendered a green double tick. ./api.ts is explicit that the
+//      service reports READ and never "delivered", so the tick can only ever
+//      mean "the server accepted it". `ChatMessage.status` carries that, and
+//      nothing else claims it.
+//
+//   4. A FAILED SEND IS VISIBLE AND RETRYABLE. The mutation had no `onError`:
+//      a failure produced no toast, no failed state and no way to try again.
+//
+//   5. THE OPTIMISTIC BUBBLE STOPS FLICKERING. `onSettled` invalidated, the
+//      refetch produced new `liveMessages`, and an effect replaced `messages`
+//      wholesale — discarding the bubble the user had just watched appear. The
+//      outbox below is a SEPARATE list, retired per-entry only once the server
+//      row carrying its id is actually in the transcript.
+//
+// Also removed, both for the same reason — a control that cannot do what it
+// says: the video-call button (no telehealth signalling exists anywhere in this
+// product) and the Clinical Actions FAB and its share menu, whose rows sent the
+// literal string "[Shared: Medical History]" and attached no clinical data at
+// all. `ThreadMessageCreate` is `{ body }`; there is no payload to attach.
+//
+// POLLING: there is no socket and no SSE, so a reply was invisible until the
+// user backed out and re-entered. The transcript query polls every 10s WHILE
+// FOCUSED (`useIsFocused`) and not at all otherwise.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding expo-* APIs.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -118,10 +172,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useIsFocused, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { chatApi, type ThreadMessage } from "./api";
+import { Toast, useToast } from "@/components/feedback";
 import { DetailShell, DETAIL_APP_BAR_LEADING_SIZE } from "@/components/shell";
 import {
   Card,
@@ -132,7 +187,7 @@ import {
   type ChromeIconName,
   type VitalStatTrend,
 } from "@/components/ui";
-import { blendTokens, useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { blendTokens, useTokenColor } from "@/lib/tokens";
 import { useResolvedScheme } from "@/lib/theme";
 import { ComposerMediaTray } from "./ComposerMediaTray";
 import { useComposerMedia } from "./useComposerMedia";
@@ -158,12 +213,16 @@ type IconName = ChromeIconName;
 //
 // InboxScreen's first conversation is the SAME person and the same avatar URI,
 // and it must stay in step: it is what pushes `?name=` into this screen.
+// `isOnline` is NOT a member of this table any more. It used to be `true` here
+// and was read unconditionally, so every live thread drew a green "Online" dot
+// beside whoever the inbox had named — a presence claim about a clinician that
+// nothing in the product can source. ./api.ts: `ThreadParticipantOut.is_active`
+// is MEMBERSHIP, not connectivity. Presence is now a prop, defaulting to false.
 const SEED_CONTACT = {
   name: "Dr. Adjoa Boateng",
   role: "Cardiologist",
   avatarUri:
     "https://lh3.googleusercontent.com/aida-public/AB6AXuDeJpe2eyE7VBbPwXD7m2u2so2Q3OUNPtsrGrSFmYPgs-ebEdihstJSB8oCR4b47ByY3B_O0tXJvybxrQFcMdbXyy9xqS7U_kZ8nFPNvIRhmjvEdFwtFcHJV0XGrYK9jh0GeoJZ1vPacpmlGzjtsCd5RCBzska_0hXM0ZEU9ysDTcXuwGisPFsqxaJkEiaMkAZ9kics4W18HE6lSAYeAoyEI8J_niTdEBQuVwViQn55GrLPUW-D2piEuATB6NuuoRLh-IK3SrUgmo-b",
-  isOnline: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -194,8 +253,23 @@ export interface ChatMessage {
    * component over shipping a second copy of it.
    */
   senderName?: string;
-  // outgoing only — show double-tick delivered status
-  delivered?: boolean;
+  /**
+   * Outgoing only. The SEND lifecycle of a message this device composed —
+   * replacing a `delivered?: boolean` that was written as the literal `true` on
+   * every locally-appended bubble, before the request resolved and also when no
+   * request had been made at all.
+   *
+   * The vocabulary is deliberately narrower than a chat app's usual one, because
+   * the service is: ./api.ts reports READ (`last_read_at`) and never
+   * "delivered", so the strongest true statement available is "the server
+   * accepted it" — `"sent"`. Nothing here means the clinician received it, and
+   * nothing draws a tick until the POST has returned.
+   *
+   * `"local"` is the honest state for a message that is NOT being transmitted:
+   * a send on the seeded/demo path, and an attachment, which has no upload
+   * endpoint anywhere in this product.
+   */
+  status?: "sending" | "sent" | "failed" | "local";
   // kind === "attachment"
   attachment?: {
     name: string;
@@ -219,8 +293,29 @@ export interface ChatMessage {
   };
 }
 
+/**
+ * One message this device composed, held OUTSIDE the transcript until the server
+ * has a row for it.
+ *
+ * `body` is what would be POSTed — null-ish (empty) for a send that transmits
+ * nothing, which is what makes `retry` refuse to "retry" a message that was
+ * never on its way anywhere.
+ */
+interface OutboxEntry {
+  message: ChatMessage;
+  body: string;
+  /** The id the service assigned. Set on success; the retirement key. */
+  serverId?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Seed conversation — mirrors Stitch comp.
+//
+// RENDERED ONLY WHEN THERE IS NO `threadId`. See the PATIENT-SAFETY block at the
+// top: these six messages used to be this screen's INITIAL state on every route,
+// so a patient opening a real conversation read invented clinical instructions
+// ("Continue as prescribed for now") and an invented 122/80 reading while the
+// transcript loaded — and kept reading them, permanently, if it failed.
 // ---------------------------------------------------------------------------
 
 const SEED_MESSAGES: ChatMessage[] = [
@@ -244,7 +339,7 @@ const SEED_MESSAGES: ChatMessage[] = [
     kind: "attachment",
     text: "Thank you, Doctor. I've uploaded my latest lab panel for your review.",
     timestamp: "10:28 AM",
-    delivered: true,
+    status: "sent",
     attachment: {
       name: "Lab_Panel_May2026.pdf",
       meta: "PDF · 2.4 MB",
@@ -271,7 +366,7 @@ const SEED_MESSAGES: ChatMessage[] = [
     kind: "text",
     text: "Those numbers are reassuring! Should I adjust my current medication schedule or continue as prescribed?",
     timestamp: "10:34 AM",
-    delivered: true,
+    status: "sent",
   },
   {
     id: "m6",
@@ -294,23 +389,17 @@ const TREND_TO_TOKEN: Record<"up" | "down" | "stable", VitalStatTrend> = {
   stable: "flat",
 };
 
-// Clinical share options shown in the FAB menu
-const CLINICAL_ACTIONS: { label: string; icon: IconName }[] = [
-  { label: "Medical History", icon: "folder-shared" },
-  { label: "Lifestyle Summary", icon: "self-improvement" },
-  { label: "Vitals Trends", icon: "show-chart" },
-  { label: "Medication Log", icon: "medication" },
-];
-
-// Canned reply for the interactive demo (no backend)
-const CANNED_REPLY =
-  "Understood. I'll review that and get back to you shortly. If anything urgent comes up, don't hesitate to reach out.";
+// `CLINICAL_ACTIONS` and `CANNED_REPLY` used to live here. Both are deleted
+// rather than moved behind a flag — see the PATIENT-SAFETY block at the top.
 
 let nextId = 200;
 function makeId() {
   nextId += 1;
   return `ct${nextId}`;
 }
+
+/** How often an OPEN thread re-reads its transcript. Nothing pushes to it. */
+const THREAD_POLL_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -355,6 +444,16 @@ export interface ChatThreadScreenProps {
    * for them explicitly.
    */
   showInternalNotes?: boolean;
+  /**
+   * Draw the presence dot beside the avatar.
+   *
+   * DEFAULTS TO FALSE, and the default is the point. This used to be read off
+   * `SEED_CONTACT.isOnline: true` with no way to override it, so every live
+   * thread asserted that the clinician was online right now. Nothing in
+   * inbox_service models connectivity (./api.ts), so until something does, no
+   * caller can truthfully pass `true` and none does.
+   */
+  isOnline?: boolean;
 }
 
 export function ChatThreadScreen({
@@ -365,6 +464,7 @@ export function ChatThreadScreen({
   seedMessages = SEED_MESSAGES,
   isGroup = false,
   showInternalNotes = false,
+  isOnline = false,
 }: ChatThreadScreenProps = {}) {
   // Accept lightweight params from the navigation call for personalisation.
   const params = useLocalSearchParams<{
@@ -375,31 +475,64 @@ export function ChatThreadScreen({
     threadId?: string;
   }>();
 
-  const contact = {
-    name: params.name ?? SEED_CONTACT.name,
-    role: params.role ?? SEED_CONTACT.role,
-    avatarUri: params.avatar ?? SEED_CONTACT.avatarUri,
-    isOnline: SEED_CONTACT.isOnline,
-  };
-
   // ---------------------------------------------------------------------
   // LIVE THREAD, when we were given one
   // ---------------------------------------------------------------------
   // `threadId` arrives from InboxScreen. Without it — PractitionerChatScreen,
-  // the profile "Message" button, every existing test — the screen keeps its
-  // seeded behaviour rather than firing a request for a thread that does not
-  // exist. That fallback is what lets this migrate one caller at a time.
+  // the profile "Message" button — the screen keeps its seeded behaviour rather
+  // than firing a request for a thread that does not exist.
   const threadId = params.threadId;
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
+  // Polling is the only way a reply arrives (no socket, no SSE), and it must
+  // stop when the screen is not on top — a background thread re-reading a
+  // clinical transcript every ten seconds is battery and audit-log noise.
+  const isFocused = useIsFocused();
 
-  const { data: wireMessages, isPending: threadPending, isError: threadError } = useQuery({
+  const {
+    data: wireMessages,
+    isPending: threadPending,
+    isError: threadError,
+  } = useQuery({
     queryKey: ["thread", threadId, "messages"],
     queryFn: () => chatApi.listMessages(threadId as string),
     enabled: Boolean(threadId),
+    refetchInterval: isFocused ? THREAD_POLL_MS : false,
   });
 
-  const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
+  // `GET /v1/threads/:id`. It has existed since inbox_service shipped and was
+  // never called, which is why the app bar of every live thread read
+  // "Doctor · Cardiologist" over a stock photo: the screen fell back to
+  // SEED_CONTACT for the role no matter whose conversation it was.
+  const { data: thread } = useQuery({
+    queryKey: ["thread", threadId],
+    queryFn: () => chatApi.getThread(threadId as string),
+    enabled: Boolean(threadId),
+  });
+
+  // The identity in the app bar. On a live thread it comes from the SERVICE, and
+  // where the service has nothing (it names no counterparty and carries no
+  // photo — see InboxScreen's `toConversation`) the slot is empty rather than
+  // filled from the seed.
+  const contact = {
+    name: threadId
+      ? (thread?.subject ?? params.name ?? "Conversation")
+      : (params.name ?? SEED_CONTACT.name),
+    // No stock photo on a live thread. `ThreadOut` names no counterparty and
+    // carries no image, so the leading slot falls through to the initials plate
+    // instead of showing a stranger's face over someone's clinician.
+    avatarUri: params.avatar ?? (threadId ? undefined : SEED_CONTACT.avatarUri),
+    isOnline,
+  };
+
+  // `assigned_role` is the ONLY role on the wire, and it is nullable. When there
+  // is none the subtitle is omitted — the line used to read
+  // `Doctor · ${contact.role}` with `role` falling back to the seed's
+  // "Cardiologist", so every live thread announced a cardiologist regardless of
+  // who it was with.
+  const defaultSubtitle = threadId
+    ? (thread?.assignedRole ? formatRole(thread.assignedRole) : undefined)
+    : `Doctor · ${params.role ?? SEED_CONTACT.role}`;
 
   // Wire -> the bubble model. Direction is resolved against the SIGNED-IN user
   // id, not against a role string: a clinician reading a clinician's thread
@@ -424,18 +557,35 @@ export function ChatThreadScreen({
           // Attribution only in a group, and only from the wire's role — the
           // service carries no display name for a sender.
           senderName: !mine && isGroup ? m.senderRole : undefined,
-          // NOT set. The service reports read, never "delivered", so a tick
-          // here would be an invented guarantee about someone's medical
-          // conversation.
-          delivered: undefined,
+          // A row that came BACK from the server is, by definition, accepted.
+          status: mine ? "sent" : undefined,
         };
       });
   }, [threadId, wireMessages, showInternalNotes, currentUser?.id, isGroup]);
 
-  // Adopt the server transcript once it lands. Local sends are appended to
-  // `messages`, so this replaces wholesale only when the query result changes.
+  // ---------------------------------------------------------------------
+  // The transcript is DERIVED, never stored
+  // ---------------------------------------------------------------------
+  // It used to be `useState(seedMessages)` plus an effect that replaced it
+  // wholesale whenever the query returned. That produced the two defects the
+  // header lists: seeds rendered on a live thread until the first response (and
+  // for ever if it failed), and the optimistic bubble was thrown away by the
+  // `onSettled` refetch a moment after the user watched it appear.
+  //
+  // Now the server's rows are the base and locally-composed messages live in a
+  // separate `outbox`, each retired only when the transcript actually contains
+  // the id the server gave it. Nothing can wipe a bubble that has not landed.
+  const baseMessages = threadId ? (liveMessages ?? []) : seedMessages;
+  const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
+  const messages = useMemo(
+    () => [...baseMessages, ...outbox.map((e) => e.message)],
+    [baseMessages, outbox],
+  );
+
   useEffect(() => {
-    if (liveMessages) setMessages(liveMessages);
+    if (!liveMessages) return;
+    const landed = new Set(liveMessages.map((m) => m.id));
+    setOutbox((prev) => prev.filter((e) => !(e.serverId && landed.has(e.serverId))));
   }, [liveMessages]);
 
   // Mark read on open. Fire-and-forget: a failure here must never block reading
@@ -445,8 +595,43 @@ export function ChatThreadScreen({
     void chatApi.markRead(threadId).catch(() => {});
   }, [threadId]);
 
+  const toast = useToast();
+
+  const patchEntry = useCallback(
+    (
+      localId: string,
+      patch: { serverId?: string; message?: Partial<ChatMessage> },
+    ) => {
+      setOutbox((prev) =>
+        prev.map((e) =>
+          e.message.id === localId
+            ? {
+                ...e,
+                serverId: patch.serverId ?? e.serverId,
+                message: { ...e.message, ...(patch.message ?? {}) },
+              }
+            : e,
+        ),
+      );
+    },
+    [],
+  );
+
   const sendMutation = useMutation({
-    mutationFn: (body: string) => chatApi.sendMessage(threadId as string, body),
+    mutationFn: (vars: { localId: string; body: string }) =>
+      chatApi.sendMessage(threadId as string, vars.body),
+    onSuccess: (created, vars) => {
+      // "sent" means EXACTLY what the wire supports: the server accepted it. The
+      // server id is recorded so the effect above can retire this bubble once
+      // the refetched transcript carries the real row, instead of both showing.
+      patchEntry(vars.localId, { serverId: created.id, message: { status: "sent" } });
+    },
+    // The mutation had NO error handler at all, so a send that failed looked
+    // exactly like one that worked.
+    onError: (_err, vars) => {
+      patchEntry(vars.localId, { message: { status: "failed" } });
+      toast.show("error", "Message not sent. Tap Retry on the message.");
+    },
     // Refetch rather than trust the optimistic row: the server assigns the id
     // and timestamp, and a divergence between them is how duplicate bubbles
     // appear after a retry.
@@ -456,24 +641,11 @@ export function ChatThreadScreen({
     },
   });
   const [draft, setDraft] = useState("");
-  const [clinicalOpen, setClinicalOpen] = useState(false);
   // Attach + mic. See the COMPOSER MEDIA block in the header.
   const media = useComposerMedia();
-  // The bar's two action glyphs, resolved by token name for the current mode.
-  // The hand-rolled bar froze them at `#00685f` and `#3d4947` — the LIGHT values
-  // of color/primary and color/on-surface-variant.
+  // The bar's action glyphs, resolved by token name for the current mode.
   const primary = useTokenColor("primary");
   const mutedGlyph = useTokenColor("on-surface-variant");
-  // The two GENUINELY floating surfaces on this screen — the clinical-actions
-  // menu and the FAB that opens it. Both keep a shadow because docs/BRAND.md
-  // §Elevation names those exact roles as the exception; both are retokenised
-  // onto the `shadow` token rather than the black-at-15% and teal-at-40%
-  // literals they carried.
-  const floatingShadow = useTokenShadow("shadow", FLOATING_SHADOW);
-  // `#ffffff` was frozen into the menu's fill, so it stayed white in dark mode.
-  // `card-surface` is the role that resolves to a surface which LIFTS off the
-  // page in both modes (#FFFFFF light, #242B2A dark).
-  const menuSurface = useTokenColor("card-surface");
   // Composer tokens. Every one of these replaces a frozen LIGHT-mode literal
   // (`#3d4947`, `#6d7a77`, `#171d1c`, `#bcc9c6`, and a `#ffffff` send glyph that
   // measured ~1.5:1 on `primary` in dark mode).
@@ -488,23 +660,7 @@ export function ChatThreadScreen({
   // hand-darkening would have gone the wrong way.
   const { scheme } = useResolvedScheme();
   const primaryPressed = blendTokens("primary", "on-primary", PRESSED_STATE_LAYER, scheme);
-  // The FAB's OPEN (selected) fill — the same recipe one layer deeper, replacing
-  // the hand-darkened `#004d46`. It has to stay distinguishable from
-  // `primaryPressed` because the FAB can be open AND pressed at once.
-  const primaryActive = blendTokens("primary", "on-primary", ACTIVE_STATE_LAYER, scheme);
-  // The clinical menu's row chrome. Both replace literals that assumed a white
-  // menu: a 6% teal wash and a 6% BLACK hairline, the latter invisible on the
-  // #242B2A surface `card-surface` resolves to in dark mode.
-  const menuRowPressed = useTokenColor("primary", 0.06);
-  const hairline = useTokenColor("outline-variant");
   const scrollRef = useRef<ScrollView>(null);
-  const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (replyTimer.current) clearTimeout(replyTimer.current);
-    };
-  }, []);
 
   const scrollToEnd = () => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
@@ -512,73 +668,59 @@ export function ChatThreadScreen({
 
   // The guard used to be "no text, no send". An attachment-only message is a
   // legitimate send (a photo of a rash, a dictated note), so EITHER a non-empty
-  // draft OR a pending attachment now qualifies. `media.attachment` is read at
-  // call time so every existing caller — the return key, the clinical share
-  // menu — picks it up without a signature change.
+  // draft OR a pending attachment now qualifies.
   const send = (text: string) => {
     const trimmed = text.trim();
     const pending = media.attachment;
     if (!trimmed && !pending) return;
-    setClinicalOpen(false);
-    // Live thread: POST it. The optimistic bubble below still renders instantly,
-    // and `onSettled` refetches so the server's id/timestamp win.
-    if (threadId && trimmed) sendMutation.mutate(trimmed);
-    setMessages((prev) => [
+
+    // WHAT IS ACTUALLY TRANSMITTED, stated once so the bubble can be honest
+    // about it. `ThreadMessageCreate` is `{ body }` and there is no upload
+    // endpoint anywhere in this product, so an attachment never leaves the
+    // handset; and with no `threadId` there is no conversation to post to.
+    const transmits = Boolean(threadId && trimmed);
+    const localId = makeId();
+
+    setOutbox((prev) => [
       ...prev,
       {
-        id: makeId(),
-        direction: "outgoing",
-        kind: pending ? "attachment" : "text",
-        // `undefined`, not "": OutgoingBubble skips the text block entirely for a
-        // falsy value, so an attachment-only message renders as just the card.
-        text: trimmed || undefined,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        // `delivered` stays true to match the seeded messages' local-demo
-        // convention, but note it is a LIE for an attachment: nothing was
-        // uploaded. It is left alone rather than made conditional because
-        // per-message delivery state is the backend's to own, and inventing a
-        // "pending" tick here would be inventing wire semantics.
-        delivered: true,
-        attachment: pending
-          ? {
-              name: pending.name,
-              meta: pending.meta,
-              icon: pending.kind === "recording" ? "mic" : "description",
-              localUri: pending.uri,
-            }
-          : undefined,
+        body: trimmed,
+        message: {
+          id: localId,
+          direction: "outgoing",
+          kind: pending ? "attachment" : "text",
+          // `undefined`, not "": OutgoingBubble skips the text block entirely for
+          // a falsy value, so an attachment-only message renders as just the card.
+          text: trimmed || undefined,
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          status: transmits ? "sending" : "local",
+          attachment: pending
+            ? {
+                name: pending.name,
+                meta: pending.meta,
+                icon: pending.kind === "recording" ? "mic" : "description",
+                localUri: pending.uri,
+              }
+            : undefined,
+        },
       },
     ]);
+    if (transmits) sendMutation.mutate({ localId, body: trimmed });
     // Frees the composer slot WITHOUT reaping the file — the message above now
     // references its uri. (`clearAttachment` would delete a capture.)
     if (pending) media.consumeAttachment();
     setDraft("");
     scrollToEnd();
-    if (replyTimer.current) clearTimeout(replyTimer.current);
-    replyTimer.current = setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: makeId(),
-          direction: "incoming",
-          kind: "text",
-          text: CANNED_REPLY,
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        },
-      ]);
-      scrollToEnd();
-    }, 1000);
   };
 
-  const sendClinicalItem = (label: string) => {
-    setClinicalOpen(false);
-    send(`[Shared: ${label}]`);
+  const retry = (localId: string) => {
+    const entry = outbox.find((e) => e.message.id === localId);
+    if (!entry || !entry.body || !threadId) return;
+    patchEntry(localId, { message: { status: "sending" } });
+    sendMutation.mutate({ localId, body: entry.body });
   };
 
   return (
@@ -614,7 +756,7 @@ export function ChatThreadScreen({
     // ------------------------------------------------------------------
     <DetailShell
       title={threadTitle ?? contact.name}
-      subtitle={threadSubtitle ?? `Doctor · ${contact.role}`}
+      subtitle={threadSubtitle ?? defaultSubtitle}
       claimsBottomInset={false}
       leading={
         <View className="relative shrink-0">
@@ -652,25 +794,17 @@ export function ChatThreadScreen({
           ) : null}
         </View>
       }
-      actions={
-        <View className="flex-row items-center">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Video call"
-            className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-            onPress={() => {
-              // TODO: initiate video call once telehealth signalling service ships.
-            }}
-          >
-            <Icon chrome="videocam" size={24} color={primary} />
-          </Pressable>
-          {/* The "Conversation info" button is GONE. It had no `onPress` — a
-              dead control, the exact class docs/PIPELINE.md's inert-control
-              audit enumerates — and 552:1376's app bar does not draw it. The
-              frame's single trailing action is a share/export glyph, which is
-              not wired here either; it is left OUT rather than added dead. */}
-        </View>
-      }
+      // No `actions`. Both of the bar's trailing controls are gone and neither
+      // is coming back as decoration:
+      //
+      //   "Conversation info"  removed earlier — it had no `onPress`, and
+      //                        552:1376's bar does not draw it.
+      //   "Video call"         removed here. Its body was a TODO reading "once
+      //                        telehealth signalling service ships", and there
+      //                        is no video transport anywhere in this product —
+      //                        no signalling, no SDK, no route. On a doctor
+      //                        thread a camera glyph is a promise that a patient
+      //                        can escalate to a call, and they cannot.
     >
       {/* KeyboardInset, NOT KeyboardAvoidingView. The KAV infers the keyboard from a
           WINDOW RESIZE, and under SDK 55's Android edge-to-edge the window is no
@@ -720,128 +854,22 @@ export function ChatThreadScreen({
             m.kind === "system" ? (
               <SystemEventRow key={m.id} label={m.text ?? ""} />
             ) : m.direction === "outgoing" ? (
-              <OutgoingBubble key={m.id} message={m} />
+              <OutgoingBubble key={m.id} message={m} onRetry={() => retry(m.id)} />
             ) : (
               <IncomingBubble key={m.id} message={m} contactName={contact.name} />
             ),
           )}
         </ScrollView>
 
-        {/* -----------------------------------------------------------
-              Clinical Actions FAB + slide-up share menu
-          ----------------------------------------------------------- */}
-        {clinicalOpen ? (
-          <Pressable
-            onPress={() => setClinicalOpen(false)}
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 15,
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Close clinical menu"
-          />
-        ) : null}
-
-        {/* Share options sheet — a MENU, which docs/BRAND.md §Elevation names
-              as one of the four roles that may genuinely float. Its shadow is
-              KEPT and retokenised: `shadow` at 8% over a 2/6 pair, replacing a
-              20px black at 15%. */}
-        {clinicalOpen ? (
-          <View
-            style={{
-              position: "absolute",
-              bottom: 96,
-              right: 72,
-              zIndex: 25,
-              backgroundColor: menuSurface,
-              borderRadius: 16,
-              overflow: "hidden",
-              ...floatingShadow,
-            }}
-          >
-            {CLINICAL_ACTIONS.map((a, i) => (
-              <Pressable
-                key={a.label}
-                accessibilityRole="button"
-                accessibilityLabel={`Share ${a.label}`}
-                onPress={() => sendClinicalItem(a.label)}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  paddingHorizontal: 16,
-                  paddingVertical: 14,
-                  // Was `rgba(0,104,95,0.06)` — the LIGHT `primary` frozen at 6%.
-                  backgroundColor: pressed ? menuRowPressed : "transparent",
-                  borderTopWidth: i > 0 ? 1 : 0,
-                  // Was `rgba(0,0,0,0.06)`, which is invisible on a #242B2A
-                  // dark-mode menu. `outline-variant` is BRAND's hairline role.
-                  borderTopColor: hairline,
-                })}
-              >
-                <View
-                  // `rgba(0,131,120,0.12)` was an exact match for
-                  // `primary-container` at 12%, so it becomes that token. Radius
-                  // 10 -> 12, the same off-scale correction VitalsCard's note box
-                  // already took (BRAND's scale is 4/12/24/full).
-                  className="h-9 w-9 items-center justify-center rounded-md bg-primary-container/12"
-                >
-                  <Icon chrome={a.icon} size={18} color={primary} />
-                </View>
-                {/* Was 15px/600 inline at `#171d1c`. 15 is on no BRAND step;
-                    `label-md` is the 14/600 the ramp actually defines. */}
-                <Text
-                  className="font-label-md text-label-md text-on-surface"
-                  style={{ minWidth: 160 }}
-                >
-                  {a.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
-        {/* FAB — the other sanctioned floating role, same retokenised pair.
-              What it does NOT keep is the old 12px teal glow at 40% opacity. */}
-        <View
-          style={{
-            position: "absolute",
-            bottom: 96,
-            right: 16,
-            zIndex: 20,
-          }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={clinicalOpen ? "Close clinical actions" : "Share clinical data"}
-            onPress={() => setClinicalOpen((v) => !v)}
-            style={({ pressed }) => [
-              {
-                width: 52,
-                height: 52,
-                borderRadius: 16,
-                alignItems: "center",
-                justifyContent: "center",
-                // Was `#004d46` / `#005049` / `#00685f` — two hand-darkened
-                // teals over the LIGHT `primary`. Hand-darkening is backwards in
-                // dark mode, where `primary` resolves to the LIGHT end of the
-                // ramp (107,216,203) and "deeper" has to mean lighter. The M3
-                // state layer gets that right in both modes for free.
-                backgroundColor: clinicalOpen
-                  ? primaryActive
-                  : pressed
-                    ? primaryPressed
-                    : primary,
-              },
-              floatingShadow,
-            ]}
-          >
-            {/* `#ffffff` was frozen here too — same ~1.5:1 dark-mode failure the
-                composer's send glyph had. */}
-            <Icon chrome={clinicalOpen ? "close" : "medical-services"} size={24} color={onPrimary} />
-          </Pressable>
-        </View>
+        {/* The Clinical Actions FAB and its four-row share menu stood here.
+              REMOVED — see the header. Each row called
+              `send("[Shared: Medical History]")`: a square-bracketed English
+              sentence in the message body, with no record, no link and no
+              payload behind it, on a thread a clinician reads. The wire has no
+              attachment concept to hang one on, so there was no honest version
+              of the control to keep. Sharing a record into a thread needs an
+              endpoint that accepts a reference; when one exists this comes back
+              with it. */}
 
         {/* -----------------------------------------------------------
               Input bar
@@ -960,9 +988,24 @@ export function ChatThreadScreen({
             </Pressable>
           </View>
         </View>
+
+        {/* A send that failed announces itself as well as marking the bubble.
+            The failed bubble carries the retry (a toast is `pointerEvents:
+            "none"` and cannot); this is the part a screen-reader user gets,
+            via the alert role Toast already has. */}
+        <Toast message={toast.message} tone={toast.tone} onDismiss={toast.clear} bottom={96} />
       </KeyboardInset>
     </DetailShell>
   );
+}
+
+/**
+ * `assigned_role` -> a line a patient can read. The wire spells it as it is
+ * stored (`"doctor"`, `"nurse"`), which is not a subtitle.
+ */
+function formatRole(role: string): string {
+  const cleaned = role.replace(/[_-]+/g, " ").trim();
+  return cleaned ? cleaned[0].toUpperCase() + cleaned.slice(1) : cleaned;
 }
 
 // ---------------------------------------------------------------------------
@@ -971,14 +1014,6 @@ export function ChatThreadScreen({
 
 /** M3's pressed state-layer opacity. Same constant InboxScreen's FAB uses. */
 const PRESSED_STATE_LAYER = 0.12;
-
-/**
- * One layer deeper than pressed, for a control that is HELD OPEN rather than
- * momentarily touched — here, the clinical-actions FAB while its menu is up.
- * 0.16 is M3's next published step above pressed, so the open and pressed fills
- * stay distinct (the FAB can be both) without inventing a per-variant token.
- */
-const ACTIVE_STATE_LAYER = 0.16;
 
 /**
  * A composer glyph button. Extracted because the three in the pill were three
@@ -1029,7 +1064,13 @@ function ComposerIconButton({
 // Bubble components
 // ---------------------------------------------------------------------------
 
-function OutgoingBubble({ message }: { message: ChatMessage }) {
+function OutgoingBubble({
+  message,
+  onRetry,
+}: {
+  message: ChatMessage;
+  onRetry?: () => void;
+}) {
   // RN takes no `currentColor`, so the two glyphs in here need real strings.
   // `on-primary` for the ones sitting ON the teal bubble, `primary` for the
   // delivery tick, which sits on the page.
@@ -1118,7 +1159,13 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           </View>
         ) : null}
 
-        {/* Timestamp + delivery status */}
+        {/* Timestamp + SEND status.
+            The tick used to render off `message.delivered`, a literal `true`
+            written at compose time — so it appeared instantly, on messages that
+            had not been POSTed and on messages that were about to fail. It now
+            renders only for `"sent"`, which means the server returned a row.
+            "Sending…", "Not sent" and the retry are the states that used to
+            have no representation at all. */}
         <View
           className="mt-xs flex-row items-center justify-end gap-xs"
           style={{ paddingRight: 4 }}
@@ -1130,7 +1177,32 @@ function OutgoingBubble({ message }: { message: ChatMessage }) {
           <Text className="font-label-sm text-label-sm text-on-surface-variant">
             {message.timestamp}
           </Text>
-          {message.delivered ? <Icon chrome="done-all" size={14} color={primary} /> : null}
+          {message.status === "sending" ? (
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">Sending…</Text>
+          ) : null}
+          {message.status === "sent" ? <Icon chrome="done-all" size={14} color={primary} /> : null}
+          {message.status === "local" ? (
+            // The one honest thing to say about a message the app is not
+            // transmitting: an attachment (no upload endpoint exists anywhere
+            // in this product) or a send on a route with no thread behind it.
+            <Text className="font-label-sm text-label-sm text-on-surface-variant">
+              Not sent — this conversation isn&apos;t connected
+            </Text>
+          ) : null}
+          {message.status === "failed" ? (
+            <>
+              <Text className="font-label-sm text-label-sm text-error">Not sent</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Retry sending message"
+                onPress={onRetry}
+                hitSlop={12}
+                className="active:opacity-70"
+              >
+                <Text className="font-label-sm text-label-sm text-primary">Retry</Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       </View>
     </View>
@@ -1372,16 +1444,10 @@ function TimelineDivider({ label }: { label: string }) {
 //                         entirely: BRAND allows only the `shadow` token, "never
 //                         grey".
 //
-// What SURVIVES is `FLOATING_SHADOW` below, shared by the two surfaces that are
-// genuinely floating roles under BRAND — the clinical-actions MENU and the FAB.
-// It is a token spec, not a table of literals: the old pair were a 20px black at
-// 15% and a 12px teal at 40%, both far outside BRAND's "<=8%, tinted with the
-// `shadow` token" ceiling.
+// The sixth, `FLOATING_SHADOW`, is now gone too — not because the rule changed
+// but because its only two consumers did. It was shared by the clinical-actions
+// MENU and the FAB, and both of those are removed (see the header: the menu's
+// rows sent a bracketed string and attached nothing). Nothing on this screen is
+// a sheet, menu, dialog, toast or FAB any more, so nothing here qualifies for
+// BRAND's `elevation/floating` exception at all.
 // ---------------------------------------------------------------------------
-
-/**
- * BRAND's sanctioned `elevation/floating` spec — "a tight `0 1px 2px` /
- * `0 2px 6px` pair at <=8%, tinted with the `shadow` token, never grey". RN
- * takes a single shadow, so this is the outer half of the pair.
- */
-const FLOATING_SHADOW = { y: 2, blur: 6, opacity: 0.08 } as const;

@@ -24,6 +24,7 @@ function render(ui: ReactElement) {
 jest.mock("expo-router", () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), navigate: jest.fn(), canGoBack: () => true },
   useLocalSearchParams: () => ({}),
+  useIsFocused: () => true,
 }));
 
 // Composer media, mocked at the MODULE BOUNDARY exactly as ChatThreadScreen's
@@ -52,6 +53,7 @@ jest.mock("../api", () => ({
     sendMessage: jest.fn(async () => ({})),
     markRead: jest.fn(async () => ({})),
     listThreads: jest.fn(async () => []),
+    getThread: jest.fn(async () => ({})),
   },
 }));
 

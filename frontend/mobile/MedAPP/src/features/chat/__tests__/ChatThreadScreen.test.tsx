@@ -47,6 +47,9 @@ jest.mock("expo-router", () => ({
     canGoBack: () => true,
   },
   useLocalSearchParams: () => ({}),
+  // The transcript query polls only while focused. No `threadId` is pushed in
+  // this suite, so the query is disabled anyway — the hook still has to exist.
+  useIsFocused: () => true,
 }));
 
 const mockScheme = { value: "light" as "light" | "dark" };
@@ -68,9 +71,10 @@ jest.mock("nativewind", () => ({
 // `const`s and a closure over one would hit its temporal dead zone.
 //
 // The exhaustive coverage of the shared hook (denial, blocked, capture failure,
-// picker failure) lives in AiAssistantScreen.test.tsx. What THIS file locks is
-// that this screen's two controls — which shipped with no `onPress` at all — are
-// wired to it, and that its own attachment message shape is populated.
+// picker failure) used to live in AiAssistantScreen.test.tsx. That screen has no
+// composer any more — there is no assistant behind it, so a composer there was a
+// dead control with a keyboard attached — and this screen is now the hook's only
+// consumer, so the coverage moved here rather than being deleted with it.
 // ---------------------------------------------------------------------------
 
 // ChatThreadScreen now imports `@/hooks/use-current-user` at module scope to
@@ -94,6 +98,7 @@ jest.mock("../api", () => ({
     sendMessage: jest.fn(async () => ({})),
     markRead: jest.fn(async () => ({})),
     listThreads: jest.fn(async () => []),
+    getThread: jest.fn(async () => ({})),
   },
 }));
 
@@ -221,21 +226,37 @@ beforeEach(() => {
 });
 
 describe("ChatThreadScreen — renders through DetailShell", () => {
-  it("keeps the bar's title, subtitle, avatar, presence dot and the video action", () => {
+  it("keeps the bar's title, subtitle and avatar", () => {
     render(<ChatThreadScreen />);
 
     expect(screen.getByText("Dr. Adjoa Boateng")).toBeTruthy();
     expect(screen.getByText("Doctor · Cardiologist")).toBeTruthy();
     expect(screen.getByLabelText("Dr. Adjoa Boateng")).toBeTruthy(); // avatar
-    expect(screen.getByLabelText("Online")).toBeTruthy();
-    expect(screen.getByLabelText("Video call")).toBeTruthy();
   });
 
-  it("no longer draws the dead 'Conversation info' action", () => {
-    // It had no `onPress`, and `chat_thread` 552:1376's app bar does not draw
-    // it. Asserted as an ABSENCE so it cannot quietly return.
+  it("draws NO presence dot, even on the seeded thread", () => {
+    // It used to be unconditional (`SEED_CONTACT.isOnline: true`, not
+    // param-overridable), so every thread asserted that a clinician was online.
+    // Nothing in inbox_service models connectivity — `is_active` is membership.
+    render(<ChatThreadScreen />);
+    expect(screen.queryByLabelText("Online")).toBeNull();
+  });
+
+  it("draws the dot when — and only when — a caller states presence", () => {
+    // The prop exists so the claim has an owner. No caller passes it today.
+    render(<ChatThreadScreen isOnline />);
+    expect(screen.getByLabelText("Online")).toBeTruthy();
+  });
+
+  it("draws neither of the bar's two dead actions", () => {
+    // "Conversation info" had no `onPress` at all. "Video call"'s body was a
+    // TODO — and there is no video transport in this product for it to reach,
+    // so a camera glyph on a doctor thread promised an escalation that does not
+    // exist. Asserted as ABSENCES so neither can quietly return.
     render(<ChatThreadScreen />);
     expect(screen.queryByLabelText("Conversation info")).toBeNull();
+    expect(screen.queryByLabelText("Video call")).toBeNull();
+    expect(code()).not.toMatch(/videocam/);
   });
 
   it("routes the back button through the shell to router.back()", () => {
@@ -310,7 +331,6 @@ describe("ChatThreadScreen — the composer still clears the keyboard", () => {
     // A KAV wrapped around the bar pushes it off the top of the screen when the
     // keyboard opens — the failure mode the shell's header argues at length.
     expect(kav.findAllByProps({ accessibilityLabel: "Go back" })).toHaveLength(0);
-    expect(kav.findAllByProps({ accessibilityLabel: "Video call" })).toHaveLength(0);
   });
 
   it("uses KeyboardInset, because a KeyboardAvoidingView cannot work here", () => {
@@ -338,8 +358,13 @@ describe("ChatThreadScreen — the composer still clears the keyboard", () => {
   });
 });
 
-describe("ChatThreadScreen — behaviour is untouched", () => {
-  it("still sends a message and still opens the clinical menu", () => {
+describe("ChatThreadScreen — the composer still composes, and claims nothing", () => {
+  it("appends the message and NEVER produces a reply, on any timer", () => {
+    // This case used to assert the opposite — that after 1000ms an INCOMING
+    // bubble reading "I'll review that and get back to you shortly" appeared.
+    // That bubble was attributed by the app bar to the clinician named there and
+    // fired on live threads too. It is deleted, not gated, so the assertion is
+    // inverted and the window widened well past the old delay.
     jest.useFakeTimers();
     try {
       render(<ChatThreadScreen />);
@@ -348,17 +373,34 @@ describe("ChatThreadScreen — behaviour is untouched", () => {
       fireEvent.press(screen.getByLabelText("Send message"));
       expect(screen.getByText("Feeling better today")).toBeTruthy();
 
-      fireEvent.press(screen.getByLabelText("Share clinical data"));
-      expect(screen.getByLabelText("Share Vitals Trends")).toBeTruthy();
-
-      // The canned reply is still on its timer.
       act(() => {
-        jest.advanceTimersByTime(1000);
+        jest.advanceTimersByTime(10_000);
       });
-      expect(screen.getByText(/I'll review that and get back to you shortly/)).toBeTruthy();
+      expect(screen.queryByText(/I'll review that and get back to you shortly/)).toBeNull();
+      expect(code()).not.toMatch(/CANNED_REPLY/);
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("says so when a send is not being transmitted, instead of ticking it", () => {
+    // No `threadId` on this path, so nothing is POSTed. The bubble used to carry
+    // `delivered: true` regardless — a green double tick on a message that never
+    // left the handset.
+    render(<ChatThreadScreen />);
+    fireEvent.changeText(screen.getByLabelText("Message input"), "Feeling better today");
+    fireEvent.press(screen.getByLabelText("Send message"));
+    expect(screen.getByText(/Not sent — this conversation isn't connected/)).toBeTruthy();
+  });
+
+  it("no longer offers a clinical share menu that shares nothing", () => {
+    // Each row sent the literal string "[Shared: Medical History]" and attached
+    // no record. `ThreadMessageCreate` is `{ body }` — there was nothing to
+    // attach it to.
+    render(<ChatThreadScreen />);
+    expect(screen.queryByLabelText("Share clinical data")).toBeNull();
+    expect(screen.queryByLabelText("Share Vitals Trends")).toBeNull();
+    expect(code()).not.toMatch(/\[Shared: /);
   });
 });
 
@@ -430,6 +472,32 @@ describe("ChatThreadScreen — attach", () => {
     await pressAsync("Attach file");
     expect(picker().getDocumentAsync).toHaveBeenCalledTimes(2);
   });
+
+  it("surfaces a picker FAILURE instead of silently doing nothing", async () => {
+    picker().getDocumentAsync.mockRejectedValueOnce(new Error("provider went away"));
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+
+    expect(screen.getByTestId("composer-media-notice")).toBeTruthy();
+    expect(screen.getByText(/could not be opened/)).toBeTruthy();
+
+    // …and the notice is clearable, so it can't outlive its cause.
+    await pressAsync("Dismiss message");
+    expect(screen.queryByTestId("composer-media-notice")).toBeNull();
+  });
+
+  it("removing the attachment is possible, and does not delete a picked FILE", async () => {
+    picker().getDocumentAsync.mockResolvedValueOnce(PICKED_PDF);
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Attach file");
+    await pressAsync("Remove attachment Referral.pdf");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    // Only captures we created are reaped; a re-pick can hand back the same uri.
+    expect(fs().__deleted).toHaveLength(0);
+  });
 });
 
 describe("ChatThreadScreen — mic", () => {
@@ -475,5 +543,51 @@ describe("ChatThreadScreen — mic", () => {
     expect(screen.getByTestId("composer-media-notice")).toBeTruthy();
     expect(screen.getByText(/needs microphone access/)).toBeTruthy();
     expect(screen.getByLabelText("Voice message")).toBeTruthy();
+  });
+
+  it("says SETTINGS when the OS will not prompt again (canAskAgain: false)", async () => {
+    setMicPermission({ granted: false, status: "denied", canAskAgain: false });
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Voice message");
+
+    // Pointless to ask — and asking would be a tap that visibly does nothing.
+    expect(audio().requestRecordingPermissionsAsync).not.toHaveBeenCalled();
+    expect(screen.getByText(/Settings/)).toBeTruthy();
+  });
+
+  it("reports a capture that produced no file rather than attaching nothing", async () => {
+    const a = audio();
+    a.__recorder.stop.mockImplementationOnce(async () => {
+      a.__recorder.isRecording = false;
+      a.__recorder.uri = null;
+    });
+    render(<ChatThreadScreen />);
+
+    await pressAsync("Voice message");
+    await pressAsync("Stop recording");
+
+    expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(screen.getByText(/could not be saved/)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// BRAND compliance — carried over from AiAssistantScreen's suite, which used to
+// be the only place these were asserted and no longer renders a composer.
+// ---------------------------------------------------------------------------
+
+describe("ChatThreadScreen — BRAND compliance", () => {
+  it("imports no icon library — the icon gate is the only file allowed to", () => {
+    const src = code();
+    expect(src).not.toMatch(/@expo\/vector-icons/);
+    expect(src).not.toMatch(/MaterialIcons/);
+  });
+
+  it("carries no raw colour literals, including white", () => {
+    const src = code();
+    expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(src).not.toMatch(/\brgba?\(/);
+    expect(src).not.toMatch(/\btext-white\b/);
   });
 });
