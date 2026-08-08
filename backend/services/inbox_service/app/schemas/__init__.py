@@ -1,4 +1,6 @@
 from .thread import (
+    AttachmentList,
+    AttachmentOut,
     HandoffCreate,
     ThreadCreate,
     ThreadList,
@@ -10,6 +12,8 @@ from .thread import (
 )
 
 __all__ = [
+    "AttachmentList",
+    "AttachmentOut",
     "HandoffCreate",
     "ThreadCreate",
     "ThreadList",

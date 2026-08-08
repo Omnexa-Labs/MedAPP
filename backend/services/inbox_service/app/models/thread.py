@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.db.base import Base, TimestampMixin
 
@@ -58,6 +58,26 @@ class ThreadMessage(Base, TimestampMixin):
     sender_role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     is_internal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    # `lazy="selectin"`, NOT the default lazy load. Under async SQLAlchemy a
+    # lazy load triggered while serialising a response raises
+    # MissingGreenlet — the IO happens outside the greenlet that can await it.
+    # selectin issues one extra SELECT at query time and makes
+    # `ThreadMessageOut.attachments` safe to read from any code path that
+    # loaded the message through a query.
+    #
+    # `post_message` does not go through a query (the object is new), so it
+    # populates this collection with `set_committed_value` — see the long note
+    # there for why a plain assignment is NOT equivalent and raises.
+    attachments: Mapped[list["MessageAttachment"]] = relationship(  # noqa: F821
+        "MessageAttachment",
+        lazy="selectin",
+        order_by="MessageAttachment.created_at",
+        # The DB-level ON DELETE CASCADE already handles the rows; this keeps
+        # the in-session identity map honest rather than issuing its own
+        # DELETEs.
+        passive_deletes=True,
+    )
 
     @property
     def message_id(self) -> UUID:

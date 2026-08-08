@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
 
 from shared.audit import audited_read
 
@@ -196,6 +197,31 @@ async def post_message(session: AsyncSession, principal, thread_id: UUID, payloa
     thread.last_message_at = datetime.now(tz=UTC)
     session.add(message)
     await session.flush()
+
+    # Deferred import: `attachment_service` imports `get_thread` and
+    # `_thread_subject_user_id` from this module, so a top-level import here
+    # would be circular. The dependency runs one way at import time
+    # (attachments -> threads) and the other way at call time.
+    from .attachment_service import attach_to_message
+
+    attachments = await attach_to_message(session, principal, thread, message, payload.attachment_ids)
+
+    # `set_committed_value`, NOT `message.attachments = [...]`.
+    #
+    # `ThreadMessage.attachments` is `lazy="selectin"`, which pre-loads only for
+    # objects that came out of a query. This one was just constructed and
+    # flushed, so the collection is unloaded — and a plain assignment first
+    # LOADS the old value to compute the delta, which is synchronous IO on an
+    # async session and dies with MissingGreenlet. (It does so on a body-only
+    # send too, with an empty list: the load happens before the value is even
+    # looked at. That is how this broke every existing message test the first
+    # time round.)
+    #
+    # `set_committed_value` populates the loaded state directly and emits no
+    # query, which is correct here because the FK was just written by
+    # `attach_to_message` — this is not a change to persist, it is the state
+    # the database already holds.
+    set_committed_value(message, "attachments", attachments)
     return message
 
 
