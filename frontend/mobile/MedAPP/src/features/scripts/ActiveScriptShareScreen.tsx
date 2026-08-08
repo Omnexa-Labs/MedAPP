@@ -71,7 +71,7 @@ import { useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell } from "@/components/shell";
 import { Toast, useToast } from "@/components/feedback";
-import { Card, Icon, InfoCallout } from "@/components/ui";
+import { Card, ErrorPanel, InfoCallout } from "@/components/ui";
 import {
   buildPrescriptionDocument,
   describeSaveResult,
@@ -110,9 +110,6 @@ const SCROLL_RESERVE = 60;
 //
 // `expo-linear-gradient` is no longer imported here at all.
 // ---------------------------------------------------------------------------
-
-/** The not-found plate, matching the sibling view screen. */
-const ERROR_PLATE = 56;
 
 /** See the twin in ActiveScriptViewScreen — a param that is actually there. */
 function text(value: string | undefined): string | undefined {
@@ -172,12 +169,11 @@ export function ActiveScriptShareScreen() {
     }
   }, [saving, drug, patient, scriptId, prescriber, issuedDate, showToast]);
 
-  // The two glyph colours the surviving content needs, by ROLE. The rest of
+  // The one glyph colour the surviving content needs, by ROLE. The rest of
   // the palette this screen resolved (`on-primary`, `on-primary-container`,
   // `on-primary-fixed-variant`, `scrim`, the hero blob, `outline`) went with the
   // pill, the hero, the two dialogs and the HIPAA footer.
   const onSurfaceVariant = useTokenColor("on-surface-variant");
-  const errorPlate = useTokenColor("on-error-container");
 
   if (!drug || !patient || !scriptId || !prescriber || !issuedDate) {
     return (
@@ -192,22 +188,15 @@ export function ActiveScriptShareScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          <Card className="items-center" testID="script-not-found">
-            <View
-              className="items-center justify-center rounded-full bg-error-container"
-              style={{ width: ERROR_PLATE, height: ERROR_PLATE }}
-            >
-              <Icon chrome="error-outline" size={28} color={errorPlate} />
-            </View>
-            <Text className="mt-4 text-center font-headline-md text-headline-md text-on-surface">
-              We can&apos;t share this prescription
-            </Text>
-            <Text className="mt-2 text-center font-body-md text-body-md text-on-surface-variant">
-              The link you followed is missing the details of the script. Nothing has been shared.
-              Open it again from your medications so the right record is loaded.
-            </Text>
-            {/* No button — see the twin panel in ActiveScriptViewScreen. */}
-          </Card>
+          {/* `no-identifier` and no `action` — see the twin panel in
+              ActiveScriptViewScreen for both. The body carries one clause the
+              twin does not: a share screen has to say that nothing went out. */}
+          <ErrorPanel
+            testID="script-not-found"
+            unrecoverable="no-identifier"
+            title="We can't share this prescription"
+            body="The link you followed is missing the details of the script. Nothing has been shared. Open it again from your medications so the right record is loaded."
+          />
         </ScrollView>
       </DetailShell>
     );

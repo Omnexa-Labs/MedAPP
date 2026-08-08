@@ -32,19 +32,62 @@
 //     state is derivable, but nothing reports "delivered".
 //   * JOIN/LEAVE EVENTS. `joined_at` exists on the participant row; there is no
 //     event stream, so a "X joined the shift" line cannot be sourced.
-//   * ATTACHMENTS. `ThreadMessageCreate` is `{ body }` — text only. There is no
-//     upload endpoint anywhere in the product.
+//   * ~~ATTACHMENTS~~ SHIPPED 2026-08-08 and wired here. Three routes, and the
+//     one thing to know before reading the code: upload is a SEPARATE call from
+//     send. See ATTACHMENTS below.
 //
-// Those four stay seeded and stay flagged. Everything else on this module is
-// real.
+// The first three stay seeded and stay flagged. Everything else on this module
+// is real.
 //
 // `is_internal` on a message is a clinician-only note — it must never render in
 // a patient-facing thread. `isInternal` is carried through deliberately so a
 // caller has to make that decision rather than leak it by default.
+//
+// ---------------------------------------------------------------------------
+// ATTACHMENTS — and the two places this module stops looking like the others
+// ---------------------------------------------------------------------------
+//   POST /v1/threads/{id}/attachments   multipart `file` + optional
+//                                       `duration_ms` -> 201 AttachmentOut
+//   POST /v1/threads/{id}/messages      { body, attachment_ids } -> the message
+//   GET  /v1/threads/{id}/attachments/{aid}/content  -> the bytes
+//
+// 1. THE UPLOAD DOES NOT GO THROUGH `client`. `client.send` does
+//    `JSON.stringify(body)`, which turns a `FormData` into `"{}"`, and the
+//    multipart boundary has to be chosen by the platform's own fetch. So
+//    `uploadAttachment` is the one raw `fetch` in this feature. What it gives
+//    up, stated rather than discovered: the client's shared 401 → refresh →
+//    retry-once. A 401 here surfaces as a failed upload the user can retry, and
+//    by then any concurrent query has already rotated the token in
+//    `secureStorage` — which is why the token is read from there rather than
+//    cached.
+//
+// 2. THERE IS NO URL ON THE RESPONSE, AND THAT IS DELIBERATE. Not an omission,
+//    and not something to add: a URL that grants access is a bearer credential,
+//    and it leaks into history, proxy logs, `Referer`, screenshots and the
+//    "copy link" a patient forwards to a relative. A voice note is a patient
+//    describing their symptoms out loud. `attachmentContentUri` therefore
+//    composes the path from ids the caller already holds and
+//    `attachmentAuthHeaders` supplies the normal bearer token — the id is not a
+//    capability, participation is. Do not cache the result as a "url", and do
+//    not introduce a signed one.
 
 import { client } from "@/lib/api/client";
+import { config } from "@/lib/config";
+import { secureStorage } from "@/lib/storage/secure-storage";
+import { getDeviceIdCached } from "@/lib/device/device-id";
+import { ApiError } from "@/types/api";
 
 export const THREADS_PATH = "/v1/threads";
+
+// The limits live in ./attachmentLimits — importable by a composer hook that has
+// no business reaching `@/lib/config`. Re-exported so a caller holding this
+// module does not need to know that.
+export {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENT_DURATION_MS,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  isAllowedContentType,
+} from "./attachmentLimits";
 
 // ---------------------------------------------------------------------------
 // Wire types — snake_case, mirroring app/schemas/thread.py exactly
@@ -68,6 +111,18 @@ interface ThreadListWire {
   items: ThreadOutWire[];
 }
 
+interface AttachmentOutWire {
+  attachment_id: string;
+  thread_id: string;
+  message_id: string | null;
+  uploader_user_id: string;
+  content_type: string;
+  byte_size: number;
+  original_filename: string;
+  duration_ms: number | null;
+  created_at: string;
+}
+
 interface ThreadMessageOutWire {
   message_id: string;
   thread_id: string;
@@ -76,6 +131,12 @@ interface ThreadMessageOutWire {
   body: string;
   is_internal: boolean;
   created_at: string;
+  /**
+   * Additive, always present, `[]` on the overwhelming majority of messages.
+   * Optional here anyway: a fixture or an older row without the key must map to
+   * `[]` rather than crash the transcript.
+   */
+  attachments?: AttachmentOutWire[];
 }
 
 interface ThreadParticipantOutWire {
@@ -105,6 +166,21 @@ export interface Thread {
   lastMessageAtIso: string | null;
 }
 
+export interface Attachment {
+  id: string;
+  threadId: string;
+  /** Null = STAGED: uploaded, not yet carried by a message. */
+  messageId: string | null;
+  uploaderUserId: string;
+  contentType: string;
+  byteSize: number;
+  /** Display only. Never used to build a path — on either side of the wire. */
+  originalFilename: string;
+  /** Voice notes only. Null for images and PDFs. */
+  durationMs: number | null;
+  createdAtIso: string;
+}
+
 export interface ThreadMessage {
   id: string;
   threadId: string;
@@ -118,6 +194,7 @@ export interface ThreadMessage {
    */
   isInternal: boolean;
   createdAtIso: string;
+  attachments: Attachment[];
 }
 
 export interface ThreadParticipant {
@@ -144,6 +221,20 @@ function toThread(w: ThreadOutWire): Thread {
   };
 }
 
+function toAttachment(w: AttachmentOutWire): Attachment {
+  return {
+    id: w.attachment_id,
+    threadId: w.thread_id,
+    messageId: w.message_id,
+    uploaderUserId: w.uploader_user_id,
+    contentType: w.content_type,
+    byteSize: w.byte_size,
+    originalFilename: w.original_filename,
+    durationMs: w.duration_ms,
+    createdAtIso: w.created_at,
+  };
+}
+
 function toMessage(w: ThreadMessageOutWire): ThreadMessage {
   return {
     id: w.message_id,
@@ -153,6 +244,7 @@ function toMessage(w: ThreadMessageOutWire): ThreadMessage {
     body: w.body,
     isInternal: w.is_internal,
     createdAtIso: w.created_at,
+    attachments: (w.attachments ?? []).map(toAttachment),
   };
 }
 
@@ -204,6 +296,47 @@ export interface HandoffInput {
   locale?: string;
 }
 
+/**
+ * The multipart part a picked file or a finished recording turns into.
+ *
+ * `uri` is device-local. React Native's `FormData` accepts this `{ uri, name,
+ * type }` shape and streams the file itself — reading it into a `Blob` first
+ * would put 8 MiB of PHI on the JS heap for no gain.
+ */
+export interface AttachmentUpload {
+  uri: string;
+  name: string;
+  /** Must be in the server's allowlist or the upload is a 415. */
+  mimeType: string;
+  /** Voice notes only. Persisted so a player can be drawn without a download. */
+  durationMs?: number;
+}
+
+/**
+ * The absolute content path for one attachment, composed from ids.
+ *
+ * NOT a url in the credential sense — see the ATTACHMENTS block at the top.
+ * Whatever fetches this must send `attachmentAuthHeaders()`; unauthenticated it
+ * is a 401 and from a non-participant a 403, which is the whole point.
+ */
+export function attachmentContentUri(threadId: string, attachmentId: string): string {
+  return `${config.apiBaseUrl}${THREADS_PATH}/${threadId}/attachments/${attachmentId}/content`;
+}
+
+/**
+ * Headers for a request this module does not itself make — `expo-audio`'s
+ * `AudioSource.headers` streams the bytes, so the bearer token has to travel
+ * with it rather than with `client`.
+ */
+export async function attachmentAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  const token = await secureStorage.getAccessToken().catch(() => null);
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const deviceId = getDeviceIdCached();
+  if (deviceId) headers["X-Device-Id"] = deviceId;
+  return headers;
+}
+
 export const chatApi = {
   /** The inbox. `GET /v1/threads` is already scoped to the principal. */
   async listThreads(): Promise<Thread[]> {
@@ -221,11 +354,100 @@ export const chatApi = {
     return (res ?? []).map(toMessage);
   },
 
-  /** Text only — the service accepts `{ body }` and nothing else. */
-  async sendMessage(threadId: string, body: string): Promise<ThreadMessage> {
+  /**
+   * Send.
+   *
+   * `attachmentIds` is omitted from the body entirely when there are none, so a
+   * body-only send stays BYTE-FOR-BYTE the request it always was — the
+   * regression the backend guards with
+   * `test_body_only_message_still_sends_unchanged`, and the one worth not
+   * breaking from this side either.
+   *
+   * `body` may be `""` when an attachment is present: a voice note needs no
+   * typed text. `{"body": ""}` with no attachment is still a 422, exactly as
+   * before, which is why the caller — not this function — decides there is
+   * something to send.
+   */
+  async sendMessage(
+    threadId: string,
+    body: string,
+    attachmentIds?: string[],
+  ): Promise<ThreadMessage> {
+    const payload: { body: string; attachment_ids?: string[] } = { body };
+    if (attachmentIds && attachmentIds.length > 0) payload.attachment_ids = attachmentIds;
     return toMessage(
-      await client.post<ThreadMessageOutWire>(`${THREADS_PATH}/${threadId}/messages`, { body }),
+      await client.post<ThreadMessageOutWire>(`${THREADS_PATH}/${threadId}/messages`, payload),
     );
+  },
+
+  /**
+   * Stage one attachment. Returns it with `messageId: null` until a message
+   * adopts it.
+   *
+   * The raw `fetch` is explained in the ATTACHMENTS block at the top: `client`
+   * would JSON-stringify the `FormData`. `Content-Type` is deliberately NOT set
+   * — the platform has to append its own multipart boundary, and setting the
+   * header by hand omits it and produces a 422 that looks like a server bug.
+   */
+  async uploadAttachment(threadId: string, file: AttachmentUpload): Promise<Attachment> {
+    const form = new FormData();
+    // The cast is React Native's: RN's FormData takes this object where the DOM
+    // type demands a Blob, and there is no lib.dom-compatible spelling of it.
+    form.append("file", {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
+    if (file.durationMs !== undefined) {
+      form.append("duration_ms", String(Math.round(file.durationMs)));
+    }
+
+    const headers = await attachmentAuthHeaders();
+    headers.Accept = "application/json";
+
+    let response: Response;
+    try {
+      response = await fetch(`${config.apiBaseUrl}${THREADS_PATH}/${threadId}/attachments`, {
+        method: "POST",
+        headers,
+        body: form,
+      });
+    } catch (cause) {
+      throw new ApiError(
+        cause instanceof Error ? cause.message : "Network request failed",
+        0,
+        "NETWORK_ERROR",
+        cause,
+      );
+    }
+
+    if (!response.ok) {
+      // Same three-key envelope tolerance `client.parseError` has: FastAPI
+      // emits `detail`, the gateway emits `error`.
+      let message = `Upload failed with status ${response.status}`;
+      try {
+        const parsed = (await response.json()) as {
+          detail?: unknown;
+          error?: string;
+          message?: string;
+        };
+        const detail = typeof parsed.detail === "string" ? parsed.detail : undefined;
+        message = parsed.message ?? parsed.error ?? detail ?? message;
+      } catch {
+        // Not JSON. The status-based message stands.
+      }
+      throw new ApiError(message, response.status);
+    }
+
+    return toAttachment((await response.json()) as AttachmentOutWire);
+  },
+
+  /** Every attachment on a thread. `{ items }`, matching `ThreadList`. */
+  async listAttachments(threadId: string): Promise<Attachment[]> {
+    const res = await client.get<{ items: AttachmentOutWire[] }>(
+      `${THREADS_PATH}/${threadId}/attachments`,
+    );
+    return (res.items ?? []).map(toAttachment);
   },
 
   /** Marks the thread read and returns the caller's participant row. */

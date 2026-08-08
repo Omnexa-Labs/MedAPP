@@ -44,8 +44,10 @@
 //   2. `SystemEvent / joined` rows — a participant has `joined_at`, but there
 //      is no event stream to build a timeline row from.
 //   3. Delivery receipts. `last_read_at` gives READ, not "delivered".
-//   4. Attachments. `ThreadMessageCreate` is `{ body }`; no upload endpoint
-//      exists anywhere in the product.
+//   4. ~~Attachments~~ CLOSED 2026-08-08. Three routes shipped and this screen
+//      now uses them — see VOICE NOTES below. Every "there is no upload
+//      endpoint" claim that survived elsewhere in this file has been corrected;
+//      if you find another, it is stale.
 //
 // ~~KEPT DESPITE BEING ABSENT FROM THE FRAME~~ REVERSED 2026-08-07. That keep
 // argued the Clinical Actions FAB and its share menu were "the only route to
@@ -65,11 +67,39 @@
 // screen — the SDK 55 surface (expo-document-picker, expo-audio,
 // expo-file-system) and the permission model are documented there in full.
 //
-// The picked file and the recording are REAL and device-local. There is NO
-// upload — this project has no endpoint that accepts composer media — so the
-// attachment rides along on the locally-appended message and the bubble renders
-// from its `file://` uri. Faking a POST to an invented route was explicitly
-// rejected. See the FLAGGED block in ./useComposerMedia.
+// ---------------------------------------------------------------------------
+// VOICE NOTES (2026-08-08) — the upload exists, and this screen owns it
+// ---------------------------------------------------------------------------
+// This block used to read "There is NO upload — this project has no endpoint
+// that accepts composer media". `inbox_service` shipped three attachment routes
+// and the composer is wired to them. Figma: `voice_note — 1..9` on the Messaging
+// page (548:615), each with a DARK proof directly beneath it.
+//
+// THE PIPELINE, and where each part lives:
+//   ./useComposerMedia    capture, permissions, the 8 MiB and four-hour limits,
+//                         the local file. Shared with AiAssistantScreen, which
+//                         has no thread — which is why it does not upload.
+//   ./VoiceNoteComposer   the mic (hold AND tap), the recording bar, the review
+//                         bar. Drawn INSIDE the pill, replacing the field.
+//   ./VoiceNoteAudio      playback, the waveform, the play/pause target.
+//   HERE                  upload -> attach -> send, as ONE mutation, so there is
+//                         one status and one Retry.
+//
+// TWO RULES THIS SCREEN'S HISTORY EXISTS TO PROTECT, restated because audio is
+// where they are easiest to break:
+//
+//   • NOTHING RENDERS AS "sent" UNTIL `POST /messages` RETURNS A ROW. Not when
+//     the upload 201s. A staged attachment is not a delivered message, and an
+//     optimistic tick is the defect item 3 below is about.
+//   • A FAILURE KEEPS THE RECORDING. The local `file://` uri survives a
+//     successful upload and a failed one, so a failed voice note is still
+//     playable and Retry re-sends the same audio. The alternative is telling a
+//     patient to say it all again.
+//
+// Accessibility: hold-to-record is inoperable under Switch Control and under a
+// screen reader, so the mic carries a tap path as an equal — and the tap path
+// starts the recording LOCKED, landing in the same state a slide-up reaches.
+// ./VoiceNoteComposer's header has the full argument.
 //
 // This screen's message model ALREADY had `kind: "attachment"` with a
 // `{ name, meta, icon }` payload — the seeded `Lab_Panel_May2026.pdf` bubble
@@ -191,6 +221,14 @@ import { blendTokens, useTokenColor } from "@/lib/tokens";
 import { useResolvedScheme } from "@/lib/theme";
 import { ComposerMediaTray } from "./ComposerMediaTray";
 import { useComposerMedia } from "./useComposerMedia";
+import { VoiceMicButton, VoiceRecordingBar, VoiceReviewBar } from "./VoiceNoteComposer";
+import {
+  VoiceNoteBubbleBody,
+  VoicePlayButton,
+  VoiceWaveform,
+  useRemoteVoiceNoteSource,
+  useVoiceNotePlayback,
+} from "./VoiceNoteAudio";
 
 // The glyph names this screen's own tables carry. `ChromeIconName` comes from the
 // Icon gate rather than from @expo/vector-icons, which src/components/ui/icons is
@@ -265,9 +303,9 @@ export interface ChatMessage {
    * accepted it" — `"sent"`. Nothing here means the clinician received it, and
    * nothing draws a tick until the POST has returned.
    *
-   * `"local"` is the honest state for a message that is NOT being transmitted:
-   * a send on the seeded/demo path, and an attachment, which has no upload
-   * endpoint anywhere in this product.
+   * `"local"` is the honest state for a message that is NOT being transmitted.
+   * Since the attachment routes shipped that is ONE case, not two: a send on a
+   * route with no `threadId` behind it. An attachment is transmitted now.
    */
   status?: "sending" | "sent" | "failed" | "local";
   // kind === "attachment"
@@ -276,12 +314,29 @@ export interface ChatMessage {
     meta: string; // e.g. "PDF · 2.4 MB"
     icon: IconName;
     /**
-     * Set for media the user just attached from the composer. A DEVICE-LOCAL
-     * `file://` path — never a server url, because there is no upload endpoint
-     * (see the header). Absent on the seeded messages, which stand in for
-     * already-uploaded server attachments.
+     * Set while the media is still on this device: a send in flight, a send that
+     * failed, or a send on a route with no thread behind it. A DEVICE-LOCAL
+     * `file://` path — never a server url, because there is no attachment url on
+     * the wire at all (see ./api).
+     *
+     * It is NOT cleared once the upload succeeds. The local copy is the same
+     * audio, needs no request to play, and is the only copy a failed upload
+     * leaves behind — which is what makes a failed voice note recoverable rather
+     * than a bubble the user can look at and nothing else.
      */
     localUri?: string;
+    /**
+     * `attachment_id` once the upload has returned one. Its presence is the ONLY
+     * evidence the server holds this file, and it is what the content path is
+     * composed from.
+     */
+    serverAttachmentId?: string;
+    /**
+     * A voice note rather than a document, so the bubble draws a player instead
+     * of a file card. Set from `duration_ms` on the wire and from the capture's
+     * measured length locally.
+     */
+    voiceDurationMs?: number;
   };
   // kind === "vitals" (incoming card from doctor)
   vitals?: {
@@ -306,6 +361,19 @@ interface OutboxEntry {
   body: string;
   /** The id the service assigned. Set on success; the retirement key. */
   serverId?: string;
+  /**
+   * The local media this entry is sending, kept so `retry` can re-upload the
+   * SAME file. Without it a failed voice note could only be re-recorded, and the
+   * recording the patient already made would be the thing they lost.
+   */
+  upload?: { uri: string; name: string; mimeType: string; durationMs?: number };
+  /**
+   * Set once the upload has returned. Retrying a send whose upload already
+   * succeeded must NOT upload again — the second staged attachment would be an
+   * orphan row and an orphan file, and nothing in the product reaps those
+   * (docs/api/inbox_service.md, "Reaping staged attachments — not built").
+   */
+  attachmentId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -545,11 +613,34 @@ export function ChatThreadScreen({
       .filter((m: ThreadMessage) => showInternalNotes || !m.isInternal)
       .map((m: ThreadMessage): ChatMessage => {
         const mine = Boolean(currentUser?.id) && m.senderUserId === currentUser?.id;
+        // The composer's slot is single, so a message from THIS app carries at
+        // most one attachment — but the schema allows eight and another client
+        // may send them, so the first is rendered and the rest are ignored rather
+        // than crashing the transcript. A partial render of a clinical thread
+        // beats a blank one.
+        // `?.` on a field the mapper always populates: a transcript is clinical
+        // content, and a message shape that predates this key — an older row, a
+        // fixture, a stubbed client — must render without the attachment rather
+        // than take the whole thread down.
+        const attachment = m.attachments?.[0];
+        const isVoice = Boolean(attachment && attachment.durationMs !== null);
         return {
           id: m.id,
           direction: mine ? "outgoing" : "incoming",
-          kind: "text",
-          text: m.body,
+          kind: attachment ? "attachment" : "text",
+          // `undefined`, not "": the server sends `body: ""` for a voice note
+          // with no typed text, and the bubbles skip the text block on a falsy
+          // value rather than drawing an empty one.
+          text: m.body || undefined,
+          attachment: attachment
+            ? {
+                name: isVoice ? "Voice note" : attachment.originalFilename,
+                meta: describeServerAttachment(attachment.contentType, attachment.byteSize),
+                icon: isVoice ? "mic" : "description",
+                serverAttachmentId: attachment.id,
+                voiceDurationMs: attachment.durationMs ?? undefined,
+              }
+            : undefined,
           timestamp: new Date(m.createdAtIso).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -600,26 +691,85 @@ export function ChatThreadScreen({
   const patchEntry = useCallback(
     (
       localId: string,
-      patch: { serverId?: string; message?: Partial<ChatMessage> },
+      patch: {
+        serverId?: string;
+        attachmentId?: string;
+        // A PARTIAL of the attachment, merged rather than replaced — the upload
+        // learns the server id and must not drop the local uri, which is what
+        // keeps a failed voice note playable.
+        message?: Partial<Omit<ChatMessage, "attachment">> & {
+          attachment?: Partial<NonNullable<ChatMessage["attachment"]>>;
+        };
+      },
     ) => {
       setOutbox((prev) =>
-        prev.map((e) =>
-          e.message.id === localId
-            ? {
-                ...e,
-                serverId: patch.serverId ?? e.serverId,
-                message: { ...e.message, ...(patch.message ?? {}) },
-              }
-            : e,
-        ),
+        prev.map((e) => {
+          if (e.message.id !== localId) return e;
+          const { attachment: attachmentPatch, ...messagePatch } = patch.message ?? {};
+          return {
+            ...e,
+            serverId: patch.serverId ?? e.serverId,
+            attachmentId: patch.attachmentId ?? e.attachmentId,
+            message: {
+              ...e.message,
+              ...messagePatch,
+              attachment: e.message.attachment
+                ? { ...e.message.attachment, ...(attachmentPatch ?? {}) }
+                : e.message.attachment,
+            },
+          };
+        }),
       );
     },
     [],
   );
 
+  // ---------------------------------------------------------------------
+  // SEND — and, when there is media, UPLOAD FIRST
+  // ---------------------------------------------------------------------
+  // Two calls, in order, inside ONE mutation, so there is one `status` for the
+  // user to read and one Retry to press. The alternative — an upload mutation
+  // feeding a send mutation — gives a bubble that can be "uploaded but not sent",
+  // a state nobody can act on.
+  //
+  // NOTHING RENDERS AS SENT UNTIL `sendMessage` RETURNS A ROW. Not when the
+  // upload succeeds, not optimistically. An optimistic delivered tick is the
+  // defect this file's history is mostly about, and audio does not get an
+  // exemption from it.
   const sendMutation = useMutation({
-    mutationFn: (vars: { localId: string; body: string }) =>
-      chatApi.sendMessage(threadId as string, vars.body),
+    // The upload rides in the VARIABLES, not read back out of `outbox`. It was
+    // read from a ref for one revision, and the ref is a render behind the
+    // `setOutbox` that `send()` performs immediately before `mutate()` — so the
+    // first send of every voice note uploaded nothing and posted a body-only
+    // message. Both callers already hold what this needs.
+    mutationFn: async (vars: {
+      localId: string;
+      body: string;
+      upload?: OutboxEntry["upload"];
+      /** Set on a retry whose upload already succeeded. */
+      attachmentId?: string;
+    }) => {
+      let attachmentId = vars.attachmentId;
+      // Upload only if it has not already succeeded — a retry after a failed
+      // SEND must not stage a second copy. See `OutboxEntry.attachmentId`.
+      if (vars.upload && !attachmentId) {
+        const uploaded = await chatApi.uploadAttachment(threadId as string, vars.upload);
+        attachmentId = uploaded.id;
+        // Recorded before the send is attempted, so a send that fails leaves the
+        // staged id behind for the retry instead of orphaning it.
+        patchEntry(vars.localId, {
+          attachmentId,
+          message: { attachment: { serverAttachmentId: attachmentId } },
+        });
+      }
+      // TWO ARGUMENTS when there is nothing attached, not three with an
+      // `undefined`. A trailing undefined is invisible in the request and very
+      // visible in every existing assertion about this call — and the point of
+      // the body-only path is that it did not change.
+      return attachmentId
+        ? chatApi.sendMessage(threadId as string, vars.body, [attachmentId])
+        : chatApi.sendMessage(threadId as string, vars.body);
+    },
     onSuccess: (created, vars) => {
       // "sent" means EXACTLY what the wire supports: the server accepted it. The
       // server id is recorded so the effect above can retire this bubble once
@@ -627,10 +777,11 @@ export function ChatThreadScreen({
       patchEntry(vars.localId, { serverId: created.id, message: { status: "sent" } });
     },
     // The mutation had NO error handler at all, so a send that failed looked
-    // exactly like one that worked.
+    // exactly like one that worked. An upload failure lands here too, which is
+    // why the copy names neither step — the user's move is the same either way.
     onError: (_err, vars) => {
       patchEntry(vars.localId, { message: { status: "failed" } });
-      toast.show("error", "Message not sent. Tap Retry on the message.");
+      toast.show("error", "Not sent. Tap Retry on the message.");
     },
     // Refetch rather than trust the optimistic row: the server assigns the id
     // and timestamp, and a divergence between them is how duplicate bubbles
@@ -675,16 +826,32 @@ export function ChatThreadScreen({
     if (!trimmed && !pending) return;
 
     // WHAT IS ACTUALLY TRANSMITTED, stated once so the bubble can be honest
-    // about it. `ThreadMessageCreate` is `{ body }` and there is no upload
-    // endpoint anywhere in this product, so an attachment never leaves the
-    // handset; and with no `threadId` there is no conversation to post to.
-    const transmits = Boolean(threadId && trimmed);
+    // about it. `body` may be `""` when an attachment is present — a voice note
+    // needs no typed text — so the condition is "either", not "text". With no
+    // `threadId` there is still no conversation to post to, which is the one
+    // remaining case that transmits nothing.
+    const transmits = Boolean(threadId && (trimmed || pending));
     const localId = makeId();
+    const isVoice = pending?.kind === "recording";
+    const upload: OutboxEntry["upload"] = pending
+      ? {
+          uri: pending.uri,
+          // A capture has no filename. `voice-note.m4a` is DISPLAY-ONLY on the
+          // server too — the storage key is `<thread>/<random>.bin` and no part
+          // of this string reaches the filesystem.
+          name: isVoice ? "voice-note.m4a" : pending.name,
+          mimeType: pending.mimeType ?? "application/octet-stream",
+          // Only for audio. A PDF has no duration and the server types the field
+          // as nullable for exactly that reason.
+          durationMs: isVoice ? pending.durationMillis : undefined,
+        }
+      : undefined;
 
     setOutbox((prev) => [
       ...prev,
       {
         body: trimmed,
+        upload,
         message: {
           id: localId,
           direction: "outgoing",
@@ -701,16 +868,18 @@ export function ChatThreadScreen({
             ? {
                 name: pending.name,
                 meta: pending.meta,
-                icon: pending.kind === "recording" ? "mic" : "description",
+                icon: isVoice ? "mic" : "description",
                 localUri: pending.uri,
+                voiceDurationMs: isVoice ? pending.durationMillis : undefined,
               }
             : undefined,
         },
       },
     ]);
-    if (transmits) sendMutation.mutate({ localId, body: trimmed });
+    if (transmits) sendMutation.mutate({ localId, body: trimmed, upload });
     // Frees the composer slot WITHOUT reaping the file — the message above now
-    // references its uri. (`clearAttachment` would delete a capture.)
+    // references its uri, and a failed upload has to be able to play it back.
+    // (`clearAttachment` would delete a capture.)
     if (pending) media.consumeAttachment();
     setDraft("");
     scrollToEnd();
@@ -718,9 +887,20 @@ export function ChatThreadScreen({
 
   const retry = (localId: string) => {
     const entry = outbox.find((e) => e.message.id === localId);
-    if (!entry || !entry.body || !threadId) return;
+    // `body || upload`, not `body`: a voice note is a legitimate send with an
+    // empty body, so the old guard would have refused to retry the one kind of
+    // message whose failure costs the user a recording. What is still refused is
+    // an entry with NOTHING to transmit, and a send with no thread behind it.
+    if (!entry || (!entry.body && !entry.upload) || !threadId) return;
     patchEntry(localId, { message: { status: "sending" } });
-    sendMutation.mutate({ localId, body: entry.body });
+    // `attachmentId` carries a staged upload forward, so a retry after a failed
+    // SEND does not stage a second copy of the same recording.
+    sendMutation.mutate({
+      localId,
+      body: entry.body,
+      upload: entry.upload,
+      attachmentId: entry.attachmentId,
+    });
   };
 
   return (
@@ -854,9 +1034,19 @@ export function ChatThreadScreen({
             m.kind === "system" ? (
               <SystemEventRow key={m.id} label={m.text ?? ""} />
             ) : m.direction === "outgoing" ? (
-              <OutgoingBubble key={m.id} message={m} onRetry={() => retry(m.id)} />
+              <OutgoingBubble
+                key={m.id}
+                message={m}
+                threadId={threadId}
+                onRetry={() => retry(m.id)}
+              />
             ) : (
-              <IncomingBubble key={m.id} message={m} contactName={contact.name} />
+              <IncomingBubble
+                key={m.id}
+                message={m}
+                threadId={threadId}
+                contactName={contact.name}
+              />
             ),
           )}
         </ScrollView>
@@ -884,7 +1074,11 @@ export function ChatThreadScreen({
           {/* Pending attachment / live recording / permission notice, ABOVE the
                 pill so the pill's geometry is untouched. It carries its own `mx-md`
                 gutter, which is why this container's `px-md` moved onto the pill. */}
-          <ComposerMediaTray media={media} />
+          {/* `showRecordingState={false}`: this composer draws recording and
+              review INSIDE the pill (Figma `voice_note — 2..5`), so the tray is
+              left with the notice and the picked-FILE chip only. Stacking both
+              would show one capture twice. */}
+          <ComposerMediaTray media={media} showRecordingState={false} />
 
           {/* `Composer / Chat (State=Empty, Docked=Yes)` 552:1512 — the SAME
               component instance the AI screen carries (550:2956), so the two
@@ -896,46 +1090,72 @@ export function ChatThreadScreen({
               `field-surface` (the role Input already uses, and the frame's
               `var(--color-field-surface)`), the `/30` hairline -> full strength,
               and the FOURTH control is gone — see the header. */}
-          <View className="mx-md h-[52px] flex-row items-center gap-xs rounded-full border border-outline-variant bg-field-surface p-xs">
-            {/* Attach — was a Pressable with NO onPress at all. */}
-            <ComposerIconButton
-              icon="attach-file"
-              label="Attach file"
-              onPress={() => void media.pickFile()}
-              disabled={media.isPicking || media.isRecording}
-            />
+          {/* THE PILL TAKES OVER while a voice note is being recorded or
+              reviewed, rather than stacking a second bar above it — the WhatsApp
+              idiom, and the question ComposerMediaTray's own FLAGGED FOR DESIGN
+              note left open. It is answered by
+              `voice_note — 2/3/4/5` on the Messaging page: the field is replaced
+              in place, so the composer's geometry never moves and the mic stays
+              under the finger that started the gesture.
 
-            {/* Text input */}
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={composerPlaceholder}
-              placeholderTextColor={placeholder}
-              onSubmitEditing={() => send(draft)}
-              returnKeyType="send"
-              multiline
-              style={{
-                flex: 1,
-                maxHeight: 96,
-                paddingHorizontal: 8,
-                color: inputText,
-                fontSize: 16,
-                lineHeight: 22,
-              }}
-              accessibilityLabel="Message input"
-            />
+              The pill's fill turns `error-container` only in the ARMED state,
+              which is the one moment the control means "this will be destroyed".
+              */}
+          <View
+            className={`mx-md h-[52px] flex-row items-center gap-xs rounded-full border p-xs ${
+              media.isCancelArmed
+                ? "border-error/40 bg-error-container"
+                : "border-outline-variant bg-field-surface"
+            }`}
+          >
+            {/* Attach and the text field give way to the recording / review bar.
+                Not disabled-in-place: a greyed paperclip beside a running timer
+                invites a tap that does nothing, where an absent one does not. */}
+            {media.isRecording ? (
+              <VoiceRecordingBar media={media} />
+            ) : media.attachment?.kind === "recording" ? (
+              <VoiceReviewBar media={media} />
+            ) : (
+              <>
+                {/* Attach — was a Pressable with NO onPress at all. */}
+                <ComposerIconButton
+                  icon="attach-file"
+                  label="Attach file"
+                  onPress={() => void media.pickFile()}
+                  disabled={media.isPicking}
+                />
 
-            {/* Mic — also had no onPress. Press to start, press again to commit;
-                  ./useComposerMedia argues why this is a toggle rather than
-                  press-and-hold (a system permission dialog breaks a held
-                  gesture). The label follows the state so a screen reader
-                  announces what the next tap does. */}
-            <ComposerIconButton
-              icon={media.isRecording ? "stop" : "mic"}
-              label={media.isRecording ? "Stop recording" : "Voice message"}
-              tint={media.isRecording ? "error" : "muted"}
-              onPress={() => void media.toggleRecording()}
-            />
+                {/* Text input */}
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder={composerPlaceholder}
+                  placeholderTextColor={placeholder}
+                  onSubmitEditing={() => send(draft)}
+                  returnKeyType="send"
+                  multiline
+                  style={{
+                    flex: 1,
+                    maxHeight: 96,
+                    paddingHorizontal: 8,
+                    color: inputText,
+                    fontSize: 16,
+                    lineHeight: 22,
+                  }}
+                  accessibilityLabel="Message input"
+                />
+              </>
+            )}
+
+            {/* Mic — hold to record, or tap to start and tap to stop. BOTH, and
+                ./VoiceNoteComposer explains at length why the tap path is not
+                optional: hold-to-record is inoperable under Switch Control and
+                under a screen reader, which consume the touch. Hidden only while
+                reviewing, when the mic would re-record over the note the user is
+                listening to. */}
+            {media.attachment?.kind === "recording" && !media.isRecording ? null : (
+              <VoiceMicButton media={media} />
+            )}
 
             {/* Send */}
             <Pressable
@@ -1064,11 +1284,54 @@ function ComposerIconButton({
 // Bubble components
 // ---------------------------------------------------------------------------
 
+/**
+ * A voice note is an attachment whose `voiceDurationMs` is set — which is the
+ * client-side reading of `duration_ms`, the field the backend added for exactly
+ * this: "persisted so the client can draw a player and scrubber without
+ * downloading the file".
+ */
+function isVoiceNote(message: ChatMessage): boolean {
+  return message.kind === "attachment" && message.attachment?.voiceDurationMs !== undefined;
+}
+
+/**
+ * The attachment exists ONLY on this handset: this device captured or picked it,
+ * and no upload has returned an id for it yet.
+ *
+ * Both halves are load-bearing — see the note at the call site. A seeded message
+ * has neither field and is therefore NOT device-local, which is right: the seeds
+ * stand in for attachments the server already holds.
+ */
+function isDeviceLocal(message: ChatMessage): boolean {
+  const a = message.attachment;
+  return Boolean(a?.localUri) && !a?.serverAttachmentId;
+}
+
+/**
+ * The `meta` line for an attachment the SERVER described. A picked file's line
+ * comes from `useComposerMedia.describeFile`; this is the same shape built from
+ * `content_type` + `byte_size`, which is all the wire carries.
+ */
+function describeServerAttachment(contentType: string, byteSize: number): string {
+  const subtype = contentType.split(";")[0].split("/").pop();
+  const label = (subtype && subtype !== "octet-stream" ? subtype : "file").toUpperCase();
+  const mb = byteSize / (1000 * 1000);
+  const size = byteSize < 1000
+    ? `${byteSize} B`
+    : byteSize < 1000 * 1000
+      ? `${Math.round(byteSize / 1000)} KB`
+      : `${mb.toFixed(1)} MB`;
+  return `${label} · ${size}`;
+}
+
 function OutgoingBubble({
   message,
+  threadId,
   onRetry,
 }: {
   message: ChatMessage;
+  /** For the content path. Absent on the seeded route, where nothing is remote. */
+  threadId?: string;
   onRetry?: () => void;
 }) {
   // RN takes no `currentColor`, so the two glyphs in here need real strings.
@@ -1105,8 +1368,23 @@ function OutgoingBubble({
           </View>
         ) : null}
 
-        {/* Attachment card */}
-        {message.kind === "attachment" && message.attachment ? (
+        {/* A VOICE NOTE IS A PLAYER, NOT A FILE CARD. A row reading
+            "voice-note.m4a · 928 KB" with a download glyph is a correct
+            description of a file and the wrong description of somebody talking.
+            Figma `voice_note — 6/7` on the Messaging page. */}
+        {isVoiceNote(message) && message.attachment ? (
+          <View className="bg-primary" style={{ borderRadius: 12, padding: 12 }}>
+            <VoiceNoteBubbleBody
+              threadId={threadId}
+              attachmentId={message.attachment.serverAttachmentId}
+              localUri={message.attachment.localUri}
+              durationMs={message.attachment.voiceDurationMs ?? null}
+            />
+          </View>
+        ) : null}
+
+        {/* Attachment card — documents and images. */}
+        {message.kind === "attachment" && message.attachment && !isVoiceNote(message) ? (
           <View
             className="bg-primary"
             style={{
@@ -1142,17 +1420,23 @@ function OutgoingBubble({
                   className="font-label-sm text-label-sm text-on-primary/75"
                   style={{ marginTop: 2 }}
                 >
-                  {/* Local media says so, in words. There is no upload endpoint,
-                      so "sent" would be false. */}
-                  {message.attachment.localUri
+                  {/* "on this device only" needs BOTH halves, and each one alone
+                      is wrong. `localUri` alone was wrong because it survives a
+                      successful upload — it is what a retry and playback use —
+                      so every uploaded file would have announced itself unsent.
+                      A missing `serverAttachmentId` alone is wrong because the
+                      seeded messages have neither field and stand in for
+                      already-uploaded attachments; keying on it made the seeded
+                      Lab_Panel claim to be device-local. */}
+                  {isDeviceLocal(message)
                     ? `${message.attachment.meta} · on this device only`
                     : message.attachment.meta}
                 </Text>
               </View>
-              {/* The download glyph is suppressed for device-local media: there is
-                  nowhere to download it FROM, and a control that cannot work is
-                  the exact defect this change was opened to fix. */}
-              {message.attachment.localUri ? null : (
+              {/* Suppressed for device-local media: there is nowhere to download
+                  it FROM, and a control that cannot work is the exact defect this
+                  change was opened to fix. */}
+              {isDeviceLocal(message) ? null : (
                 <Icon chrome="download" size={20} color={onPrimaryMuted} />
               )}
             </View>
@@ -1183,8 +1467,9 @@ function OutgoingBubble({
           {message.status === "sent" ? <Icon chrome="done-all" size={14} color={primary} /> : null}
           {message.status === "local" ? (
             // The one honest thing to say about a message the app is not
-            // transmitting: an attachment (no upload endpoint exists anywhere
-            // in this product) or a send on a route with no thread behind it.
+            // transmitting — which now only ever means a send on a route with no
+            // thread behind it (PractitionerChatScreen, the profile "Message"
+            // button). Attachments transmit.
             <Text className="font-label-sm text-label-sm text-on-surface-variant">
               Not sent — this conversation isn&apos;t connected
             </Text>
@@ -1224,7 +1509,15 @@ function OutgoingBubble({
  */
 const INCOMING_BUBBLE = "rounded-md border border-outline-variant bg-card-surface px-4 py-3";
 
-function IncomingBubble({ message, contactName }: { message: ChatMessage; contactName: string }) {
+function IncomingBubble({
+  message,
+  threadId,
+  contactName,
+}: {
+  message: ChatMessage;
+  threadId?: string;
+  contactName: string;
+}) {
   // Resolved by NAME so they step with the mode. The outgoing card's pair are
   // `on-primary` / `on-primary` at 75% because it sits on a `primary` fill; an
   // incoming card sits on `card-surface`, so it takes the on-surface pair.
@@ -1285,7 +1578,23 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
               sits on `primary` and uses `on-primary` washes, so this uses
               `on-surface` washes over `card-surface` for the same contrast
               relationship in either mode. */}
-          {message.kind === "attachment" && message.attachment ? (
+          {/* A voice note FROM the other party. The composer cannot produce one
+              on this side of a 1:1, but the schema and the transcript both
+              carry it, and rendering a clinician's spoken reply as a file row
+              with a download glyph would be the same mistake as outgoing. The
+              player sits on `card-surface`, so it takes the on-surface pair
+              rather than the bubble's `on-primary` washes. */}
+          {isVoiceNote(message) && message.attachment ? (
+            <View className={message.text ? "mt-sm" : ""}>
+              <IncomingVoiceNote
+                threadId={threadId}
+                attachmentId={message.attachment.serverAttachmentId}
+                durationMs={message.attachment.voiceDurationMs ?? null}
+              />
+            </View>
+          ) : null}
+
+          {message.kind === "attachment" && message.attachment && !isVoiceNote(message) ? (
             <View
               className={`flex-row items-center gap-base rounded-md border border-outline-variant bg-surface-container-low p-3 ${
                 message.text ? "mt-sm" : ""
@@ -1302,7 +1611,7 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
                   className="font-label-sm text-label-sm text-on-surface-variant"
                   style={{ marginTop: 2 }}
                 >
-                  {message.attachment.localUri
+                  {isDeviceLocal(message)
                     ? `${message.attachment.meta} · on this device only`
                     : message.attachment.meta}
                 </Text>
@@ -1310,7 +1619,7 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
               {/* Suppressed for device-local media: there is nowhere to download
                   it FROM, and a control that cannot work is the defect this
                   screen's composer pass was opened to fix. */}
-              {message.attachment.localUri ? null : (
+              {isDeviceLocal(message) ? null : (
                 <Icon chrome="download" size={20} color={incomingGlyphMuted} />
               )}
             </View>
@@ -1323,6 +1632,33 @@ function IncomingBubble({ message, contactName }: { message: ChatMessage; contac
           {message.timestamp}
         </Text>
       </View>
+    </View>
+  );
+}
+
+/** The incoming player. Same anatomy as the outgoing one, in on-surface tokens. */
+function IncomingVoiceNote({
+  threadId,
+  attachmentId,
+  durationMs,
+}: {
+  threadId?: string;
+  attachmentId?: string;
+  durationMs: number | null;
+}) {
+  const source = useRemoteVoiceNoteSource(threadId, attachmentId);
+  const playback = useVoiceNotePlayback(source, durationMs);
+  return (
+    <View className="flex-row items-center gap-base">
+      <VoicePlayButton
+        playback={playback}
+        glyphToken="primary"
+        fillToken="primary"
+        fillAlpha={0.12}
+        label="voice note"
+      />
+      <VoiceWaveform progress={playback.progress} playedToken="primary" restToken="outline-variant" />
+      <Text className="font-label-sm text-label-sm text-on-surface-variant">{playback.label}</Text>
     </View>
   );
 }

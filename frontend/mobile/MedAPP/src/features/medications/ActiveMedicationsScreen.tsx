@@ -32,7 +32,9 @@
 //   * "Offline · Updated 12 Jul at 09:42" — a fixed date that would still have
 //     said 12 Jul in 2027.
 //   * Both "Try again" buttons — they flipped a local enum. Nothing refetched,
-//     because there was nothing to fetch.
+//     because there was nothing to fetch. The shared ErrorPanel now makes that
+//     shape a type error: its `retry` must return the promise of the request it
+//     re-issues, so a callback that only sets state cannot compile.
 //   * The `?state=` hatch — five async states on a screen that makes no request,
 //     every one of them reachable only by URL, including states that render
 //     clinical data. See ./state.ts.
@@ -46,7 +48,7 @@ import { useCallback } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { DetailShell } from "@/components/shell";
-import { Card, Icon, InfoCallout } from "@/components/ui";
+import { Card, EmptyState, Icon, InfoCallout } from "@/components/ui";
 import { shareTextFile } from "@/lib/share";
 import { useTokenColor } from "@/lib/tokens";
 import { buildMedicationListText } from "./list-export";
@@ -237,20 +239,23 @@ export function ActiveMedicationCard({
  * chase their clinician because a server returned 500 is the harm.
  *
  * Its "Add a medication" button is gone: it opened an Alert saying medication
- * entry was not available.
+ * entry was not available — which is why no `action` is passed to the shared
+ * EmptyState, whose Action=No case is the ABSENCE of the prop.
+ *
+ * The `flex-1 items-center justify-center py-12` wrapper stays: this is the
+ * FlatList's `ListEmptyComponent` and it centres against the content container's
+ * `flexGrow: 1`. EmptyState sets no outer flex, so dropping the wrapper would
+ * pin the panel to the top of the list.
  */
 function EmptyMedications() {
   return (
-    <View testID="medications-empty" className="flex-1 items-center justify-center py-12">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-tint">
-        <Icon name="medication" size={32} />
-      </View>
-      <Text className="mt-4 font-headline-md text-headline-md text-on-surface">
-        No active medications
-      </Text>
-      <Text className="mt-2 w-full px-2 text-center font-body-md text-body-md text-on-surface-variant">
-        Ask your clinician to share a prescription.
-      </Text>
+    <View className="flex-1 items-center justify-center py-12">
+      <EmptyState
+        testID="medications-empty"
+        icon="medication"
+        title="No active medications"
+        body="Ask your clinician to share a prescription."
+      />
     </View>
   );
 }

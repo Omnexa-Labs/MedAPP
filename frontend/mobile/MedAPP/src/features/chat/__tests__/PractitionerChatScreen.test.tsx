@@ -80,6 +80,21 @@ jest.mock("expo-audio", () => {
     getRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
     requestRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
     setAudioModeAsync: jest.fn(async () => {}),
+    // Playback, added with the voice-note pass: the review bar and the sent
+    // bubble both mount a player. A recorder-only mock leaves them throwing
+    // "useAudioPlayer is not a function" the moment a capture exists.
+    useAudioPlayer: jest.fn(() => ({
+      play: jest.fn(),
+      pause: jest.fn(),
+      seekTo: jest.fn(async () => {}),
+    })),
+    useAudioPlayerStatus: jest.fn(() => ({
+      currentTime: 0,
+      duration: 0,
+      playing: false,
+      isLoaded: false,
+      didJustFinish: false,
+    })),
   };
 });
 

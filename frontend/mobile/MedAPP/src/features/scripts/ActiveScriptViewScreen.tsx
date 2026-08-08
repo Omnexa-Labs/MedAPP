@@ -89,7 +89,7 @@ import { router, useLocalSearchParams, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { DetailShell } from "@/components/shell";
 import { Toast, useToast } from "@/components/feedback";
-import { Card, Icon } from "@/components/ui";
+import { ErrorPanel } from "@/components/ui";
 import {
   buildPrescriptionDocument,
   describeSaveResult,
@@ -116,9 +116,6 @@ const SCROLL_RESERVE = 60;
  * the only thing that number was measured against.
  */
 const TOAST_BOTTOM = 30;
-
-/** The not-found plate, same 56 the booking-expired frame draws. */
-const ERROR_PLATE = 56;
 
 /**
  * A route param that is actually there.
@@ -254,7 +251,6 @@ export function ActiveScriptViewScreen() {
   // with the alpha composed in rather than a second, frozen "faint teal". The
   // watermark tint that used to sit beside it went with "MEDAPP SECURE".
   const glyphTint = useTokenColor("primary", 0.1);
-  const errorPlate = useTokenColor("on-error-container");
   const onSurface = useTokenColor("on-surface");
   // Filled CTA, exactly as the shared Button resolves it: `primary` fill,
   // `on-primary` content, pressed = the M3 state layer of one over the other.
@@ -286,24 +282,19 @@ export function ActiveScriptViewScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          <Card className="items-center" testID="script-not-found">
-            <View
-              className="items-center justify-center rounded-full bg-error-container"
-              style={{ width: ERROR_PLATE, height: ERROR_PLATE }}
-            >
-              <Icon chrome="error-outline" size={28} color={errorPlate} />
-            </View>
-            <Text className="mt-4 text-center font-headline-md text-headline-md text-on-surface">
-              We can&apos;t show this prescription
-            </Text>
-            <Text className="mt-2 text-center font-body-md text-body-md text-on-surface-variant">
-              The link you followed is missing the details of the script. Open it again from your
-              medications so the right record is loaded.
-            </Text>
-            {/* No button. The app bar's back chevron is the exit, and a second
-                control saying the same thing under a different name is two
-                affordances for one action. */}
-          </Card>
+          {/* `no-identifier`, not `not-found`: nothing was looked up. The guard
+              above is a route-param check, and re-issuing it would fail the same
+              way, so there is no retry to offer.
+
+              No `action` either. The app bar's back chevron is the exit, and a
+              second control saying the same thing under a different name is two
+              affordances for one action. */}
+          <ErrorPanel
+            testID="script-not-found"
+            unrecoverable="no-identifier"
+            title="We can't show this prescription"
+            body="The link you followed is missing the details of the script. Open it again from your medications so the right record is loaded."
+          />
         </ScrollView>
       </DetailShell>
     );

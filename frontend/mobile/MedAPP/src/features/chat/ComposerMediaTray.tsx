@@ -8,13 +8,16 @@
 // src/components/ui: there is no Figma frame for it, so it is not part of the
 // design system yet.
 //
-// FLAGGED FOR DESIGN: neither composer frame draws a pending-attachment state or
-// a recording state at all — the mic and paperclip were drawn as decoration. This
-// tray is therefore built from existing system parts only (InfoCallout, Icon, the
-// surface-container + outline-variant + radius/full vocabulary the input pill
-// already uses) rather than inventing a treatment. It needs a designer pass
-// before it ships: specifically whether the recording state should take over the
-// whole pill (the WhatsApp idiom) instead of stacking above it.
+// ~~FLAGGED FOR DESIGN~~ ANSWERED 2026-08-08, and the answer was the WhatsApp
+// idiom. The flag read: "whether the recording state should take over the whole
+// pill instead of stacking above it". The voice-note frames on the Messaging page
+// (`voice_note — 1..9`, each with a DARK proof beneath it) take over the pill, so
+// THE RECORDING AND REVIEW STATES HAVE MOVED OUT OF THIS FILE into
+// ./VoiceNoteComposer, which draws them inside the pill.
+//
+// What is left here is what still stacks above the pill and always did: the
+// notice, and the chip for a picked FILE. A document has no in-pill state to take
+// over — there is nothing to scrub and nothing to time — so it keeps the chip.
 //
 // docs/BRAND.md compliance notes for a reviewer:
 //   - every glyph goes through <Icon />; this file imports no icon library.
@@ -44,12 +47,34 @@ const KIND_GLYPH: Record<ComposerAttachmentKind, "description" | "mic"> = {
   recording: "mic",
 };
 
-export function ComposerMediaTray({ media }: { media: ComposerMedia }) {
+export function ComposerMediaTray({
+  media,
+  showRecordingState = true,
+}: {
+  media: ComposerMedia;
+  /**
+   * False for a composer that draws the recording and review states INSIDE its
+   * pill (ChatThreadScreen, via ./VoiceNoteComposer). True — the default — keeps
+   * the stacked bar for AiAssistantScreen, whose pill has no in-place treatment
+   * and no frame asking for one.
+   *
+   * A prop rather than two trays: this file exists because two composers had two
+   * copies of the same chip, and splitting it again for one differing row would
+   * undo that.
+   */
+  showRecordingState?: boolean;
+}) {
   const { attachment, isRecording, recordingMillis, notice } = media;
   const mutedGlyph = useTokenColor("on-surface-variant");
   const errorGlyph = useTokenColor("on-error-container");
 
-  if (!attachment && !isRecording && !notice) return null;
+  // A voice note is drawn inside the pill when the caller says so, and the tray
+  // must not also draw a chip for it — the same capture would appear twice, once
+  // as a scrubber and once as a filename.
+  const showsAttachment =
+    Boolean(attachment) && (showRecordingState || attachment?.kind !== "recording");
+  const showsRecording = isRecording && showRecordingState;
+  if (!showsAttachment && !showsRecording && !notice) return null;
 
   return (
     <View className="mx-md mb-xs gap-xs">
@@ -77,7 +102,7 @@ export function ComposerMediaTray({ media }: { media: ComposerMedia }) {
         </InfoCallout>
       ) : null}
 
-      {isRecording ? (
+      {showsRecording ? (
         <View
           className="flex-row items-center gap-sm rounded-full border border-error/40 bg-error-container px-sm py-xs"
           testID="composer-recording-bar"
@@ -99,7 +124,7 @@ export function ComposerMediaTray({ media }: { media: ComposerMedia }) {
         </View>
       ) : null}
 
-      {attachment && !isRecording ? (
+      {attachment && showsAttachment && !isRecording ? (
         <View
           className="flex-row items-center gap-sm rounded-full border border-outline-variant bg-surface-container-high px-sm py-xs"
           testID="composer-attachment-chip"
@@ -109,9 +134,10 @@ export function ComposerMediaTray({ media }: { media: ComposerMedia }) {
             <Text className="font-label-md text-label-md text-on-surface" numberOfLines={1}>
               {attachment.name}
             </Text>
-            {/* "Not sent yet" is stated in words rather than implied by the chip's
-                position, because there is no upload endpoint and the file is
-                device-local until one exists. See ./useComposerMedia. */}
+            {/* "Not sent yet" is stated in words rather than implied by the
+                chip's position. The upload exists now, but it does not run until
+                SEND — the file is genuinely still device-local while this chip is
+                on screen. See ChatThreadScreen's VOICE NOTES block. */}
             <Text className="font-label-sm text-label-sm text-on-surface-variant" numberOfLines={1}>
               {attachment.meta} · not sent yet
             </Text>

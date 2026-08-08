@@ -128,6 +128,21 @@ jest.mock("expo-audio", () => {
     getRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
     requestRecordingPermissionsAsync: jest.fn(async () => ({ ...permission })),
     setAudioModeAsync: jest.fn(async () => {}),
+    // Playback, added with the voice-note pass: the review bar and the sent
+    // bubble both mount a player. A recorder-only mock leaves them throwing
+    // "useAudioPlayer is not a function" the moment a capture exists.
+    useAudioPlayer: jest.fn(() => ({
+      play: jest.fn(),
+      pause: jest.fn(),
+      seekTo: jest.fn(async () => {}),
+    })),
+    useAudioPlayerStatus: jest.fn(() => ({
+      currentTime: 0,
+      duration: 0,
+      playing: false,
+      isLoaded: false,
+      didJustFinish: false,
+    })),
   };
 });
 
@@ -511,14 +526,20 @@ describe("ChatThreadScreen — mic", () => {
       playsInSilentMode: true,
     });
     expect(a.__recorder.record).toHaveBeenCalled();
-    expect(screen.getByTestId("composer-recording-bar")).toBeTruthy();
+    // The recording state moved INSIDE the composer pill with the voice-note
+    // pass (Figma `voice_note — 2..5`), so the id is the pill's, not the tray's.
+    // ComposerMediaTray still draws it for AiAssistantScreen, whose suite still
+    // asserts `composer-recording-bar`.
+    expect(screen.getByTestId("voice-recording-bar")).toBeTruthy();
 
     await pressAsync("Stop recording");
     expect(a.__recorder.stop).toHaveBeenCalled();
     // Session handed back, so the OS mic indicator clears.
     expect(a.setAudioModeAsync).toHaveBeenLastCalledWith({ allowsRecording: false });
-    expect(screen.getByText("Voice note")).toBeTruthy();
-    expect(screen.getByLabelText("Voice message")).toBeTruthy();
+    // …and lands in REVIEW rather than in a named chip: a capture is now
+    // listened back to before it is sent.
+    expect(screen.getByTestId("voice-review-bar")).toBeTruthy();
+    expect(screen.getByLabelText("Play voice note")).toBeTruthy();
   });
 
   it("discards a recording without attaching it, and reaps the file", async () => {
@@ -528,7 +549,8 @@ describe("ChatThreadScreen — mic", () => {
     await pressAsync("Discard recording");
 
     expect(audio().__recorder.stop).toHaveBeenCalled();
-    expect(screen.queryByTestId("composer-recording-bar")).toBeNull();
+    expect(screen.queryByTestId("voice-recording-bar")).toBeNull();
+    expect(screen.queryByTestId("voice-review-bar")).toBeNull();
     expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
     expect(fs().__deleted).toEqual(["file:///cache/AV/recording-1.m4a"]);
   });
@@ -568,6 +590,7 @@ describe("ChatThreadScreen — mic", () => {
     await pressAsync("Stop recording");
 
     expect(screen.queryByTestId("composer-attachment-chip")).toBeNull();
+    expect(screen.queryByTestId("voice-review-bar")).toBeNull();
     expect(screen.getByText(/could not be saved/)).toBeTruthy();
   });
 });

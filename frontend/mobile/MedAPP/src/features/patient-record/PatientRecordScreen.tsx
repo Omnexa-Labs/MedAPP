@@ -81,7 +81,16 @@ import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { DetailShell } from "@/components/shell";
-import { AvatarWithFallback, Button, Card, Icon, VitalStatCard } from "@/components/ui";
+import {
+  AvatarWithFallback,
+  Button,
+  Card,
+  EmptyState,
+  ErrorPanel,
+  Icon,
+  VitalStatCard,
+  type RetryHandler,
+} from "@/components/ui";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ApiError } from "@/types/api";
 import { ehrApi, type PatientBundle } from "@/features/overview/api";
@@ -166,7 +175,10 @@ export function PatientRecordScreen() {
       <ErrorState
         offline={state.offline}
         retrying={query.isFetching}
-        onRetry={() => void query.refetch()}
+        // The promise, not `void query.refetch()`: ErrorPanel derives the
+        // pending label from the request being in flight, and a handler that
+        // returns nothing is the shape of the retries that refetched nothing.
+        onRetry={() => query.refetch()}
         onBack={goBack}
       />
     );
@@ -336,16 +348,18 @@ function VitalsSection({ vitals }: { vitals: readonly RecordVital[] }) {
         ) : null}
       </View>
 
+      {/* `inline`, never the default card: this sits INSIDE the vitals Card, and
+          a card drawn inside a card is the drift the shared panel replaces. The
+          "Latest vitals" heading and its `updated` label above stay put — only
+          the section's own body is empty. */}
       {assessed.length === 0 ? (
-        <View className="mt-5 items-center py-5">
-          <Icon chrome="monitor-heart" />
-          <Text className="mt-3 font-label-md text-label-md text-on-surface">
-            No observations recorded
-          </Text>
-          <Text className="mt-1 text-center font-body-md text-body-md text-on-surface-variant">
-            Nothing has been recorded against this record yet.
-          </Text>
-        </View>
+        <EmptyState
+          container="inline"
+          className="mt-5"
+          icon="monitor-heart"
+          title="No observations recorded"
+          body="Nothing has been recorded against this record yet."
+        />
       ) : null}
 
       {scored.length > 0 ? (
@@ -447,36 +461,20 @@ function LoadingState({ onBack }: { onBack: () => void }) {
 }
 
 /**
- * A panel that fills the screen and offers a way out. The three terminal states
- * below differ only in words, so they share one body rather than three
- * near-identical copies that can drift apart.
+ * The screen CHROME a terminal state needs: the app bar with its way back, and
+ * a full-height centred slot for the panel.
+ *
+ * It no longer draws the panel itself. It used to be a fourth hand-rolled
+ * anatomy — a `p-5` Card with no icon plate at all, its own type and its own
+ * 24 gap to the button — and the shared `ErrorPanel` is now the one that decides
+ * all of that. What is left here is what the shared component cannot own: these
+ * three states replace a WHOLE SCREEN, so the app bar and the centring are the
+ * screen's business.
  */
-function TerminalPanel({
-  testID,
-  title,
-  body,
-  onBack,
-  children,
-}: {
-  testID: string;
-  title: string;
-  body: string;
-  onBack: () => void;
-  children: React.ReactNode;
-}) {
+function TerminalPanel({ onBack, children }: { onBack: () => void; children: React.ReactNode }) {
   return (
     <DetailShell title="Patient record" onBack={onBack}>
-      <View className="flex-1 items-center justify-center px-4">
-        <Card testID={testID} className="w-full items-center justify-center p-5">
-          <Text className="text-center font-headline-md text-headline-md text-on-surface">
-            {title}
-          </Text>
-          <Text className="mt-2 text-center font-body-md text-body-md text-on-surface-variant">
-            {body}
-          </Text>
-          <View className="mt-6 w-full">{children}</View>
-        </Card>
-      </View>
+      <View className="flex-1 items-center justify-center px-4">{children}</View>
     </DetailShell>
   );
 }
@@ -491,33 +489,42 @@ function NotFoundState({
   onRoster: () => void;
 }) {
   return (
-    <TerminalPanel
-      testID="not-found-card"
-      title="Patient record unavailable"
-      // The two reasons are different facts and are worded as such. Neither
-      // mentions permission any more — that is `ForbiddenState`, and folding
-      // the three together is what let an outage read as a missing record.
-      body={
-        reason === "no-id"
-          ? "This link did not name a patient, so no record was opened."
-          : "No record exists for this patient."
-      }
-      onBack={onBack}
-    >
-      <Button label="Back to patient roster" shadow={false} onPress={onRoster} />
+    <TerminalPanel onBack={onBack}>
+      <ErrorPanel
+        testID="not-found-card"
+        className="w-full"
+        // A missing id looked nothing up; a 404 looked one up and there was
+        // nothing there. Both are dead ends, and naming which keeps them
+        // greppable rather than collapsing to "no retry".
+        unrecoverable={reason === "404" ? "not-found" : "no-identifier"}
+        title="Patient record unavailable"
+        // The two reasons are different facts and are worded as such. Neither
+        // mentions permission any more — that is `ForbiddenState`, and folding
+        // the three together is what let an outage read as a missing record.
+        body={
+          reason === "no-id"
+            ? "This link did not name a patient, so no record was opened."
+            : "No record exists for this patient."
+        }
+        // A way OUT, not a retry: the roster is somewhere else to be, and
+        // re-issuing this lookup would return the same nothing.
+        action={{ label: "Back to patient roster", onPress: onRoster }}
+      />
     </TerminalPanel>
   );
 }
 
 function ForbiddenState({ onBack, onRoster }: { onBack: () => void; onRoster: () => void }) {
   return (
-    <TerminalPanel
-      testID="forbidden-card"
-      title="You do not have access"
-      body="This record exists, but no active consent grants you access to it. Ask the patient or the records team to grant access."
-      onBack={onBack}
-    >
-      <Button label="Back to patient roster" shadow={false} onPress={onRoster} />
+    <TerminalPanel onBack={onBack}>
+      <ErrorPanel
+        testID="forbidden-card"
+        className="w-full"
+        unrecoverable="forbidden"
+        title="You do not have access"
+        body="This record exists, but no active consent grants you access to it. Ask the patient or the records team to grant access."
+        action={{ label: "Back to patient roster", onPress: onRoster }}
+      />
     </TerminalPanel>
   );
 }
@@ -536,26 +543,27 @@ function ErrorState({
   onBack,
 }: {
   offline: boolean;
+  /** The query's own `isFetching` — a refetch can also start elsewhere. */
   retrying: boolean;
-  onRetry: () => void;
+  onRetry: RetryHandler;
   onBack: () => void;
 }) {
   return (
-    <TerminalPanel
-      testID="record-error-card"
-      title={offline ? "You’re offline" : "Couldn’t load this record"}
-      body={
-        offline
-          ? "This record could not be reached. Nothing is shown rather than something out of date."
-          : "Something went wrong loading this record. No clinical data is shown."
-      }
-      onBack={onBack}
-    >
-      <Button
-        label={retrying ? "Retrying…" : "Try again"}
-        shadow={false}
-        onPress={onRetry}
-        disabled={retrying}
+    <TerminalPanel onBack={onBack}>
+      <ErrorPanel
+        testID="record-error-card"
+        className="w-full"
+        title={offline ? "You’re offline" : "Couldn’t load this record"}
+        body={
+          offline
+            ? "This record could not be reached. Nothing is shown rather than something out of date."
+            : "Something went wrong loading this record. No clinical data is shown."
+        }
+        // The only one of the three that has something to re-issue. The
+        // "Retrying…" label and the disabled state are the panel's, derived from
+        // the promise, so nothing here can claim a refetch that is not running.
+        retry={onRetry}
+        retrying={retrying}
       />
     </TerminalPanel>
   );

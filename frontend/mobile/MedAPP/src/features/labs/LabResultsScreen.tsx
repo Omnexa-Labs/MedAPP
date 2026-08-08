@@ -56,7 +56,7 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { router, type Href } from "expo-router";
 import { DetailShell } from "@/components/shell";
-import { Button, Card, Icon, InfoCallout, SearchField } from "@/components/ui";
+import { Card, EmptyState, ErrorPanel, Icon, InfoCallout, SearchField } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import { labApi, type LabResult } from "./api";
 
@@ -190,35 +190,31 @@ export function LabResultsScreen() {
           </View>
         ) : results.isError ? (
           // A failure NEVER renders the empty state. Same rule as the
-          // medications list, for the same reason.
-          <View testID="lab-results-error" className="items-center gap-3 py-12">
-            <Text className="font-headline-md text-headline-md text-on-surface">
-              Couldn’t load your lab results
-            </Text>
-            <Text className="text-center font-body-md text-body-md text-on-surface-variant">
-              No results are shown. This does not mean you have none.
-            </Text>
-            <Button
-              label={results.isFetching ? "Retrying…" : "Try again"}
-              variant="outline"
-              fullWidth={false}
-              shadow={false}
-              disabled={results.isFetching}
-              onPress={() => void results.refetch()}
-            />
-          </View>
+          // medications list, for the same reason. `container="card"` because
+          // this sits in the scroll body, not inside a section — the panel IS
+          // the surface that replaces the list.
+          <ErrorPanel
+            testID="lab-results-error"
+            title="Couldn’t load your lab results"
+            body="No results are shown. This does not mean you have none."
+            retry={() => results.refetch()}
+            // React Query drives the pending label here too, because the list
+            // query is also refetched on mount and on reconnect.
+            retrying={results.isFetching}
+          />
         ) : shown.length === 0 ? (
-          <View testID="lab-results-empty" className="items-center gap-2 py-12">
-            <Icon name="lab-sample" size={32} />
-            <Text className="font-headline-md text-headline-md text-on-surface">
-              {searching ? "No results match your search" : "No lab results yet"}
-            </Text>
-            <Text className="text-center font-body-md text-body-md text-on-surface-variant">
-              {searching
+          // Same component, different message and glyph: an empty search result
+          // and an empty record are not the same fact.
+          <EmptyState
+            testID="lab-results-empty"
+            icon="lab-sample"
+            title={searching ? "No results match your search" : "No lab results yet"}
+            body={
+              searching
                 ? "Try a different word, or clear the search to see everything."
-                : "Results your clinician or lab uploads will appear here."}
-            </Text>
-          </View>
+                : "Results your clinician or lab uploads will appear here."
+            }
+          />
         ) : (
           shown.map((result) => <ResultCard key={result.id} result={result} />)
         )}

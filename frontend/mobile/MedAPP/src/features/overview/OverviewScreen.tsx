@@ -111,7 +111,15 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { ehrApi, type Vital } from "./api";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
-import { Button, Card, Icon, VitalStatCard, type HealthIconName } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorPanel,
+  SkeletonCard,
+  VitalStatCard,
+  type HealthIconName,
+} from "@/components/ui";
 import { PatientShell } from "@/components/shell";
 import { Toast, useToast } from "@/components/feedback";
 import {
@@ -393,7 +401,7 @@ export function OverviewScreen() {
           {summaryPending ? (
             <VitalsSkeleton />
           ) : summaryError ? (
-            <VitalsError onRetry={() => refetchSummary()} />
+            <VitalsError retry={() => refetchSummary()} />
           ) : metrics.length === 0 ? (
             <VitalsEmpty />
           ) : (
@@ -459,16 +467,18 @@ export function OverviewScreen() {
 // State panels
 // ---------------------------------------------------------------------------
 //
-// Local, and not imported from `src/components/ui/`, for the reason
-// features/care/components/FacilityStatePanels.tsx already sets out at length:
-// `EmptyState 517:1773` and `ErrorPanel 517:2111` are APPROVED IN FIGMA AND
-// UNCODED (docs/PIPELINE.md §5), and `docs/PIPELINE.md` §2 makes the Design
-// System page the source of truth for what may live in `components/ui`. Several
-// screens carry a private copy each. These two are inside a Card rather than
-// being one, because the range control above them belongs to the same section
-// and must not disappear when the readings fail to load.
+// These are the SHARED `EmptyState` / `ErrorPanel` / `SkeletonCard` now, not the
+// private copies that used to sit here. The copies had drifted in the ways those
+// components document: a hardcoded `fontSize: 18` on both headings (the ramp has
+// no 18) and skeleton bars on `surface-container-high`, which is the same
+// #242B2A as `card-surface` in dark, so the placeholder rendered as blank cards.
+//
+// `container="inline"` on both panels, NOT the default Card: they render INSIDE
+// the Health Trends Card so the 7D/1M/3M/1Y range control survives a failure,
+// and a card drawn inside a card is precisely the drift the Inline variant
+// exists to prevent.
 
-/** No shimmer — see the note on FindCareScreen's SkeletonCard for why. */
+/** No shimmer — see the note in SkeletonCard for why (one Reanimated consumer). */
 function VitalsSkeleton() {
   return (
     <View
@@ -476,13 +486,13 @@ function VitalsSkeleton() {
       style={{ marginHorizontal: -6 }}
       accessibilityLabel="Loading your readings"
     >
+      {/* SkeletonCard hides ITSELF from assistive tech, so the "Loading…"
+          announcement stays on this wrapper — which is also why the two cards are
+          rendered per-cell rather than with `count`: the 2-up grid is these 50%
+          cells, and `count` returns a fragment with no cell around each card. */}
       {[0, 1].map((i) => (
         <View key={i} style={{ width: "50%", paddingHorizontal: 6, marginBottom: 12 }}>
-          <View className="gap-sm rounded-card bg-surface-container-low p-md">
-            <View className="h-3 w-1/2 rounded bg-surface-container-high" />
-            <View className="h-6 w-2/3 rounded bg-surface-container-high" />
-            <View className="h-10 w-full rounded bg-surface-container-high" />
-          </View>
+          <SkeletonCard shape="vital-stat-card" />
         </View>
       ))}
     </View>
@@ -493,54 +503,35 @@ function VitalsSkeleton() {
  * The state the fabricated readings used to occupy.
  *
  * It says the readings could not be loaded and it does not guess at them. The
- * retry is `refetch`, which react-query owns — no manual state to reset.
+ * retry is `refetch`, which react-query owns — no manual state to reset, and
+ * ErrorPanel's `retry` type is what forces it to be the real request rather than
+ * a local flag.
  */
-function VitalsError({ onRetry }: { onRetry: () => void }) {
-  const glyph = useTokenColor("on-error-container");
+function VitalsError({ retry }: { retry: () => Promise<unknown> }) {
   return (
-    <View className="mt-md items-center" testID="vitals-error">
-      <View className="h-12 w-12 items-center justify-center rounded-full bg-error-container">
-        {/* Decorative: the heading below says the same thing in words, so the
-            failure is never carried by a red circle alone. */}
-        <Icon chrome="cloud-off" size={26} color={glyph} />
-      </View>
-      <Text
-        accessibilityRole="header"
-        className="mt-sm text-center font-headline-md text-on-surface"
-        style={{ fontSize: 18 }}
-      >
-        We couldn&apos;t load your readings
-      </Text>
-      <Text className="mt-xs text-center font-body-md text-body-md text-on-surface-variant">
-        Nothing is shown here rather than something out of date. Check your connection and try
-        again.
-      </Text>
-      <View className="mt-md w-full">
-        <Button label="Try again" size="docked" pill={false} shadow={false} onPress={onRetry} />
-      </View>
-    </View>
+    <ErrorPanel
+      container="inline"
+      className="mt-md"
+      testID="vitals-error"
+      icon="cloud-off"
+      title="We couldn't load your readings"
+      body="Nothing is shown here rather than something out of date. Check your connection and try again."
+      retry={retry}
+    />
   );
 }
 
 /** A live account with no readings. Distinct from a failure, and it says so. */
 function VitalsEmpty() {
-  const glyph = useTokenColor("primary");
   return (
-    <View className="mt-md items-center" testID="vitals-empty">
-      <View className="h-12 w-12 items-center justify-center rounded-full bg-primary-tint">
-        <Icon chrome="monitor-heart" size={26} color={glyph} />
-      </View>
-      <Text
-        accessibilityRole="header"
-        className="mt-sm text-center font-headline-md text-on-surface"
-        style={{ fontSize: 18 }}
-      >
-        No readings yet
-      </Text>
-      <Text className="mt-xs text-center font-body-md text-body-md text-on-surface-variant">
-        Vitals recorded by your care team will appear here.
-      </Text>
-    </View>
+    <EmptyState
+      container="inline"
+      className="mt-md"
+      testID="vitals-empty"
+      icon="monitor-heart"
+      title="No readings yet"
+      body="Vitals recorded by your care team will appear here."
+    />
   );
 }
 
