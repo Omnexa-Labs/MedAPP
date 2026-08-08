@@ -292,7 +292,9 @@ export const authApi = {
   },
 };
 
-// Convenience export for store/auth-store.ts hydration.
+// Convenience export that existed solely for store/auth-store.ts hydration,
+// which now calls `authApi.me()` directly. Kept as a named alias — it is a
+// one-line re-export and removing a public name is not worth the churn.
 export function fetchCurrentUser(): Promise<User> {
   return authApi.me();
 }
