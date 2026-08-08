@@ -237,10 +237,19 @@ path or a patient screen. `Appointments` and `Inbox` are wired to the real
 `/(app)/appointments` and `/(app)/inbox`; `AppointmentManagementScreen` is
 currently authored patient-side and needs a practitioner variant.
 
-Neither bell has a destination — there is no notifications screen — and
-`unreadCount` is prop-driven with no data source, so the badge is absent until a
-notifications store exists. A mock display _name_ is harmless; a mock unread
-count is a false statement to the user. See the prop docs.
+The **patient** bell has a destination (`/(app)/notifications`, defaulted by
+`PatientShell`) but **no unread badge and no `unreadCount` prop** — both were
+removed on 2026-08-08. The branch could never fire: no screen ever passed a
+count, and `notification_service` exposes no read state for one to be computed
+from (`status` is delivery status; `delivered_at` is when the server sent it).
+`PatientAppBar`'s header lists the three fields the server must add — a
+server-owned `read_at`, a route to set it, and a count that does not require
+paging the inbox. A prop whose only possible value is `undefined` is a shell API
+that looks wired and is not. Recorded in `docs/api/README.md`'s gap register.
+
+**`PractitionerAppBar` still has `unreadCount`** and is untouched by that pass —
+same gap, but it is a different bar with a different audience, and rewriting it
+was outside the scope of the patient-home work. It should follow.
 
 The patient `BottomNav` has no `href` table at all: routing is the caller's, via
 `onTabPress`. `PatientShell` passes it straight through.

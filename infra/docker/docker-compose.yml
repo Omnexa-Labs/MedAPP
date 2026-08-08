@@ -259,6 +259,41 @@ services:
     depends_on: [postgres]
     environment: *svc-env
     ports: ["8013:8013"]
+    # ATTACHMENT BYTES. Message attachments (voice notes, images, PDFs) are
+    # written to a directory, not to Postgres — see
+    # `backend/services/inbox_service/app/storage.py` for the choice and its
+    # limits. Without this named volume the files live in the container's
+    # writable layer and every `docker compose up --build` silently destroys
+    # every attachment ever uploaded.
+    #
+    # MOUNTED AT /app/var, **NOT** AT /app/var/attachments. This looks like a
+    # cosmetic difference and is not — it was found live, and the first version
+    # of this line 500'd every single upload with:
+    #
+    #   PermissionError: [Errno 13] Permission denied:
+    #   '/app/var/attachments/<thread-id>'
+    #
+    # Docker seeds an empty named volume from the image's contents at the
+    # mount path, INCLUDING ownership — but only if that path exists in the
+    # image. `backend/Dockerfile` creates and chowns `/app/var` to 10001;
+    # `/app/var/attachments` does not exist there, so mounting the volume at
+    # the deeper path made Docker create the directory itself, as root:root
+    # 0755. The container runs as UID 10001 (Pod Security `restricted`), so it
+    # could read that directory and never write to it.
+    #
+    # Mounting one level up at `/app/var` seeds the volume from a directory
+    # that DOES exist and IS owned by 10001, and the service then creates
+    # `attachments/` inside it with mode 0700. No Dockerfile change, no
+    # root-owned mount, no init container.
+    #
+    # A named volume rather than a bind mount, for the same ownership reason:
+    # a bind mount from a Windows or macOS host lands root-owned and puts the
+    # bug straight back.
+    #
+    # NOT SHARED BETWEEN REPLICAS. This service cannot be scaled horizontally
+    # while local storage is in use.
+    volumes:
+      - inbox_attachments:/app/var
 
   # ADDED 2026-08-07. This service exists on disk and IS routed by the gateway
   # (`/v1/onboarding` -> onboarding_service:8013), but had no container at all,
@@ -475,3 +510,6 @@ volumes:
   pgdata:
   mongodata:
   qdrantdata:
+  # inbox_service message attachments. `docker compose down -v` DELETES PATIENT
+  # FILES from here — the database backup does not contain them.
+  inbox_attachments:

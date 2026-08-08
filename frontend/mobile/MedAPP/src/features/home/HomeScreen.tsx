@@ -20,12 +20,15 @@
 //     design brief §2/§5 — initials-tinted circle, not a hardcoded photo.
 //
 // Design-approved deviations from the raw prototype (per FINAL DESIGN REVIEW):
-//   - AI hero card gets a "Why this? / Dismiss" trust row for medical-AI
-//     consent/transparency expectations.
-//   - Notification bell uses a small dot-style unread badge (no numeral —
-//     unread counts aren't modeled yet; a dot communicates "has activity").
 //   - Bell touch target bumped to 44x44 via hitSlop/padding (WCAG 4.1.2);
 //     the frame's bell asset is a raw 26x40 icon graphic.
+//
+// The approved "Why this? / Dismiss" trust row is GONE, and the reason is in
+// the FABRICATION PASS note below: it was the transparency control for an
+// inference this screen never made. With the invented inference deleted there
+// is nothing left to explain or dismiss, so the row would have been two dead
+// Pressables guarding nothing. Re-add it, unchanged, the moment the hero shows
+// a real model output.
 //
 // Flagged deviation (not silently dropped): this frame's header/quick-services
 // no longer includes a dedicated SOS affordance (the previous build promoted
@@ -61,15 +64,48 @@
 // FLAGGED — behaviour the shell cannot express, not silently dropped:
 // the old bell carried a count-less unread DOT and the label "Notifications,
 // unread". Nothing in the app models notification counts, so that dot was a
-// decorative claim of unread activity with no data behind it. PatientAppBar
-// renders a badge only for a real positive `unreadCount` (see its own FLAGGED
-// note), so this screen now passes none and the label is plainly
-// "Notifications". Re-wire `unreadCount` the moment a notifications store
-// exists — the badge treatment is already built and tested.
+// decorative claim of unread activity with no data behind it. The badge
+// treatment PatientAppBar used to hold for this is gone too — see that file and
+// docs/api/README.md's gap register for the fields `notification_service` would
+// have to expose before a badge can mean anything.
+//
+// ============================================================================
+// FABRICATION PASS (2026-08-07) — this screen had NO network call and said
+// clinical things anyway
+// ============================================================================
+// Everything on it below the greeting was a literal, and four of those literals
+// were statements about the patient's body or their care:
+//
+//   * "Your blood pressure readings look steady this week — great progress on
+//     your care plan." Attributed to MedAI, i.e. presented as something a system
+//     had ANALYSED. Nothing in this app has ever read a blood pressure. This was
+//     the worst string in the file and it is deleted outright, not softened: a
+//     fabricated inference dressed as a model output is worse than no card.
+//   * "Morning breathing improves your HRV" + a licensing-placeholder image. An
+//     invented clinical claim in an invented article. The whole Health Insights
+//     section goes with it — there is no content service, so the section cannot
+//     be sourced, and BRAND's own rule for this pass is that an unsourceable
+//     card is removed rather than re-filled.
+//   * Sleep "7h 20m" and Steps "6,240 / 8,000". These CAN be sourced —
+//     `wearable_sync_service` stores `sleep_minutes` and `steps`, and
+//     `features/wearables/daily.ts` already owns the cumulative-latest-per-day
+//     arithmetic that LifestyleHubScreen uses. So they are wired, not deleted.
+//     The "/ 8,000" goal is deleted: nothing stores a step target, so the
+//     denominator was the one half of that row that could not be made true.
+//   * `NEXT_APPOINTMENT` — an invented clinician and the literal string
+//     "Tomorrow, 10:30 AM", which was still saying "tomorrow" on the day the
+//     appointment would have been yesterday. `GET /v1/bookings` is live and
+//     `appointmentsApi.listAppointments()` already adapts it, so this card now
+//     renders the patient's real next booking or nothing at all.
+//
+// The rule applied throughout: source it or remove it. No placeholder was
+// invented to stand in for anything deleted, and every removal is recorded in
+// docs/api/README.md's gap register.
 
 import { useEffect } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
+import { useQuery } from "@tanstack/react-query";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -81,6 +117,9 @@ import { useAuthStore } from "@/store/auth-store";
 import { PatientShell } from "@/components/shell";
 import { AvatarWithFallback, Card, Icon, type ChromeIconName } from "@/components/ui";
 import { useTokenColor, type ColorToken } from "@/lib/tokens";
+import { appointmentsApi, type Appointment } from "@/features/appointments/api";
+import { wearablesApi } from "@/features/wearables/api";
+import { dailyTotalFor } from "@/features/wearables/daily";
 
 // ============================================================================
 // ICON GATE (2026-08-02) — the direct `MaterialIcons` import is gone
@@ -104,37 +143,104 @@ import { useTokenColor, type ColorToken } from "@/lib/tokens";
 // precisely so screens can type a forwarded glyph without importing the library.
 
 // ============================================================================
-// The Upcoming Appointments card's provider — ONE object, not three literals
+// The Upcoming Appointments card — a real booking or no card
 // ============================================================================
-// This card used to disagree with itself. The face and the name line said
-// "Dr. Sarah Chen"; the Join Call handler pushed `providerName: "Dr. Julian
-// Sterling"` and `providerId: "julian-sterling"` into the waiting room. So the
-// patient tapped a call with Sarah Chen and landed in a waiting room for Julian
-// Sterling — two invented clinicians, one card, and a visible identity swap
-// mid-journey.
+// `NEXT_APPOINTMENT` used to live here: an invented clinician, an invented
+// specialty and an id of "appointment-next", rendered under the literal string
+// "Tomorrow, 10:30 AM". Three separate untruths in one card, and the third was
+// the one that could never become right — a hardcoded "Tomorrow" is wrong on
+// every day but the one it was written on.
 //
-// Neither name exists. scripts/seed_dev_data.py creates the doctors a tester
-// actually sees in Find Care, and this is the "Virtual · Cardiologist" slot, so
-// it is Dr. Adjoa Boateng — the seeded cardiologist whose bio is hypertension
-// management and heart-failure follow-up, i.e. the one who runs a remote review
-// clinic. `providerId` is her seed slug so the waiting room can resolve her once
-// that screen reads real providers.
+// The constant existed because two halves of the card had drifted apart (the
+// face said "Dr. Sarah Chen", the Join Call handler pushed "Dr. Julian
+// Sterling"), and hoisting them into one object made them agree. They agreed on
+// a fiction. The fix is the source, not the shape: `GET /v1/bookings` is routed,
+// live, and already adapted by `features/appointments/api.ts`, which hydrates
+// each booking's clinician from doctor_service. The card takes `upcoming[0]`
+// from exactly that call — the same query key AppointmentManagementScreen uses,
+// so the two screens share one cache and cannot disagree about "next".
 //
-// Hoisted to a constant because the bug was structural: the card had no single
-// source for the provider, so the two halves could drift without anything
-// failing. They now cannot differ.
-const NEXT_APPOINTMENT = {
-  id: "appointment-next",
-  providerId: "adjoa-boateng",
-  providerName: "Dr. Adjoa Boateng",
-  providerSpecialty: "Cardiologist",
-  /** Derived by hand rather than sliced, so the honorific never becomes a letter. */
-  initials: "AB",
-} as const;
+// It renders NOTHING while the query is pending, on error, or when the patient
+// has no upcoming booking. A skeleton or an empty-state illustration would both
+// be additions this pass has no design for; an absent section is the honest
+// resting state and matches what the appointments screen does with the same
+// data.
+
+/**
+ * `Tomorrow, 10:30 AM` — but derived from the instant, so it stops saying
+ * "Tomorrow" when it stops being tomorrow.
+ *
+ * Formatted on the device, in the device's own zone and locale, for the reason
+ * AppointmentManagementScreen's `formatWhen` gives: the server stores an
+ * instant and the patient reads a wall clock. This differs from that helper
+ * only in preferring the relative day words the frame asks for on this card.
+ */
+function formatWhen(iso: string, now: Date = new Date()): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  // Compared as LOCAL calendar days, not as a 24-hour delta: an appointment at
+  // 09:00 tomorrow is 14 hours away at 19:00 today, and "in 14 hours" is not
+  // what "Tomorrow" means to a patient reading a schedule.
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(d) - startOfDay(now)) / 86_400_000);
+  if (days === 0) return `Today, ${time}`;
+  if (days === 1) return `Tomorrow, ${time}`;
+
+  const day = d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+  return `${day}, ${time}`;
+}
+
+/**
+ * "Dr. Kwabena Osei" -> "KO". Same rule as the appointments screen: the
+ * honorific is stripped first so every clinician does not initial as "D".
+ */
+function initialsOf(name: string): string {
+  return name
+    .replace(/^Dr\.?\s+/i, "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+/**
+ * The clinician's name, or an honest stand-in — `hydrate` leaves `doctor` null
+ * when doctor_service could not resolve the id, and a real appointment should
+ * still be visible with its time intact rather than borrowing a name.
+ */
+function doctorName(a: Appointment): string {
+  return a.doctor?.name ?? "Unknown clinician";
+}
 
 export function HomeScreen() {
   const user = useAuthStore((s) => s.user);
   const firstName = user?.displayName?.trim().split(/\s+/)[0] || "there";
+
+  // Same key as AppointmentManagementScreen, deliberately: one cache entry, so
+  // "your next appointment" cannot read differently on two screens.
+  const { data: appointments } = useQuery({
+    queryKey: ["appointments"],
+    queryFn: () => appointmentsApi.listAppointments(),
+  });
+  // `upcoming` is already sorted soonest-first by the api module.
+  const nextAppointment = appointments?.upcoming[0] ?? null;
+
+  // Same key and same single request as LifestyleHubScreen — `recent_samples`
+  // on the summary is what wearable_sync_service offers for this, and fetching
+  // per device would be an N+1 for two numbers.
+  const { data: wearableSummary } = useQuery({
+    queryKey: ["wearables", "summary"],
+    queryFn: () => wearablesApi.getSummary(),
+  });
+  const samples = wearableSummary?.recentSamples ?? [];
+  // `null` when there is no reading, and the row is then not rendered at all.
+  // docs/api/wearable_sync_service.md: "No readings returns null, not zero.
+  // Zero steps claims the patient did not move; no data does not."
+  const sleep = dailyTotalFor(samples, "sleep_minutes");
+  const steps = dailyTotalFor(samples, "steps");
 
   // ai-pulse: scale 1 → 1.1 → 1 over 3s, infinite. Matches the Stitch keyframe.
   const pulse = useSharedValue(1);
@@ -146,6 +252,14 @@ export function HomeScreen() {
     );
   }, [pulse]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+
+  // The hero is `bg-primary-container`, so everything drawn ON it takes that
+  // container's own content pair. Both of these were `rgba(255,255,255,…)` /
+  // `#ffffff` — the light value of a token, frozen: in dark mode
+  // `primary-container` is #005049 and the glyph stayed pure white on it while
+  // every sibling surface had flipped.
+  const onHero = useTokenColor("on-primary-container");
+  const onHeroWash = useTokenColor("on-primary-container", 0.1);
 
   return (
     // Chrome (patient app bar + patient bottom nav + status bar + safe area) is
@@ -178,7 +292,7 @@ export function HomeScreen() {
                 height: 160,
                 width: 160,
                 borderRadius: 80,
-                backgroundColor: "rgba(255,255,255,0.10)",
+                backgroundColor: onHeroWash,
                 ...(Platform.OS === "web" ? { pointerEvents: "none" } : {}),
               },
               pulseStyle,
@@ -190,40 +304,28 @@ export function HomeScreen() {
             className="absolute -bottom-5 -left-5 h-24 w-24 rounded-full bg-primary/20"
           />
           <View className="z-10 gap-sm">
-            <View className="h-12 w-12 items-center justify-center rounded-xl bg-white/20">
-              {/* Decorative — "Talk to MedAI" is the heading right below it.
-                  Stays literal white to match its `text-white` text siblings on
-                  this teal hero, which is the same value in both modes. */}
-              <Icon chrome="auto-awesome" size={24} color="#ffffff" />
+            <View className="h-12 w-12 items-center justify-center rounded-xl bg-on-primary-container/20">
+              {/* Decorative — "Talk to MedAI" is the heading right below it. */}
+              <Icon chrome="auto-awesome" size={24} color={onHero} />
             </View>
-            <Text className="font-headline-md text-headline-md text-white">Talk to MedAI</Text>
+            <Text className="font-headline-md text-headline-md text-on-primary-container">
+              Talk to MedAI
+            </Text>
+            {/* An INVITATION, not an inference. This slot used to hold a
+                quoted sentence about the patient's own blood pressure,
+                attributed to MedAI, on a screen that issues no vitals request
+                and never has — the strongest possible framing (a system
+                analysed you) around the weakest possible basis (a string
+                literal). The wording here is AiAssistantScreen's own empty
+                state, so the card promises exactly what the destination
+                delivers and asserts nothing about this patient. */}
             <Text
-              className="font-body-md text-white/90"
+              className="font-body-md text-on-primary-container/90"
               style={{ fontSize: 15, lineHeight: 21, maxWidth: "80%" }}
             >
-              “Your blood pressure readings look steady this week — great progress on your care
-              plan.”
+              Ask about symptoms, a medicine or a lab report. MedAI gives general information, not a
+              diagnosis.
             </Text>
-            {/* Trust row: "why this?" / dismiss affordance for medical-AI
-                  transparency (approved deviation — not in the raw prototype). */}
-            <View className="flex-row items-center gap-md">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Why this suggestion?"
-                hitSlop={6}
-              >
-                <Text className="font-inter-medium text-[12px] text-white/85 underline">
-                  Why this?
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Dismiss suggestion"
-                hitSlop={6}
-              >
-                <Text className="font-inter-medium text-[12px] text-white/85">Dismiss</Text>
-              </Pressable>
-            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Ask MedAI"
@@ -234,15 +336,28 @@ export function HomeScreen() {
               // deleted style was a literal `#000` at 15% — grey haze, roughly
               // double the ceiling the floating role itself allows. Contrast
               // against the teal hero already separates it.
-              className="mt-sm w-fit flex-row items-center gap-sm self-start rounded-full bg-white px-md py-sm active:scale-95"
+              // `bg-white` + `text-primary` was a WCAG failure waiting for dark
+              // mode: `primary` is #6BD8CB there, so the label would have been
+              // mint on pure white, ~1.4:1. `surface` is the role this pill
+              // actually plays — a raised page-coloured chip lifted off the
+              // teal hero — and it carries `primary` correctly in both schemes
+              // because that is the pairing every other surface on this screen
+              // already uses.
+              className="mt-sm w-fit flex-row items-center gap-sm self-start rounded-full bg-surface px-md py-sm active:scale-95"
             >
               <Text className="font-inter-semibold text-[14px] text-primary">Ask MedAI</Text>
             </Pressable>
           </View>
         </View>
 
-        {/* Quick Services */}
-        <Section title="Quick Services" actionLabel="View All">
+        {/* Quick Services.
+            No `actionLabel`. It carried "View All" and no `onAction`, so
+            `Section` rendered `onPress={undefined}` — a live-looking link with
+            a press animation and `accessibilityRole="button"` that did nothing
+            on every render since the strip shipped. There is no "all services"
+            screen to send it to (the strip IS every service), so the affordance
+            is removed rather than pointed somewhere plausible. */}
+        <Section title="Quick Services">
           {/* ================================================================
               SIXTH TILE: "Find Care" — and why the strip is now 3 x 2
               ================================================================
@@ -316,10 +431,16 @@ export function HomeScreen() {
                 tint="primary"
                 onPress={() => router.push("/(app)/appointments" as Href)}
               />
-              {/* Pharmacy, Labs, Vitals and Records don't have shipped routes
-                  yet — rendered as visual stubs (no onPress), matching the
-                  existing "Smart Sync"/"Inbox" stub pattern above until those
-                  features ship. */}
+              {/* Pharmacy, Labs, Vitals and Records have no shipped
+                  destination. `pharmacy-detail` needs a pharmacy id and is not
+                  a directory; there is no labs screen, no vitals screen, and
+                  `patient-record` is blocked on slug-vs-UUID and consent gating
+                  (docs/api/README.md). So they render as NON-INTERACTIVE tiles.
+                  They used to be `Pressable`s with `accessibilityRole="button"`
+                  and `active:scale-95` and no handler — a control that
+                  announced itself as a button to TalkBack and depressed under
+                  the finger, four times in one strip. A tile with no
+                  destination must not do either. */}
               <QuickService icon="local-pharmacy" label="Pharmacy" tint="primary" />
             </View>
             <View className="flex-row gap-base">
@@ -335,131 +456,180 @@ export function HomeScreen() {
           </View>
         </Section>
 
-        {/* Health Insights */}
-        <Section title="Your Health Insights">
-          {/* Shared `Card`, not a hand-rolled bordered View. Geometry is
-              unchanged — `rounded-card` and `p-md` are the same 24/24 this had
-              — but the hairline goes full-strength `outline-variant` and the
-              fill becomes `card-surface` instead of a literal `bg-white`.
-              With the drop shadow deleted (docs/BRAND.md §Elevation) those two
-              ARE the separation, and Card strips elevation keys structurally,
-              so a blur cannot return through `style`. */}
-          <Card className="flex-row gap-sm">
-            {/* Insight image: flagged in the design brief as a content-type
-                  asset (licensing owner undecided) — placeholder rendered as a
-                  tinted icon tile rather than hardcoding a stock photo URL. */}
-            <View
-              className="h-20 w-20 items-center justify-center rounded-2xl"
-              style={{ backgroundColor: "#ffd999" }}
-            >
-              {/* Decorative — the insight's own title is beside it. The
-                  `#ffd999` plate and `#ff9966` glyph stay literal: this whole
-                  tile is the flagged stand-in for a licensed content image, and
-                  neither value is a token or maps to one. It goes when the real
-                  asset does. */}
-              <Icon chrome="wb-sunny" size={32} color="#ff9966" />
-            </View>
-            <View className="flex-1 justify-center gap-xs">
-              <View className="w-fit flex-row items-center gap-xs self-start rounded-full bg-primary-container/20 px-sm py-xs">
-                <Text className="font-label-sm text-label-sm uppercase tracking-wider text-primary">
-                  Mindfulness
-                </Text>
-              </View>
-              <Text className="font-headline-md text-on-surface" style={{ fontSize: 15 }}>
-                Morning breathing improves your HRV
-              </Text>
-              <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 13 }}>
-                5 minutes of deep breathing each morning is linked to better recovery scores.
-              </Text>
-            </View>
-          </Card>
-        </Section>
+        {/* "Your Health Insights" is DELETED — the whole section, not just its
+            copy. It was one card whose article ("Morning breathing improves
+            your HRV", "5 minutes of deep breathing each morning is linked to
+            better recovery scores") was written into this file, under a
+            category chip that was also written into this file, beside a tile
+            the design brief had already flagged as a stand-in for a licensed
+            image nobody had licensed. There is no content service and no
+            insights endpoint anywhere in the backend, so nothing about this
+            card could be sourced — and a health claim with no source is the
+            one kind of placeholder this pass may not keep. It comes back when
+            there is a service behind it; the layout is one `Card` and is not
+            worth preserving in the meantime. Recorded in docs/api/README.md.
 
-        {/* Daily Wellness */}
-        <Section title="Daily Wellness">
-          <View className="gap-sm">
-            <WellnessRow icon="bedtime" label="Sleep" value="7h 20m" />
-            <WellnessRow icon="directions-walk" label="Steps Today" value="6,240 / 8,000" />
-            <View className="mt-xs flex-row gap-sm">
-              <InputTrigger icon="bedtime" label="Log Sleep" />
-              <InputTrigger icon="fitness-center" label="Log Activity" />
-            </View>
-          </View>
-        </Section>
+            It took `#ffd999` and `#ff9966` with it, which were the last two
+            literal colours on this screen. */}
 
-        {/* Upcoming Appointments */}
-        <Section
-          title="Upcoming Appointments"
-          actionLabel="View All"
-          onAction={() => router.push("/(app)/appointments" as Href)}
-        >
-          {/* Shared `Card` — same swap and same reasoning as the insight card
-              above: identical 24 radius / 24 inset, full-strength hairline,
-              `card-surface` fill, no drop shadow. */}
-          <Card className="gap-sm">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-row items-center gap-sm">
-                <AvatarWithFallback
-                  size={44}
-                  initials={NEXT_APPOINTMENT.initials}
-                  label={NEXT_APPOINTMENT.providerName}
+        {/* Daily Wellness — live from wearable_sync_service.
+            Both rows were literals ("7h 20m", "6,240 / 8,000") and both are now
+            the day's real cumulative reading, resolved by the shared
+            `dailyTotalFor` so this screen cannot invent its own arithmetic. A
+            row with no reading for today is NOT rendered: the alternative is a
+            zero, and a zero here says the patient did not sleep.
+
+            The step GOAL is gone. "6,240 / 8,000" had two numbers and only one
+            of them can exist — nothing in this product stores a target, so the
+            denominator was pure invention and it is dropped rather than
+            defaulted to some round number.
+
+            The whole section hides when neither figure is available, which is
+            also the un-paired-device state. */}
+        {sleep || steps ? (
+          <Section title="Daily Wellness">
+            <View className="gap-sm">
+              {sleep ? (
+                <WellnessRow icon="bedtime" label="Sleep" value={formatSleep(sleep.value)} />
+              ) : null}
+              {steps ? (
+                <WellnessRow
+                  icon="directions-walk"
+                  label="Steps Today"
+                  value={Math.round(steps.value).toLocaleString()}
                 />
-                <View>
-                  <Text className="font-headline-md text-on-surface" style={{ fontSize: 15 }}>
-                    {NEXT_APPOINTMENT.providerName}
-                  </Text>
-                  <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 13 }}>
-                    {NEXT_APPOINTMENT.providerSpecialty}
+              ) : null}
+            </View>
+          </Section>
+        ) : null}
+
+        {/* Upcoming Appointments — the patient's real next booking, or nothing.
+            The section header's "View All" is the one that was always wired,
+            and it stays. */}
+        {nextAppointment ? (
+          <Section
+            title="Upcoming Appointments"
+            actionLabel="View All"
+            onAction={() => router.push("/(app)/appointments" as Href)}
+          >
+            {/* Shared `Card`: 24 radius / 24 inset, full-strength hairline,
+                `card-surface` fill, no drop shadow (docs/BRAND.md §Elevation). */}
+            <Card className="gap-sm">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 flex-row items-center gap-sm">
+                  <AvatarWithFallback
+                    size={44}
+                    uri={nextAppointment.doctor?.avatarUri}
+                    initials={initialsOf(doctorName(nextAppointment))}
+                    label={doctorName(nextAppointment)}
+                  />
+                  <View className="flex-1">
+                    <Text
+                      numberOfLines={1}
+                      className="font-headline-md text-on-surface"
+                      style={{ fontSize: 15 }}
+                    >
+                      {doctorName(nextAppointment)}
+                    </Text>
+                    {/* `DoctorSummary` carries a specialty; a booking whose
+                        doctor lookup failed has none, and the line is dropped
+                        rather than filled. */}
+                    {nextAppointment.doctor?.specialty ? (
+                      <Text
+                        numberOfLines={1}
+                        className="font-body-md text-on-surface-variant"
+                        style={{ fontSize: 13 }}
+                      >
+                        {nextAppointment.doctor.specialty}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                {/* The badge is now the booking's STORED mode, not a fixed
+                    "Virtual". `BookingOut.mode` is a real column, so this can
+                    say "In person" when that is what it is — the old literal
+                    told every patient their visit was a video call. */}
+                <View className="rounded-full bg-primary-container/20 px-sm py-xs">
+                  <Text className="font-label-sm text-label-sm text-primary">
+                    {nextAppointment.mode === "video" ? "Virtual" : "In person"}
                   </Text>
                 </View>
               </View>
-              <View className="rounded-full bg-primary-container/20 px-sm py-xs">
-                <Text className="font-label-sm text-label-sm text-primary">Virtual</Text>
+              <View className="gap-xs rounded-2xl bg-surface-container-low p-sm">
+                <Text className="font-inter-semibold text-[13px] text-on-surface">
+                  {formatWhen(nextAppointment.startsAtIso)}
+                </Text>
+                {/* Only a video visit gets the secure-link line. */}
+                {nextAppointment.mode === "video" ? (
+                  <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 12 }}>
+                    Video call via MedApp Secure Link
+                  </Text>
+                ) : null}
               </View>
-            </View>
-            <View className="gap-xs rounded-2xl bg-surface-container-low p-sm">
-              <Text className="font-inter-semibold text-[13px] text-on-surface">
-                Tomorrow, 10:30 AM
-              </Text>
-              <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 12 }}>
-                Video call via MedApp Secure Link
-              </Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Join video call"
-              onPress={() =>
-                // Route was added in this iteration. Expo Router's typedRoutes
-                // regenerates the union on next dev server start — cast bypasses
-                // the strict pathname check until then.
-                router.push({
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  pathname: "/(app)/waiting-room" as any,
-                  params: {
-                    sessionId: NEXT_APPOINTMENT.id,
-                    viewerRole: "patient",
-                    providerId: NEXT_APPOINTMENT.providerId,
-                    providerName: NEXT_APPOINTMENT.providerName,
-                    providerSpecialty: NEXT_APPOINTMENT.providerSpecialty,
-                    appointmentId: NEXT_APPOINTMENT.id,
-                  },
-                })
-              }
-              className="w-full flex-row items-center justify-center gap-sm rounded-full bg-primary py-sm active:scale-95"
-              // Shadow deleted: an in-card CTA is not a floating surface. The
-              // removed style was a literal `#00685f` at 25% over a 12px blur —
-              // a coloured glow, off-token and three times the ≤8% ceiling
-              // docs/BRAND.md allows even for things that DO float. The pressed
-              // background literals below are pre-existing and out of scope for
-              // this pass (listed in the report).
-              style={({ pressed }) => ({
-                backgroundColor: pressed ? "#008378" : "#00685f",
-              })}
-            >
-              <Text className="font-inter-semibold text-[14px] text-white">Join Call</Text>
-            </Pressable>
-          </Card>
-        </Section>
+              {/* THREE states, which is what the data actually has — see
+                  AppointmentManagementScreen's join control, whose reasoning
+                  this mirrors so the two entry points cannot diverge.
+                  `provision_room` never raises, so a video booking can 201 with
+                  `room_id: null`; "video" and "has a room" are separate facts
+                  and a button drawn from the first alone is a control with
+                  nothing behind it.
+
+                  The room handle travels as `sessionId`. It used to be the
+                  APPOINTMENT id under that name, which the waiting room would
+                  have resolved to no room at all. */}
+              {nextAppointment.mode === "video" && nextAppointment.roomId ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Join video call"
+                  onPress={() =>
+                    // No cast. The `as any` here was added when `waiting-room`
+                    // was new and typedRoutes had not regenerated its union yet;
+                    // it has, so the literal type-checks on its own and the
+                    // suppression was suppressing nothing (eslint reported the
+                    // disable directive itself as unused). Note it is not `as
+                    // Href` either — `Href` admits the query-string forms, which
+                    // an object route's `pathname` slot does not.
+                    router.push({
+                      pathname: "/(app)/waiting-room",
+                      params: {
+                        sessionId: nextAppointment.roomId,
+                        appointmentId: nextAppointment.id,
+                        viewerRole: "patient",
+                        providerId: nextAppointment.doctorId,
+                        providerName: doctorName(nextAppointment),
+                        providerSpecialty: nextAppointment.doctor?.specialty ?? "",
+                        startAt: nextAppointment.startsAtIso,
+                      },
+                    })
+                  }
+                  // The inline `style` callback is DELETED. It set
+                  // `#00685f`/`#008378` — the light values of `primary` and
+                  // `primary-container` — and an inline style beats a class, so
+                  // it silently overrode this element's own `bg-primary` and
+                  // pinned the button to light teal in dark mode while its
+                  // `text-white` label stayed white. `active:opacity-90` is the
+                  // pressed treatment instead: it needs no colour value at all,
+                  // so there is nothing left to freeze.
+                  className="w-full flex-row items-center justify-center gap-sm rounded-full bg-primary py-sm active:scale-95 active:opacity-90"
+                >
+                  {/* `text-on-primary`, not `text-white`. They are the same
+                      value in light mode and opposites in dark, where
+                      `on-primary` is #003731 — the dark ink this mint button
+                      needs. */}
+                  <Text className="font-inter-semibold text-[14px] text-on-primary">Join Call</Text>
+                </Pressable>
+              ) : nextAppointment.mode === "video" ? (
+                /* Pending, stated in words rather than as a disabled button: a
+                   greyed control tells the patient they are doing something
+                   wrong, when the room simply is not ready and there is nothing
+                   for them to do. */
+                <Text className="font-body-md text-on-surface-variant" style={{ fontSize: 12 }}>
+                  The video room is not ready yet — check back closer to your appointment.
+                </Text>
+              ) : null}
+            </Card>
+          </Section>
+        ) : null}
       </ScrollView>
     </PatientShell>
   );
@@ -474,17 +644,27 @@ export function HomeScreen() {
 // now the shared `Card` — docs/BRAND.md §Elevation: cards cast no drop shadow,
 // and separation is surface tone plus a hairline.
 
+/**
+ * `actionLabel` and `onAction` are ONE optional pair, not two independent
+ * optionals, and the type is what enforces it.
+ *
+ * Quick Services passed `actionLabel="View All"` and no `onAction`, so this
+ * component rendered `<Pressable onPress={undefined}>` — a primary-coloured
+ * link with `accessibilityRole="button"`, a 6px hitSlop and `active:scale-95`
+ * that had never done anything. Nothing failed, because the old signature said
+ * a label without a handler was legal. It is now a compile error: supply both
+ * or neither.
+ */
+type SectionAction =
+  | { actionLabel: string; onAction: () => void }
+  | { actionLabel?: never; onAction?: never };
+
 function Section({
   title,
-  actionLabel,
-  onAction,
   children,
-}: {
-  title: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  children: React.ReactNode;
-}) {
+  ...action
+}: { title: string; children: React.ReactNode } & SectionAction) {
+  const { actionLabel, onAction } = action;
   return (
     <View className="mt-lg">
       <View className="mb-sm flex-row items-center justify-between px-xs">
@@ -543,6 +723,24 @@ const TINTS: Record<Tint, { bg: string; fg: ColorToken }> = {
   error: { bg: "bg-error-container", fg: "on-error-container" },
 };
 
+/**
+ * A tile with a destination is a BUTTON. A tile without one is a picture of a
+ * tile, and that difference is now structural rather than a matter of who
+ * remembered to pass `onPress`.
+ *
+ * Four of the six tiles have no destination, and all six used to render the
+ * same `<Pressable accessibilityRole="button" … active:scale-95>` regardless.
+ * TalkBack announced "Pharmacy, button" and the tile depressed under the finger
+ * for a tap that went nowhere — four false affordances in one 6-item strip,
+ * which is worse than one because the strip as a whole then reads as broken
+ * rather than as unfinished.
+ *
+ * The inert branch keeps the plate, the glyph, the label and the exact
+ * geometry, and drops the three things that make a control a control: the
+ * `Pressable`, the `button` role and the press animation. It is still
+ * discoverable — the `<Text>` label is the accessible node, so a screen reader
+ * reads "Pharmacy" as content, which is what it is.
+ */
 function QuickService({
   icon,
   label,
@@ -556,24 +754,16 @@ function QuickService({
 }) {
   const t = TINTS[tint];
   const glyph = useTokenColor(t.fg);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      // flex-1 so three tiles + two 8px gaps divide the column exactly, on
-      // whatever width the device actually reports (see the strip note).
-      className="flex-1 items-center gap-base active:scale-95"
-    >
-      {/* 56 = 24px glyph + 2 x 16 padding, both on the spacing scale. It is
-          UNCHANGED by the move to two rows: the plate was sized down from 64
-          when five had to share one row, and the 3-up tile (104 at 360dp) has
-          room for either — keeping 56 keeps all six tiles identical to the five
-          that shipped, which is the point of wrapping instead of resizing. No
-          `cardShadow` — docs/BRAND.md, cards and plates cast no drop shadow. */}
+  // 56 = 24px glyph + 2 x 16 padding, both on the spacing scale. It is
+  // UNCHANGED by the move to two rows: the plate was sized down from 64 when
+  // five had to share one row, and the 3-up tile (104 at 360dp) has room for
+  // either — keeping 56 keeps all six tiles identical to the five that shipped,
+  // which is the point of wrapping instead of resizing. No `cardShadow` —
+  // docs/BRAND.md, cards and plates cast no drop shadow.
+  const body = (
+    <>
       <View className={`h-14 w-14 items-center justify-center rounded-md ${t.bg}`}>
-        {/* Decorative — the tile's own label is directly beneath it, and the
-            Pressable already carries that label for assistive tech. */}
+        {/* Decorative — the tile's own label is directly beneath it. */}
         <Icon chrome={icon} size={24} color={glyph} />
       </View>
       {/* label-sm 12, matching the frame. numberOfLines guards against a future
@@ -584,8 +774,37 @@ function QuickService({
       >
         {label}
       </Text>
+    </>
+  );
+
+  // flex-1 so three tiles + two 8px gaps divide the column exactly, on whatever
+  // width the device actually reports (see the strip note).
+  if (!onPress) return <View className="flex-1 items-center gap-base">{body}</View>;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      className="flex-1 items-center gap-base active:scale-95"
+    >
+      {body}
     </Pressable>
   );
+}
+
+/**
+ * `sleep_minutes` -> "7h 20m", or "45m" under the hour.
+ *
+ * The wire unit is minutes and the row used to print a literal "7h 20m", so the
+ * conversion is the one piece of arithmetic this row needs. It rounds rather
+ * than truncating: a 439.6-minute night is 7h 20m, not 7h 19m.
+ */
+function formatSleep(minutes: number): string {
+  const total = Math.round(minutes);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 // Daily Wellness row — icon + label left, metric value right. bg-white/60 +
@@ -606,8 +825,7 @@ function WellnessRow({
   return (
     // `border-white bg-white/60` was a literal, so in dark mode these two rows
     // stayed light-grey pills while everything around them went dark — the one
-    // unflippable surface left on this screen. Same tokens as `InputTrigger`
-    // below, which is the sibling control and already rendered correctly.
+    // unflippable surface left on this screen.
     <View className="flex-row items-center justify-between rounded-2xl border border-outline-variant/20 bg-surface-container-low p-sm">
       <View className="flex-row items-center gap-sm">
         <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/10">
@@ -621,45 +839,29 @@ function WellnessRow({
   );
 }
 
-// FLAGGED — deliberately NOT migrated to the shared `SearchField`, against the
-// extraction plan, which listed HomeScreen as a SearchField adopter and named
-// this component as the thing it "absorbs".
+// `InputTrigger` — the "Log Sleep" / "Log Activity" tiles — is DELETED.
 //
-// Despite the name, `InputTrigger` is not a field or a search entry point: it is
-// a quick-log ACTION TILE ("Log Sleep", "Log Activity") — a 28px glyph stacked
-// over a `label-md` caption in a `rounded-2xl` `bg-surface-container-low` box,
-// two-up in a row. SearchField is a 52pt horizontal row with a leading search
-// glyph and a clear button; the two share no geometry, no slot order and no
-// purpose. Migrating it would make the dashboard render two search bars where
-// the design has two log buttons.
+// It was the purest form of the defect this pass exists to fix: the component
+// took no `onPress` prop AT ALL, so the two tiles could not have been wired
+// even by a caller who wanted to. They rendered
+// `<Pressable accessibilityRole="button" … active:scale-95>` and were, by
+// construction, incapable of doing anything.
 //
-// HomeScreen has NO search row today, so its listing as an adopter is only
-// correct once a search entry point is actually added to the dashboard. When it
-// is, `SearchField` with `editable={false}` + `onPress` is the right shape for it
-// (that trigger mode is already built and tested) — but it is an ADDITION to this
-// screen, not a replacement for this tile.
+// They are not wired instead of deleted because there is nothing to wire them
+// to. `wearable_sync_service` ingests DEVICE samples — `POST /v1/wearables/sync`
+// takes a `deviceId` and a batch of readings — and manual patient logging has no
+// endpoint, no screen and no store anywhere in this product. A "Log Sleep" tile
+// that opened a form would be inventing the feature, not connecting it.
 //
-// What this tile actually wants is its own primitive: it is the third copy of
-// "glyph over caption in a tinted tile" in the app (see also
-// PatientDashboardScreen's `QuickActionTile`, Figma 211:252). That is a separate
-// extraction, not this one.
+// An earlier note here flagged this component as deliberately NOT migrated to
+// the shared `SearchField` (it is a log tile, not a search entry point) and
+// pointed at PatientDashboardScreen's `QuickActionTile` as a third copy of
+// "glyph over caption in a tinted tile" wanting one extraction. That
+// observation dies with both call sites: the dashboard is deleted (see
+// docs/api/README.md) and these tiles are gone. Nothing is left to extract, and
+// HomeScreen's listing as a `SearchField` adopter was only ever correct once a
+// search row is genuinely added to this screen.
 //
-// Its `#00685f` glyph IS fixed here, against that earlier "leave it as legacy"
-// note, because the icon-gate pass had to rewrite this exact call site anyway —
-// an icon's colour is a prop, so routing the glyph through `<Icon />` means
-// touching the literal either way, and re-typing a frozen light-mode hex into
-// the new call would have been a choice rather than an omission.
-function InputTrigger({ icon, label }: { icon: ChromeIconName; label: string }) {
-  const accent = useTokenColor("primary");
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="flex-1 items-center justify-center gap-sm rounded-2xl border border-outline-variant/20 bg-surface-container-low py-md active:scale-95"
-    >
-      {/* Decorative — the caption below it is the tile's name. */}
-      <Icon chrome={icon} size={28} color={accent} />
-      <Text className="font-label-md text-label-md text-on-surface-variant">{label}</Text>
-    </Pressable>
-  );
-}
+// Recorded in docs/api/README.md's gap register: manual sleep/activity logging
+// needs a route on wearable_sync_service (or a new observations endpoint) before
+// the affordance can return.

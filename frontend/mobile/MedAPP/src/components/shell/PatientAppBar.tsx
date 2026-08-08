@@ -68,7 +68,7 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API
 // here. Only expo-router is used (for the default back action).
 
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { AvatarWithFallback, Icon, Logo } from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
@@ -95,19 +95,51 @@ const LOGO_HEIGHT = 42; // Logo 101:103 is 110x42; the asset's 584:224 ratio mak
 const RIGHT_GROUP_GAP = 12; // RightGroup 111:285 is 100 wide for two 44s
 /** LeadingGroup 741:866's gap, bound to `spacing/8`: back 16 -> 60, logo at 68. */
 const LEADING_GROUP_GAP = 8;
-/**
- * UnreadBadge 191:114 — 20x20 at (22, -2) inside the 44x44 bell button, fill
- * `error`, 2px INSIDE stroke bound to `surface` as the separation ring.
- *
- * The negative top is intentional and matches the frame: the badge overhangs the
- * button's top edge. Nothing on the path to it sets `overflow: hidden`, so it is
- * not clipped.
- */
-const BADGE = 20;
-const BADGE_RING = 2;
-const BADGE_LEFT = 22; // relative to the 44x44 bell button
-const BADGE_TOP = -2;
-const LABEL_LINE_HEIGHT = 16; // label-sm 12px at the frame's 1.3 leading
+
+// ---------------------------------------------------------------------------
+// THE UNREAD BADGE IS GONE, AND SO IS THE `unreadCount` PROP (2026-08-07)
+// ---------------------------------------------------------------------------
+// UnreadBadge 191:114 was implemented here in full — 20x20 at (22, -2), `error`
+// fill, a 2px `surface` separation ring, an `on-error` numeral clamped at "99+",
+// and a label that switched to "Notifications, 3 unread". It was covered by
+// tests. It had never rendered once, on any screen, in the product.
+//
+// `showBadge` required a positive `unreadCount`, and NO SCREEN IN THE CODEBASE
+// PASSED ONE. `PatientShell` declared the prop and forwarded its own — which no
+// caller supplied either. So the chain was: 12 patient screens -> shell ->
+// bar -> `undefined` -> branch never taken. The prop's own doc said this
+// outright ("nothing in the app models notification counts yet, so no caller can
+// supply a real value") and treated it as a temporary state. It was not
+// temporary: it is a MISSING BACKEND CONCEPT, and the previous note's advice to
+// "re-wire it the moment a notifications store exists" quietly implied a store
+// that could be written against. There isn't one to write against.
+//
+// The gap is precise, so it is stated precisely rather than left as a prop that
+// looks wired. `notification_service` returns `InboxMessageWire`
+// `{ delivery_id, event_id, event_type, title, body, channel, status,
+// delivered_at }`. `status` is DELIVERY status ("sent", "failed") and is
+// documented as free text; `delivered_at` is when the SERVER sent it. Neither
+// records whether the PATIENT has seen it, and there is no per-user read
+// marker, no `read_at`, no `POST /v1/me/inbox/{id}/read` and no unread count on
+// any endpoint. A client-side "unread" would therefore have to be invented on
+// device — and would then reset on reinstall and disagree across devices, which
+// on a channel that carries appointment and prescription notices is a worse
+// failure than showing nothing.
+//
+// What the server must expose before a badge can mean anything (logged in
+// docs/api/README.md's gap register):
+//   1. a per-recipient READ marker on the delivery — `read_at: datetime | null`
+//      on `InboxMessageOut`, server-owned so it survives reinstall;
+//   2. a way to SET it — `POST /v1/me/inbox/{delivery_id}/read`, and a
+//      mark-all for the screen-level action;
+//   3. a count that does not require paging the whole inbox — either
+//      `unread_count` on the list envelope beside `items`, or
+//      `GET /v1/me/inbox/unread-count`.
+// De-duplicate on `event_id`, not `delivery_id`: push and in-app deliveries of
+// one happening must count once.
+//
+// The badge treatment is recoverable from git when those land. What must not
+// come back before them is a prop whose only possible value is `undefined`.
 
 interface Props {
   /**
@@ -153,17 +185,8 @@ interface Props {
    * only reason the prop is tri-state rather than a boolean with a default.
    */
   avatarExpanded?: boolean;
-  /**
-   * Unread notification count. The badge renders only for a positive number.
-   *
-   * FLAGGED (same gap as PractitionerAppBar): nothing in the app models
-   * notification counts yet, so no caller can supply a real value. HomeScreen
-   * currently draws a count-less dot. A mock display NAME is harmless; a mock
-   * unread count is a false statement to the user — so callers pass nothing and
-   * the badge is simply absent until a notifications store exists. The
-   * treatment is implemented and covered by tests.
-   */
-  unreadCount?: number;
+  /* No `unreadCount`. See the block comment above the constants for the exact
+     fields `notification_service` must expose before the badge can return. */
   /**
    * FLAGGED: no notifications screen exists in src/app/(app)/, so there is no
    * default destination — an unhandled bell no-ops rather than pushing an
@@ -181,7 +204,6 @@ export function PatientAppBar({
   avatarLabel = "Your profile",
   onAvatarPress,
   avatarExpanded,
-  unreadCount,
   onNotificationsPress,
 }: Props) {
   // Figma 101:109 binds the bell glyph's strokes to `color/primary`, NOT to
@@ -212,9 +234,6 @@ export function PatientAppBar({
     if (router.canGoBack()) return router.back();
     if (backFallbackHref) router.replace(backFallbackHref);
   };
-
-  const showBadge = typeof unreadCount === "number" && unreadCount > 0;
-  const badgeText = showBadge ? (unreadCount > 99 ? "99+" : String(unreadCount)) : "";
 
   // AvatarWithFallback carries its own accessibilityRole="image" + label. That is
   // right when the wrapper is a plain View — the image IS the accessible thing.
@@ -302,7 +321,7 @@ export function PatientAppBar({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={showBadge ? `Notifications, ${badgeText} unread` : "Notifications"}
+          accessibilityLabel="Notifications"
           accessibilityHint={onNotificationsPress ? undefined : "Not available yet"}
           onPress={() => onNotificationsPress?.()}
           className="items-center justify-center rounded-full active:opacity-70"
@@ -323,27 +342,6 @@ export function PatientAppBar({
           />
           {/* RN has no currentColor to inherit, so the token is resolved in JS. */}
           <Icon chrome="notifications-none" size={GLYPH} color={primary} />
-          {showBadge ? (
-            // The separation ring is `border-surface`, never a literal white: on
-            // a dark surface a white ring would be the brightest thing in the bar.
-            <View
-              className="absolute items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-error"
-              style={{
-                width: BADGE,
-                height: BADGE,
-                left: BADGE_LEFT,
-                top: BADGE_TOP,
-                borderWidth: BADGE_RING,
-              }}
-            >
-              <Text
-                className="text-center font-label-sm text-label-sm text-on-error"
-                style={{ lineHeight: LABEL_LINE_HEIGHT }}
-              >
-                {badgeText}
-              </Text>
-            </View>
-          ) : null}
         </Pressable>
       </View>
     </View>

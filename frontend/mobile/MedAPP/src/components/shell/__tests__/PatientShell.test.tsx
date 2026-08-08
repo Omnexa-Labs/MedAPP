@@ -199,14 +199,20 @@ describe("PatientShell", () => {
     }
   });
 
-  it("passes the avatar and unread count through to the bar", () => {
+  // Was "passes the avatar and unread count through to the bar". The unread
+  // half asserted a forward that no product caller ever exercised — this suite
+  // was the ONLY thing in the codebase that ever passed `unreadCount`, which is
+  // precisely why the dead prop survived. Both prop and badge are gone; see
+  // PatientAppBar's header for what notification_service must expose first.
+  it("passes the avatar through to the bar, and the bell claims no unread state", () => {
     render(
-      <PatientShell avatarInitials="MN" avatarLabel="Melchizedek Narh" unreadCount={7}>
+      <PatientShell avatarInitials="MN" avatarLabel="Melchizedek Narh">
         <Text>Body</Text>
       </PatientShell>,
     );
     expect(screen.getByText("MN")).toBeTruthy();
-    expect(screen.getByLabelText("Notifications, 7 unread")).toBeTruthy();
+    expect(screen.getByLabelText("Notifications")).toBeTruthy();
+    expect(screen.queryByLabelText(/unread/i)).toBeNull();
   });
 
   it("suppresses the bottom nav for a detail screen but keeps the bar", () => {

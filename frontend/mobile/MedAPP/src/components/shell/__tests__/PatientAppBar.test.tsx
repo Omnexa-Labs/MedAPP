@@ -5,8 +5,8 @@
 //
 //  - the avatar must fall back to a glyph, not a bare tinted circle
 //    (docs/BRAND.md: "an empty coloured circle reads as a broken image");
-//  - the badge must be ABSENT at 0 / undefined rather than showing a fabricated
-//    count, since nothing models notifications yet;
+//  - the bell must NOT announce an unread count, since nothing on the wire
+//    records whether a patient has read anything;
 //  - the bar must not centre the logo or drop the avatar — that is the
 //    PRACTITIONER layout, and the two bars are mirror images.
 //
@@ -163,28 +163,21 @@ describe("PatientAppBar", () => {
     expect(disclosure.props.accessibilityHint).toBe("Opens your account menu");
   });
 
-  it("shows no unread badge when no count is supplied", () => {
+  // The four badge tests that were here are gone with the badge itself. They
+  // asserted a rich treatment — absent at 0, absent at undefined, "99+" clamp,
+  // "Notifications, 3 unread" in the accessible name — that no screen could ever
+  // reach, because `unreadCount` had no supplier and the wire has no read state
+  // for one to be computed from. Passing tests around an unreachable branch are
+  // how a dead prop survives an audit.
+  //
+  // This is what replaces them: the bell announces itself plainly, and there is
+  // no way to make it claim otherwise.
+  it("announces the bell plainly — there is no unread state to report", () => {
     render(<PatientAppBar />);
     expect(screen.getByLabelText("Notifications")).toBeTruthy();
-    expect(screen.queryByText("3")).toBeNull();
-  });
-
-  it("shows no unread badge at zero", () => {
-    render(<PatientAppBar unreadCount={0} />);
-    // The count is part of the accessible name, so its absence is observable.
-    expect(screen.getByLabelText("Notifications")).toBeTruthy();
-    expect(screen.queryByText("0")).toBeNull();
-  });
-
-  it("renders the unread count and announces it", () => {
-    render(<PatientAppBar unreadCount={3} />);
-    expect(screen.getByText("3")).toBeTruthy();
-    expect(screen.getByLabelText("Notifications, 3 unread")).toBeTruthy();
-  });
-
-  it("clamps a large unread count", () => {
-    render(<PatientAppBar unreadCount={1204} />);
-    expect(screen.getByText("99+")).toBeTruthy();
+    // Nothing on this bar may announce a count. See PatientAppBar's header for
+    // the `notification_service` fields that must ship before one can.
+    expect(screen.queryByLabelText(/unread/i)).toBeNull();
   });
 
   it("calls the notifications handler", () => {

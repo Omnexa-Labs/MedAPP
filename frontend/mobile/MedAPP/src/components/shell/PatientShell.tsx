@@ -124,9 +124,11 @@ interface Props extends Pick<ViewProps, "testID"> {
    * `patient-profile-overview`, all rendering `activeTab="home"` without being
    * Home. The PO ruled that pattern out: a screen that is not one of the five
    * tabs may not wear the tab bar, because the bar can only render a lie
-   * (docs/PIPELINE.md §5). All three are `DetailShell` screens now, and the
-   * highlighted-tab-is-a-dead-button problem this prop solved cannot arise on a
-   * screen with no tab bar.
+   * (docs/PIPELINE.md §5). Two of those three are `DetailShell` screens now and
+   * the third, `patient-dashboard`, was DELETED on 2026-08-08 — it was reachable
+   * by nothing, duplicated Home, and fabricated a blood-pressure alarm
+   * (docs/api/README.md). Either way the highlighted-tab-is-a-dead-button
+   * problem this prop solved cannot arise on a screen with no tab bar.
    *
    * Kept, not deleted, and deliberately so: the escape hatch is now the DOOR BACK
    * to the pattern that was ruled out, which is the same argument DetailShell
@@ -167,7 +169,13 @@ interface Props extends Pick<ViewProps, "testID"> {
    * four, and no screen can forget it.
    */
   onAvatarPress?: () => void;
-  unreadCount?: number;
+  /* `unreadCount` is gone from this shell and from PatientAppBar. It was
+     declared here and forwarded faithfully, and NO screen ever passed one — the
+     bar's badge branch could not fire, because there is no read/unread state on
+     the wire for anything to compute it from. PatientAppBar's header lists the
+     exact `notification_service` fields that must land first; until they do, a
+     forwarded prop whose only possible value is `undefined` is a shell API that
+     looks wired and is not. */
   onNotificationsPress?: () => void;
   children: React.ReactNode;
 }
@@ -184,7 +192,6 @@ export function PatientShell({
   avatarInitials,
   avatarLabel,
   onAvatarPress,
-  unreadCount,
   onNotificationsPress,
   children,
   testID,
@@ -245,7 +252,6 @@ export function PatientShell({
           // No `avatarExpanded`. The avatar now NAVIGATES; it does not expand a
           // panel, and announcing `expanded: false` for a control that opens a
           // screen would be a false disclosure.
-          unreadCount={unreadCount}
           onNotificationsPress={handleNotificationsPress}
         />
         <View className="flex-1">{children}</View>
