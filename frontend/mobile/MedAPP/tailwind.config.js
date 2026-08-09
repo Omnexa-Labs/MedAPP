@@ -12,6 +12,15 @@ module.exports = {
     "./src/components/**/*.{js,jsx,ts,tsx}",
     "./src/features/**/*.{js,jsx,ts,tsx}",
     "./src/hooks/**/*.{js,jsx,ts,tsx}",
+    // Tests are NOT a source of utility classes, and scanning them broke the
+    // bundler once: a theme drift-guard QUOTED a bad class in a comment
+    // (`text-[color:var(--color/on-primary,white)]`), Tailwind harvested it as
+    // a real arbitrary value, and the `/` produced CSS that Metro could not
+    // parse — `SyntaxError: Unexpected token Delim('/')`, with no file or line
+    // pointing anywhere near the test. A suite that names classes in order to
+    // forbid them must not also define them.
+    "!./src/**/__tests__/**",
+    "!./src/**/*.test.{js,jsx,ts,tsx}",
   ],
   presets: [require("nativewind/preset")],
   darkMode: "class",
