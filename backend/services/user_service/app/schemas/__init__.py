@@ -20,6 +20,7 @@ from .otp import (
 from .user import UserOut, UserUpdate
 
 __all__ = [
+    "PublicUserOut",
     "SignupRequest",
     "LoginRequest",
     "TokenPair",
@@ -41,3 +42,5 @@ __all__ = [
     "UserOut",
     "UserUpdate",
 ]
+
+from .user import PublicUserOut  # noqa: E402,F401

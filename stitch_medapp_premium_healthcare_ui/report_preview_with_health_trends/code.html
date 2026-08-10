@@ -1,0 +1,379 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Report Preview - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-highest": "#dee4e1",
+                        "tertiary": "#0058be",
+                        "outline-variant": "#bcc9c6",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "background": "#f5faf8",
+                        "surface-variant": "#dee4e1",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "on-secondary": "#ffffff",
+                        "on-primary-fixed-variant": "#005049",
+                        "inverse-on-surface": "#edf2f0",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#008378",
+                        "surface-container": "#eaefed",
+                        "primary": "#00685f",
+                        "inverse-primary": "#6bd8cb",
+                        "primary-fixed": "#89f5e7",
+                        "surface": "#f5faf8",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-surface": "#171d1c",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#57657a",
+                        "on-surface-variant": "#3d4947",
+                        "inverse-surface": "#2c3130",
+                        "tertiary-container": "#2170e4",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "surface-dim": "#d6dbd9",
+                        "secondary-fixed": "#d5e3fc",
+                        "on-tertiary-container": "#fefcff",
+                        "secondary": "#515f74",
+                        "outline": "#6d7a77",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-bright": "#f5faf8",
+                        "error": "#ba1a1a",
+                        "surface-container-low": "#f0f5f2",
+                        "on-primary-fixed": "#00201d",
+                        "secondary-container": "#d5e3fc",
+                        "surface-tint": "#006a61",
+                        "on-primary-container": "#f4fffc",
+                        "on-background": "#171d1c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "md": "24px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "gutter": "24px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #eaefed; }
+        .ambient-shadow { box-shadow: 0px 4px 20px rgba(71, 85, 105, 0.05); }
+        .modal-shadow { box-shadow: 0px -10px 30px rgba(71, 85, 105, 0.1); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-on-surface antialiased bg-surface-container h-screen flex flex-col overflow-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface/90 backdrop-blur-md border-b border-outline-variant/30 shadow-sm sticky top-0 z-40 flex-none">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors rounded-full p-2 flex items-center justify-center cursor-pointer active:scale-95 duration-200">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface">Report Preview</h1>
+</div>
+<button class="text-primary font-label-md text-label-md px-4 py-2 hover:bg-surface-container-low rounded-full transition-colors cursor-pointer active:scale-95 duration-200">
+                Done
+            </button>
+</div>
+</header>
+<!-- Main Content Area (Scrollable) -->
+<main class="flex-grow overflow-y-auto px-4 md:px-gutter py-md bg-surface-container">
+<div class="max-w-3xl mx-auto">
+<!-- Document Paper Wrapper -->
+<div class="bg-surface-container-lowest rounded-xl ambient-shadow p-6 md:p-10 border border-outline-variant/30 mb-[120px]">
+<!-- Document Header -->
+<div class="border-b-2 border-primary/20 pb-6 mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary mb-2">Comprehensive Health Report</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Generated by MedApp Clinical Systems</p>
+</div>
+<div class="text-left md:text-right">
+<div class="font-label-md text-label-md text-on-surface mb-1">Patient: <span class="font-body-md text-body-md font-medium">John Doe</span></div>
+<div class="font-label-md text-label-md text-on-surface">Date: <span class="font-body-md text-body-md font-medium">August 24, 2024</span></div>
+</div>
+</div>
+<!-- Clinical Summary -->
+<section class="mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">summarize</span>
+                        Clinical Summary
+                    </h3>
+<div class="bg-surface-container-low p-5 rounded-lg border border-outline-variant/20">
+<p class="font-body-md text-body-md text-on-surface leading-relaxed">
+                            Patient exhibits stable cardiovascular metrics over the past 30 days. Blood pressure trends indicate a successful response to the adjusted medication regimen initiated last month, with averages returning to the target clinical range. Heart rate variability is within normal limits. Continued monitoring is recommended, maintaining the current activity level and dietary guidelines.
+                        </p>
+</div>
+</section>
+<!-- Health Trends Section -->
+<section class="mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+                        Health Trends
+                    </h3>
+<div class="grid md:grid-cols-2 gap-6">
+<!-- Heart Rate Stability Chart -->
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-4 flex flex-col">
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-4">Heart Rate Stability (30 Days)</h4>
+<div class="relative flex-grow min-h-[160px] flex items-end pt-4">
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between py-4 z-0">
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+</div>
+<!-- Line Chart Graphic (Faux using SVG) -->
+<svg class="absolute inset-0 w-full h-full z-10" preserveAspectRatio="none" viewBox="0 0 100 100">
+<defs>
+<linearGradient id="hrGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#0d9488" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#0d9488" stop-opacity="0"></stop>
+</linearGradient>
+</defs>
+<polygon fill="url(#hrGradient)" points="0,100 0,60 10,55 20,65 30,50 40,58 50,45 60,52 70,40 80,48 90,35 100,42 100,100"></polygon>
+<polyline fill="none" points="0,60 10,55 20,65 30,50 40,58 50,45 60,52 70,40 80,48 90,35 100,42" stroke="#0d9488" stroke-linejoin="round" stroke-width="2"></polyline>
+<circle cx="10" cy="55" fill="#0d9488" r="1.5"></circle>
+<circle cx="50" cy="45" fill="#0d9488" r="1.5"></circle>
+<circle cx="90" cy="35" fill="#0d9488" r="1.5"></circle>
+</svg>
+</div>
+<div class="flex justify-between mt-2 font-label-sm text-slate-500">
+<span class="">Day 1</span>
+<span class="">Day 15</span>
+<span class="">Day 30</span>
+</div>
+</div>
+<!-- Blood Pressure Trends Chart -->
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-4 flex flex-col">
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-4 flex justify-between items-center">
+<span class="">BP Trends (mmHg)</span>
+<div class="flex gap-3 text-xs items-center font-normal">
+<span class="flex items-center gap-1 text-slate-600"><span class="w-2 h-2 rounded-full bg-slate-500"></span> Sys</span>
+<span class="flex items-center gap-1 text-slate-600"><span class="w-2 h-2 rounded-full bg-[#0d9488]"></span> Dia</span>
+</div>
+</h4>
+<div class="relative flex-grow min-h-[160px] flex items-end pt-4">
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between py-4 z-0">
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+<div class="border-b border-slate-200 w-full h-0"></div>
+</div>
+<!-- Line Chart Graphic (Faux using SVG) -->
+<svg class="absolute inset-0 w-full h-full z-10" preserveAspectRatio="none" viewBox="0 0 100 100">
+<!-- Systolic (Slate) -->
+<polyline fill="none" points="0,30 20,25 40,35 60,20 80,28 100,22" stroke="#64748b" stroke-linejoin="round" stroke-width="2"></polyline>
+<circle cx="20" cy="25" fill="#64748b" r="1.5"></circle>
+<circle cx="60" cy="20" fill="#64748b" r="1.5"></circle>
+<circle cx="100" cy="22" fill="#64748b" r="1.5"></circle>
+<!-- Diastolic (Teal) -->
+<polyline fill="none" points="0,70 20,65 40,75 60,60 80,68 100,62" stroke="#0d9488" stroke-linejoin="round" stroke-width="2"></polyline>
+<circle cx="20" cy="65" fill="#0d9488" r="1.5"></circle>
+<circle cx="60" cy="60" fill="#0d9488" r="1.5"></circle>
+<circle cx="100" cy="62" fill="#0d9488" r="1.5"></circle>
+</svg>
+</div>
+<div class="flex justify-between mt-2 font-label-sm text-slate-500">
+<span class="">Day 1</span>
+<span class="">Day 15</span>
+<span class="">Day 30</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Blood Pressure Section -->
+<section class="mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-md flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">vital_signs</span>
+                        Blood Pressure
+                    </h3>
+<div class="grid md:grid-cols-2 gap-6">
+<!-- Chart Placeholder -->
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-4 flex flex-col">
+<h4 class="font-label-md text-label-md text-on-surface-variant mb-4">30-Day Trend (mmHg)</h4>
+<div class="relative flex-grow min-h-[160px] flex items-end gap-2 pt-4 px-2">
+<!-- Faux Chart -->
+<div class="absolute left-0 top-0 h-full w-full flex flex-col justify-between py-4 z-0">
+<div class="border-b border-outline-variant/20 w-full h-0"></div>
+<div class="border-b border-outline-variant/20 w-full h-0"></div>
+<div class="border-b border-outline-variant/20 w-full h-0"></div>
+<div class="border-b border-outline-variant/20 w-full h-0"></div>
+</div>
+<div class="w-full flex justify-between items-end h-full z-10 px-2">
+<div class="w-2 bg-primary/40 rounded-t h-[60%]"></div>
+<div class="w-2 bg-primary/60 rounded-t h-[75%] relative"><div class="absolute w-2 h-2 rounded-full bg-primary -top-1"></div></div>
+<div class="w-2 bg-primary/40 rounded-t h-[65%]"></div>
+<div class="w-2 bg-primary/80 rounded-t h-[85%]"></div>
+<div class="w-2 bg-primary/50 rounded-t h-[55%]"></div>
+<div class="w-2 bg-primary rounded-t h-[50%] relative"><div class="absolute w-2 h-2 rounded-full bg-primary -top-1 shadow-[0_0_8px_rgba(0,104,95,0.6)]"></div></div>
+</div>
+</div>
+</div>
+<!-- Table -->
+<div class="overflow-hidden rounded-lg border border-outline-variant/40">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low font-label-md text-label-md text-on-surface-variant">
+<tr>
+<th class="p-3 border-b border-outline-variant/30">Date</th>
+<th class="p-3 border-b border-outline-variant/30 text-right">Sys</th>
+<th class="p-3 border-b border-outline-variant/30 text-right">Dia</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md text-on-surface">
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="p-3 border-b border-outline-variant/20">Aug 24</td>
+<td class="p-3 border-b border-outline-variant/20 text-right font-medium">118</td>
+<td class="p-3 border-b border-outline-variant/20 text-right">78</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="p-3 border-b border-outline-variant/20">Aug 22</td>
+<td class="p-3 border-b border-outline-variant/20 text-right font-medium">122</td>
+<td class="p-3 border-b border-outline-variant/20 text-right">80</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="p-3 border-b border-outline-variant/20">Aug 20</td>
+<td class="p-3 border-b border-outline-variant/20 text-right font-medium">120</td>
+<td class="p-3 border-b border-outline-variant/20 text-right">79</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="p-3">Aug 18</td>
+<td class="p-3 text-right font-medium">125</td>
+<td class="p-3 text-right">82</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- Heart Rate Section -->
+<section class="mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-md flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">favorite</span>
+                        Heart Rate
+                    </h3>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Resting Avg</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-primary font-bold">68</span>
+<span class="font-body-md text-body-md text-on-surface-variant">bpm</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2">Peak</span>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">142</span>
+<span class="font-body-md text-body-md text-on-surface-variant">bpm</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Care Team Section -->
+<section>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">groups</span>
+                        Care Team Recipients
+                    </h3>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-4 p-3 rounded-lg border border-outline-variant/20 bg-surface-container-lowest">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-label-md text-label-md">
+                                SA
+                            </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Dr. Sarah Adams</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-sm">Primary Care Physician</div>
+</div>
+</div>
+<div class="flex items-center gap-4 p-3 rounded-lg border border-outline-variant/20 bg-surface-container-lowest">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-label-md text-label-md">
+                                MR
+                            </div>
+<div>
+<div class="font-label-md text-label-md text-on-surface">Dr. Michael Reed</div>
+<div class="font-body-md text-body-md text-on-surface-variant text-sm">Cardiologist</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom Action Bar -->
+<nav class="fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 py-2 px-2 md:px-gutter">
+  <div class="max-w-3xl mx-auto flex justify-between items-center">
+    <button class="flex flex-col items-center justify-center gap-1 flex-1 py-1 text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">home</span>
+      <span class="font-label-sm text-[10px] md:text-label-sm uppercase tracking-tight">Home</span>
+    </button>
+    <button class="flex flex-col items-center justify-center gap-1 flex-1 py-1 text-primary transition-colors">
+      <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+      <span class="font-label-sm text-[10px] md:text-label-sm uppercase tracking-tight font-bold">Overview</span>
+    </button>
+    <button class="flex flex-col items-center justify-center gap-1 flex-1 py-1 text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">mail</span>
+      <span class="font-label-sm text-[10px] md:text-label-sm uppercase tracking-tight">Inbox</span>
+    </button>
+    <button class="flex flex-col items-center justify-center gap-1 flex-1 py-1 text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">group</span>
+      <span class="font-label-sm text-[10px] md:text-label-sm uppercase tracking-tight">Community</span>
+    </button>
+    <button class="flex flex-col items-center justify-center gap-1 flex-1 py-1 text-on-surface-variant hover:text-primary transition-colors">
+      <span class="material-symbols-outlined">auto_awesome</span>
+      <span class="font-label-sm text-[10px] md:text-label-sm uppercase tracking-tight">Lifestyle</span>
+    </button>
+  </div>
+</nav>
+
+
+</body></html>

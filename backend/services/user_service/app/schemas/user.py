@@ -120,3 +120,20 @@ class UserUpdate(BaseModel):
             ]
         }
     }
+
+
+class PublicUserOut(BaseModel):
+    """The MINIMUM needed to render "who wrote this".
+
+    Separate from `UserOut` on purpose. `UserOut` is the self-view and carries
+    contact details and health fields; this is what one service may learn about
+    another service's user, and it is deliberately just a name and a role.
+
+    No avatar: the `User` model has no such column. Clinician photos live on
+    `doctor_service.photo_url`. Exposing a null here would imply the concept
+    exists and is unset.
+    """
+
+    user_id: UUID
+    display_name: str
+    role: str

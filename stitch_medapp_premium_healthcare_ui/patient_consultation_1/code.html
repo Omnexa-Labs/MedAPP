@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #f5faf8;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .chat-container {
+            height: calc(100vh - 144px); /* Adjusting for TopAppBar and BottomBar */
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-container": "#f4fffc",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "secondary-fixed": "#d5e3fc",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "outline": "#6d7a77",
+                      "tertiary-fixed": "#d8e2ff",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "secondary-container": "#d5e3fc",
+                      "error": "#ba1a1a",
+                      "surface-variant": "#dee4e1",
+                      "inverse-surface": "#2c3130",
+                      "surface-container-low": "#f0f5f2",
+                      "on-tertiary-container": "#fefcff",
+                      "on-primary": "#ffffff",
+                      "secondary": "#515f74",
+                      "primary-fixed": "#89f5e7",
+                      "on-background": "#171d1c",
+                      "on-secondary-container": "#57657a",
+                      "surface": "#f5faf8",
+                      "on-tertiary-fixed": "#001a42",
+                      "on-surface": "#171d1c",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#0058be",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#005049",
+                      "primary-container": "#008378",
+                      "on-tertiary": "#ffffff",
+                      "background": "#f5faf8",
+                      "surface-container-high": "#e4e9e7",
+                      "on-surface-variant": "#3d4947",
+                      "surface-bright": "#f5faf8",
+                      "on-primary-fixed": "#00201d",
+                      "surface-tint": "#006a61",
+                      "surface-container-lowest": "#ffffff",
+                      "outline-variant": "#bcc9c6",
+                      "error-container": "#ffdad6",
+                      "surface-container-highest": "#dee4e1",
+                      "inverse-on-surface": "#edf2f0",
+                      "surface-dim": "#d6dbd9",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "inverse-primary": "#6bd8cb",
+                      "surface-container": "#eaefed",
+                      "primary": "#00685f",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "tertiary-container": "#2170e4"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "lg": "48px",
+                      "xl": "80px",
+                      "sm": "12px",
+                      "container-max": "1280px",
+                      "base": "8px",
+                      "md": "24px"
+              },
+              "fontFamily": {
+                      "headline-xl": ["Manrope"],
+                      "body-md": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-md": ["Manrope"],
+                      "headline-lg-mobile": ["Manrope"],
+                      "body-lg": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-lg": ["Manrope"]
+              },
+              "fontSize": {
+                      "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md text-on-surface">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md sticky top-0 z-40 shadow-sm border-b border-outline-variant/30 h-20">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto h-full">
+<div class="flex items-center gap-sm">
+<button class="material-symbols-outlined text-primary cursor-pointer active:scale-95 duration-200">arrow_back</button>
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant/30">
+<img alt="Patient Avatar" class="w-full h-full object-cover" data-alt="Close-up studio portrait of a young woman with a calm expression, softly lit with natural daylight. The image has a clean, high-end healthcare aesthetic with a neutral, soft-focus background that matches a premium medical application theme. Warm skin tones and sharp details convey a sense of human trust and professional care." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVEqd970pbp1sKkLHEIW9auwUVc-hlVxrUzylNcqaL1eO_tCDX_oWBs-XQMAgQ5sD33oInet2k-DMNlfXgrJqBiOMzEIWTPmN7FNe0m1HW9QTqiGXV0RsAVTeh3UoIkP0pAsgqa8DN2J8AyWyzHnFF0-8pdlhaN29e3O82o2WYS7FxzcCe4Jdal6_fwZDzPee8cW6BvujIpW8kEJpd6_GEioKZ7vEfB-CNxgUFxTrvVDEZ75lTXJo53IXfrMTTU-TIM8Ybw1ofS7vK">
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Sarah Jenkins</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary inline-block"></span> Online
+                        </p>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="hidden md:flex items-center gap-2 bg-primary-container text-on-primary-container px-4 py-2 rounded-xl font-label-md text-label-md hover:bg-primary transition-colors active:scale-95 duration-200 shadow-sm">
+<span class="material-symbols-outlined text-lg">videocam</span>
+                    Start Video Call
+                </button>
+<button class="md:hidden text-primary p-2">
+<span class="material-symbols-outlined">videocam</span>
+</button>
+<button class="material-symbols-outlined text-on-surface-variant cursor-pointer active:scale-95 duration-200">info</button>
+</div>
+</div>
+</header>
+<!-- Main Chat Canvas -->
+<main class="max-w-container-max mx-auto px-gutter py-md chat-container overflow-y-auto flex flex-col gap-lg bg-background">
+<!-- Timeline Marker -->
+<div class="flex justify-center">
+<span class="bg-surface-container text-on-surface-variant font-label-sm text-label-sm px-4 py-1 rounded-full">Today, Oct 24</span>
+</div>
+<!-- Chat Bubble: Patient -->
+<div class="flex flex-col items-start max-w-[85%] md:max-w-[60%] animate-in">
+<div class="flex items-end gap-2">
+<div class="p-4 bg-white border border-outline-variant shadow-[0px_4px_20px_rgba(71,85,105,0.05)] rounded-2xl rounded-bl-none">
+<p class="text-on-surface font-body-md">Hello Doctor, I've been feeling a bit of chest tightness since this morning. Should I be concerned?</p>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2 px-1">
+<span class="font-label-sm text-label-sm text-outline">09:12 AM</span>
+</div>
+</div>
+<!-- Chat Bubble: Doctor (Brand Palette) -->
+<div class="flex flex-col items-end self-end max-w-[85%] md:max-w-[60%]">
+<div class="flex items-end gap-2">
+<div class="p-4 bg-primary text-on-primary shadow-sm rounded-2xl rounded-br-none">
+<p class="font-body-md">Good morning Sarah. I'm sorry to hear that. On a scale of 1 to 10, how intense is the tightness?</p>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2 px-1">
+<span class="font-label-sm text-label-sm text-outline">09:14 AM</span>
+<span class="material-symbols-outlined text-primary text-sm">done_all</span>
+</div>
+</div>
+<!-- Medical Document Card -->
+<div class="flex flex-col items-start max-w-[85%] md:max-w-[60%]">
+<div class="p-4 bg-white border border-outline-variant shadow-[0px_4px_20px_rgba(71,85,105,0.05)] rounded-2xl flex flex-col gap-3">
+<p class="text-on-surface font-body-md">I've attached my blood pressure readings from the last 3 days.</p>
+<div class="flex items-center gap-3 p-3 bg-surface-container-low border border-outline-variant/30 rounded-xl cursor-pointer hover:bg-surface-container transition-colors">
+<div class="w-12 h-12 flex items-center justify-center bg-tertiary/10 rounded-lg text-tertiary">
+<span class="material-symbols-outlined text-3xl">description</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface">BP_Report_Oct.pdf</p>
+<p class="font-label-sm text-label-sm text-outline">1.2 MB • PDF</p>
+</div>
+<span class="material-symbols-outlined text-outline">download</span>
+</div>
+</div>
+<div class="mt-2 px-1">
+<span class="font-label-sm text-label-sm text-outline">09:15 AM</span>
+</div>
+</div>
+<!-- Chat Bubble: Doctor -->
+<div class="flex flex-col items-end self-end max-w-[85%] md:max-w-[60%]">
+<div class="p-4 bg-primary text-on-primary shadow-sm rounded-2xl rounded-br-none">
+<p class="font-body-md">Thank you. The readings look slightly elevated. I'm going to send a temporary prescription to your pharmacy and I'd like to schedule a quick video call now to discuss your symptoms.</p>
+</div>
+<div class="flex items-center gap-2 mt-2 px-1">
+<span class="font-label-sm text-label-sm text-outline">09:17 AM</span>
+<span class="material-symbols-outlined text-primary text-sm">done_all</span>
+</div>
+</div>
+</main>
+<!-- Clinical Actions Floating Menu -->
+<div class="fixed bottom-24 right-gutter flex flex-col items-end gap-3 z-30">
+<div class="hidden bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-lg p-2 min-w-[200px] mb-2 flex flex-col gap-1 glass-effect" id="actions-menu">
+<button class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-container-low text-on-surface-variant text-label-md font-label-md transition-colors w-full text-left">
+<span class="material-symbols-outlined text-primary">prescriptions</span>
+                Send Prescription
+            </button>
+<button class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-container-low text-on-surface-variant text-label-md font-label-md transition-colors w-full text-left">
+<span class="material-symbols-outlined text-tertiary">monitor_heart</span>
+                Request Vitals
+            </button>
+<button class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-container-low text-on-surface-variant text-label-md font-label-md transition-colors w-full text-left">
+<span class="material-symbols-outlined text-on-secondary-fixed-variant">assignment</span>
+                Add Clinical Note
+            </button>
+</div>
+<button class="w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform duration-200" onclick="document.getElementById('actions-menu').classList.toggle('hidden')">
+<span class="material-symbols-outlined text-2xl">medical_services</span>
+</button>
+</div>
+<!-- Message Input Area -->
+<footer class="fixed bottom-0 left-0 w-full bg-surface border-t border-outline-variant/20 px-gutter py-4 z-40">
+<div class="max-w-container-max mx-auto flex items-center gap-md">
+<div class="flex gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors">
+<span class="material-symbols-outlined">add_photo_alternate</span>
+</button>
+</div>
+<div class="flex-1 relative">
+<input class="w-full bg-surface-container-low border border-outline-variant/30 rounded-full px-6 py-3 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-body-md" placeholder="Type a secure message..." type="text">
+</div>
+<button class="bg-primary text-on-primary w-12 h-12 rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-transform">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</footer>
+<!-- BottomNavBar (Hidden in chat flow for focus as per UX rules, but structure kept for reference) -->
+<!-- Suppressed to prioritize content canvas for focused journey -->
+
+
+<nav class="fixed bottom-0 left-0 w-full bg-surface-container-lowest border-t border-outline-variant/30 px-gutter py-3 z-50 md:hidden">
+  <div class="flex justify-between items-center max-w-container-max mx-auto">
+    <button class="flex flex-col items-center gap-1 text-on-surface-variant transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[24px]">home</span>
+      <span class="text-[10px] font-medium">Home</span>
+    </button>
+    <button class="flex flex-col items-center gap-1 text-on-surface-variant transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[24px]">grid_view</span>
+      <span class="text-[10px] font-medium">Overview</span>
+    </button>
+    <button class="flex flex-col items-center gap-1 text-primary">
+      <span class="material-symbols-outlined text-[24px] font-bold">mail</span>
+      <span class="text-[10px] font-bold">Inbox</span>
+    </button>
+    <button class="flex flex-col items-center gap-1 text-on-surface-variant transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[24px]">group</span>
+      <span class="text-[10px] font-medium">Community</span>
+    </button>
+    <button class="flex flex-col items-center gap-1 text-on-surface-variant transition-colors hover:text-primary">
+      <span class="material-symbols-outlined text-[24px]">auto_awesome</span>
+      <span class="text-[10px] font-medium">Lifestyle</span>
+    </button>
+  </div>
+</nav></body></html>

@@ -87,10 +87,10 @@ export interface SignUpPayload {
 // captured for future use (the user-service signup doesn't accept them yet);
 // they'll be persisted via PATCH /me + a preferences endpoint once those land.
 export interface SignUpFullPayload {
-  // Step 1
-  firstName: string;
-  middleName?: string;
-  lastName: string;
+  // Step 1 — single Full Name field (see schema.ts). Replaced
+  // firstName/middleName/lastName; middleName is no longer collected anywhere
+  // in the app (flagged). Split into first/last in signUpFull below.
+  fullName: string;
   email: string;
   password: string;
   // Step 2 — recorded client-side until /me PATCH is wired.
@@ -191,11 +191,22 @@ export const authApi = {
     // Backend signup takes first/last/phone/role/verification_token. Step 2
     // and Step 3 data are deferred — they belong on PATCH /me + a preferences
     // endpoint that doesn't exist yet. Dropping them here is intentional.
+    // FLAGGED, needs a product/backend decision — do not treat as settled.
+    // The UI collapsed first/middle/last into one Full Name field (the Figma
+    // frame draws one input), but SignupRequestWire still requires both
+    // first_name and last_name, so we whitespace-split. This is LOSSY:
+    //   "Kwame"            -> first_name "Kwame",  last_name "Kwame"  (dup!)
+    //   "Ama Serwaa Mensah"-> first_name "Ama",    last_name "Serwaa Mensah"
+    // Mononyms are common in the markets docs/BRAND.md targets (GH/NG/KE), so
+    // the correct fix is a backend that accepts a single legal name (or an
+    // explicit optional surname field in the design), not a smarter heuristic.
+    const [firstName, ...rest] = payload.fullName.trim().split(/\s+/);
+    const lastName = rest.length > 0 ? rest.join(" ") : firstName;
     const body: SignupRequestWire = {
       email: payload.email,
       password: payload.password,
-      first_name: payload.firstName,
-      last_name: payload.lastName,
+      first_name: firstName,
+      last_name: lastName,
       role: "user",
     };
     // If the user verified a phone via OTP, persist it on the account so
@@ -281,7 +292,9 @@ export const authApi = {
   },
 };
 
-// Convenience export for store/auth-store.ts hydration.
+// Convenience export that existed solely for store/auth-store.ts hydration,
+// which now calls `authApi.me()` directly. Kept as a named alias — it is a
+// one-line re-export and removing a public name is not worth the churn.
 export function fetchCurrentUser(): Promise<User> {
   return authApi.me();
 }

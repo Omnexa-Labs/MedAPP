@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedApp | Welcome Alex</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed-dim": "#b9c7df",
+                        "outline-variant": "#bcc9c6",
+                        "primary-fixed": "#89f5e7",
+                        "on-primary-container": "#f4fffc",
+                        "on-tertiary-container": "#fefcff",
+                        "secondary-container": "#d5e3fc",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "secondary-fixed": "#d5e3fc",
+                        "surface-tint": "#006a61",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "surface-container-low": "#f0f5f2",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-error-container": "#93000a",
+                        "on-background": "#171d1c",
+                        "tertiary": "#0058be",
+                        "surface-container-high": "#e4e9e7",
+                        "tertiary-fixed": "#d8e2ff",
+                        "surface-container": "#eaefed",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-surface": "#171d1c",
+                        "on-primary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-surface-variant": "#3d4947",
+                        "outline": "#6d7a77",
+                        "inverse-surface": "#2c3130",
+                        "background": "#f5faf8",
+                        "secondary": "#515f74",
+                        "on-primary-fixed": "#00201d",
+                        "primary": "#00685f",
+                        "inverse-on-surface": "#edf2f0",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#001a42",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-container": "#57657a",
+                        "surface-variant": "#dee4e1",
+                        "tertiary-container": "#2170e4",
+                        "surface-bright": "#f5faf8",
+                        "primary-container": "#008378",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "inverse-primary": "#6bd8cb",
+                        "surface": "#f5faf8",
+                        "surface-container-highest": "#dee4e1"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "sm": "12px",
+                        "xl": "80px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "md": "24px",
+                        "lg": "48px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        .step-complete-animate {
+            transition: all 0.3s ease;
+        }
+        .step-complete-animate:active {
+            transform: scale(0.98);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-md selection:bg-primary-fixed selection:text-on-primary-fixed">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter h-16 max-w-container-max mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAuBtw_47jZZguSCIfRmER3BzFnJdwPqlB5UJZOZzHT_NqElKBC9slmYQwHz9A_5vAPC6blK36049w3sUUkqS9eFcOhxwbrDhIbQ78Thv8cmLZ5EmzFIZ2Bws71xuL7epcrT_9xTj6nsri21oPKtjS_AxSw3xphNscSeOYmpWm_inPLjcqvggGGm2Po8ZD_yjyh7rpv8Om0EgSxbady6YJvoFOLBmiVUiJnY8lVbYbxLECZOylCRMXNv5tSIoZvYpvfeJKmY3lanBfE"/>
+</div>
+<span class="font-headline-md text-headline-md font-bold text-primary">MedApp</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-variant/50 transition-colors active:scale-95 duration-150">
+<span class="material-symbols-outlined text-primary">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter py-md md:py-lg flex flex-col gap-lg pb-32">
+<!-- Welcome Hero Section -->
+<section class="flex flex-col gap-xs">
+<span class="font-label-md text-label-md text-primary tracking-widest">GETTING STARTED</span>
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">Welcome to MedApp, Alex!</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+                Let's set up your health center. Complete these steps to get the most out of your personalized care.
+            </p>
+</section>
+<!-- Quick Action Cards (Continuity) -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-md">
+<button class="glass-card p-md rounded-xl flex flex-col items-center gap-sm text-center hover:bg-white transition-all shadow-[0px_4px_20px_rgba(71,85,105,0.05)] group">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed flex items-center justify-center text-on-tertiary-fixed-variant group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">forum</span>
+</div>
+<span class="font-label-md text-label-md">Talk to AI</span>
+</button>
+<button class="glass-card p-md rounded-xl flex flex-col items-center gap-sm text-center hover:bg-white transition-all shadow-[0px_4px_20px_rgba(71,85,105,0.05)] group">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center text-on-primary-fixed-variant group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">person_search</span>
+</div>
+<span class="font-label-md text-label-md">Find Doctor</span>
+</button>
+<button class="glass-card p-md rounded-xl flex flex-col items-center gap-sm text-center hover:bg-white transition-all shadow-[0px_4px_20px_rgba(71,85,105,0.05)] group">
+<div class="w-12 h-12 rounded-full bg-secondary-fixed flex items-center justify-center text-on-secondary-fixed-variant group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">upload_file</span>
+</div>
+<span class="font-label-md text-label-md">Upload Records</span>
+</button>
+<button class="glass-card p-md rounded-xl flex flex-col items-center gap-sm text-center hover:bg-white transition-all shadow-[0px_4px_20px_rgba(71,85,105,0.05)] group">
+<div class="w-12 h-12 rounded-full bg-error-container flex items-center justify-center text-on-error-container group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">emergency</span>
+</div>
+<span class="font-label-md text-label-md">Emergency</span>
+</button>
+</section>
+<!-- Bento Grid: Checklist & Snapshots -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-md items-start">
+<!-- Checklist Section -->
+<section class="lg:col-span-8 flex flex-col gap-md">
+<div class="bg-surface-container-lowest p-gutter rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30">
+<div class="flex items-center justify-between mb-lg">
+<h2 class="font-headline-md text-headline-md text-on-surface">Getting Started</h2>
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm text-label-sm">0 of 3 Tasks</span>
+</div>
+<div class="space-y-md">
+<!-- Step 1 -->
+<div class="flex items-start gap-md p-md rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all group cursor-pointer">
+<div class="w-10 h-10 flex-shrink-0 rounded-full border-2 border-outline-variant flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">sensors</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-label-md text-label-md text-on-surface mb-xs">Connect your first health device</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Sync your Blood Pressure or Heart Rate monitor for real-time tracking.</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</div>
+<!-- Step 2 -->
+<div class="flex items-start gap-md p-md rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all group cursor-pointer">
+<div class="w-10 h-10 flex-shrink-0 rounded-full border-2 border-outline-variant flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">medication</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-label-md text-label-md text-on-surface mb-xs">Add your current medications</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Log your prescriptions to get reminders and safety alerts.</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</div>
+<!-- Step 3 -->
+<div class="flex items-start gap-md p-md rounded-lg border border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all group cursor-pointer">
+<div class="w-10 h-10 flex-shrink-0 rounded-full border-2 border-outline-variant flex items-center justify-center group-hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary">stethoscope</span>
+</div>
+<div class="flex-grow">
+<h3 class="font-label-md text-label-md text-on-surface mb-xs">Find your primary care physician</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Search our network to link your health records directly to your doctor.</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Snapshot Placeholders -->
+<aside class="lg:col-span-4 flex flex-col gap-md">
+<!-- Heart Rate Placeholder -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-sm">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-label-md text-label-md text-on-surface">Heart Rate</span>
+</div>
+<div class="h-32 bg-surface-container rounded-lg flex flex-col items-center justify-center text-center px-sm gap-xs overflow-hidden relative">
+<div class="absolute inset-0 bg-gradient-to-br from-error/5 to-transparent"></div>
+<span class="material-symbols-outlined text-on-surface-variant/40 text-4xl">add_circle</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant relative z-10">Connect Apple Health or Fitbit</p>
+</div>
+</div>
+<!-- Blood Pressure Placeholder -->
+<div class="bg-surface-container-lowest p-md rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-sm">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 1;">blood_pressure</span>
+<span class="font-label-md text-label-md text-on-surface">Blood Pressure</span>
+</div>
+<div class="h-32 bg-surface-container rounded-lg flex flex-col items-center justify-center text-center px-sm gap-xs overflow-hidden relative">
+<div class="absolute inset-0 bg-gradient-to-br from-tertiary/5 to-transparent"></div>
+<button class="bg-tertiary text-on-tertiary font-label-md text-label-md px-4 py-2 rounded-full shadow-sm hover:scale-105 transition-transform active:scale-95 z-10">
+                            Connect Device
+                        </button>
+</div>
+</div>
+</aside>
+</div>
+<!-- Tips / How it Works Section -->
+<section class="flex flex-col gap-md">
+<h2 class="font-headline-md text-headline-md text-on-surface">Tips for New Users</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<div class="bg-primary-container/20 p-md rounded-xl border border-primary/10 flex flex-col gap-sm">
+<div class="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">security</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface">Data Privacy</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Your medical records are encrypted and only accessible by you and authorized doctors.</p>
+</div>
+<div class="bg-secondary-container/20 p-md rounded-xl border border-secondary/10 flex flex-col gap-sm">
+<div class="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">smart_toy</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface">AI Assistant</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Our Assistant can help interpret test results or explain medical terminology 24/7.</p>
+</div>
+<div class="bg-surface-container-high p-md rounded-xl border border-outline-variant/30 flex flex-col gap-sm relative overflow-hidden group cursor-pointer">
+<img class="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:opacity-20 transition-opacity" data-alt="A clean, modern medical office with soft natural lighting coming from large windows. A high-tech tablet on a wooden desk displays a friendly user interface for medical data. The atmosphere is calm, professional, and reassuring with a color palette of soft whites, light teals, and natural wood tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzjbtuAXiySGveNuCcKGdnL4A3g8EDmgiwiyZHwmTr46aH9vVgDDi4kiRp75-0A0Mz0eZklS9bbVDM3qDMj1M4sb7-k0KlPQ8OHFEaV-BVJ3JbhmtrWjwJP_q8L1RCbKSw_9LLrrcp3EUG3TH8UKY81UpJ4XhMgTMjniIubjQyTxTmGgr6OkvMwKtFoxEkoSFaul3MUS6kQ177A-SPKuEFcu0eZm0Kl3sB9oWjdMv9B5gGxtfeoVqx2xgnrMUHPGa1X0vVdCUAuZa9"/>
+<div class="relative z-10">
+<div class="w-10 h-10 bg-outline-variant/20 rounded-lg flex items-center justify-center mb-sm">
+<span class="material-symbols-outlined text-on-surface">menu_book</span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface">User Guide</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Explore the full capabilities of MedApp in our comprehensive onboarding guide.</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3">
+<a class="flex flex-col items-center justify-center text-primary p-2" href="#">
+<span class="material-symbols-outlined" data-icon="home" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-sm text-label-sm mt-1 font-bold">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-label-sm text-label-sm mt-1">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="font-label-sm text-label-sm mt-1">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-sm text-label-sm mt-1">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-sm text-label-sm mt-1">Lifestyle</span>
+</a>
+</nav>
+<script>
+        // Simple interactive effect for checklist items
+        document.querySelectorAll('.cursor-pointer').forEach(item => {
+            item.addEventListener('click', function() {
+                const icon = this.querySelector('.material-symbols-outlined');
+                if (icon && icon.textContent !== 'check_circle') {
+                    icon.textContent = 'check_circle';
+                    icon.style.fontVariationSettings = "'FILL' 1";
+                    icon.classList.remove('text-outline-variant');
+                    icon.classList.add('text-primary');
+                    this.classList.add('opacity-70');
+                    
+                    // Simple toast or feedback logic could go here
+                }
+            });
+        });
+
+        // Atmospheric parallax or slight movement on cards
+        document.addEventListener('mousemove', (e) => {
+            const cards = document.querySelectorAll('.glass-card');
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            cards.forEach(card => {
+                const shiftX = (x - 0.5) * 10;
+                const shiftY = (y - 0.5) * 10;
+                card.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
+            });
+        });
+    </script>
+</body></html>

@@ -11,6 +11,11 @@ import { config } from "@/lib/config";
 // - All non-2xx responses throw `ApiError` so React Query's `retry` callback
 //   can branch on status (no retries on 4xx).
 // - Network failures throw `ApiError` with status === 0.
+// - A 401 on an authenticated request triggers ONE shared refresh + ONE retry.
+//   Before this, an expired access token bricked the app: every request threw
+//   401, `query-client.ts` refuses to retry 4xx, and nothing told the auth store
+//   — so `isAuthenticated` stayed true and the route guard kept the user inside
+//   an app where nothing loaded, recoverable only by a cold restart.
 
 type AuthTokenProvider = () => string | null;
 let authTokenProvider: AuthTokenProvider | null = null;
@@ -29,6 +34,54 @@ let deviceIdProvider: DeviceIdProvider | null = null;
 
 export function registerDeviceIdProvider(provider: DeviceIdProvider): void {
   deviceIdProvider = provider;
+}
+
+// Session refresher, registered by the auth store (same injection pattern as
+// the two providers above, and for the same reason: `auth/api.ts` imports THIS
+// module, so this module can never import it back).
+//
+// Resolves true when a fresh access token has been persisted and the caller
+// should retry; false when the session is gone. The implementation owns the
+// sign-out on failure — the client only needs the yes/no.
+type SessionRefresher = () => Promise<boolean>;
+let sessionRefresher: SessionRefresher | null = null;
+
+export function registerSessionRefresher(refresher: SessionRefresher): void {
+  sessionRefresher = refresher;
+}
+
+// Single in-flight refresh, shared by every request that 401s while it runs.
+//
+// Without this, an expired access token on a screen that fires N parallel
+// queries produces N refresh calls. The backend ROTATES the refresh token on
+// every call (see `authApi.refresh`), so the 2nd..Nth calls present a token the
+// 1st already consumed — the server rejects them and the user is signed out of
+// a session that had just been renewed. The whole point of this variable is
+// that the second 401 awaits the first refresh instead of starting another.
+let refreshInFlight: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  const refresher = sessionRefresher;
+  // Nothing registered (tests, or a request before the store loaded). Report
+  // "not refreshed" so the caller surfaces the original 401.
+  if (!refresher) return Promise.resolve(false);
+
+  const flight = refresher()
+    // A refresher that throws is a failed refresh, not a client crash.
+    .catch(() => false)
+    .finally(() => {
+      // Guard the identity check: a later refresh may already own the slot.
+      if (refreshInFlight === flight) refreshInFlight = null;
+    });
+  refreshInFlight = flight;
+  return flight;
+}
+
+/** Test seam — drops any registered refresher and in-flight refresh. */
+export function __resetAuthRefreshForTests(): void {
+  sessionRefresher = null;
+  refreshInFlight = null;
 }
 
 export interface RequestOptions {
@@ -93,7 +146,7 @@ async function parseError(response: Response): Promise<ApiError> {
   return new ApiError(message, response.status, code, details);
 }
 
-async function request<T>(method: string, path: string, body: unknown, opts: RequestOptions): Promise<T> {
+async function send<T>(method: string, path: string, body: unknown, opts: RequestOptions): Promise<T> {
   const url = path.startsWith("http") ? path : `${config.apiBaseUrl}${path}`;
   const hasBody = body !== undefined && body !== null && method !== "GET";
   const headers = buildHeaders(opts, hasBody);
@@ -126,6 +179,33 @@ async function request<T>(method: string, path: string, body: unknown, opts: Req
     return undefined as T;
   }
   return (await response.json()) as T;
+}
+
+async function request<T>(method: string, path: string, body: unknown, opts: RequestOptions): Promise<T> {
+  try {
+    return await send<T>(method, path, body, opts);
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) throw error;
+
+    // `withAuth: false` marks the endpoints that carry their own credential:
+    // login, signup, logout, and — critically — refresh itself and the `/me`
+    // probe it makes. Excluding them is what stops a 401 on the refresh call
+    // from triggering another refresh, forever.
+    if ((opts.withAuth ?? true) === false) throw error;
+
+    // The caller walked away (screen unmounted, query cancelled). Renewing the
+    // session on its behalf and retrying would be work nobody is waiting for.
+    if (opts.signal?.aborted) throw error;
+
+    const refreshed = await refreshSession();
+    // Refresh failed. The refresher has already signed the user out, so the
+    // `(app)` route guard bounces them to sign-in; surface the original 401.
+    if (!refreshed) throw error;
+
+    // Exactly one retry. `send` rebuilds headers, so it picks up the rotated
+    // access token from the provider. A second 401 propagates.
+    return await send<T>(method, path, body, opts);
+  }
 }
 
 export const client = {

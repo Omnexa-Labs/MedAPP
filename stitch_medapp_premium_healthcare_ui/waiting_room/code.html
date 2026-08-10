@@ -1,0 +1,268 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed": "#89f5e7",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary-fixed": "#00201d",
+                    "surface-container": "#eaefed",
+                    "outline-variant": "#bcc9c6",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-error": "#ffffff",
+                    "on-secondary-container": "#57657a",
+                    "surface-container-highest": "#dee4e1",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-primary-container": "#f4fffc",
+                    "on-primary-fixed-variant": "#005049",
+                    "on-background": "#171d1c",
+                    "surface-tint": "#006a61",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "surface-variant": "#dee4e1",
+                    "background": "#f5faf8",
+                    "on-tertiary-container": "#fefcff",
+                    "surface": "#f5faf8",
+                    "inverse-primary": "#6bd8cb",
+                    "surface-bright": "#f5faf8",
+                    "on-surface-variant": "#3d4947",
+                    "tertiary-fixed": "#d8e2ff",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#0058be",
+                    "secondary-fixed": "#d5e3fc",
+                    "primary-container": "#008378",
+                    "primary": "#00685f",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#d6dbd9",
+                    "secondary": "#515f74",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "secondary-container": "#d5e3fc",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface-container-high": "#e4e9e7",
+                    "outline": "#6d7a77",
+                    "surface-container-low": "#f0f5f2",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-surface": "#171d1c",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "error-container": "#ffdad6",
+                    "inverse-surface": "#2c3130",
+                    "tertiary-container": "#2170e4"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "sm": "12px",
+                    "md": "24px",
+                    "gutter": "24px",
+                    "xs": "4px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f5faf8;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm dark:shadow-none docked full-width top-0 sticky z-40">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img alt="User profile picture" class="w-full h-full object-cover" data-alt="A professional headshot of a person with a friendly expression, captured with soft, clinical studio lighting. The background is a clean, neutral gray, consistent with a high-end medical application's user profile interface. The color palette is natural and bright, emphasizing a human-centric healthcare experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBe54DOwEVv3mpjY6ZXTDJIbsOAoWdEN3AJ38SpZP2Ljsh9RmOQ8Fq-8FyCim3HgZk2_BsvYjD3eHPJvgdPyrl5qDfHEv_RMeyzZBSFCr34nyzYl0hBuSKAhs4qXxmFkklWnBTyh-ZJn_tPCoBPPYd_QGjNZnfWvKNHjcI57h27C38M8_ydilZ-IFPLR4WzVa-QmlhagC4F_00z_zUxoVHgMWcuDrJ2YcYzcVGJPhL4WIaaxglv4p53uV4dwjSpTq8tYAB4nsPzZqb_">
+</div>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp</span>
+</div>
+<div class="hidden md:flex items-center gap-lg">
+<nav class="flex gap-md">
+<a class="text-on-surface-variant dark:text-outline-variant font-label-md text-label-md hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg cursor-pointer active:scale-95 duration-200" href="#">Home</a>
+<a class="text-primary dark:text-primary-fixed-dim font-bold font-label-md text-label-md hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg cursor-pointer active:scale-95 duration-200" href="#">Find Care</a>
+<a class="text-on-surface-variant dark:text-outline-variant font-label-md text-label-md hover:bg-surface-container-low transition-colors px-3 py-2 rounded-lg cursor-pointer active:scale-95 duration-200" href="#">Chat</a>
+</nav>
+<div class="cursor-pointer active:scale-95 duration-200 p-2 rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" data-icon="notifications">notifications</span>
+</div>
+</div>
+<div class="md:hidden">
+<span class="material-symbols-outlined text-primary" data-icon="more_vert">more_vert</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-gutter py-lg max-w-container-max mx-auto w-full">
+<!-- Header Info -->
+<div class="text-center mb-lg">
+<h1 class="font-headline-xl text-headline-xl text-on-surface mb-sm">Video Consultation</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Dr. Sterling will join you shortly</p>
+</div>
+<!-- Waiting Room Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-md w-full">
+<!-- Camera Preview Card (Main Feature) -->
+<div class="lg:col-span-8 bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 overflow-hidden flex flex-col">
+<div class="relative aspect-video bg-inverse-surface group">
+<img alt="Camera preview" class="w-full h-full object-cover opacity-80" data-alt="A POV camera perspective of a patient sitting in a brightly lit, modern home office environment. The lighting is warm and natural, coming from a side window, highlighting professional yet comfortable surroundings. The image has a slight soft-focus blur around the edges to simulate a webcam preview interface for a premium telemedicine application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxF2Vxy8bsUkfO8fOIOsNhF31hOUUhzdNi0BkX-ijDB9h6fCUxp1xI5a8HSz4jl5eIcyIvamD4VRygk14QVbR0zg3CNVGYMndDw6dbwojWlEyp7XAUP9tDeeFSN3SX-e9i1hRgyJd170JLPgzsEzdn8fkxtKMTbB7Op84d5IjTz4NAH5VyT1__jrvCySC9ZKtJcyF10bL0n858pqU1qeY-99hF9ezBptv5ADxVf0EUK-aTAW6wvllA2BnNs-OVbtRw1K6VrB_Y_6T8">
+<!-- Camera Overlay Controls -->
+<div class="absolute bottom-md left-1/2 -translate-x-1/2 flex gap-sm">
+<button class="w-12 h-12 rounded-full bg-surface/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-surface/40 transition-all border border-white/20">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</button>
+<button class="w-12 h-12 rounded-full bg-surface/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-surface/40 transition-all border border-white/20">
+<span class="material-symbols-outlined" data-icon="videocam">videocam</span>
+</button>
+<button class="w-12 h-12 rounded-full bg-surface/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-surface/40 transition-all border border-white/20">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+<!-- Badge Status -->
+<div class="absolute top-md left-md">
+<span class="bg-primary-container/90 backdrop-blur-sm text-on-primary-container px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-xs">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                            Live Preview
+                        </span>
+</div>
+</div>
+<div class="p-md flex justify-between items-center bg-surface-container-low">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="account_circle">account_circle</span>
+<span class="font-label-md text-label-md text-on-surface">Alex Johnson (You)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant italic">Testing equipment...</span>
+</div>
+</div>
+<!-- Sidebar Info Panels -->
+<div class="lg:col-span-4 flex flex-col gap-md">
+<!-- Hardware Check Card -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary" data-icon="fact_check">fact_check</span>
+                        Hardware Check
+                    </h2>
+<ul class="space-y-sm">
+<li class="flex items-center justify-between p-sm rounded-lg bg-surface-container-low border border-outline-variant/10">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="mic">mic</span>
+<span class="font-body-md text-body-md text-on-surface">Microphone</span>
+</div>
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</li>
+<li class="flex items-center justify-between p-sm rounded-lg bg-surface-container-low border border-outline-variant/10">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="videocam">videocam</span>
+<span class="font-body-md text-body-md text-on-surface">Camera</span>
+</div>
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</li>
+<li class="flex items-center justify-between p-sm rounded-lg bg-surface-container-low border border-outline-variant/10">
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary" data-icon="wifi">wifi</span>
+<span class="font-body-md text-body-md text-on-surface">Connection</span>
+</div>
+<span class="material-symbols-outlined text-primary text-xl" data-icon="check_circle" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</li>
+</ul>
+</div>
+<!-- Doctor Info Card -->
+<div class="bg-primary-container text-on-primary-container rounded-xl p-md flex flex-col gap-sm shadow-sm">
+<div class="flex items-center gap-md">
+<div class="w-14 h-14 rounded-full border-2 border-on-primary-container/30 overflow-hidden p-0.5">
+<img alt="Dr. Sterling" class="w-full h-full object-cover rounded-full" data-alt="A portrait of a male doctor, Dr. Sterling, wearing a white medical coat and a stethoscope. He has a warm, confident smile that conveys expertise and kindness. The setting is a blurred, high-end medical office with clinical lighting. The overall mood is reassuring and professional, matching a modern telemedicine aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3aEgB735H_y6AwCFDenAcyrPd6rLbwlJe5L5Wp1Aja40Qk_hXH0r-ipBmmZfmr0gglvvty1v1T1t1UqAZRP822tKEgeO7FQBJyN4VQjggUNP-XOCjkRQ1qZ2BFHNXBFuaKOATcTAYK5yUK4bjqxwPAw2g6WZPdiMoG-ILAY-Fv5c_9QVrPuNf8ATTDryWhSoByIfZ-qFyqHU3WSc-qA0rxbBOl83XiQXrooff_qCPm0O8jxtiF7kYX28aEGA30i5XobXzU5KGZ1WH">
+</div>
+<div>
+<p class="font-headline-md text-headline-md leading-tight">Dr. Sterling</p>
+<p class="font-label-md text-label-md opacity-90">Cardiologist • 15 Years Exp.</p>
+</div>
+</div>
+<div class="bg-on-primary-container/10 p-sm rounded-lg">
+<p class="font-label-sm text-label-sm leading-relaxed">"Hello Alex! I'm just finishing up with another patient. I'll be with you in about 2 minutes."</p>
+</div>
+</div>
+<!-- Action Button -->
+<div class="mt-auto">
+<button class="w-full py-4 bg-outline-variant text-on-surface-variant font-headline-md text-headline-md rounded-xl cursor-not-allowed opacity-60 flex items-center justify-center gap-sm transition-all shadow-md" disabled="">
+<span class="material-symbols-outlined" data-icon="sensors">sensors</span>
+                        Waiting for Doctor...
+                    </button>
+<p class="text-center font-label-sm text-label-sm text-on-surface-variant mt-sm">The 'Join Call' button will enable automatically</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Visible on Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 pb-4 pt-2 bg-surface/90 backdrop-blur-md border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] z-50 rounded-t-xl">
+  <div class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform duration-150">
+    <span class="material-symbols-outlined" data-icon="home">home</span>
+    <span class="font-label-sm text-label-sm">Home</span>
+  </div>
+  <div class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors active:scale-90 duration-150">
+    <span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+    <span class="font-label-sm text-label-sm">Overview</span>
+  </div>
+  <div class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors active:scale-90 duration-150">
+    <span class="material-symbols-outlined" data-icon="mail">mail</span>
+    <span class="font-label-sm text-label-sm">Inbox</span>
+  </div>
+  <div class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors active:scale-90 duration-150">
+    <span class="material-symbols-outlined" data-icon="group">group</span>
+    <span class="font-label-sm text-label-sm">Community</span>
+  </div>
+  <div class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 hover:text-primary transition-colors active:scale-90 duration-150">
+    <span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+    <span class="font-label-sm text-label-sm">Lifestyle</span>
+  </div>
+</nav>
+<!-- Floating Action Button Contextual Logic (Suppressed on Details) -->
+<!-- Suppressed as per Task Logic for "Waiting Room" which acts as a Details/Focused journey -->
+
+
+</body></html>

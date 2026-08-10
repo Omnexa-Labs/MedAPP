@@ -22,8 +22,28 @@ export const useWelcomeStore = create<WelcomeState>((set) => ({
   isHydrating: true,
 
   hydrate: async () => {
-    const seen = await prefs.get<boolean>(HAS_SEEN_WELCOME_KEY);
-    set({ hasSeenWelcome: seen === true, isHydrating: false });
+    // try/FINALLY, not try/catch, and this is load-bearing.
+    //
+    // `src/app/_layout.tsx` renders NOTHING until `isHydrating` is false on
+    // both stores. This function had no error handling at all, so a throwing
+    // `prefs.get` left the flag stuck true and the app showed a permanently
+    // blank white screen — no error, no splash, no way forward.
+    //
+    // Observed on device: after the OS cleared app data, `keystore2` returned
+    // UNKNOWN_ERROR and the app never painted. Any keystore fault does it — a
+    // restored backup, an OS upgrade, a user clearing storage.
+    //
+    // Failing to read "has the user seen welcome" is not fatal: the honest
+    // default is FALSE, which routes to the splash. Showing the intro again is
+    // a far better outcome than showing nothing.
+    try {
+      const seen = await prefs.get<boolean>(HAS_SEEN_WELCOME_KEY);
+      set({ hasSeenWelcome: seen === true });
+    } catch {
+      set({ hasSeenWelcome: false });
+    } finally {
+      set({ isHydrating: false });
+    }
   },
 
   completeWelcome: async () => {

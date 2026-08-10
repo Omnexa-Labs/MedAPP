@@ -67,7 +67,27 @@ class EventBus:
             self._dlx_name, aio_pika.ExchangeType.FANOUT, durable=True
         )
 
+    async def _ensure_connected(self) -> None:
+        """Connect if we never did, or if the connection has since closed.
+
+        `aio_pika.connect_robust` recovers a connection it has ALREADY made, so
+        it handles a broker bounce on its own. What it cannot do is recover from
+        a connect that never succeeded — and that was the real hole: a service
+        booting before RabbitMQ took the failure once, its caller stored `None`,
+        and `publish()` was a silent no-op for the life of the process.
+
+        This makes the first successful publish do the connecting. Cheap: after
+        the first call `_exchange` is set and this is two attribute reads.
+        """
+        if self._exchange is not None and self._connection is not None and not self._connection.is_closed:
+            return
+        await self.connect()
+
     async def publish(self, event: DomainEvent, routing_key: str | None = None) -> None:
+        # NOT an assert. Asserting "not connected" turns a recoverable broker
+        # blip into a 500 on whatever request happened to be publishing, and
+        # asserts vanish under -O.
+        await self._ensure_connected()
         assert self._exchange is not None, "EventBus not connected"
         body = event.model_dump_json().encode()
         await self._exchange.publish(

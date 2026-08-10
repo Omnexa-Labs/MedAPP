@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Create New Health Group | MedApp Specialist</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#eaefed",
+                        "secondary-container": "#d5e3fc",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "error-container": "#ffdad6",
+                        "outline": "#6d7a77",
+                        "inverse-on-surface": "#edf2f0",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-primary": "#ffffff",
+                        "surface": "#f5faf8",
+                        "surface-container-high": "#e4e9e7",
+                        "surface-bright": "#f5faf8",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#bcc9c6",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#171d1c",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#006a61",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "inverse-primary": "#6bd8cb",
+                        "tertiary-container": "#2170e4",
+                        "inverse-surface": "#2c3130",
+                        "tertiary": "#0058be",
+                        "on-surface-variant": "#3d4947",
+                        "error": "#ba1a1a",
+                        "primary-container": "#008378",
+                        "clinical-error": "#ba1a1a",
+                        "primary-fixed": "#89f5e7",
+                        "surface-variant": "#dee4e1",
+                        "secondary": "#515f74",
+                        "on-primary-container": "#f4fffc",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#f0f5f2",
+                        "secondary-fixed": "#d5e3fc",
+                        "clinical-info": "#0058be",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-background": "#171d1c",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "on-error-container": "#93000a",
+                        "surface-container-highest": "#dee4e1",
+                        "on-primary-fixed-variant": "#005049",
+                        "primary": "#00685f",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-tertiary-container": "#fefcff",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-container": "#57657a",
+                        "background": "#f5faf8",
+                        "surface-bg": "#f5faf8",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "clinical-success": "#00685f",
+                        "on-primary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "lg": "48px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "container-max": "1280px",
+                        "sm": "12px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "caption": ["Inter"],
+                        "headline-xl": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col font-body-md">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-sm border-b-[0.5px] border-outline-variant h-16">
+<div class="flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-full">
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-primary cursor-pointer active:scale-95 transition-transform" data-icon="arrow_back">arrow_back</button>
+<h1 class="text-headline-md font-headline-md text-primary">MedApp Specialist</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden cursor-pointer active:scale-95 transition-transform">
+<img alt="Specialist Profile Avatar" data-alt="A close-up professional headshot of a diverse female medical doctor in her 40s wearing a clean white clinical coat and a stethoscope. She is smiling warmly with a blurred medical office background in soft blues and greens. The lighting is soft and clinical, conveying expertise, trust, and professional care in a modern healthcare setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCum9Iti_Q-LNwUMh2q2LO01xUw0uWaABM-Oanp1CjeBRTiAVf35CZPXJuapiu3dp_r8cFHWswc1KCJXTiwovaDg5sCnEd0Gkbhxfhvq7VErbPLDDrB1L30OI662RhTbSj1mZ9KeucjzER3GkRjlOFe5LKA4_PHkyDft7_2-iTZfp7a6cv8YlwppWi5ql9MBmaCmVQKfXoQbDc24Hpqho1C8nQj8FBhI772RuCx2-msM2FB23WTV151aQFSpXkoKFpwUCgDqikAUy6H"/>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer active:scale-95 transition-transform" data-icon="settings">settings</span>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 mt-16 pb-24 w-full max-w-3xl mx-auto px-gutter py-md">
+<!-- Header Section -->
+<section class="mb-lg">
+<h2 class="text-headline-lg font-headline-lg text-on-surface mb-2">Create New Health Group</h2>
+<p class="text-body-md text-on-surface-variant">Connect with peers, share research, and facilitate patient care discussions in a secure environment.</p>
+</section>
+<!-- Form Section -->
+<div class="space-y-lg">
+<!-- Cover Image Upload -->
+<div class="relative group">
+<label class="text-label-md font-label-md text-on-surface-variant mb-base block">Group Cover Image</label>
+<div class="w-full h-48 rounded-xl bg-surface-container-high border-2 border-dashed border-outline-variant flex flex-col items-center justify-center transition-all hover:bg-surface-variant/30 cursor-pointer relative overflow-hidden">
+<div class="flex flex-col items-center gap-2">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="add_photo_alternate">add_photo_alternate</span>
+<span class="text-label-md font-label-md text-primary">Upload Placeholder Image</span>
+<p class="text-caption text-outline">Recommended: 1280x480px (PNG, JPG)</p>
+</div>
+<!-- Hover Overlay -->
+<div class="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+<div class="bg-surface px-4 py-2 rounded-full shadow-md text-label-md font-label-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="upload">upload</span>
+                            Select File
+                        </div>
+</div>
+</div>
+</div>
+<!-- Basic Info Bento Section -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Group Name -->
+<div class="space-y-base col-span-1 md:col-span-2">
+<label class="text-label-md font-label-md text-on-surface-variant" for="group-name">Group Name</label>
+<input class="w-full bg-surface-container-lowest border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-4 py-3 text-body-md outline-none transition-all placeholder:text-outline-variant" id="group-name" placeholder="e.g., Advanced Cardiology Network" type="text"/>
+</div>
+<!-- Category Selector -->
+<div class="space-y-base">
+<label class="text-label-md font-label-md text-on-surface-variant">Category</label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface-container-lowest border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-4 py-3 text-body-md outline-none transition-all pr-10">
+<option value="">Select Category</option>
+<option value="cardiology">Cardiology</option>
+<option value="diabetes">Diabetes Support</option>
+<option value="neurology">Neurology</option>
+<option value="oncology">Oncology</option>
+<option value="general">General Medicine</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" data-icon="expand_more">expand_more</span>
+</div>
+</div>
+<!-- Privacy Settings -->
+<div class="space-y-base">
+<label class="text-label-md font-label-md text-on-surface-variant">Privacy Settings</label>
+<div class="flex gap-2 p-1 bg-surface-container-high rounded-lg h-[50px]">
+<button class="flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md bg-secondary-container text-on-secondary-container" id="btn-public" onclick="togglePrivacy('public')">
+<span class="material-symbols-outlined text-sm" data-icon="public">public</span>
+                            Public
+                        </button>
+<button class="flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md text-on-surface-variant hover:bg-surface-variant" id="btn-private" onclick="togglePrivacy('private')">
+<span class="material-symbols-outlined text-sm" data-icon="lock">lock</span>
+                            Private
+                        </button>
+</div>
+</div>
+</div>
+<!-- Description -->
+<div class="space-y-base">
+<label class="text-label-md font-label-md text-on-surface-variant" for="description">Group Description</label>
+<textarea class="w-full bg-surface-container-lowest border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-4 py-3 text-body-md outline-none transition-all resize-none placeholder:text-outline-variant" id="description" placeholder="Define the goals, guidelines, and target members of this group..." rows="5"></textarea>
+<div class="flex justify-between items-center px-1">
+<span class="text-caption text-outline">Clinical accuracy and professional conduct are required.</span>
+<span class="text-caption text-outline">0 / 1000</span>
+</div>
+</div>
+<!-- Advanced Toggles (Modern UI Patterns) -->
+<div class="bg-surface-container-low rounded-2xl p-6 space-y-md border border-outline-variant/30">
+<h3 class="text-label-md font-label-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="tune">tune</span>
+                    Advanced Clinical Settings
+                </h3>
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-label-md font-label-md text-on-surface">Provider Verification</span>
+<span class="text-caption text-on-surface-variant">Only verified specialists can join.</span>
+</div>
+<button class="w-12 h-6 bg-primary rounded-full relative transition-colors" onclick="this.classList.toggle('bg-primary'); this.classList.toggle('bg-outline-variant')">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full transition-all translate-x-0" style="right: 4px;"></div>
+</button>
+</div>
+<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4">
+<div class="flex flex-col">
+<span class="text-label-md font-label-md text-on-surface">HIPAA Compliance Filter</span>
+<span class="text-caption text-on-surface-variant">Auto-flag sensitive patient data.</span>
+</div>
+<button class="w-12 h-6 bg-primary rounded-full relative transition-colors">
+<div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" style="right: 4px;"></div>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Bar -->
+<footer class="fixed bottom-0 left-0 w-full z-50 bg-surface/80 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.05)] border-t-[0.5px] border-outline-variant">
+<div class="max-w-3xl mx-auto px-gutter h-20 flex items-center justify-between gap-md">
+<button class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-colors px-4 py-3 rounded-full hover:bg-surface-variant">
+                Cancel
+            </button>
+<button class="flex-1 bg-primary text-on-primary rounded-full px-8 py-3.5 text-label-md font-label-md shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="group_add">group_add</span>
+                Create Group
+            </button>
+</div>
+</footer>
+<!-- Mobile Navigation Suppressed based on "Task-Focused" rule -->
+<script>
+        function togglePrivacy(type) {
+            const btnPublic = document.getElementById('btn-public');
+            const btnPrivate = document.getElementById('btn-private');
+            
+            if(type === 'public') {
+                btnPublic.className = "flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md bg-secondary-container text-on-secondary-container";
+                btnPrivate.className = "flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md text-on-surface-variant hover:bg-surface-variant";
+            } else {
+                btnPrivate.className = "flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md bg-secondary-container text-on-secondary-container";
+                btnPublic.className = "flex-1 flex items-center justify-center gap-2 rounded-md transition-all text-label-md font-label-md text-on-surface-variant hover:bg-surface-variant";
+            }
+        }
+
+        // Simple animation on create click
+        document.querySelector('.bg-primary').addEventListener('click', function() {
+            const originalContent = this.innerHTML;
+            this.innerHTML = '<span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span> Processing...';
+            this.disabled = true;
+            setTimeout(() => {
+                this.innerHTML = '<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span> Success';
+                this.classList.replace('bg-primary', 'bg-clinical-success');
+            }, 1200);
+        });
+    </script>
+</body></html>

@@ -1,0 +1,395 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Doctor Profile - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "inverse-on-surface": "#edf2f0",
+                "on-primary": "#ffffff",
+                "secondary-fixed": "#d5e3fc",
+                "on-surface-variant": "#3d4947",
+                "surface-container-low": "#f0f5f2",
+                "primary-container": "#008378",
+                "background": "#f5faf8",
+                "inverse-surface": "#2c3130",
+                "primary-fixed-dim": "#6bd8cb",
+                "error": "#ba1a1a",
+                "on-primary-fixed": "#00201d",
+                "secondary": "#515f74",
+                "on-error-container": "#93000a",
+                "outline-variant": "#bcc9c6",
+                "tertiary-container": "#2170e4",
+                "on-secondary-container": "#57657a",
+                "on-tertiary": "#ffffff",
+                "on-secondary-fixed": "#0d1c2e",
+                "on-tertiary-fixed-variant": "#004395",
+                "secondary-fixed-dim": "#b9c7df",
+                "surface-container": "#eaefed",
+                "surface-container-highest": "#dee4e1",
+                "on-surface": "#171d1c",
+                "outline": "#6d7a77",
+                "on-tertiary-container": "#fefcff",
+                "on-primary-container": "#f4fffc",
+                "on-secondary": "#ffffff",
+                "error-container": "#ffdad6",
+                "on-primary-fixed-variant": "#005049",
+                "surface-dim": "#d6dbd9",
+                "primary-fixed": "#89f5e7",
+                "secondary-container": "#d5e3fc",
+                "tertiary-fixed": "#d8e2ff",
+                "tertiary": "#0058be",
+                "on-secondary-fixed-variant": "#3a485b",
+                "surface": "#f5faf8",
+                "tertiary-fixed-dim": "#adc6ff",
+                "primary": "#00685f",
+                "surface-bright": "#f5faf8",
+                "inverse-primary": "#6bd8cb",
+                "surface-container-high": "#e4e9e7",
+                "surface-container-lowest": "#ffffff",
+                "surface-variant": "#dee4e1",
+                "on-error": "#ffffff",
+                "on-tertiary-fixed": "#001a42",
+                "surface-tint": "#006a61",
+                "on-background": "#171d1c"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+              },
+              "spacing": {
+                "lg": "48px",
+                "xl": "80px",
+                "xs": "4px",
+                "gutter": "24px",
+                "sm": "12px",
+                "base": "8px",
+                "container-max": "1280px",
+                "md": "24px"
+              },
+              "fontFamily": {
+                "label-md": ["Inter"],
+                "label-sm": ["Inter"],
+                "headline-xl": ["Manrope"],
+                "headline-md": ["Manrope"],
+                "headline-lg-mobile": ["Manrope"],
+                "headline-lg": ["Manrope"],
+                "body-md": ["Inter"],
+                "body-lg": ["Inter"]
+              },
+              "fontSize": {
+                "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .soft-shadow {
+            shadow-color: rgba(71, 85, 105, 0.05);
+            box-shadow: 0px 4px 20px rgba(71, 85, 105, 0.05);
+        }
+        .premium-gradient {
+            background: linear-gradient(135deg, #00685f 0%, #004d46 100%);
+        }
+        .glass-header {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-surface font-body-md antialiased pb-24">
+<!-- TopAppBar -->
+<header class="sticky top-0 z-40 bg-surface/80 glass-header border-b border-outline-variant/30 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<div class="cursor-pointer active:scale-95 duration-200">
+<img alt="User" class="w-10 h-10 rounded-full border-2 border-primary-fixed" data-alt="A professional close-up portrait of a user for a profile avatar. The lighting is soft and high-key, emphasizing a clean and clinical modern medical aesthetic. The background is a soft, out-of-focus medical office with light teal and white tones, matching a premium healthcare app color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOSrY52fvcHuntVXEzVmPboTNlKyQ7kf9A6-APjJqAVr_2EXXMeKDHGZ8auXPIzV0SrebenbTdL8Dp1ZW08CB9xhPIiL7C9qeTopcIpMhpB_VEcpHi9y96aZEsyXb07EM4_6-HNqfqRNst22lwf6sdjWfLpsmIHBwFETf-DAHyWVGmZaIsMQcxWtf2Q1OUNys0QVAAiSlq0_2vugS24nvCUcJF6qU4NW2JN3jRc51YpLQl71CeRAU4Z-7aoteo-j5Ju_53fH-wg9Tr">
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">MedApp</h1>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined text-primary cursor-pointer active:scale-95 duration-200 p-2 hover:bg-surface-container-low rounded-full transition-colors">notifications</button>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-4 md:px-gutter mt-base lg:mt-md">
+<!-- Hero Profile Header -->
+<section class="mb-lg">
+<div class="bg-surface-container-lowest rounded-xl soft-shadow border border-outline-variant/30 overflow-hidden">
+<div class="flex flex-col md:flex-row md:items-end gap-md p-md md:p-lg relative">
+<!-- Background Accent -->
+<div class="absolute top-0 right-0 w-1/3 h-full bg-primary/5 -skew-x-12 transform translate-x-1/2 pointer-events-none"></div>
+<div class="relative z-10 w-32 h-32 md:w-48 md:h-48 shrink-0 rounded-xl overflow-hidden border-4 border-surface-container-lowest soft-shadow">
+<img alt="Doctor" class="w-full h-full object-cover" data-alt="A professional and warm portrait of a senior male physician with a kind smile, wearing a white medical coat and a stethoscope around his neck. The setting is a brightly lit, high-end contemporary medical clinic with soft teal accents and clean white surfaces. The lighting is bright and airy, conveying trust, expertise, and a premium healthcare experience." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_JcN85zIIU6ER9XmbdkTvBA0Mt3-7ykGkTIEWgpWUhaMtD-Ol_HyWmmSiNUckDoWwX4UMKFZnGBLFwz_zesQYTp2vnH4xva4_68nVxNt-ulFBPlqyIGAQaFtbN_18kHJBquw_0sZLB6hVgFffJNxWx7ywNF0AQjsJJNGTkp9DtZGidCFF3Bvj7u8FrdAIAdPe0atfaP1H368UW-2C6eBxS-Pui5BMjU-BnwBM_Lmj-qseQFCmaYbgyujYMu818W73bYg_eSNTA3dQ">
+</div>
+<div class="relative z-10 flex-1">
+<div class="flex flex-wrap items-center gap-sm mb-xs">
+<span class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+                                Board Certified
+                            </span>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm">
+<span class="material-symbols-outlined text-yellow-500" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-bold text-on-surface">4.9</span>
+<span class="">(1,240 Reviews)</span>
+</div>
+</div>
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-xs">Dr. Julian Sterling, MD</h2>
+<p class="text-primary font-headline-md text-headline-md mb-md">Senior Cardiologist &amp; Internal Medicine</p>
+<div class="flex flex-wrap gap-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">work</span>
+</div>
+<div>
+<p class="text-label-sm text-on-surface-variant">Experience</p>
+<p class="font-label-md text-on-surface">15+ Years</p>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">location_on</span>
+</div>
+<div>
+<p class="text-label-sm text-on-surface-variant">Location</p>
+<p class="font-label-md text-on-surface">Mayo Clinic, Rochester</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Left Column: About & Services -->
+<div class="lg:col-span-2 space-y-lg">
+<!-- About Section -->
+<section>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary">person_search</span>
+                        About Dr. Sterling
+                    </h3>
+<div class="bg-surface-container-lowest p-md md:p-lg rounded-xl border border-outline-variant/30 soft-shadow">
+<p class="text-body-md text-on-surface-variant leading-relaxed">
+                            Dr. Julian Sterling is a world-renowned cardiologist specializing in advanced cardiac imaging and preventive heart care. With over 15 years of clinical practice, he has dedicated his career to integrating cutting-edge medical technology with a patient-centered approach. He focuses on early detection of cardiovascular diseases and personalized treatment plans that empower patients to take control of their heart health.
+                        </p>
+<button class="mt-md text-primary font-label-md flex items-center gap-xs hover:underline">
+                            Read full biography <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</section>
+<!-- Specialized Services Bento Grid -->
+<section>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-md flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary">medical_services</span>
+                        Specialized Services
+                    </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<div class="md:col-span-2 bg-primary/5 border border-primary/10 p-md rounded-xl flex flex-col justify-between">
+<div>
+<span class="material-symbols-outlined text-primary mb-sm text-3xl">cardiology</span>
+<h4 class="font-label-md text-on-surface text-lg mb-xs">Advanced Cardiac Imaging</h4>
+<p class="text-on-surface-variant text-label-sm">State-of-the-art 3D echocardiography and MRI diagnostics for precise heart health mapping.</p>
+</div>
+<div class="mt-md flex -space-x-2">
+<div class="w-8 h-8 rounded-full bg-primary-fixed border-2 border-surface-container-lowest"></div>
+<div class="w-8 h-8 rounded-full bg-secondary-fixed border-2 border-surface-container-lowest"></div>
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed border-2 border-surface-container-lowest"></div>
+<div class="flex items-center justify-center text-[10px] font-bold text-on-surface-variant">+4 Techs</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/30 p-md rounded-xl hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-primary mb-sm">monitor_heart</span>
+<h4 class="font-label-md text-on-surface mb-xs">Heart Rate Analysis</h4>
+<p class="text-on-surface-variant text-label-sm">24-hour ambulatory monitoring.</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/30 p-md rounded-xl hover:border-primary/30 transition-colors">
+<span class="material-symbols-outlined text-primary mb-sm">nutrition</span>
+<h4 class="font-label-md text-on-surface mb-xs">Lifestyle Coaching</h4>
+<p class="text-on-surface-variant text-label-sm">Nutrition plans for hypertension.</p>
+</div>
+<div class="md:col-span-2 bg-surface-container-highest/50 border border-outline-variant/30 p-md rounded-xl flex items-center gap-md">
+<div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-primary text-4xl">emergency</span>
+</div>
+<div>
+<h4 class="font-label-md text-on-surface mb-xs">Post-Operative Care</h4>
+<p class="text-on-surface-variant text-label-sm">Comprehensive recovery tracking and virtual check-ins for heart surgery patients.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Patient Education Videos -->
+<section>
+<div class="flex justify-between items-end mb-md">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary">play_circle</span>
+                            Patient Education
+                        </h3>
+<a class="text-primary font-label-md hover:underline" href="#">View Channel</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="group cursor-pointer">
+<div class="relative aspect-video rounded-xl overflow-hidden mb-sm border border-outline-variant/30 soft-shadow">
+<img alt="Video Thumbnail" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A high-quality video thumbnail showing a medical professional pointing to a high-resolution 3D digital model of a human heart on a sleek, tablet screen. The lighting is cinematic with soft blues and teals, creating a high-tech medical laboratory atmosphere that is clean and professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmykLuqDrkiryLlHQd67Iw_UTOrNMMHnlQIxmlHfzZJkqHmyEdY7jls0JUamQoNAwzTZQTg31Sg1AQ9Bg5vToKZY6wISps8bZWY4DiknqF9SBSejRW9A4hTSUFLiTh7M7nzhbdxAPEXGetfAxCRVG150LZydypE9aDUbwtTq0XOVzAgEV3wUhsDkg2hwOuYAXF28XbZnC3GM-zFiAULlmoXnVS9ybJl2JNj1nPN-xBaUD0ND-2BrODEAJAIclpDkeTvT9949wiDcJ8">
+<div class="absolute inset-0 bg-on-surface/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<div class="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center text-primary shadow-xl">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="absolute bottom-2 right-2 bg-on-surface/70 text-white text-[10px] px-2 py-0.5 rounded font-bold">12:45</div>
+</div>
+<h4 class="font-label-md text-on-surface group-hover:text-primary transition-colors">Understanding Atrial Fibrillation</h4>
+<p class="text-label-sm text-on-surface-variant">Preventive Cardiology Series</p>
+</div>
+<div class="group cursor-pointer">
+<div class="relative aspect-video rounded-xl overflow-hidden mb-sm border border-outline-variant/30 soft-shadow">
+<img alt="Video Thumbnail" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" data-alt="A clean, minimalist medical education video thumbnail featuring a close-up of healthy food items like avocados and nuts next to a stethoscope on a white marble surface. The lighting is bright, natural, and inviting, styled in a modern wellness aesthetic using soft teal and green color accents." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuZRjoag4DW2hjU-UWh23y4UVe23pS-R3tiKHrcI-tUtVFgYeb4MfKfB-YoPmnNUxiNdv8gNsnI3-BC3RFnEgSZtYqMBqi3ZHXFLKFOu22RzGbTWag8VS8dcCDXWRwpBI7xNZM-WCyhL4CbRJ-4E-siPs_ICD1EcOxmgt6-0YvRkEp5z2yTK8m9tO13QL9wXSZITOm8-Ed0pKbRygCmS2DQ_iu8bg-Pf9ZLrRj7hrRQ-fr80ff4OS5si2lzBdb409xBM6TUh7_x9g_">
+<div class="absolute inset-0 bg-on-surface/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<div class="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center text-primary shadow-xl">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+</div>
+<div class="absolute bottom-2 right-2 bg-on-surface/70 text-white text-[10px] px-2 py-0.5 rounded font-bold">08:20</div>
+</div>
+<h4 class="font-label-md text-on-surface group-hover:text-primary transition-colors">Dietary Habits for a Stronger Heart</h4>
+<p class="text-label-sm text-on-surface-variant">Wellness &amp; Nutrition</p>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Reviews & Insights -->
+<div class="space-y-lg">
+<!-- Quick Insights Card -->
+<section class="bg-surface-container-low p-md rounded-xl border border-outline-variant/20">
+<h4 class="font-label-md text-on-surface mb-md">Clinic Availability</h4>
+<div class="space-y-sm">
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="text-label-sm text-on-surface-variant">Monday - Friday</span>
+<span class="font-label-md text-primary">09:00 - 18:00</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="text-label-sm text-on-surface-variant">Wait Time</span>
+<span class="font-label-md text-on-surface">~ 15 Minutes</span>
+</div>
+<div class="flex justify-between items-center py-2">
+<span class="text-label-sm text-on-surface-variant">Accepting New Patients</span>
+<span class="flex h-2.5 w-2.5 rounded-full bg-primary"></span>
+</div>
+</div>
+<div class="mt-md p-sm bg-primary/10 rounded-lg flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary">contact_emergency</span>
+<p class="text-[11px] leading-tight text-on-primary-fixed-variant">Dr. Sterling is available for emergency cardiac consultations via tele-health.</p>
+</div>
+</section>
+<!-- Reviews Section -->
+<section>
+<div class="flex justify-between items-center mb-md">
+<h3 class="font-headline-md text-headline-md text-on-surface">Reviews</h3>
+<span class="text-primary font-label-md">See All</span>
+</div>
+<div class="space-y-md">
+<!-- Review Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 soft-shadow">
+<div class="flex justify-between items-start mb-sm">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center font-bold text-xs text-primary">SW</div>
+<div>
+<p class="font-label-md text-on-surface">Sarah Williams</p>
+<p class="text-[10px] text-on-surface-variant">2 days ago</p>
+</div>
+</div>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+</div>
+<p class="text-label-sm text-on-surface-variant leading-relaxed italic">"Dr. Sterling is incredibly thorough. He took the time to explain my diagnostic results in a way I could actually understand. Highly recommended!"</p>
+</div>
+<!-- Review Card -->
+<div class="bg-surface-container-lowest p-md rounded-xl border border-outline-variant/30 soft-shadow">
+<div class="flex justify-between items-start mb-sm">
+<div class="flex items-center gap-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center font-bold text-xs text-primary">MR</div>
+<div>
+<p class="font-label-md text-on-surface">Michael Reed</p>
+<p class="text-[10px] text-on-surface-variant">1 week ago</p>
+</div>
+</div>
+<div class="flex text-yellow-500">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 0;">star</span>
+</div>
+</div>
+<p class="text-label-sm text-on-surface-variant leading-relaxed italic">"The facility is top-notch and the staff was very professional. Very pleased with my routine check-up."</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Sticky Book Appointment CTA -->
+<div class="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-container-max px-4 z-30 md:px-gutter">
+<button class="w-full premium-gradient text-on-primary font-label-md py-4 rounded-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-md">
+<span class="material-symbols-outlined">calendar_month</span>
+            Book Appointment
+        </button>
+</div>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] pb-4 pt-2">
+<div class="flex justify-around items-center max-w-container-max mx-auto px-2"><div class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-3 py-1 active:scale-90 transition-transform duration-150 cursor-pointer">
+  <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">home</span>
+  <span class="font-label-sm text-[11px] mt-1">Home</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150">
+  <span class="material-symbols-outlined">grid_view</span>
+  <span class="font-label-sm text-[11px] mt-1">Overview</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150">
+  <span class="material-symbols-outlined">mail</span>
+  <span class="font-label-sm text-[11px] mt-1">Inbox</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150">
+  <span class="material-symbols-outlined">group</span>
+  <span class="font-label-sm text-[11px] mt-1">Community</span>
+</div>
+<div class="flex flex-col items-center justify-center text-on-surface-variant px-3 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150">
+  <span class="material-symbols-outlined">auto_awesome</span>
+  <span class="font-label-sm text-[11px] mt-1">Lifestyle</span>
+</div></div>
+</nav>
+
+
+</body></html>

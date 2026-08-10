@@ -10,6 +10,22 @@ web-build/
 expo-env.d.ts
 
 # Native
+#
+# `android/` and `ios/` are BUILD OUTPUT here, not source. This is a managed
+# (CNG) Expo project: `npx expo prebuild` — which `expo run:android` invokes —
+# regenerates both deterministically from app.json plus the config plugins, so
+# committing them would create a second source of truth that silently drifts
+# from the config and then has to be reconciled by hand.
+#
+# They exist locally only so a development build can be installed on a physical
+# device (needed because Expo Go is pinned to one SDK and the Play Store only
+# ships the newest, which will not run this project's SDK 55).
+#
+# If the project ever genuinely needs hand-edited native code, that is the point
+# to un-ignore these and adopt the bare workflow deliberately — not by letting a
+# build tool decide it.
+/android
+/ios
 .kotlin/
 *.orig.*
 *.jks

@@ -1,0 +1,354 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Patient Profile Overview - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-dim": "#d6dbd9",
+                        "secondary-container": "#d5e3fc",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-primary-fixed": "#00201d",
+                        "on-tertiary-fixed": "#001a42",
+                        "primary-fixed": "#89f5e7",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-secondary-container": "#57657a",
+                        "surface-variant": "#dee4e1",
+                        "on-background": "#171d1c",
+                        "background": "#f5faf8",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "outline-variant": "#bcc9c6",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-tertiary-container": "#fefcff",
+                        "inverse-surface": "#2c3130",
+                        "surface-container-low": "#f0f5f2",
+                        "surface": "#f5faf8",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#d5e3fc",
+                        "secondary": "#515f74",
+                        "surface-container": "#eaefed",
+                        "inverse-on-surface": "#edf2f0",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e4e9e7",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#f5faf8",
+                        "surface-container-highest": "#dee4e1",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-container": "#2170e4",
+                        "primary-container": "#008378",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "on-surface-variant": "#3d4947",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-primary-container": "#f4fffc",
+                        "surface-tint": "#006a61",
+                        "on-surface": "#171d1c",
+                        "tertiary": "#0058be",
+                        "surface-container-lowest": "#ffffff",
+                        "primary": "#00685f",
+                        "outline": "#6d7a77",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#6bd8cb",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "xl": "80px",
+                        "md": "24px",
+                        "sm": "12px",
+                        "container-max": "1280px"
+                    },
+                    "fontFamily": {
+                        "headline-xl": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md sticky top-0 z-40 w-full border-b border-outline-variant/30 shadow-sm dark:shadow-none hidden md:block">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp</span>
+</div>
+<nav class="flex items-center gap-6">
+<a class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">home</span>Home
+                </a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">medical_services</span>Find Care
+                </a>
+<a class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2" href="#">
+<span class="material-symbols-outlined">chat_bubble</span>Chat
+                </a>
+<a class="text-primary dark:text-primary-fixed-dim font-bold hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 px-3 py-2 rounded-lg font-label-md text-label-md flex items-center gap-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>Profile
+                </a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-colors cursor-pointer active:scale-95 duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover border-2 border-surface-container" data-alt="A close-up portrait of a professional woman with a warm smile, set against a soft, bright, slightly blurred background. The lighting is natural and flattering, embodying a calm, trustworthy modern healthcare aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5HYUYkLbXmclxhD0g6S4bUEApj3kTJWwNmwG8WIl3xtx9xbDNgdMHuUHJSw2blsLtU0eHsTujzHEPMBW06AGWStSXi22r5Bzue2NSu_ka9IzQbyC7LTVv8YrRaZ7kvptH5KL771BTzyvcYuQMgmy7gqoP6BLs0CwNROhRQXZkWgvcW2u7ZBkpuyQ_DGGPl-I0PcCNPSddgdarbEFdhb6cKtK4oTtIOaO_MkgBm4j48p3nmMn2f0vWgTScjkCGb8rpLWR7jjTF3-lw">
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-4 md:px-gutter py-lg pb-32 md:pb-lg flex flex-col gap-lg">
+<!-- Page Header & Quick Actions -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Patient Profile</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage your personal and medical information.</p>
+</div>
+<div class="flex gap-3 w-full md:w-auto">
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-surface-container text-on-surface font-label-md text-label-md rounded-lg hover:bg-surface-container-high transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">share</span>Share Records
+                </button>
+<button class="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-primary text-on-primary font-label-md text-label-md rounded-lg hover:bg-surface-tint transition-colors active:scale-95 duration-200 shadow-[0_4px_14px_rgba(0,104,95,0.2)]">
+<span class="material-symbols-outlined">edit</span>Edit Profile
+                </button>
+</div>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- Profile Header Card (Spans 12 cols on mobile, 4 on desktop) -->
+<div class="md:col-span-4 bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col items-center text-center">
+<div class="relative mb-4">
+<img alt="Sarah Jenkins" class="w-32 h-32 rounded-full object-cover border-4 border-surface shadow-sm" data-alt="A professional, well-lit studio portrait of a woman in her early 30s. The background is a clean, bright white to fit a modern UI. She is wearing a simple, elegant dark top, projecting confidence and approachability." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA11Rz0hj16CIWhFNgikVE4127suOtSzSY-cxfr1vOjX31r7Qg2rpK-hjJC1N-6p84pgLzQsfFhto6keGjdyjj0yMxlWfdfpXhyV1kuEQvG4HeR7j_175IIsyTxjYCYGHHWc3W_xnQUEEn7M_GllDAjoawTkCJK_Ctbl_VfPL8aur-o_d4eVwjwQVj29Ir-TylQRUZhN-VA92DgGxxkUBLlhVI8mKcnNYQV4me09dknOH2FIgnOSReiQPn-Flg5LmIubwVnCxQ2ACUF">
+<button class="absolute bottom-0 right-0 bg-secondary-container text-on-secondary-container p-2 rounded-full shadow-sm hover:bg-secondary-fixed-dim transition-colors">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span>
+</button>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-1">Sarah Jenkins</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">Patient ID: #MJ-84729</p>
+<!-- Key Stats Mini-Bento -->
+<div class="grid grid-cols-3 gap-3 w-full">
+<div class="bg-surface p-3 rounded-lg flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">Age</span>
+<span class="font-headline-md text-headline-md text-primary">32</span>
+</div>
+<div class="bg-surface p-3 rounded-lg flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">Blood</span>
+<span class="font-headline-md text-headline-md text-error">O+</span>
+</div>
+<div class="bg-surface p-3 rounded-lg flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-1">Weight</span>
+<span class="font-headline-md text-headline-md text-secondary">64<span class="text-[14px] font-normal text-on-surface-variant">kg</span></span>
+</div>
+</div>
+<div class="mt-6 w-full pt-6 border-t border-outline-variant/20 flex flex-col gap-3 text-left">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">cake</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Date of Birth</p>
+<p class="font-body-md text-body-md text-on-surface">Oct 14, 1991</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">female</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Sex</p>
+<p class="font-body-md text-body-md text-on-surface">Female</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Info Area (Spans 12 cols on mobile, 8 on desktop) -->
+<div class="md:col-span-8 flex flex-col gap-6">
+<!-- Personal Information -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">badge</span> Personal Information
+                        </h3>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-8">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Email Address</p>
+<p class="font-body-md text-body-md text-on-surface flex items-center gap-2">
+                                sarah.jenkins@example.com
+                                <span class="bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Verified</span>
+</p>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Phone Number</p>
+<p class="font-body-md text-body-md text-on-surface">+1 (555) 123-4567</p>
+</div>
+<div class="md:col-span-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-1">Home Address</p>
+<p class="font-body-md text-body-md text-on-surface">1234 Sycamore Lane, Apt 4B<br>San Francisco, CA 94110</p>
+</div>
+</div>
+</section>
+<!-- Health Trends -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">trending_up</span> Health Trends
+                        </h3>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Steps</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-2.5 h-2.5 rounded-full bg-error"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Heart Rate</span>
+</div>
+</div>
+</div>
+<!-- Chart -->
+<div class="w-full h-40 mb-8 relative">
+<!-- Grid lines -->
+<div class="absolute inset-0 flex flex-col justify-between">
+<div class="w-full h-px bg-outline-variant/20"></div>
+<div class="w-full h-px bg-outline-variant/20"></div>
+<div class="w-full h-px bg-outline-variant/20"></div>
+<div class="w-full h-px bg-outline-variant/20"></div>
+<div class="w-full h-px bg-outline-variant/20"></div>
+</div>
+<!-- SVG lines -->
+<svg class="absolute inset-0 w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+<!-- Heart Rate (Error color) -->
+<path class="text-error opacity-70" d="M0,70 L16,65 L33,75 L50,55 L66,60 L83,35 L100,45" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"></path>
+<!-- Steps (Primary color) -->
+<path class="text-primary" d="M0,85 L16,60 L33,55 L50,30 L66,20 L83,10 L100,15" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"></path>
+</svg>
+<!-- X-axis labels -->
+<div class="absolute -bottom-6 left-0 right-0 flex justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span class="">Mon</span>
+<span class="">Tue</span>
+<span class="">Wed</span>
+<span class="">Thu</span>
+<span class="">Fri</span>
+<span class="">Sat</span>
+<span class="">Sun</span>
+</div>
+</div>
+<!-- Alert Box -->
+<div class="bg-primary-container/10 p-4 rounded-lg flex items-start sm:items-center gap-3 border border-primary-container/20">
+<div class="w-8 h-8 rounded-full bg-primary-container/30 flex items-center justify-center text-primary shrink-0 mt-0.5 sm:mt-0">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface">You've been <span class="font-semibold text-primary">15% more active</span> this week than last week.</p>
+</div>
+</section>
+<!-- Medical Network Bento Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Primary Care Provider -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col h-full">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">stethoscope</span> Primary Care
+                        </h3>
+<div class="flex items-start gap-4 flex-grow bg-surface p-4 rounded-lg">
+<img alt="Dr. Emily Chen" class="w-12 h-12 rounded-full object-cover" data-alt="A portrait of a confident female doctor in a white coat with a stethoscope around her neck. She is smiling warmly in a bright, modern clinic setting, conveying trust and professionalism suitable for a premium healthcare app." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdgAsKuqwb2wqT0Xr-Us3k-RZOzISa1TLRqymRK-Mz2dQCs6V8Oj6p9R8v3xworXDhCDk2fwAzTRZNxj8SD653mx3H4kVm5zcukwUHZkcVaH93wc_pFC1klf48F_FeTnBRRtaXJrZPi_JYK7qWOoCDqhu3Q2SJO0GRRKhkBAAxp4xEBSXUw1DES_a8dNCAYFPo9wChpooaBOUr5HMZtBlCIxw4BPXvSVBQ3koVNnIaCj0mVMA009ejzw2vNPSjYXH3t_6k7SsHEywK">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface">Dr. Emily Chen, MD</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-2">Internal Medicine • Bay Area Health</p>
+<button class="text-primary font-label-md text-label-md hover:underline flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">calendar_month</span> Book Appointment
+                                </button>
+</div>
+</div>
+</section>
+<!-- Emergency Contact -->
+<section class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col h-full">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-error">emergency</span> Emergency Contact
+                            </h3>
+</div>
+<div class="flex flex-col gap-4 flex-grow bg-error-container/20 p-4 rounded-lg border border-error-container/50">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface">Michael Jenkins</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Spouse</p>
+</div>
+<div class="flex flex-col gap-2 mt-auto">
+<a class="flex items-center gap-2 font-body-md text-body-md text-on-surface hover:text-primary transition-colors" href="tel:+15559876543">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">call</span> +1 (555) 987-6543
+                                </a>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-surface dark:bg-inverse-surface border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] fixed bottom-0 left-0 w-full z-50 rounded-t-xl flex justify-around items-center px-4 pb-4 pt-2 md:hidden"><a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-2 py-1 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">mail</span>
+<span class="font-label-sm text-label-sm">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant px-2 py-1 hover:text-primary dark:hover:text-primary-fixed-dim active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined">auto_awesome</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</a></nav>
+
+
+</body></html>

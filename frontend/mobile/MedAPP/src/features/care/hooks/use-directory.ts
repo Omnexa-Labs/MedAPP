@@ -39,7 +39,16 @@ interface UseDirectoryResult {
   entries: DirectoryEntry[];
   isLoading: boolean;
   error: unknown;
-  refetch: () => void;
+  /**
+   * Returns the promise of the requests it re-issues.
+   *
+   * It used to return `void` and drop them on the floor, which meant the caller
+   * could not tell a retry in flight from a retry that never started — so
+   * FindCareScreen's "Try again" had no pending state at all. `ErrorPanel`'s
+   * `retry` now requires the promise for exactly that reason, and a void return
+   * no longer type-checks there.
+   */
+  refetch: () => Promise<unknown>;
 }
 
 /**
@@ -121,18 +130,17 @@ export function useDirectory(chip: DirectoryChip, q: string): UseDirectoryResult
       // panel regardless. If one chip's source fails but others
       // succeed, we keep showing what loaded — better than blank.
       const error = allQueries.find((q) => q.isError)?.error ?? null;
-      const refetch = () => {
-        allQueries.forEach((q) => q.refetch());
-      };
+      // `all` fans out over every source, so the retry is only settled when
+      // the last one is. `allSettled`, not `all`: one failing source must not
+      // leave the panel stuck on "Retrying…" forever.
+      const refetch = () => Promise.allSettled(allQueries.map((q) => q.refetch()));
       return { entries, isLoading, error, refetch };
     }
     return {
       entries: (singleQuery.data ?? []) as DirectoryEntry[],
       isLoading: singleQuery.isLoading,
       error: singleQuery.error ?? null,
-      refetch: () => {
-        singleQuery.refetch();
-      },
+      refetch: () => singleQuery.refetch(),
     };
   }, [chip, allQueries, singleQuery]);
 }

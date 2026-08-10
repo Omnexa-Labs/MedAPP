@@ -1,0 +1,321 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Interaction History | MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed": "#d8e2ff",
+                      "surface": "#f5faf8",
+                      "tertiary": "#0058be",
+                      "on-primary-container": "#f4fffc",
+                      "surface-container-high": "#e4e9e7",
+                      "outline-variant": "#bcc9c6",
+                      "on-primary-fixed": "#00201d",
+                      "inverse-on-surface": "#edf2f0",
+                      "primary-fixed": "#89f5e7",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "on-primary-fixed-variant": "#005049",
+                      "tertiary-container": "#2170e4",
+                      "secondary-fixed": "#d5e3fc",
+                      "on-tertiary-container": "#fefcff",
+                      "background": "#f5faf8",
+                      "on-tertiary-fixed": "#001a42",
+                      "on-tertiary": "#ffffff",
+                      "surface-container-highest": "#dee4e1",
+                      "outline": "#6d7a77",
+                      "error": "#ba1a1a",
+                      "primary": "#00685f",
+                      "on-error": "#ffffff",
+                      "surface-container": "#eaefed",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "primary-container": "#008378",
+                      "on-background": "#171d1c",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "on-error-container": "#93000a",
+                      "inverse-primary": "#6bd8cb",
+                      "on-surface": "#171d1c",
+                      "surface-tint": "#006a61",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-low": "#f0f5f2",
+                      "error-container": "#ffdad6",
+                      "on-secondary-container": "#57657a",
+                      "surface-variant": "#dee4e1",
+                      "on-primary": "#ffffff",
+                      "secondary": "#515f74",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "surface-dim": "#d6dbd9",
+                      "secondary-container": "#d5e3fc",
+                      "inverse-surface": "#2c3130",
+                      "surface-bright": "#f5faf8",
+                      "on-secondary": "#ffffff",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "on-surface-variant": "#3d4947"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "md": "24px",
+                      "lg": "48px",
+                      "gutter": "24px",
+                      "xs": "4px",
+                      "xl": "80px",
+                      "sm": "12px",
+                      "container-max": "1280px",
+                      "base": "8px"
+              },
+              "fontFamily": {
+                      "headline-xl": ["Manrope"],
+                      "headline-md": ["Manrope"],
+                      "label-md": ["Inter"],
+                      "headline-lg-mobile": ["Manrope"],
+                      "body-md": ["Inter"],
+                      "headline-lg": ["Manrope"],
+                      "body-lg": ["Inter"],
+                      "label-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .glass-header {
+            backdrop-filter: blur(12px);
+            background-color: rgba(245, 250, 248, 0.85);
+        }
+        .search-focus:focus-within {
+            box-shadow: 0 0 0 2px #00685f;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen pb-32">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 glass-header shadow-sm h-16">
+<div class="flex items-center justify-between px-md h-full w-full max-w-container-max mx-auto">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-primary cursor-pointer active:opacity-70 p-2 hover:bg-surface-container-low transition-colors rounded-full" data-icon="arrow_back">arrow_back</button>
+<h1 class="font-headline-md text-headline-md text-primary font-bold">Interaction History</h1>
+</div>
+<button class="material-symbols-outlined text-primary cursor-pointer active:opacity-70 p-2 hover:bg-surface-container-low transition-colors rounded-full" data-icon="share">share</button><button class="material-symbols-outlined text-primary cursor-pointer active:opacity-70 p-2 hover:bg-surface-container-low transition-colors rounded-full" data-icon="filter_list">filter_list</button>
+</div>
+</header>
+<main class="pt-24 px-4 max-w-2xl mx-auto">
+<!-- Search Bar Section -->
+<section class="mb-lg">
+<div class="relative group">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-outline" data-icon="search">search</span>
+</div>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl py-4 pl-12 pr-4 text-body-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all shadow-sm" placeholder="Search medication history..." type="text">
+</div>
+</section>
+<!-- Chronological Groups -->
+<div class="space-y-lg">
+<!-- Group: This Month -->
+<div>
+<h2 class="font-headline-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md px-2">This Month</h2>
+<div class="space-y-4">
+<!-- History Item: Severe -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-sm">
+<div class="space-y-1">
+<p class="text-label-sm text-on-surface-variant">Today, 10:24 AM</p>
+<h3 class="font-headline-md text-body-lg font-bold">Warfarin + Aspirin</h3>
+</div>
+<span class="px-3 py-1 rounded-full text-label-sm font-bold bg-[#ffdad6] text-[#93000a] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="warning" style="font-variation-settings: 'FILL' 1;">warning</span>
+                                Severe Interaction
+                            </span>
+</div>
+<div class="flex items-center justify-between mt-md pt-md border-t border-surface-container-high">
+<span class="text-primary font-label-md flex items-center gap-1 group-hover:gap-2 transition-all">
+                                View Details 
+                                <span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+<!-- History Item: No Interaction -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-sm">
+<div class="space-y-1">
+<p class="text-label-sm text-on-surface-variant">Yesterday, 08:15 PM</p>
+<h3 class="font-headline-md text-body-lg font-bold">Amoxicillin + Ibuprofen</h3>
+</div>
+<span class="px-3 py-1 rounded-full text-label-sm font-bold bg-[#d1fae5] text-[#065f46] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                No Interactions Found
+                            </span>
+</div>
+<div class="flex items-center justify-between mt-md pt-md border-t border-surface-container-high">
+<span class="text-primary font-label-md flex items-center gap-1 group-hover:gap-2 transition-all">
+                                View Details 
+                                <span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Group: October 2024 -->
+<div>
+<h2 class="font-headline-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md px-2">October 2024</h2>
+<div class="space-y-4">
+<!-- History Item: Moderate -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-sm">
+<div class="space-y-1">
+<p class="text-label-sm text-on-surface-variant">Oct 28, 04:30 PM</p>
+<h3 class="font-headline-md text-body-lg font-bold">Lisinopril + Potassium</h3>
+</div>
+<span class="px-3 py-1 rounded-full text-label-sm font-bold bg-[#fef3c7] text-[#92400e] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="info" style="font-variation-settings: 'FILL' 1;">info</span>
+                                Moderate Interaction
+                            </span>
+</div>
+<div class="flex items-center justify-between mt-md pt-md border-t border-surface-container-high">
+<span class="text-primary font-label-md flex items-center gap-1 group-hover:gap-2 transition-all">
+                                View Details 
+                                <span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+<!-- History Item: Moderate -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-sm">
+<div class="space-y-1">
+<p class="text-label-sm text-on-surface-variant">Oct 12, 09:00 AM</p>
+<h3 class="font-headline-md text-body-lg font-bold">Metformin + B12 Complex</h3>
+</div>
+<span class="px-3 py-1 rounded-full text-label-sm font-bold bg-[#fef3c7] text-[#92400e] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="info" style="font-variation-settings: 'FILL' 1;">info</span>
+                                Moderate Interaction
+                            </span>
+</div>
+<div class="flex items-center justify-between mt-md pt-md border-t border-surface-container-high">
+<span class="text-primary font-label-md flex items-center gap-1 group-hover:gap-2 transition-all">
+                                View Details 
+                                <span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+<!-- History Item: No Interaction -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
+<div class="flex justify-between items-start mb-sm">
+<div class="space-y-1">
+<p class="text-label-sm text-on-surface-variant">Oct 05, 11:20 AM</p>
+<h3 class="font-headline-md text-body-lg font-bold">Sertraline + Melatonin</h3>
+</div>
+<span class="px-3 py-1 rounded-full text-label-sm font-bold bg-[#d1fae5] text-[#065f46] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                No Interactions Found
+                            </span>
+</div>
+<div class="flex items-center justify-between mt-md pt-md border-t border-surface-container-high">
+<span class="text-primary font-label-md flex items-center gap-1 group-hover:gap-2 transition-all">
+                                View Details 
+                                <span class="material-symbols-outlined" data-icon="chevron_right">chevron_right</span>
+</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-8 mb-6 p-4 bg-primary-container/10 border border-primary/20 rounded-xl flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary" data-icon="info">info</span>
+        <p class="text-body-md text-on-surface font-medium">Export full history for your doctor</p>
+    </div>
+    <button class="text-primary font-bold flex items-center gap-1 hover:underline">
+        Export
+        <span class="material-symbols-outlined text-[18px]" data-icon="ios_share">ios_share</span>
+    </button>
+</div></main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-20 px-4 bg-surface-container dark:bg-surface-container-highest rounded-t-xl shadow-lg">
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-surface-container-high transition-all scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 transition-all scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="history" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-label-sm text-label-sm">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-surface-container-high transition-all scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="pill">pill</span>
+<span class="font-label-sm text-label-sm">Medications</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container hover:bg-surface-container-high transition-all scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-label-sm">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple search filter micro-interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        const cards = document.querySelectorAll('.bg-surface-container-lowest.rounded-xl');
+
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    card.style.display = 'block';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                } else {
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateY(10px)';
+                    setTimeout(() => {
+                        if (card.style.opacity === '0') card.style.display = 'none';
+                    }, 200);
+                }
+            });
+        });
+
+        // Add visual feedback for interactions
+        cards.forEach(card => {
+            card.addEventListener('mousedown', () => {
+                card.style.transform = 'scale(0.98)';
+            });
+            card.addEventListener('mouseup', () => {
+                card.style.transform = 'scale(1)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'scale(1)';
+            });
+        });
+    </script>
+
+
+</body></html>

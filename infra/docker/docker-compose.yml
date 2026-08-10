@@ -2,8 +2,7 @@ name: medapp
 
 x-py-build: &py-build
   context: ../..
-  args:
-    BUILDKIT_INLINE_CACHE: 1
+  dockerfile: backend/Dockerfile
 
 x-svc-env: &svc-env
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
@@ -12,6 +11,17 @@ x-svc-env: &svc-env
   GW_CORS_ORIGIN_REGEX: "http://(localhost|127\\.0\\.0\\.1):\\d+"
   # Shared secret for development across all services.
   JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  # doctor_service and booking_service use `shared.auth.get_current_principal`
+  # as-is instead of overriding it in their own `app/deps.py` (unlike the
+  # twelve services that do). That shared dependency reads its secret from
+  # MEDAPP_DEFAULT_JWT_SECRET and returns 503 "auth not configured" when it
+  # is unset — which is what every authenticated /v1/doctors and
+  # /v1/bookings call was doing. Set it here so the dev stack works;
+  # the real fix is for those two services to own their JWT config the
+  # way the others do.
+  MEDAPP_DEFAULT_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  MEDAPP_DEFAULT_JWT_AUDIENCE: "medapp.platform"
+  MEDAPP_DEFAULT_JWT_ISSUER: "medapp"
   GW_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   USER_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   DOCTOR_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
@@ -24,7 +34,7 @@ x-svc-env: &svc-env
   LAB_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   EHR_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   INBOX_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
-  SOCIAL_SERVICE_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  SOCIAL_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   ANALYTICS_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   ONBOARDING_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   WEARABLE_SYNC_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
@@ -98,6 +108,23 @@ services:
       RABBITMQ_DEFAULT_USER: medapp
       RABBITMQ_DEFAULT_PASS: medapp
     ports: ["5672:5672", "15672:15672"]
+    # Nothing could wait on the broker being READY before this existed, which is
+    # why `condition: service_started` was the best any service could do - and
+    # service_started only means the container process launched, not that AMQP
+    # is accepting. That gap is the startup race: user_service won it, its
+    # connect failed, app.state.event_bus stayed None, and publish() silently
+    # no-opped for the life of the process.
+    healthcheck:
+      # `ping` is NOT enough and was measured to be wrong here: it only asks
+      # whether the Erlang node answers, which happens BEFORE the AMQP listener
+      # binds. With ping, compose reported healthy and user_service still got
+      # ECONNREFUSED on a cold start - the race survived the fix.
+      #
+      # `check_port_connectivity` tests the listener the clients actually dial.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.105.0
@@ -123,7 +150,7 @@ services:
       args:
         SERVICE: user_service
         SERVICE_PORT: 8001
-    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_started } }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
     environment: *svc-env
     ports: ["8001:8001"]
 
@@ -134,7 +161,11 @@ services:
       args:
         SERVICE: doctor_service
         SERVICE_PORT: 8002
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8002:8002"]
 
@@ -167,7 +198,11 @@ services:
       args:
         SERVICE: booking_service
         SERVICE_PORT: 8005
-    depends_on: [postgres, rabbitmq]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8005:8005"]
 
@@ -178,7 +213,11 @@ services:
       args:
         SERVICE: payment_service
         SERVICE_PORT: 8006
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8006:8006"]
 
@@ -189,7 +228,11 @@ services:
       args:
         SERVICE: telemedicine_service
         SERVICE_PORT: 8007
-    depends_on: [redis]
+    depends_on:
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8007:8007"]
 
@@ -200,7 +243,9 @@ services:
       args:
         SERVICE: notification_service
         SERVICE_PORT: 8008
-    depends_on: [rabbitmq]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8008:8008"]
 
@@ -214,6 +259,61 @@ services:
     depends_on: [postgres]
     environment: *svc-env
     ports: ["8013:8013"]
+    # ATTACHMENT BYTES. Message attachments (voice notes, images, PDFs) are
+    # written to a directory, not to Postgres — see
+    # `backend/services/inbox_service/app/storage.py` for the choice and its
+    # limits. Without this named volume the files live in the container's
+    # writable layer and every `docker compose up --build` silently destroys
+    # every attachment ever uploaded.
+    #
+    # MOUNTED AT /app/var, **NOT** AT /app/var/attachments. This looks like a
+    # cosmetic difference and is not — it was found live, and the first version
+    # of this line 500'd every single upload with:
+    #
+    #   PermissionError: [Errno 13] Permission denied:
+    #   '/app/var/attachments/<thread-id>'
+    #
+    # Docker seeds an empty named volume from the image's contents at the
+    # mount path, INCLUDING ownership — but only if that path exists in the
+    # image. `backend/Dockerfile` creates and chowns `/app/var` to 10001;
+    # `/app/var/attachments` does not exist there, so mounting the volume at
+    # the deeper path made Docker create the directory itself, as root:root
+    # 0755. The container runs as UID 10001 (Pod Security `restricted`), so it
+    # could read that directory and never write to it.
+    #
+    # Mounting one level up at `/app/var` seeds the volume from a directory
+    # that DOES exist and IS owned by 10001, and the service then creates
+    # `attachments/` inside it with mode 0700. No Dockerfile change, no
+    # root-owned mount, no init container.
+    #
+    # A named volume rather than a bind mount, for the same ownership reason:
+    # a bind mount from a Windows or macOS host lands root-owned and puts the
+    # bug straight back.
+    #
+    # NOT SHARED BETWEEN REPLICAS. This service cannot be scaled horizontally
+    # while local storage is in use.
+    volumes:
+      - inbox_attachments:/app/var
+
+  # ADDED 2026-08-07. This service exists on disk and IS routed by the gateway
+  # (`/v1/onboarding` -> onboarding_service:8013), but had no container at all,
+  # so every partner-onboarding call failed at DNS inside the compose network.
+  # It was the only one of the 20 services with no compose entry.
+  #
+  # Host port 8022 rather than 8013: inbox_service already publishes 8013, and
+  # they share an INTERNAL port harmlessly because the hostnames differ.
+  onboarding_service:
+    build:
+      <<: *py-build
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: onboarding_service
+        SERVICE_PORT: 8013
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *svc-env
+    ports: ["8022:8013"]
 
   lab_service:
     build:
@@ -222,7 +322,11 @@ services:
       args:
         SERVICE: lab_service
         SERVICE_PORT: 8009
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8009:8009"]
 
@@ -233,7 +337,11 @@ services:
       args:
         SERVICE: ehr_service
         SERVICE_PORT: 8010
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8010:8010"]
 
@@ -244,7 +352,11 @@ services:
       args:
         SERVICE: wearable_sync_service
         SERVICE_PORT: 8014
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8014:8014"]
 
@@ -255,7 +367,11 @@ services:
       args:
         SERVICE: social_service
         SERVICE_PORT: 8011
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment: *svc-env
     ports: ["8011:8011"]
 
@@ -277,7 +393,7 @@ services:
       args:
         SERVICE: hms_service
         SERVICE_PORT: 8020
-    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_started } }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       HMS_MGMT_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_hms_mgmt
@@ -313,7 +429,7 @@ services:
       args:
         SERVICE: pharmacy_service
         SERVICE_PORT: 8015
-    depends_on: { postgres: { condition: service_healthy } }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
     environment:
       <<: *svc-env
       PHARMACY_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pharmacies
@@ -326,7 +442,7 @@ services:
       args:
         SERVICE: pharmacist_service
         SERVICE_PORT: 8016
-    depends_on: { postgres: { condition: service_healthy } }
+    depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
     environment:
       <<: *svc-env
       PHARMACIST_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pharmacists
@@ -394,3 +510,6 @@ volumes:
   pgdata:
   mongodata:
   qdrantdata:
+  # inbox_service message attachments. `docker compose down -v` DELETES PATIENT
+  # FILES from here — the database backup does not contain them.
+  inbox_attachments:

@@ -9,7 +9,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.audit import audited_read
+
 from ..config import settings
+from ..models.audit import AccessAudit
 from ..models.room import Room, RoomMessage, RoomParticipant, RoomStatus
 from ..schemas.room import RoomCreate, RoomMessageCreate
 
@@ -102,8 +105,56 @@ async def get_room(session: AsyncSession, principal, room_id: UUID) -> Room:
     return room
 
 
+async def _room_patient_user_id(session: AsyncSession, room: Room) -> UUID | None:
+    """The user id of the room's PATIENT participant — the data subject.
+
+    A consultation room's participants are created with explicit roles
+    ("patient", "doctor") by `create_room`, so the subject is a lookup rather
+    than a guess. Returns None when there is no patient participant (a room
+    provisioned before its participants, or an ad-hoc room): a NULL subject is
+    an honest "we do not know", and inventing one — e.g. defaulting to
+    `created_by_user_id` — would put a wrong fact in an audit log, which is
+    worse than a missing one.
+    """
+    return await session.scalar(
+        select(RoomParticipant.user_id).where(
+            RoomParticipant.room_id == room.id, RoomParticipant.role == "patient"
+        )
+    )
+
+
+async def read_room(session: AsyncSession, principal, room_id: UUID) -> Room:
+    """Router-facing single-room read. AUDITED, both outcomes.
+
+    `get_room` itself is deliberately NOT audited: it is the internal
+    authorization helper that `join`/`leave`/`end`/`post_message`/
+    `list_messages` all call, and auditing it would write two rows for one
+    request and file a message POST under a read. Same discipline as
+    `ehr_service`'s `enforce_access=False` — audit at the entry point, once.
+    """
+    room = await session.get(Room, room_id)
+    if room is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "room not found")
+    async with audited_read(session, AccessAudit, principal, "room", resource_id=room_id) as audit:
+        audit.patient_id = await _room_patient_user_id(session, room)
+        room = await get_room(session, principal, room_id)
+    return room
+
+
 async def generate_room_token(session: AsyncSession, principal, room_id: UUID) -> tuple[str, datetime]:
-    room = await get_room(session, principal, room_id)
+    """AUDITED as `room_token`.
+
+    Issuing a room token is the moment access to a live consultation is
+    granted — the token is what `join`/`post_message` check afterwards. A
+    reviewer asking who could have been in a patient's consultation wants this
+    row, not just the message reads.
+    """
+    room = await session.get(Room, room_id)
+    if room is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "room not found")
+    async with audited_read(session, AccessAudit, principal, "room_token", resource_id=room_id) as audit:
+        audit.patient_id = await _room_patient_user_id(session, room)
+        room = await get_room(session, principal, room_id)
     principal_id = _principal_uuid(principal)
     principal_role = _principal_role(principal)
     expires_at = datetime.now(tz=UTC) + timedelta(hours=1)
@@ -184,6 +235,19 @@ async def post_message(session: AsyncSession, principal, room_id: UUID, token: s
 
 
 async def list_messages(session: AsyncSession, principal, room_id: UUID) -> list[RoomMessage]:
-    room = await get_room(session, principal, room_id)
-    result = await session.scalars(select(RoomMessage).where(RoomMessage.room_id == room.id).order_by(RoomMessage.created_at.asc()))
-    return list(result.all())
+    """The consultation transcript. AUDITED, both outcomes.
+
+    **No message bodies in the row.** The transcript is the most sensitive text
+    in this service; the audit row records that it was read, by whom, whose
+    consultation it was, and how many messages were handed over.
+    """
+    room = await session.get(Room, room_id)
+    if room is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "room not found")
+    async with audited_read(session, AccessAudit, principal, "room_messages", resource_id=room_id) as audit:
+        audit.patient_id = await _room_patient_user_id(session, room)
+        room = await get_room(session, principal, room_id)
+        result = await session.scalars(select(RoomMessage).where(RoomMessage.room_id == room.id).order_by(RoomMessage.created_at.asc()))
+        messages = list(result.all())
+        audit.record_count = len(messages)
+    return messages

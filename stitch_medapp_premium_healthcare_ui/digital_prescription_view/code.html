@@ -1,0 +1,323 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Digital Prescription | MedApp</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#f5faf8",
+                    "primary-container": "#008378",
+                    "outline": "#6d7a77",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "on-error": "#ffffff",
+                    "inverse-on-surface": "#edf2f0",
+                    "surface-container-high": "#e4e9e7",
+                    "surface-bright": "#f5faf8",
+                    "error-container": "#ffdad6",
+                    "on-primary-fixed-variant": "#005049",
+                    "tertiary": "#0058be",
+                    "surface-container-low": "#f0f5f2",
+                    "inverse-primary": "#6bd8cb",
+                    "on-error-container": "#93000a",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "surface-variant": "#dee4e1",
+                    "on-primary": "#ffffff",
+                    "secondary-fixed": "#d5e3fc",
+                    "on-background": "#171d1c",
+                    "surface-container-highest": "#dee4e1",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface-dim": "#d6dbd9",
+                    "on-surface-variant": "#3d4947",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-surface": "#2c3130",
+                    "surface-container": "#eaefed",
+                    "on-tertiary-container": "#fefcff",
+                    "secondary": "#515f74",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "on-primary-container": "#f4fffc",
+                    "on-tertiary": "#ffffff",
+                    "primary-fixed": "#89f5e7",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "on-secondary-container": "#57657a",
+                    "on-surface": "#171d1c",
+                    "background": "#f5faf8",
+                    "surface-tint": "#006a61",
+                    "primary": "#00685f",
+                    "on-primary-fixed": "#00201d",
+                    "tertiary-fixed": "#d8e2ff",
+                    "secondary-container": "#d5e3fc",
+                    "outline-variant": "#bcc9c6",
+                    "tertiary-container": "#2170e4",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-secondary": "#ffffff",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "sm": "12px",
+                    "md": "24px",
+                    "gutter": "24px",
+                    "xl": "80px",
+                    "xs": "4px",
+                    "container-max": "1280px",
+                    "lg": "48px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "body-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-xl": ["Manrope"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .verified-badge-glow {
+            box-shadow: 0 0 15px rgba(0, 106, 97, 0.2);
+        }
+        .clinical-texture {
+            background-image: radial-gradient(#006a61 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+            opacity: 0.03;
+        }
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            pointer-events: none;
+            user-select: none;
+            opacity: 0.04;
+            white-space: nowrap;
+            z-index: 0;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md min-h-screen pb-24">
+<!-- Top Navigation (Manual implementation of TopAppBar logic for sub-page) -->
+<header class="sticky top-0 z-50 backdrop-blur-md bg-surface/80 dark:bg-surface-dim/80 shadow-sm">
+<div class="flex justify-between items-center w-full px-md py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-sm">
+<button aria-label="Go back" class="hover:bg-surface-container-high transition-colors p-2 rounded-full active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Digital Prescription</h1>
+</div>
+</div>
+<div class="flex items-center gap-xs bg-primary-container/10 px-3 py-1 rounded-full verified-badge-glow">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="font-label-md text-label-md text-primary">Verified document</span>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-md py-lg md:py-xl flex flex-col items-center">
+<!-- Main Document Card -->
+<div class="relative w-full max-w-3xl bg-surface-container-lowest rounded-xl shadow-[0_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant overflow-hidden mb-lg">
+<!-- Clinical Texture Overlay -->
+<div class="clinical-texture absolute inset-0 pointer-events-none"></div>
+<div class="watermark font-headline-xl text-[120px] font-extrabold uppercase">MEDAPP SECURE</div>
+<div class="relative z-10 p-md md:p-lg">
+<!-- Document Header -->
+<div class="flex flex-col md:flex-row justify-between border-b border-outline-variant pb-md mb-md gap-md">
+<div class="space-y-1">
+<div class="text-primary font-headline-md text-headline-md tracking-tight font-extrabold">MedApp</div>
+<p class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-widest">Digital Prescription Rx</p>
+</div>
+<div class="text-right flex flex-col items-end gap-1">
+<div class="bg-surface-container text-outline px-4 py-2 rounded-lg font-label-md text-label-md">
+                            No. #RX-992-Rivers
+                        </div>
+<p class="text-on-surface-variant font-body-md text-body-md">Issued: Oct 12, 2023</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-lg">
+<!-- Left Column: Patient & Provider -->
+<div class="space-y-md">
+<!-- Patient Section -->
+<section>
+<h2 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-2">Patient Information</h2>
+<div class="bg-surface-container-low p-4 rounded-lg">
+<p class="font-headline-md text-headline-md text-on-surface">Alex Rivers</p>
+<p class="font-body-md text-body-md text-on-surface-variant">ID: #8829-X • DOB: 12/05/1988</p>
+</div>
+</section>
+<!-- Prescriber Section -->
+<section>
+<h2 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-2">Prescriber Information</h2>
+<div class="space-y-1">
+<p class="font-headline-md text-headline-md text-on-surface">Dr. Sarah Jenkins</p>
+<p class="font-body-md text-body-md text-primary font-semibold">Central Cardiology Center</p>
+<p class="font-body-md text-body-md text-on-surface-variant">License: MD-99283-A</p>
+</div>
+</section>
+</div>
+<!-- Right Column: Medication -->
+<div class="space-y-md">
+<section>
+<h2 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-2">Medication Details</h2>
+<div class="border-2 border-primary/20 bg-primary/5 p-4 rounded-xl relative overflow-hidden">
+<div class="absolute -right-4 -top-4 opacity-10">
+<span class="material-symbols-outlined text-[100px]">medication</span>
+</div>
+<p class="font-headline-md text-headline-md text-primary-fixed-variant">Lisinopril 10mg</p>
+<div class="mt-2 grid grid-cols-2 gap-2">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Quantity</span>
+<span class="font-body-md text-body-md font-bold text-on-surface">30 Tablets</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-outline">Refills</span>
+<span class="font-body-md text-body-md font-bold text-on-surface">3 Remaining</span>
+</div>
+</div>
+</div>
+</section>
+<section>
+<h2 class="font-label-md text-label-md text-outline uppercase tracking-wider mb-2">Instructions</h2>
+<div class="bg-surface-container-low p-4 rounded-lg flex items-start gap-sm">
+<span class="material-symbols-outlined text-primary">schedule</span>
+<p class="font-body-md text-body-md text-on-surface italic">"Once daily in the morning"</p>
+</div>
+</section>
+</div>
+</div>
+<!-- Indication & Pharmacy Notes -->
+<div class="mt-lg pt-md border-t border-outline-variant grid grid-cols-1 md:grid-cols-2 gap-md">
+<div>
+<h3 class="font-label-md text-label-md text-outline mb-2">Indication</h3>
+<p class="font-body-md text-body-md text-on-surface">Hypertension management</p>
+</div>
+<div class="bg-surface-container p-4 rounded-lg">
+<h3 class="font-label-md text-label-md text-outline mb-2">Pharmacy Instructions</h3>
+<ul class="text-label-md space-y-1 text-on-surface-variant">
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Dispense as written</li>
+<li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span> Patient to monitor BP weekly</li>
+</ul>
+</div>
+</div>
+<!-- Digital Sign & Integrity -->
+<div class="mt-lg flex flex-col md:flex-row items-center justify-between gap-md p-md bg-surface-container-high/30 rounded-xl border border-outline-variant/30">
+<div class="flex items-center gap-md">
+<div class="w-16 h-16 bg-white rounded-lg flex items-center justify-center shadow-sm">
+<img alt="QR Code Signature" class="w-12 h-12" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCO7czg_wrLN_fFOUZ-uRsXB6r-pnVQXduveqA4uuGvIaRtUgS71tbhh3ABZp3E_VFF6xODnsJKM8blNMnx0eFLovUf2ZVxcmWzpeqAHpkzngcKwx0gyCvE_s315tnn8JyBPVoX3K_xzi_XGTBUpmEo2pYMEXZ2eTUCckqZqPWZOpFNw-yq6_yfA-gK7-DzPw7YqNKZSecjL-UzRhgMOV9oKRNrqpOCK9rx0O76h0o80QGuTseZX4Sv3kl9iIBl8MEMgESnt1LQJFk6">
+</div>
+<div>
+<p class="font-label-md text-label-md text-on-surface">Security &amp; Integrity</p>
+<p class="font-label-sm text-label-sm text-outline max-w-xs">This document is digitally signed, timestamped, and end-to-end encrypted for your safety.</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-label-sm text-label-sm text-outline mb-1">Signature Hash</p>
+<code class="text-[10px] bg-surface-container-highest px-2 py-1 rounded text-on-surface-variant font-mono">SHA-256: f1e2d3c4b5a6...</code>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Action Buttons (Desktop and Mobile) -->
+<div class="w-full max-w-3xl flex flex-col md:flex-row gap-md">
+<button class="flex-1 bg-primary text-on-primary font-label-md text-label-md py-4 px-lg rounded-xl flex items-center justify-center gap-2 shadow-lg hover:brightness-110 active:scale-[0.98] transition-all duration-200">
+<span class="material-symbols-outlined">send</span>
+                Share Prescription
+            </button>
+<button class="flex-1 bg-surface-container-highest text-on-surface font-label-md text-label-md py-4 px-lg rounded-xl flex items-center justify-center gap-2 border border-outline-variant hover:bg-surface-variant active:scale-[0.98] transition-all duration-200">
+<span class="material-symbols-outlined">download</span>
+                Download PDF
+            </button>
+</div>
+<!-- Secondary Details / Options Bento Grid -->
+<div class="w-full max-w-3xl mt-lg grid grid-cols-1 md:grid-cols-3 gap-md">
+<div class="bg-surface-container-low p-md rounded-xl border border-outline-variant/30 hover:shadow-md transition-shadow cursor-pointer">
+<span class="material-symbols-outlined text-primary mb-2">local_pharmacy</span>
+<h4 class="font-label-md text-label-md text-on-surface">Send to Pharmacy</h4>
+<p class="font-label-sm text-label-sm text-outline mt-1">Directly integrate with local CVS or Walgreens.</p>
+</div>
+<div class="bg-surface-container-low p-md rounded-xl border border-outline-variant/30 hover:shadow-md transition-shadow cursor-pointer">
+<span class="material-symbols-outlined text-primary mb-2">qr_code_2</span>
+<h4 class="font-label-md text-label-md text-on-surface">One-Time QR</h4>
+<p class="font-label-sm text-label-sm text-outline mt-1">Generate a temporary code for physical scanning.</p>
+</div>
+<div class="bg-surface-container-low p-md rounded-xl border border-outline-variant/30 hover:shadow-md transition-shadow cursor-pointer">
+<span class="material-symbols-outlined text-primary mb-2">print</span>
+<h4 class="font-label-md text-label-md text-on-surface">Print Script</h4>
+<p class="font-label-sm text-label-sm text-outline mt-1">Standard format for physical pharmacy copies.</p>
+</div>
+</div>
+</main><nav class="md:hidden bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3">
+  <div class="max-w-container-max mx-auto flex justify-between items-center"><a href="#" class="flex flex-col items-center justify-center text-on-surface-variant p-2"><span class="material-symbols-outlined" data-icon="home">home</span><span class="font-label-sm text-label-sm mt-1">Home</span></a><a href="#" class="flex flex-col items-center justify-center text-primary p-2"><span class="material-symbols-outlined" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span><span class="font-label-sm text-label-sm mt-1 font-bold">Overview</span></a><a href="#" class="flex flex-col items-center justify-center text-on-surface-variant p-2"><span class="material-symbols-outlined" data-icon="mail">mail</span><span class="font-label-sm text-label-sm mt-1">Inbox</span></a><a href="#" class="flex flex-col items-center justify-center text-on-surface-variant p-2"><span class="material-symbols-outlined" data-icon="group">group</span><span class="font-label-sm text-label-sm mt-1">Community</span></a><a href="#" class="flex flex-col items-center justify-center text-on-surface-variant p-2"><span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span><span class="font-label-sm text-label-sm mt-1">Lifestyle</span></a></div>
+</nav>
+<!-- Success Toast (Hidden by default) -->
+<div class="fixed bottom-32 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface px-6 py-3 rounded-full flex items-center gap-3 shadow-2xl opacity-0 pointer-events-none transition-all duration-300 translate-y-4" id="toast">
+<span class="material-symbols-outlined text-primary-fixed">check_circle</span>
+<span class="font-label-md text-label-md">Document downloaded successfully</span>
+</div>
+<script>
+        // Micro-interactions
+        const btns = document.querySelectorAll('button');
+        const toast = document.getElementById('toast');
+
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const isDownload = btn.innerText.includes('Download');
+                if (isDownload) {
+                    toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+                    toast.classList.add('opacity-100', 'translate-y-0');
+                    
+                    setTimeout(() => {
+                        toast.classList.add('opacity-0', 'translate-y-4');
+                        toast.classList.remove('opacity-100', 'translate-y-0');
+                    }, 3000);
+                }
+            });
+        });
+
+        // Simple parallax on clinical texture
+        window.addEventListener('mousemove', (e) => {
+            const texture = document.querySelector('.clinical-texture');
+            if(texture) {
+                const moveX = (e.clientX / window.innerWidth - 0.5) * 10;
+                const moveY = (e.clientY / window.innerHeight - 0.5) * 10;
+                texture.style.transform = `translate(${moveX}px, ${moveY}px)`;
+            }
+        });
+    </script>
+
+
+
+
+</body></html>

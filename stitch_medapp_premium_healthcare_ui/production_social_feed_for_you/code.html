@@ -1,0 +1,367 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MedApp - Social Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#f5faf8",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "#171d1c",
+                        "tertiary": "#0058be",
+                        "on-tertiary-container": "#fefcff",
+                        "on-primary": "#ffffff",
+                        "secondary": "#515f74",
+                        "primary-fixed": "#89f5e7",
+                        "on-background": "#171d1c",
+                        "on-secondary-container": "#57657a",
+                        "secondary-container": "#d5e3fc",
+                        "surface-variant": "#dee4e1",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2c3130",
+                        "surface-container-low": "#f0f5f2",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-primary-container": "#f4fffc",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "secondary-fixed": "#d5e3fc",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "outline": "#6d7a77",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "tertiary-container": "#2170e4",
+                        "surface-container-highest": "#dee4e1",
+                        "inverse-on-surface": "#edf2f0",
+                        "surface-dim": "#d6dbd9",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "inverse-primary": "#6bd8cb",
+                        "surface-container": "#eaefed",
+                        "primary": "#00685f",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-primary-fixed": "#00201d",
+                        "surface-bright": "#f5faf8",
+                        "surface-tint": "#006a61",
+                        "surface-container-lowest": "#ffffff",
+                        "outline-variant": "#bcc9c6",
+                        "error-container": "#ffdad6",
+                        "on-error": "#ffffff",
+                        "on-primary-fixed-variant": "#005049",
+                        "primary-container": "#008378",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f5faf8",
+                        "on-surface-variant": "#3d4947",
+                        "surface-container-high": "#e4e9e7"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "xs": "4px",
+                        "gutter": "24px",
+                        "lg": "48px",
+                        "xl": "80px",
+                        "sm": "12px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "safe": "env(safe-area-inset-bottom, 20px)"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Manrope"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-xl": ["Manrope"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Hide scrollbar for horizontal scroll areas but keep functionality */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen pb-xl md:pb-0">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-surface-bright/80 dark:bg-surface-dim/80 backdrop-blur-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] z-40">
+<div class="flex items-center justify-between px-md py-sm w-full max-w-container-max mx-auto">
+<!-- Leading Avatar -->
+<button class="w-10 h-10 rounded-full overflow-hidden active:scale-95 duration-200 focus:outline-none focus:ring-2 focus:ring-primary">
+<img alt="User Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7DCXZwyu3UUX1KSLNItGrpl219NwvyQ883eD0kPUYtbpHt2ikap-aRg72eiZFQZY6cexixbXuLdiIqLT3GRxeh1ITq4a-RWUjdLPF7hXeKMo6-k0DIYIvCud9w62EGzAUmqqBYX67FaSkjyEWa45f2XDmEudmWJEfq80RvdcInhfqzKMv40rZWSF3cuZhyQqUN624yoK6zX_9a0nq-spdR3IDMsrSw2B36dk6jVP6uTf1kAonQDBgIOPE87tupqhW8ggAh2Wpet0V">
+</button>
+<!-- Headline / Brand -->
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">MedApp</h1>
+<!-- Trailing Icon -->
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant dark:text-outline hover:bg-surface-container-low dark:hover:bg-surface-container transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<div class="flex max-w-container-max mx-auto w-full">
+<!-- SideNav (Desktop Only) -->
+<aside class="hidden md:flex flex-col gap-base p-md h-[calc(100vh-64px)] w-72 rounded-r-xl bg-surface dark:bg-surface-dim bg-surface-container-low dark:bg-surface-container-high shadow-[0px_10px_30px_rgba(71,85,105,0.1)] sticky top-[64px]">
+<!-- Profile Header -->
+<div class="flex items-center gap-3 p-2 mb-4">
+<img alt="Healthcare Professional Avatar" class="w-12 h-12 rounded-full object-cover border-2 border-primary-container" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVsIPH9b2ygION6rt8vbG-zfVvRMZ1UNbhwrjZtoIg5nx-HsGjhSx6bczhtOoO6Z6BMhpyMEchAMHCj6sjJFTBRS6walgdHrc9HcfeZJFrBWjG87PB01qvTbbP3YAZChYdMCcECrqChF1s-WqGql1s2OnTtl_2zIcK40j0ZJ3uJNBerzXXxH2uh9-WjlucF1NxkLaIoeo9yaA2X-oY9yvR1_KpmRRlMsIVxi4MMLsl9uBVFh5O_z_KVzOXW5ryGvc5zL1pfEi40xQY">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim text-lg">Dr. Julian Vance</h2>
+<p class="font-label-sm text-label-sm text-secondary">Chief Medical Officer</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant opacity-75">MedApp Health</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-full text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all active:translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-full text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all active:translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="font-label-md text-label-md">Appointments</span>
+</a>
+<!-- Social/Community is Active Intent -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-full bg-primary-container text-on-primary-container dark:bg-primary-fixed dark:text-on-primary-fixed hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all active:translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined icon-fill">groups</span>
+<span class="font-label-md text-label-md">Patients</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-full text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all active:translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="font-label-md text-label-md">Messages</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-full text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-all active:translate-x-1 duration-150 mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 w-full max-w-3xl mx-auto px-4 md:px-gutter py-md">
+<!-- Feed Toggle & Header -->
+<div class="mb-lg">
+<div class="flex justify-center mb-6"><div class="bg-surface-container-low p-1 rounded-full inline-flex shadow-inner w-full max-w-md">
+<button class="flex-1 px-4 py-2 rounded-full bg-surface-container-lowest shadow-[0px_2px_8px_rgba(71,85,105,0.08)] font-label-md text-label-md text-primary transition-all">For You</button>
+<button class="flex-1 px-4 py-2 rounded-full text-on-surface-variant font-label-md text-label-md hover:text-primary transition-all">Following</button>
+<button class="flex-1 px-4 py-2 rounded-full text-on-surface-variant font-label-md text-label-md hover:text-primary transition-all">Explore</button>
+<button class="flex-1 px-4 py-2 rounded-full text-on-surface-variant font-label-md text-label-md hover:text-primary transition-all">Community</button>
+</div></div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Practitioner Insights</h2>
+<p class="text-on-surface-variant">Stay updated with verified health professionals.</p>
+</div>
+<!-- Suggested Groups Carousel (Bento-style horizontal scroll) -->
+<div class="mb-lg">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-headline-md text-headline-md text-on-surface">Suggested Groups</h3>
+<button class="text-primary font-label-md text-label-md hover:underline">View All</button>
+</div>
+<div class="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
+<!-- Group Card 1 -->
+<div class="min-w-[200px] bg-surface-container-lowest rounded-xl p-4 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-variant snap-start flex-shrink-0 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-tertiary-fixed to-transparent opacity-20 z-0"></div>
+<div class="relative z-10">
+<div class="w-12 h-12 rounded-lg bg-tertiary-container flex items-center justify-center text-on-tertiary-container mb-3 shadow-sm group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined">nutrition</span>
+</div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Holistic Nutrition</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-4">12k Members</p>
+<button class="w-full py-1.5 rounded-full border border-primary text-primary font-label-sm text-label-sm hover:bg-primary-container hover:text-on-primary-container transition-colors">Join</button>
+</div>
+</div>
+<!-- Group Card 2 -->
+<div class="min-w-[200px] bg-surface-container-lowest rounded-xl p-4 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-variant snap-start flex-shrink-0 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-primary-fixed to-transparent opacity-20 z-0"></div>
+<div class="relative z-10">
+<div class="w-12 h-12 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container mb-3 shadow-sm group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined">fitness_center</span>
+</div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Physical Therapy</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-4">8.5k Members</p>
+<button class="w-full py-1.5 rounded-full border border-primary text-primary font-label-sm text-label-sm hover:bg-primary-container hover:text-on-primary-container transition-colors">Join</button>
+</div>
+</div>
+<!-- Group Card 3 -->
+<div class="min-w-[200px] bg-surface-container-lowest rounded-xl p-4 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-variant snap-start flex-shrink-0 relative overflow-hidden group">
+<div class="absolute inset-0 bg-gradient-to-br from-secondary-fixed to-transparent opacity-20 z-0"></div>
+<div class="relative z-10">
+<div class="w-12 h-12 rounded-lg bg-secondary-container flex items-center justify-center text-on-secondary-container mb-3 shadow-sm group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined">psychology</span>
+</div>
+<h4 class="font-label-md text-label-md text-on-surface mb-1">Mental Wellness</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-4">24k Members</p>
+<button class="w-full py-1.5 rounded-full border border-primary text-primary font-label-sm text-label-sm hover:bg-primary-container hover:text-on-primary-container transition-colors">Join</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Feed -->
+<div class="flex flex-col gap-lg">
+<!-- Post Card 1 -->
+<div class="mb-4 bg-primary-container/10 p-4 rounded-xl border border-primary/20">
+<h3 class="font-label-md text-label-md text-primary mb-2">Recommended for You</h3>
+<p class="text-on-surface-variant text-sm mb-0">Discover insights from experts in your circle of interest.</p>
+</div><article class="bg-surface-container-lowest rounded-[20px] shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-variant overflow-hidden">
+<!-- Post Header -->
+<div class="p-4 flex items-start gap-3">
+<img alt="Dr. Sarah Jenkins Avatar" class="w-12 h-12 rounded-full object-cover border border-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1F9YZ9jEQ7LqHXwwZfzFIS1Tke2IyLooPSWu5-ASvK0f2jCBFRzjmXWtTKSHsJvQeDHGklLiflFAD8QwTxxpG17snWQf8hGxQcSk1O6UfUp7vhtcdKIqt0mZB-YrzRa6T4Kd3ypPHwIy9X0uYNVt1XxGcYucN1CNf_o8oCYj8SDqxpQSYOKsMrmnxUj_Eq-DwJWHxwDcw-VmbYplmj0HOPrPFYFvZMWstx8LSj7bDQchjgaVDmemWlGujBbGsBZCbP1YOAeYXeiSV">
+<div class="flex-1">
+<div class="flex items-center gap-1">
+<h4 class="font-label-md text-label-md text-on-surface">Dr. Sarah Jenkins</h4>
+<span class="material-symbols-outlined text-primary text-[16px] icon-fill">verified</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Clinical Nutritionist • 2h ago</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<!-- Post Content -->
+<div class="px-4 pb-2">
+<p class="font-body-md text-body-md text-on-surface mb-3 line-clamp-3">Understanding the gut-brain axis is crucial for managing systemic inflammation. Recent studies show that incorporating diverse plant fibers can shift microbiome composition in just 48 hours. Here's a simple graphic breaking down the best sources.</p>
+<button class="text-primary font-label-sm text-label-sm hover:underline mb-3">Read more</button>
+</div>
+<!-- Post Media (Glassmorphism overlay on image) -->
+<div class="relative w-full aspect-video bg-surface-container-low overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A bright, beautifully arranged flat lay of vibrant, fresh vegetables, fruits, and whole grains on a clean white surface. The lighting is high-key and natural, creating a fresh, healthy, and modern aesthetic. Deep greens, rich reds, and earthy browns pop against the light background, suggesting vitality and nutritional wellness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYKhQF4KoUWiGLOeH3J9UEs5AhluseOwnD_BW5AaLfGcizcyj-PN-oMMC7wLnF0Ta8IUpcxoKvT70eMgagmpt2lt_3jgYlTXG3ccPU5k1q16x3VpwMW9h1ChA87V-OVOMC6wib5W0-JWwOObP1td-1TppFHTI_P4QPomvpn08fcBbJxVqkPdNjPPUrSCUuniEKfu7_lX-Yac2Zt_6l5jH6t3Yjcjsml6YxqcIa3gSk0AtSDii3geReN6YUQ6HrrllT1FHZbT9XPUHe">
+<!-- Glass Pill overlay -->
+<div class="absolute bottom-3 right-3 bg-surface-bright/80 backdrop-blur-md px-3 py-1 rounded-full border border-surface-variant/50 flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[14px] text-primary">article</span>
+<span class="font-label-sm text-label-sm text-on-surface">Medical Journal</span>
+</div>
+</div>
+<!-- Post Actions -->
+<div class="p-4 flex items-center justify-between border-t border-surface-variant">
+<div class="flex gap-4">
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors group">
+<span class="material-symbols-outlined group-hover:icon-fill transition-all">favorite</span>
+<span class="font-label-sm text-label-sm">342</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span class="font-label-sm text-label-sm">48</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors group">
+<span class="material-symbols-outlined group-hover:icon-fill transition-all">bookmark</span>
+</button>
+</div>
+</article>
+<!-- Post Card 2 -->
+<article class="bg-surface-container-lowest rounded-[20px] shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-variant overflow-hidden">
+<div class="p-4 flex items-start gap-3">
+<img alt="Nurse Marcus Avatar" class="w-12 h-12 rounded-full object-cover border border-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeDSZTRWbfzneMe8FW0JDMPgrXyQ5HpKiZ66RZsrChlx5zwi4wgAl2dniZ7hT08oy3i1ZF6w_dPlfv8KK2tJefxkSDLJM-VxvIDnfyji4RSIXTbakQTIhv8rGY2bKCRiJ7XCjMFWF-28ZdPAommHVrMS_AVPhFNNMiL91TIef4MQ-_FKqeAiPMB6B1mhcpZPjGWVss1xPNLmm8bjtEIM1ZWiXyITCM7qLPMuwLkcP8hWVFsQc99k-nlKEQoBig6WwkM8U5zWEr3KUk">
+<div class="flex-1">
+<div class="flex items-center gap-1">
+<h4 class="font-label-md text-label-md text-on-surface">Marcus Chen, RN</h4>
+<span class="material-symbols-outlined text-primary text-[16px] icon-fill">verified</span>
+</div>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Pediatric Care • 5h ago</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<div class="px-4 pb-4">
+<p class="font-body-md text-body-md text-on-surface">Seasonal allergies are starting early this year. Here is a quick checklist for parents to differentiate between common cold symptoms and allergic rhinitis in toddlers. Swipe through for the breakdown.</p>
+</div>
+<!-- Text Only / Info Card style post -->
+<div class="mx-4 mb-4 bg-tertiary-fixed rounded-xl p-4 border border-tertiary-fixed-dim/30">
+<div class="flex items-start gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary flex items-center justify-center text-on-tertiary shrink-0">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</div>
+<div>
+<h5 class="font-label-md text-label-md text-on-tertiary-container mb-1">Key Differentiator</h5>
+<p class="font-body-md text-body-md text-on-tertiary-container/80 text-sm">Itchy, watery eyes are highly indicative of allergies, whereas a low-grade fever almost always points to a viral infection.</p>
+</div>
+</div>
+</div>
+<div class="p-4 flex items-center justify-between border-t border-surface-variant">
+<div class="flex gap-4">
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors group">
+<span class="material-symbols-outlined">favorite</span>
+<span class="font-label-sm text-label-sm">89</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span class="font-label-sm text-label-sm">12</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+<button class="text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">bookmark</span>
+</button>
+</div>
+</article>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-gutter py-sm pb-safe bg-surface-bright/90 dark:bg-surface-dim/90 backdrop-blur-lg shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] rounded-t-xl"><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-label-sm text-label-sm mt-1">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="font-label-sm text-label-sm mt-1">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary p-2" href="#">
+<span class="material-symbols-outlined" data-icon="group" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="font-label-sm text-label-sm mt-1 font-bold">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-sm text-label-sm mt-1">Lifestyle</span>
+</a></nav>
+<!-- Fixing the Active state for Mobile Nav based on JSON instructions. Re-rendering Home as Active -->
+</body></html>

@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Post Composer | MedApp Specialist</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container": "#eaefed",
+                    "secondary-container": "#d5e3fc",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "error-container": "#ffdad6",
+                    "outline": "#6d7a77",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary": "#ffffff",
+                    "surface": "#f5faf8",
+                    "surface-container-high": "#e4e9e7",
+                    "surface-bright": "#f5faf8",
+                    "surface-container-lowest": "#ffffff",
+                    "outline-variant": "#bcc9c6",
+                    "on-secondary": "#ffffff",
+                    "on-surface": "#171d1c",
+                    "tertiary-fixed": "#d8e2ff",
+                    "on-tertiary": "#ffffff",
+                    "surface-tint": "#006a61",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "inverse-primary": "#6bd8cb",
+                    "tertiary-container": "#2170e4",
+                    "inverse-surface": "#2c3130",
+                    "tertiary": "#0058be",
+                    "on-surface-variant": "#3d4947",
+                    "error": "#ba1a1a",
+                    "primary-container": "#008378",
+                    "clinical-error": "#ba1a1a",
+                    "primary-fixed": "#89f5e7",
+                    "surface-variant": "#dee4e1",
+                    "secondary": "#515f74",
+                    "on-primary-container": "#f4fffc",
+                    "on-error": "#ffffff",
+                    "surface-container-low": "#f0f5f2",
+                    "secondary-fixed": "#d5e3fc",
+                    "clinical-info": "#0058be",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-background": "#171d1c",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "on-error-container": "#93000a",
+                    "surface-container-highest": "#dee4e1",
+                    "on-primary-fixed-variant": "#005049",
+                    "primary": "#00685f",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "on-tertiary-container": "#fefcff",
+                    "surface-dim": "#d6dbd9",
+                    "on-secondary-container": "#57657a",
+                    "background": "#f5faf8",
+                    "surface-bg": "#f5faf8",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "clinical-success": "#00685f",
+                    "on-primary-fixed": "#00201d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "lg": "48px",
+                    "xs": "4px",
+                    "xl": "80px",
+                    "gutter": "24px",
+                    "base": "8px",
+                    "container-max": "1280px",
+                    "sm": "12px"
+            },
+            "fontFamily": {
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "caption": ["Inter"],
+                    "headline-xl": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        .glass-effect {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #bcc9c6;
+            border-radius: 10px;
+        }
+        .editor-container:focus-within {
+            border-color: #006a61;
+            box-shadow: 0 0 0 2px rgba(0, 106, 97, 0.1);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body-md text-on-surface selection:bg-primary-fixed-dim/30">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-container/80 backdrop-blur-md shadow-sm border-b-[0.5px] border-outline-variant h-16">
+<div class="flex justify-between items-center px-gutter w-full max-w-container-max mx-auto h-full">
+<div class="flex items-center gap-4">
+<div class="cursor-pointer active:scale-95 transition-transform">
+<img alt="Specialist Profile Avatar" class="w-10 h-10 rounded-full bg-surface-variant object-cover border border-outline-variant" data-alt="A professional headshot of a female doctor with a kind expression, wearing a clinical white coat with a stethoscope around her neck, set against a soft-focus medical office background with medical teal accents and warm lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGcFJzqaORX-cMdUi3Y7TK6gdhQPFfhC-X3c6UYiX7ZCY0gSmYFQNF6ElPBbfHmteqo3XGs1Z0NbioJdbZxqa4tTE1bsHTokytddqlwbxO2H6TzERjwaogeafVCGJlk3dOO0Fzt1E0DO7vpOVApXstbyfwv14IzNWXJxx_bIiVoSg001OlOvTf9Ij83wt0CVx4CH1sNhG5AM7f8LGkmLUWtusMSQfKQXTlHCtpDsuLDcT6qlWp__Wh7licGYjlBLIPjhkFpgh0rfAg"/>
+</div>
+<h1 class="text-headline-md font-headline-md text-primary">MedApp Specialist</h1>
+</div>
+<div class="flex items-center gap-base">
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container-low transition-colors rounded-full cursor-pointer active:scale-95">settings</button>
+</div>
+</div>
+</header>
+<!-- Sidebar Navigation (Desktop) -->
+<aside class="fixed left-0 top-0 h-full hidden md:flex flex-col p-4 z-40 bg-surface-container-low shadow-lg w-80 pt-20">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-4 mb-8 px-4">
+<div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined">account_circle</span>
+</div>
+<div class="flex flex-col">
+<span class="text-label-md font-label-md text-on-surface">Dr. Sarah Chen</span>
+<span class="text-body-md text-on-surface-variant">Cardiology Specialist</span>
+</div>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="text-on-surface-variant px-4 py-3 hover:bg-surface-variant rounded-full transition-all flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">group_add</span>
+<span class="text-label-md font-label-md">Groups</span>
+</a>
+<a class="bg-secondary-container text-on-secondary-container rounded-full px-4 py-3 flex items-center gap-3 transition-all" href="#">
+<span class="material-symbols-outlined">edit_note</span>
+<span class="text-label-md font-label-md">Post Composer</span>
+</a>
+<a class="text-on-surface-variant px-4 py-3 hover:bg-surface-variant rounded-full transition-all flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">forum</span>
+<span class="text-label-md font-label-md">Community</span>
+</a>
+<a class="text-on-surface-variant px-4 py-3 hover:bg-surface-variant rounded-full transition-all flex items-center gap-3" href="#">
+<span class="material-symbols-outlined">monitoring</span>
+<span class="text-label-md font-label-md">Analytics</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="pt-24 pb-32 md:pl-80 px-4 md:px-gutter max-w-container-max mx-auto">
+<div class="max-w-4xl mx-auto">
+<!-- Composer Header -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-lg">
+<div>
+<span class="text-caption text-primary uppercase tracking-widest mb-2 block">Specialist Portal</span>
+<h2 class="text-headline-lg font-headline-lg text-on-surface">Create New Clinical Content</h2>
+<p class="text-body-md text-on-surface-variant mt-2">Draft articles, health tips, or clinical updates for your audience.</p>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-6 py-2.5 rounded-full border border-outline text-label-md font-label-md text-on-surface hover:bg-surface-variant/50 transition-colors active:scale-95">
+                        Save Draft
+                    </button>
+<button class="px-8 py-2.5 rounded-full bg-primary-container text-on-primary-container text-label-md font-label-md shadow-md hover:brightness-110 transition-all active:scale-95 flex items-center gap-2">
+<span>Publish</span>
+<span class="material-symbols-outlined text-sm">send</span>
+</button>
+</div>
+</div>
+<!-- Composer Bento Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Main Editor Column -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Title Input -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm transition-shadow focus-within:shadow-md">
+<label class="text-label-sm font-label-sm text-on-surface-variant mb-2 block">ARTICLE TITLE</label>
+<input class="w-full bg-transparent border-none text-headline-md font-headline-md focus:ring-0 p-0 placeholder:text-outline-variant" placeholder="Enter a descriptive title..." type="text"/>
+</div>
+<!-- Rich Text Editor -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm flex flex-col min-h-[500px]">
+<!-- Toolbar -->
+<div class="p-3 border-b border-outline-variant flex flex-wrap items-center gap-1 bg-surface-container-low/50 rounded-t-xl">
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_bold</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_italic</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_underlined</button>
+<div class="w-[1px] h-6 bg-outline-variant mx-1"></div>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_list_bulleted</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_list_numbered</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">format_quote</button>
+<div class="w-[1px] h-6 bg-outline-variant mx-1"></div>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">link</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">image</button>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">video_library</button>
+<div class="flex-grow"></div>
+<button class="p-2 hover:bg-surface-variant rounded-lg transition-colors material-symbols-outlined text-on-surface-variant">spellcheck</button>
+</div>
+<!-- Content Area -->
+<textarea class="flex-grow p-6 bg-transparent border-none focus:ring-0 text-body-lg resize-none custom-scrollbar placeholder:text-outline-variant" placeholder="Start writing your medical insight here..."></textarea>
+</div>
+</div>
+<!-- Sidebar Settings Column -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Media Attachment -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+<h3 class="text-label-md font-label-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">attachment</span>
+                            Featured Media
+                        </h3>
+<div class="border-2 border-dashed border-outline-variant rounded-xl aspect-video flex flex-col items-center justify-center gap-2 bg-surface hover:bg-surface-variant transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:scale-110 transition-transform">add_a_photo</span>
+<span class="text-label-sm font-label-sm text-on-surface-variant">Upload image or video</span>
+</div>
+<p class="text-caption text-outline mt-3">Max size: 50MB. Format: JPG, PNG, MP4.</p>
+</div>
+<!-- Category Tagging -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+<h3 class="text-label-md font-label-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">sell</span>
+                            Categories
+                        </h3>
+<div class="flex flex-wrap gap-2 mb-4">
+<span class="px-3 py-1 bg-primary-container/10 text-primary border border-primary/20 rounded-full text-label-sm font-label-sm flex items-center gap-1">
+                                Clinical Advice <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+<span class="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full text-label-sm font-label-sm flex items-center gap-1">
+                                Wellness <button class="material-symbols-outlined text-[14px]">close</button>
+</span>
+</div>
+<div class="relative">
+<input class="w-full bg-surface border border-outline-variant rounded-lg text-body-md py-2 px-3 focus:border-primary focus:ring-0 transition-all placeholder:text-outline-variant" placeholder="Add custom tag..." type="text"/>
+<span class="absolute right-3 top-2.5 material-symbols-outlined text-outline-variant">add</span>
+</div>
+</div>
+<!-- Audience & Visibility -->
+<div class="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant shadow-sm">
+<h3 class="text-label-md font-label-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">visibility</span>
+                            Target Audience
+                        </h3>
+<div class="flex flex-col gap-3">
+<label class="flex items-center justify-between p-3 rounded-lg border border-outline-variant bg-surface-container-low cursor-pointer hover:border-primary transition-all">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">public</span>
+<div class="flex flex-col">
+<span class="text-label-md font-label-md">Public</span>
+<span class="text-caption text-on-surface-variant">Visible to all patients</span>
+</div>
+</div>
+<input checked="" class="text-primary focus:ring-primary w-5 h-5" name="audience" type="radio"/>
+</label>
+<label class="flex items-center justify-between p-3 rounded-lg border border-outline-variant hover:border-primary transition-all cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant">group</span>
+<div class="flex flex-col">
+<span class="text-label-md font-label-md">Private Groups</span>
+<span class="text-caption text-on-surface-variant">Clinical peers only</span>
+</div>
+</div>
+<input class="text-primary focus:ring-primary w-5 h-5" name="audience" type="radio"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe h-16 bg-surface/80 backdrop-blur-md shadow-sm border-t-[0.5px] border-outline-variant">
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-label-sm font-label-sm">Groups</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-2xl px-6 py-1 active:scale-90 transition-transform shadow-md" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="text-label-sm font-label-sm">Compose</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">public</span>
+<span class="text-label-sm font-label-sm">Social</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-secondary-container dark:text-outline px-4 py-1 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="text-label-sm font-label-sm">Profile</span>
+</a>
+</nav>
+<script>
+        // Simple Interaction logic
+        document.querySelectorAll('button, a').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if(el.classList.contains('material-symbols-outlined') && !el.closest('nav')) {
+                    el.style.transform = 'scale(1.2)';
+                    setTimeout(() => el.style.transform = 'scale(1)', 150);
+                }
+            });
+        });
+
+        // Sticky functionality for composer header on scroll
+        const header = document.querySelector('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 20) {
+                header.classList.add('shadow-md');
+            } else {
+                header.classList.remove('shadow-md');
+            }
+        });
+    </script>
+</body></html>

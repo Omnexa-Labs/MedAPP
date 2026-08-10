@@ -16,7 +16,29 @@ branch_labels = None
 depends_on = None
 
 
+def _columns() -> set[str]:
+    bind = op.get_bind()
+    return {col["name"] for col in sa.inspect(bind).get_columns("users")}
+
+
 def upgrade() -> None:
+    # The 0001 initial migration was later rewritten to create
+    # `first_name` / `last_name` directly instead of `full_name`. On a
+    # clean database 0001 therefore leaves nothing for this revision to
+    # split, and the unconditional `add_column` below failed with
+    # `DuplicateColumn: column "first_name" of relation "users" already
+    # exists` — which meant user_service could not migrate from scratch
+    # at all. Databases created before that rewrite still have
+    # `full_name` and still need the split, so this revision now
+    # inspects the live table and only does the work that is actually
+    # outstanding. Both shapes converge on the same end state.
+    columns = _columns()
+    if "full_name" not in columns and {"first_name", "last_name"} <= columns:
+        # Already in the post-split shape; only the role default (step 6)
+        # is still worth asserting, and it is idempotent.
+        op.alter_column("users", "role", server_default="user")
+        return
+
     # 1. Add new columns as nullable first
     op.add_column("users", sa.Column("first_name", sa.String(255), nullable=True))
     op.add_column("users", sa.Column("last_name", sa.String(255), nullable=True))

@@ -9,7 +9,7 @@
 // future share screens parallel (e.g. LabResultShareScreen).
 //
 // Translation rules (same as HomeScreen / OverviewScreen):
-//   - glass-header backdrop-blur → opaque bg-surface + border + shadow.
+//   - glass-header backdrop-blur → the shared DetailAppBar; no blur, no shadow.
 //   - hover:* / group-hover:* / focus:ring → dropped (no hover on RN).
 //   - The two CSS overlay modals (#success-modal, #qr-modal) become
 //     React Native <Modal> components, following the bottom-sheet /
@@ -21,55 +21,101 @@
 //   - The 5-minute QR countdown is real local state (setInterval),
 //     mirroring the script in the comp. No network — design-only pass.
 //
+// ============================================================================
+// "SEND NOW" NEVER SENT ANYTHING — the whole Quick Send section is deleted
+// ============================================================================
+// The pharmacy rows ran a `setTimeout(…, 1500)` and then opened a modal that
+// said "Your prescription has been securely transmitted to the pharmacy. You
+// will receive a notification when it's ready for pickup." There was no request,
+// no pharmacy integration, no notification pipeline and no failure branch — a
+// patient who tapped it was told their script was waiting for them somewhere it
+// had never been sent, and delay in dispensing an antihypertensive is direct
+// clinical harm. The two pharmacies were constants besides ("CVS Pharmacy",
+// "Walgreens" — US chains, "0.8 miles away", in a Ghana-seeded product), and
+// "View Nearby" had no `onPress`.
+//
+// Nothing takes its place but a statement that the capability does not exist,
+// which is the treatment PatientRecordScreen's ActionInfoSheet already uses for
+// clinician workflows that are not connected. `pharmacy_service` is a DIRECTORY
+// (docs/api/directory_services.md); there is no route anywhere in the product
+// that transmits a prescription to one. Recorded in docs/api/README.md.
+//
+// ============================================================================
+// THE SECURITY CLAIMS AND THE "ONE-TIME" QR ARE DELETED TOO
+// ============================================================================
+//   * "HIPAA Compliant • 256-bit AES Encryption • Clinical Grade Security" —
+//     an unbacked regulatory assertion in shipped UI.
+//   * the "one-time", "temporary, encrypted" QR: a STATIC remote PNG on
+//     lh3.googleusercontent.com, identical bytes for every user and every script
+//     forever, under a live 5:00 countdown and an "IDENTITY VERIFIED" badge.
+//     The countdown was the only real thing in the dialog and it counted down a
+//     code that never expired.
+//   * the "SECURE SCRIPT" lock chip and the app bar's "Verified script" tick.
+//   * the app bar's profile <Image>, a second remote Google-CDN asset — and
+//     removing both stops this screen making outbound requests to a third-party
+//     CDN while it displays prescription data.
+// The sibling ActiveScriptViewScreen deleted the matching set; the two agree.
+//
+// "Print Script" and "Copy Clinical Link" went with them: both were Pressables
+// with no `onPress`, and a row of dead controls under a heading that promises
+// options is the same defect at lower stakes. Download is what remains, and it
+// is real — a text file through @/lib/documents, labelled with the extension it
+// actually produces because there is no PDF generator in this project.
+//
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here.
 
-import { useEffect, useRef, useState } from "react";
-import {
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { BottomNav } from "@/features/home/components/BottomNav";
+import { DetailShell } from "@/components/shell";
+import { Toast, useToast } from "@/components/feedback";
+import { Card, ErrorPanel, InfoCallout } from "@/components/ui";
+import {
+  buildPrescriptionDocument,
+  describeSaveResult,
+  formatDocumentTimestamp,
+  prescriptionFileName,
+  saveTextDocument,
+} from "@/lib/documents";
+import { useTokenColor } from "@/lib/tokens";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
-// The Stitch "active-pill" — linear-gradient(135deg, #006a61 → #008378).
-// 135deg = top-left → bottom-right, so start {0,0} end {1,1}.
-// Typed `as const` so expo-linear-gradient sees the 2-tuple it requires.
-const PILL_GRADIENT = ["#006a61", "#008378"] as const;
-// The QR hero — bg-gradient-to-br from-primary(#00685f) to-primary-container(#008378).
-const HERO_GRADIENT = ["#00685f", "#008378"] as const;
-const GRADIENT_START = { x: 0, y: 0 } as const;
-const GRADIENT_END = { x: 1, y: 1 } as const;
+/**
+ * The scroll reserve, after the forbidden `<BottomNav>` was deleted.
+ *
+ * It used to be 140 = the nav's 80 outer height (8 + 48 + 24, per BottomNav.tsx)
+ * + 60 under the security footer. The nav is gone and DetailShell claims the
+ * bottom inset, so only the 60 remains.
+ */
+const SCROLL_RESERVE = 60;
 
 // ---------------------------------------------------------------------------
-// Params. All optional strings (route params arrive as strings); we
-// fall back to the comp's sample values so the screen is never blank
-// during design review or deep-linking without context.
+// The two LinearGradients are gone with the surfaces they filled.
+//
+// `pillGradient` filled the "Send Now" pill and the success dialog's Done
+// button; `heroGradient` filled the one-time-QR hero panel. Both were carefully
+// retokenised in an earlier dark-mode pass — the reasoning is preserved here
+// because it is the only record of it, and because the next teal ramp on this
+// screen will need it:
+//
+//   Neither ramp can be expressed as a straight `primary → primary-container`
+//   pair. M3 tones those two in OPPOSITE directions between modes (primary
+//   40→80 goes light, primary-container 30 goes dark), so the honest-looking
+//   pair produces a mint-to-deep-teal ramp in dark with no single label colour
+//   that reads across it, and there is no "gradient/*" token in docs/BRAND.md.
+//   Each ramp was therefore derived from ONE token plus its own tone step.
+//
+// `expo-linear-gradient` is no longer imported here at all.
 // ---------------------------------------------------------------------------
 
-interface NearbyPharmacy {
-  id: string;
-  name: string;
-  detail: string;
+/** See the twin in ActiveScriptViewScreen — a param that is actually there. */
+function text(value: string | undefined): string | undefined {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || undefined;
 }
-
-const NEARBY_PHARMACIES: NearbyPharmacy[] = [
-  { id: "cvs", name: "CVS Pharmacy", detail: "0.8 miles away • Open until 10 PM" },
-  { id: "walgreens", name: "Walgreens", detail: "1.2 miles away • 24 Hours" },
-];
-
-const QR_TTL_SECONDS = 300; // 5:00, matches the comp
 
 export function ActiveScriptShareScreen() {
   const params = useLocalSearchParams<{
@@ -80,390 +126,175 @@ export function ActiveScriptShareScreen() {
     issuedDate?: string;
   }>();
 
-  const drug = params.drug ?? "Lisinopril 10mg";
-  const patient = params.patient ?? "Alex Rivers";
-  const scriptId = params.scriptId ?? "#8829-X";
-  const prescriber = params.prescriber ?? "Dr. Sarah Jenkins";
-  const issuedDate = params.issuedDate ?? "Oct 12, 2023";
+  // Five `?? "<clinical constant>"` fallbacks used to sit here, kept in sync
+  // with ActiveScriptViewScreen's thirteen by a comment. Both sets are deleted:
+  // a share screen that invents the patient and the drug when the link is
+  // partial is a screen that offers to send a fabricated record onward.
+  const drug = text(params.drug);
+  const patient = text(params.patient);
+  const scriptId = text(params.scriptId);
+  const prescriber = text(params.prescriber);
+  const issuedDate = text(params.issuedDate);
 
-  // Which pharmacy card is mid-send (shows a spinner). null = none.
-  const [sendingId, setSendingId] = useState<string | null>(null);
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [qrVisible, setQrVisible] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(QR_TTL_SECONDS);
+  // Download — a real write, reported by the shared toast. See the note at the
+  // head of this file for why the label names ".txt".
+  const { message: toastMessage, tone: toastTone, show: showToast, clear: clearToast } = useToast();
+  const [saving, setSaving] = useState(false);
 
-  // Track timers so we can clear them on unmount — leaking a setTimeout
-  // that calls setState after unmount throws a warning.
-  const sendTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const qrInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (sendTimer.current) clearTimeout(sendTimer.current);
-      if (qrInterval.current) clearInterval(qrInterval.current);
-    };
-  }, []);
-
-  const handleSend = (id: string) => {
-    if (sendingId) return; // ignore double-taps mid-send
-    setSendingId(id);
-    // Simulated transmit — design-only. Real send hits the share API
-    // in the wiring pass.
-    sendTimer.current = setTimeout(() => {
-      setSendingId(null);
-      setSuccessVisible(true);
-    }, 1500);
-  };
-
-  const openQr = () => {
-    setSecondsLeft(QR_TTL_SECONDS);
-    setQrVisible(true);
-    if (qrInterval.current) clearInterval(qrInterval.current);
-    qrInterval.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          if (qrInterval.current) clearInterval(qrInterval.current);
-          return 0;
-        }
-        return s - 1;
+  const onDownload = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // This screen carries a SUBSET of the Rx fields — it has no quantity,
+      // refills, license or DOB in its params. The builder omits what it isn't
+      // given rather than substituting sample values, so the file is a shorter
+      // record here, not an invented one.
+      const body = buildPrescriptionDocument({
+        drug,
+        patient,
+        scriptId,
+        prescriber,
+        issuedDate,
+        generatedAt: formatDocumentTimestamp(),
       });
-    }, 1000);
-  };
+      const result = await saveTextDocument({
+        fileName: prescriptionFileName({ drug, scriptId }),
+        body,
+        dialogTitle: "Save or send your prescription",
+      });
+      const { tone, message } = describeSaveResult(result);
+      showToast(tone, message);
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, drug, patient, scriptId, prescriber, issuedDate, showToast]);
 
-  const closeQr = () => {
-    setQrVisible(false);
-    if (qrInterval.current) clearInterval(qrInterval.current);
-  };
+  // The one glyph colour the surviving content needs, by ROLE. The rest of
+  // the palette this screen resolved (`on-primary`, `on-primary-container`,
+  // `on-primary-fixed-variant`, `scrim`, the hero blob, `outline`) went with the
+  // pill, the hero, the two dialogs and the HIPAA footer.
+  const onSurfaceVariant = useTokenColor("on-surface-variant");
 
-  const mm = Math.floor(secondsLeft / 60);
-  const ss = secondsLeft % 60;
-  const timerLabel = `${mm}:${ss < 10 ? "0" : ""}${ss}`;
-
-  return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* Top app bar — back + title + verified/avatar */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-md py-sm"
-          style={appBarShadow}
-        >
-          <View className="flex-row items-center gap-base">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => router.back()}
-              className="rounded-full p-xs active:scale-95"
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#00685f" />
-            </Pressable>
-            <Text className="font-headline-md text-headline-md text-primary">
-              Share Prescription
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-sm">
-            <MaterialIcons name="verified-user" size={22} color="#00685f" />
-            <Image
-              source={{
-                uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuD6LAeX-YlXMlQGv0_wVk0DJGPhlaIcEgvqYrSVhPJeWnOwGnFALF3S-hBNLRbVXmsiOpbXZup8mZCqfByqANRcBBUJWzCRxNcYXQRDQX90x2cY4i6jue6aOc67_2Z1WQp1QY7uaqHLQo11jMgaFLIQnHHYcoRB55mqmVBoMt0AN-RFmPYz3Jn8qxe7KP4pDiHhFU7x5v5uSszvhkBWdFM62k1XSp2si-CpfpaJ0pPT_oMa0nlkHCtvoNBiwMgqirk01MAAmTKQr3oq",
-              }}
-              className="h-8 w-8 rounded-full border border-outline-variant"
-              accessibilityLabel="Your profile"
-            />
-          </View>
-        </View>
-
+  if (!drug || !patient || !scriptId || !prescriber || !issuedDate) {
+    return (
+      <DetailShell title="Share Prescription">
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 140 }}
+          contentContainerStyle={{
+            paddingHorizontal: 24,
+            paddingBottom: SCROLL_RESERVE,
+            paddingTop: 24,
+            flexGrow: 1,
+            justifyContent: "center",
+          }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Summary card */}
-          <View
-            className="mt-md rounded-xl border border-outline-variant bg-surface-container-lowest p-md"
-            style={cardShadow}
-          >
-            <View className="mb-sm flex-row items-start justify-between">
-              <View className="flex-1 pr-sm">
-                <Text className="font-headline-md text-headline-md mb-xs text-primary">{drug}</Text>
-                <View className="flex-row items-center gap-xs">
-                  <MaterialIcons name="person" size={16} color="#3d4947" />
-                  <Text className="font-body-md text-on-surface-variant">
-                    {patient} • ID: {scriptId}
-                  </Text>
-                </View>
-              </View>
-              <View className="flex-row items-center gap-xs rounded-full bg-primary/10 px-sm py-xs">
-                <MaterialIcons name="lock" size={16} color="#00685f" />
-                <Text className="font-label-sm text-label-sm text-primary">SECURE SCRIPT</Text>
-              </View>
-            </View>
-            <View className="mt-sm flex-row gap-md border-t border-outline-variant pt-sm">
-              <View className="flex-1">
-                <Text className="text-label-sm uppercase text-outline" style={{ letterSpacing: 1 }}>
-                  Prescriber
-                </Text>
-                <Text className="font-label-md text-label-md mt-xs text-on-surface">
-                  {prescriber}
-                </Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-label-sm uppercase text-outline" style={{ letterSpacing: 1 }}>
-                  Issued Date
-                </Text>
-                <Text className="font-label-md text-label-md mt-xs text-on-surface">
-                  {issuedDate}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Quick Send */}
-          <View className="mt-lg">
-            <View className="mb-sm flex-row items-center justify-between">
-              <Text className="font-headline-md text-headline-md text-on-surface">Quick Send</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="View nearby pharmacies"
-                hitSlop={6}
-                className="flex-row items-center gap-xs active:opacity-70"
-              >
-                <MaterialIcons name="map" size={16} color="#00685f" />
-                <Text className="font-label-sm text-label-sm text-primary">View Nearby</Text>
-              </Pressable>
-            </View>
-            <View className="gap-sm">
-              {NEARBY_PHARMACIES.map((p) => (
-                <View
-                  key={p.id}
-                  className="flex-row items-center justify-between rounded-xl border border-outline-variant bg-surface-container-lowest p-sm"
-                  style={cardShadow}
-                >
-                  <View className="flex-1 flex-row items-center gap-md">
-                    <View className="h-12 w-12 items-center justify-center rounded-lg bg-surface-container">
-                      <MaterialIcons name="local-pharmacy" size={28} color="#00685f" />
-                    </View>
-                    <View className="flex-1">
-                      <Text className="font-label-md text-label-md text-on-surface">{p.name}</Text>
-                      <Text className="font-label-sm text-label-sm text-outline">{p.detail}</Text>
-                    </View>
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Send ${drug} to ${p.name}`}
-                    disabled={sendingId !== null}
-                    onPress={() => handleSend(p.id)}
-                    style={({ pressed }) => ({
-                      borderRadius: 999,
-                      overflow: "hidden",
-                      transform: [{ scale: pressed ? 0.95 : 1 }],
-                      opacity: sendingId && sendingId !== p.id ? 0.5 : 1,
-                    })}
-                  >
-                    <LinearGradient
-                      colors={PILL_GRADIENT}
-                      start={GRADIENT_START}
-                      end={GRADIENT_END}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 6,
-                        paddingHorizontal: 20,
-                        paddingVertical: 10,
-                      }}
-                    >
-                      {sendingId === p.id ? (
-                        <MaterialIcons name="autorenew" size={16} color="#ffffff" />
-                      ) : null}
-                      <Text className="font-label-md text-label-md text-white">
-                        {sendingId === p.id ? "Sending…" : "Send Now"}
-                      </Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Share Securely (QR hero) */}
-          <View className="mt-lg">
-            <Text className="font-headline-md text-headline-md mb-sm text-on-surface">
-              Share Securely
-            </Text>
-            <LinearGradient
-              colors={HERO_GRADIENT}
-              start={GRADIENT_START}
-              end={GRADIENT_END}
-              style={[{ borderRadius: 12, overflow: "hidden", padding: 24 }, cardShadow]}
-            >
-              {/* Decorative blurred blob → a soft translucent circle. */}
-              <View
-                style={{
-                  position: "absolute",
-                  right: -48,
-                  top: -48,
-                  width: 192,
-                  height: 192,
-                  borderRadius: 96,
-                  backgroundColor: "rgba(255,255,255,0.10)",
-                }}
-              />
-              <View className="items-center">
-                <View className="mb-md h-16 w-16 items-center justify-center rounded-full bg-white/20">
-                  <MaterialIcons name="qr-code-2" size={36} color="#ffffff" />
-                </View>
-                <Text className="font-headline-md text-headline-md mb-xs text-white">
-                  In-Person Dispensing
-                </Text>
-                <Text className="font-body-md text-body-md mb-md text-center text-on-primary-container/80">
-                  Generate a temporary, encrypted QR code for a pharmacist to scan directly from your
-                  device.
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Generate one-time QR code"
-                  onPress={openQr}
-                  className="rounded-xl bg-surface-container-lowest px-lg py-sm active:scale-95"
-                >
-                  <Text className="font-label-md text-label-md text-primary">
-                    Generate One-Time QR Code
-                  </Text>
-                </Pressable>
-              </View>
-            </LinearGradient>
-          </View>
-
-          {/* Other Options */}
-          <View className="mt-lg">
-            <Text className="font-headline-md text-headline-md mb-sm text-on-surface">
-              Other Options
-            </Text>
-            <View className="gap-sm">
-              <OtherOption icon="picture-as-pdf" label="Download PDF" />
-              <OtherOption icon="print" label="Print Script" />
-              <OtherOption icon="link" label="Copy Clinical Link" />
-            </View>
-          </View>
-
-          {/* Security footer */}
-          <View className="mt-lg flex-row items-center justify-center gap-sm border-t border-outline-variant/30 pt-lg">
-            <MaterialIcons name="health-and-safety" size={16} color="#6d7a77" />
-            <Text className="text-label-sm text-outline">
-              HIPAA Compliant • 256-bit AES Encryption • Clinical Grade Security
-            </Text>
-          </View>
+          {/* `no-identifier` and no `action` — see the twin panel in
+              ActiveScriptViewScreen for both. The body carries one clause the
+              twin does not: a share screen has to say that nothing went out. */}
+          <ErrorPanel
+            testID="script-not-found"
+            unrecoverable="no-identifier"
+            title="We can't share this prescription"
+            body="The link you followed is missing the details of the script. Nothing has been shared. Open it again from your medications so the right record is loaded."
+          />
         </ScrollView>
+      </DetailShell>
+    );
+  }
 
-        {/* Pushed from Overview — keep Overview highlighted. */}
-        <BottomNav
-          active="overview"
-          onTabPress={(key) => {
-            if (key === "home") router.back();
-          }}
-        />
-      </SafeAreaView>
-
-      {/* Success modal */}
-      <Modal
-        visible={successVisible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => setSuccessVisible(false)}
+  return (
+    // No app-bar action slot: it carried a "Verified script" tick and a remote
+    // profile photo. See the head of this file.
+    <DetailShell title="Share Prescription">
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: SCROLL_RESERVE }}
+        showsVerticalScrollIndicator={false}
       >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(44,49,48,0.4)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-        >
-          <View className="w-full max-w-sm items-center rounded-2xl bg-surface-container-lowest p-lg">
-            <View className="mb-md h-20 w-20 items-center justify-center rounded-full bg-primary/10">
-              <MaterialIcons name="check-circle" size={48} color="#00685f" />
+        {/* Summary card */}
+        <Card className="mt-md">
+          <View className="mb-sm flex-row items-start justify-between">
+            <View className="flex-1 pr-sm">
+              <Text className="font-headline-md text-headline-md mb-xs text-primary">{drug}</Text>
+              <View className="flex-row items-center gap-xs">
+                <MaterialIcons name="person" size={16} color={onSurfaceVariant} />
+                <Text className="font-body-md text-on-surface-variant">
+                  {patient} • ID: {scriptId}
+                </Text>
+              </View>
             </View>
-            <Text className="font-headline-md text-headline-md mb-xs text-primary">Script Sent!</Text>
-            <Text className="font-body-md text-body-md mb-lg text-center text-on-surface-variant">
-              Your prescription has been securely transmitted to the pharmacy. You will receive a
-              notification when it's ready for pickup.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Done"
-              onPress={() => setSuccessVisible(false)}
-              style={({ pressed }) => ({
-                width: "100%",
-                borderRadius: 12,
-                overflow: "hidden",
-                opacity: pressed ? 0.92 : 1,
-              })}
-            >
-              <LinearGradient
-                colors={PILL_GRADIENT}
-                start={GRADIENT_START}
-                end={GRADIENT_END}
-                style={{ paddingVertical: 14, alignItems: "center" }}
-              >
-                <Text className="font-label-md text-label-md text-white">Done</Text>
-              </LinearGradient>
-            </Pressable>
+            {/* The "SECURE SCRIPT" padlock chip that sat here is deleted. */}
           </View>
-        </View>
-      </Modal>
-
-      {/* QR modal */}
-      <Modal
-        visible={qrVisible}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={closeQr}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(44,49,48,0.4)",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-          }}
-        >
-          <View className="w-full max-w-sm rounded-2xl bg-surface-container-lowest p-lg">
-            <View className="mb-md flex-row items-center justify-between">
-              <Text className="font-label-md text-label-md text-primary">One-Time Access Code</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close QR code"
-                hitSlop={8}
-                onPress={closeQr}
-              >
-                <MaterialIcons name="close" size={24} color="#6d7a77" />
-              </Pressable>
+          <View className="mt-sm flex-row gap-md border-t border-outline-variant pt-sm">
+            <View className="flex-1">
+              <Text className="text-label-sm uppercase text-outline" style={{ letterSpacing: 1 }}>
+                Prescriber
+              </Text>
+              <Text className="font-label-md text-label-md mt-xs text-on-surface">
+                {prescriber}
+              </Text>
             </View>
-            <View className="mb-md rounded-2xl border-2 border-primary/20 bg-white p-md">
-              <Image
-                source={{
-                  uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuDScQEMTVEwwlBgYyUNaJDZSI3snGuaNa827BojWmmZ7yxrveOXdFB6HFNurnZ5KF1pVPwXSOGcPXOcQ2YQRu88no-poClduBgyCFTlrjZLr9_mEWzRvsVWfkOJfYUenzk86ivinUw4veKhh9X6wVy5S-o9C-eaAt1RhNvB_nqDNQ-Q9Oe_oFsBirqfzRl74iK5vWAbc-OxVrCLa6Kmyi0_-w2l5sVGHOUxKVUW_E9V7dblIM-vq7gYhtEnZ7qWDJlvPYGHglkZKlcS",
-                }}
-                style={{ width: "100%", aspectRatio: 1, borderRadius: 8 }}
-                resizeMode="contain"
-                accessibilityLabel="Encrypted one-time QR code"
-              />
-            </View>
-            <Text className="text-label-sm mb-base text-center text-outline">
-              This code expires in{" "}
-              <Text className="font-bold text-primary">{timerLabel}</Text>
-            </Text>
-            <View className="flex-row items-center justify-center gap-xs rounded-lg bg-primary-fixed p-xs">
-              <MaterialIcons name="verified" size={16} color="#005049" />
-              <Text className="text-label-sm text-on-primary-fixed-variant">IDENTITY VERIFIED</Text>
+            <View className="flex-1">
+              <Text className="text-label-sm uppercase text-outline" style={{ letterSpacing: 1 }}>
+                Issued Date
+              </Text>
+              <Text className="font-label-md text-label-md mt-xs text-on-surface">
+                {issuedDate}
+              </Text>
             </View>
           </View>
+        </Card>
+
+        {/* Send to a pharmacy — stated as unavailable, because it is.
+            This replaces the Quick Send list and its fake transmission (see the
+            head of this file). It is a statement, not a control: there is no
+            disabled button here either, because a greyed "Send Now" still tells
+            the patient the product can do this and is merely busy. */}
+        <View className="mt-lg">
+          <Text className="font-headline-md text-headline-md mb-sm text-on-surface">
+            Sending to a pharmacy
+          </Text>
+          <InfoCallout icon="local-pharmacy">
+            MedApp can&apos;t send prescriptions to a pharmacy yet. Save a copy below and take it
+            with you, or ask your prescriber to send it directly.
+          </InfoCallout>
         </View>
-      </Modal>
-    </View>
+
+        {/* Download — the one control on this screen that does what it says.
+            "Print Script" and "Copy Clinical Link" sat beside it with no
+            `onPress`, and the "HIPAA Compliant • 256-bit AES Encryption • Clinical
+            Grade Security" footer sat under all three. All three are deleted. */}
+        <View className="mt-lg">
+          <Text className="font-headline-md text-headline-md mb-sm text-on-surface">
+            Save a copy
+          </Text>
+          <View className="gap-sm">
+            {/* `picture-as-pdf` went with the word PDF — the glyph asserted the
+                format just as loudly as the label did. */}
+            <OtherOption
+              icon="download"
+              label={saving ? "Saving…" : "Download Copy (.txt)"}
+              accessibilityLabel="Download a text copy of this prescription"
+              onPress={onDownload}
+              disabled={saving}
+            />
+          </View>
+          <Text className="font-label-sm text-label-sm mt-sm text-outline">
+            A patient copy for your own records. It is not signed and is not a dispensable
+            prescription.
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* Download outcome. Sibling of the ScrollView inside DetailShell, which is
+          where the view screen's toast sits too — 30 clears the shell's bottom
+          inset, and a detail screen has no BottomNav to clear. */}
+      <Toast message={toastMessage} tone={toastTone} onDismiss={clearToast} bottom={30} />
+
+      {/* Both <Modal> dialogs are gone: the "Script Sent!" success sheet, which
+          announced a transmission that never happened, and the one-time-QR
+          dialog with its static image, live countdown and IDENTITY VERIFIED
+          badge. */}
+    </DetailShell>
   );
 }
 
@@ -471,43 +302,56 @@ export function ActiveScriptShareScreen() {
 // Pieces
 // ---------------------------------------------------------------------------
 
-function OtherOption({ icon, label }: { icon: IconName; label: string }) {
+/**
+ * A full-width option row.
+ *
+ * `onPress` is optional and `accessibilityLabel` now separable from the visible
+ * label — the download row's label changes to "Saving…" mid-write, and letting
+ * that string double as the accessible name would rename the control under a
+ * screen reader while it worked.
+ *
+ * One caller now, where there were three. The two that passed no `onPress` at
+ * all ("Print Script", "Copy Clinical Link") are deleted rather than left
+ * visible: the flag that used to stand here had been carried for long enough.
+ * The component stays generic because the next real option will use it.
+ */
+function OtherOption({
+  icon,
+  label,
+  accessibilityLabel,
+  onPress,
+  disabled,
+}: {
+  icon: IconName;
+  label: string;
+  accessibilityLabel?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+}) {
+  const primary = useTokenColor("primary");
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
       className="flex-row items-center gap-md rounded-xl border border-outline-variant bg-surface-container-lowest p-md active:bg-surface-container"
+      style={{ opacity: disabled ? 0.6 : 1 }}
     >
-      <MaterialIcons name={icon} size={24} color="#00685f" />
+      <MaterialIcons name={icon} size={24} color={primary} />
       <Text className="font-label-md text-label-md text-on-surface">{label}</Text>
     </Pressable>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Shadows — same Platform.select pattern as the other screens.
+// Elevation — nothing on this screen casts a shadow.
+//
+// `cardShadow` is gone: its three call sites were the summary card, the
+// pharmacy list rows and the QR hero panel — all cards/rows/panels, separated
+// by surface tone and an `outline-variant` hairline per docs/BRAND.md
+// §Elevation. `appBarShadow` went earlier with the hand-rolled app bar. The
+// two <Modal> dialogs that were the only floating surfaces left are deleted, so
+// there is nothing on this screen that could claim an effect.
 // ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.05,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};

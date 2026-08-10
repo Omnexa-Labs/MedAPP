@@ -41,11 +41,45 @@ class SignupRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def _validate_role(cls, v: str) -> str:
-        # `user` is the default app account type; other roles are for provider
-        # or admin workflows that require KYC or elevated access.
-        allowed = {"user", "doctor", "nurse", "hospital_admin"}
-        if v not in allowed:
-            raise ValueError(f"role must be one of {sorted(allowed)}")
+        """PUBLIC SIGNUP GRANTS `user` AND NOTHING ELSE (2026-08-05).
+
+        This validator used to accept `{"user", "doctor", "nurse",
+        "hospital_admin"}` from the request body, and `auth_service.py` wrote it
+        straight to `User.role`, from where `issue_tokens_for_user` stamped it
+        into the access token. `kyc_status` was set to "pending" and NOTHING
+        anywhere gated token issuance or any route on KYC.
+
+        So every role-based authorization check in the platform was reachable by
+        an anonymous attacker with one unauthenticated HTTP request. It chained:
+        sign up as `doctor`, log in, and `lab_service._can_access_result` returned
+        early for any doctor — an unauthenticated read of ANY patient's lab
+        results. Both halves are fixed in this pass.
+
+        A ROLE IS NOT SELF-SERVICE. Clinician and admin roles must be granted by
+        an authenticated admin route or by a KYC-approval transition that a human
+        or a verified credential drives. Until such a route exists, the only way
+        to obtain one is a deliberate database change — which is the correct
+        friction, not a gap.
+
+        The unknown values are still REJECTED rather than silently coerced, so a
+        client sending `role: "wizard"` gets a validation error. But a KNOWN
+        elevated role is also refused here, with a message that says why: silently
+        downgrading it would leave a caller believing they had signed up as a
+        clinician.
+
+        Regulation: Ghana Act 843 s.28 (appropriate technical measures) and
+        HIPAA §164.308(a)(3)/(a)(4) — workforce authorization and minimum
+        necessary both presuppose that a role is assigned, not claimed.
+        """
+        known = {"user", "doctor", "nurse", "hospital_admin"}
+        if v not in known:
+            raise ValueError(f"role must be one of {sorted(known)}")
+        if v != "user":
+            raise ValueError(
+                "public signup can only create a 'user' account. Clinician and "
+                "admin roles are granted through an authenticated provisioning "
+                "flow, not requested at signup."
+            )
         return v
 
 

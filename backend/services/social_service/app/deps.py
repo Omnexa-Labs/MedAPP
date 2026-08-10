@@ -31,5 +31,30 @@ async def get_current_principal(authorization: str | None = Header(default=None)
     return Principal(subject=str(claims["sub"]), role=str(claims["role"]))
 
 
+async def get_optional_principal(authorization: str | None = Header(default=None)) -> Principal | None:
+    """The caller if they presented a usable token, otherwise None.
+
+    Exists for the FEED, which is readable without a token but now carries
+    per-viewer flags (`liked_by_me`, `bookmarked_by_me`). Requiring a token
+    there would be a breaking change for a route already shipped as open;
+    ignoring the token would show a signed-in user their own likes as false.
+
+    A MALFORMED or EXPIRED token returns None rather than 401. That is the
+    deliberate difference from `get_current_principal`: on an anonymous-readable
+    route a bad token is no worse than no token, and 401ing would take the feed
+    away from a reader whose session merely lapsed. Routes that ACT on behalf of
+    a user must keep using `get_current_principal`.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    token = authorization.split(" ", 1)[1]
+    try:
+        claims = decode_token(token, secret=settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    except Exception:  # noqa: BLE001 - see the docstring: never lock out a reader
+        return None
+    return Principal(subject=str(claims["sub"]), role=str(claims["role"]))
+
+
 DbSession = Depends(get_db)
 CurrentPrincipal = Depends(get_current_principal)
+OptionalPrincipal = Depends(get_optional_principal)

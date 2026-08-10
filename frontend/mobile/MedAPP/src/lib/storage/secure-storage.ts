@@ -21,14 +21,38 @@ const DEVICE_ID_KEY = "medapp.device.id";
 // localStorage — less secure than hardware-backed storage, but acceptable
 // for development. localStorage is not sessionStorage: tokens survive a
 // tab close the same way native tokens survive an app restart.
+//
+// "Acceptable for development" was the whole justification, and nothing
+// enforced it: `expo start --web` and a production web export take the same
+// branch, so a shipped web build would put PHI-scoped JWTs somewhere any
+// injected script can read (`localStorage` is not origin-isolated from XSS).
+// Outside __DEV__ this now throws instead. A web build that needs to ship must
+// first give this module a real backing store (httpOnly cookie session, or
+// in-memory + silent refresh) — not inherit the dev shim by omission.
+function assertWebFallbackAllowed(): void {
+  if (!__DEV__) {
+    throw new Error(
+      "secure-storage: refusing to store credentials in localStorage on web. " +
+        "expo-secure-store has no web implementation and the localStorage " +
+        "fallback is XSS-readable — it is a development-only shim.",
+    );
+  }
+}
+
 const webStore = {
-  getItemAsync: (key: string): Promise<string | null> =>
-    Promise.resolve(localStorage.getItem(key)),
+  getItemAsync: (key: string): Promise<string | null> => {
+    assertWebFallbackAllowed();
+    return Promise.resolve(localStorage.getItem(key));
+  },
   setItemAsync: (key: string, value: string): Promise<void> => {
+    assertWebFallbackAllowed();
     localStorage.setItem(key, value);
     return Promise.resolve();
   },
   deleteItemAsync: (key: string): Promise<void> => {
+    // Deletion is the one operation that stays permitted: a build that flipped
+    // to the guard must still be able to clear anything an earlier dev build
+    // left behind, and refusing to delete credentials is not a safer failure.
     localStorage.removeItem(key);
     return Promise.resolve();
   },

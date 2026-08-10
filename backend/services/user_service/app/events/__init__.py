@@ -35,8 +35,11 @@ async def init_bus(app: FastAPI) -> EventBus | None:
         await bus.connect()
     except Exception as exc:  # noqa: BLE001
         log.warning("event_bus.connect_failed", error=str(exc))
-        app.state.event_bus = None
-        return None
+        # KEEP the bus rather than storing None. EventBus._ensure_connected
+        # retries on the first publish, so a service that boots before RabbitMQ
+        # recovers by itself instead of staying silent for its whole lifetime.
+        app.state.event_bus = bus
+        return bus
     app.state.event_bus = bus
     return bus
 

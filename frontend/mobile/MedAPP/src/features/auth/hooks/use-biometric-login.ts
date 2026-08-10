@@ -12,21 +12,35 @@ import { useAuthStore } from "@/store/auth-store";
 // server-side change — the backend only sees a refresh-token call. This
 // is the standard banking-app pattern.
 //
-// Capability surface (drives which buttons render on SignInScreen):
+// Capability surface (drives which buttons render on SignInScreen).
 //
-//   capability.available  — device has the sensor AND the user has
-//                            enrolled at least one biometric AND a
-//                            refresh token is stored from a prior
-//                            sign-in. False on first install, after
-//                            sign-out, or on an unenrolled simulator.
-//   capability.kinds      — which sensors the device exposes. We use it
-//                            to decide whether to render the FaceID
-//                            button, the Fingerprint button, or both.
+// These are TWO separate questions and used to be collapsed into one
+// `available` flag, which was a bug: the approved Login frame (57:144 /
+// 57:148) draws the divider and both biometric tiles unconditionally, and
+// hiding them because no refresh token was stored yet meant a fresh
+// install — or any session after sign-out — showed no biometric
+// affordance at all on the one screen where a first-time user could learn
+// the feature exists. It also made the `no_credentials` failure mode
+// below unreachable, since the same flag hid the control that raises it.
+//
+//   capability.deviceCapable
+//        — device has the sensor AND the user has enrolled at least one
+//          biometric. This is what the UI gates on: if it is false the
+//          tiles cannot do anything but fail, so hiding them is correct.
+//   capability.hasEnrolledCredential
+//        — a refresh token from a prior password sign-in is stored, i.e.
+//          biometric can actually complete right now. NOT a render gate:
+//          when it is false the tiles still render and the flow raises
+//          `no_credentials`, which the caller turns into "Sign in with
+//          your password first to enable biometric."
+//   capability.kinds
+//        — which sensors the device exposes. We use it to decide whether
+//          to render the FaceID button, the Fingerprint button, or both.
 //
 // Failure modes the hook surfaces:
 //
-//   no_credentials   — no refresh token in SecureStore. Caller hides the
-//                       buttons; nothing to unlock.
+//   no_credentials   — no refresh token in SecureStore. Caller tells the
+//                       user to sign in with a password first.
 //   user_cancel      — user dismissed the biometric prompt. Silent;
 //                       caller should not show an error.
 //   biometric_failed — wrong finger / wrong face / lockout. Caller shows
@@ -38,8 +52,17 @@ import { useAuthStore } from "@/store/auth-store";
 type BiometricKind = "face" | "fingerprint" | "iris";
 
 export interface BiometricCapability {
-  /** Device has hardware AND has at least one biometric enrolled AND a refresh token is stored. */
-  available: boolean;
+  /**
+   * Device has the hardware AND the user has enrolled at least one biometric.
+   * This is the RENDER gate — see the note at the top of the file.
+   */
+  deviceCapable: boolean;
+  /**
+   * A refresh token from a prior password sign-in is stored, so the flow can
+   * complete without falling through to `no_credentials`. Informational: do NOT
+   * use it to hide the biometric controls.
+   */
+  hasEnrolledCredential: boolean;
   /** Sensors the device exposes. Empty when no hardware. */
   kinds: BiometricKind[];
   /** True once the capability probe has finished — drives loading state on first render. */
@@ -62,7 +85,8 @@ function mapAuthenticationType(t: LocalAuthentication.AuthenticationType): Biome
 /** Probe whether the user can sign in with biometric on this device right now. */
 export function useBiometricCapability(): BiometricCapability {
   const [state, setState] = useState<BiometricCapability>({
-    available: false,
+    deviceCapable: false,
+    hasEnrolledCredential: false,
     kinds: [],
     ready: false,
   });
@@ -79,7 +103,8 @@ export function useBiometricCapability(): BiometricCapability {
       if (cancelled) return;
       const kinds = types.map(mapAuthenticationType).filter((k): k is BiometricKind => k !== null);
       setState({
-        available: hasHw && isEnrolled && hasToken,
+        deviceCapable: hasHw && isEnrolled,
+        hasEnrolledCredential: hasToken,
         kinds,
         ready: true,
       });
@@ -158,8 +183,10 @@ export function useBiometricLogin() {
         return response;
       } catch (cause) {
         // Refresh failed — token expired, revoked, or backend
-        // unreachable. Clear the stale refresh so the buttons stop
-        // appearing on the next sign-in screen render.
+        // unreachable. Clear the stale refresh so the next attempt fails
+        // fast with `no_credentials` instead of re-prompting the sensor.
+        // (The tiles stay visible either way — they gate on device
+        // capability, not on the token.)
         await secureStorage.clearRefreshToken();
         throw new BiometricLoginAbort("refresh_failed");
       }

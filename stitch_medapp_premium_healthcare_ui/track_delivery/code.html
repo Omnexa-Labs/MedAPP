@@ -1,0 +1,275 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Track Delivery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#0d1c2e",
+                        "outline-variant": "#bcc9c6",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-error-container": "#93000a",
+                        "surface": "#f5faf8",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#eaefed",
+                        "on-surface": "#171d1c",
+                        "on-primary-fixed-variant": "#005049",
+                        "tertiary": "#0058be",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#006a61",
+                        "surface-dim": "#d6dbd9",
+                        "secondary-container": "#d5e3fc",
+                        "tertiary-container": "#2170e4",
+                        "surface-container-high": "#e4e9e7",
+                        "primary-fixed": "#89f5e7",
+                        "inverse-primary": "#6bd8cb",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "on-tertiary-container": "#fefcff",
+                        "inverse-surface": "#2c3130",
+                        "surface-container-low": "#f0f5f2",
+                        "outline": "#6d7a77",
+                        "inverse-on-surface": "#edf2f0",
+                        "on-primary-container": "#f4fffc",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f5faf8",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "surface-variant": "#dee4e1",
+                        "secondary-fixed": "#d5e3fc",
+                        "primary-container": "#008378",
+                        "on-primary": "#ffffff",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-primary-fixed": "#00201d",
+                        "primary": "#00685f",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-surface-variant": "#3d4947",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f5faf8",
+                        "on-secondary-container": "#57657a",
+                        "on-background": "#171d1c",
+                        "surface-container-highest": "#dee4e1",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "error": "#ba1a1a",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "secondary": "#515f74"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "sm": "12px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "md": "24px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "headline-xl": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                        "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-24 font-body-md selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="bg-surface dark:bg-on-secondary-fixed docked full-width top-0 bg-surface-bright/80 backdrop-blur-md dark:bg-on-secondary-fixed/90 shadow-sm sticky z-40">
+<div class="flex justify-between items-center w-full px-4 h-16 container mx-auto max-w-[container-max]">
+<button aria-label="Go back" class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-secondary-fixed-dim/20 active:scale-95 transition-all duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Track Delivery</h1>
+<button aria-label="Help" class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-secondary-fixed-dim/20 active:scale-95 transition-all duration-200 p-2 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+</button>
+</div>
+</header>
+<main class="container mx-auto max-w-[container-max] px-4 md:px-gutter mt-6 md:mt-md flex flex-col gap-lg">
+<!-- Header Section -->
+<section class="text-center md:text-left flex flex-col gap-xs">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary">Arriving by 4:30 PM</h2>
+<p class="font-body-md text-body-md text-secondary">Order #MED-98234</p>
+</section>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Left Column: Map & Driver -->
+<div class="md:col-span-7 flex flex-col gap-md">
+<!-- Live Map Card -->
+<div class="bg-surface-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 overflow-hidden relative h-[300px] md:h-[400px]">
+<!-- Map Placeholder Image -->
+<img alt="Map View" class="w-full h-full object-cover" data-alt="A clean, modern top-down map interface showing a delivery route in a medical healthcare context. The map uses a soft, light-mode palette with muted teal and warm neutral tones, avoiding harsh contrasts. A smooth primary teal route line connects a pharmacy icon to a residential destination icon. A small delivery vehicle icon is shown mid-route, emphasizing active progress. The overall style is minimal, corporate, and highly legible, with ambient lighting and no realistic clutter." data-location="City Streets" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0YuD1rlBkBXOCf6xYqR5tpeSDMIUwGV6qro1wbXJ4Fv_zQybmM6fXvHuNGniGVBuMxj16Jb6bLFrD_iANTxx03rivpN97VRd1Fr3fxuUBqWXdpXiYk-Q8SAMzFaM0n11j9HsUi4RWXrrE2EAQj09xt02vjTiIpyvzlmjCu7tnLWukZsZon-r22Hu6hjhB_0KjaFLmdfQnclvb0U1HrzBjocpe7IiNnZKjwjJHa5Z07sfy5ne0ioVzKlJPH0TDk3lDCOD6PaQgg5rc">
+<!-- Overlay Badge -->
+<div class="absolute top-4 left-4 bg-surface/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm flex items-center gap-2 border border-outline-variant/20">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-md text-label-md text-primary">Live Tracking</span>
+</div>
+</div>
+<!-- Courier Card -->
+<div class="bg-surface-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md flex items-center justify-between">
+<div class="flex items-center gap-sm">
+<div class="relative">
+<img alt="Courier Avatar" class="w-12 h-12 rounded-full object-cover border-2 border-surface-container" data-alt="A professional headshot of a friendly delivery driver in a clean, modern setting. The driver is a young male wearing a crisp teal uniform shirt. The lighting is soft, high-key, and well-lit, conveying trust and reliability. The background is a soft, out-of-focus light gray or white. The overall mood is warm, accessible, and aligned with a premium healthcare service aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfQYUjsL7gDKul9JcdGBjpnpvyDwvY5FteKQKsMz9scnIziIIrqUrnb68g8MjoKJZiiGQT37rkYuTk0JqUbViOX2vlw9yS3C-SnPkbEUsHbLopu9MZnTaNJzAaZfS0cWa-QXX_pQ36xSnLToNclH0fjWbaTfg6wXkUfDejwEAvEqYbMCT04XBAF75olvlzgm7VnM58kdgRApDslW_UNddeXW-_FuYzOpOHtElZf7uaCsJPPZDhHUcP2cs2fW7hQqk9OJWp6eoffscL">
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-lowest"></div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Marcus T.</h3>
+<p class="font-body-md text-body-md text-sm text-secondary">Courier • Toyota Prius</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button aria-label="Message Marcus" class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="chat">chat</span>
+</button>
+<button aria-label="Call Marcus" class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-primary hover:bg-surface-container transition-colors">
+<span class="material-symbols-outlined" data-icon="call">call</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Right Column: Timeline & Address -->
+<div class="md:col-span-5 flex flex-col gap-md">
+<!-- Status Timeline Card -->
+<div class="bg-surface-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md">
+<h3 class="font-label-md text-label-md text-on-surface mb-6 uppercase tracking-wider text-secondary">Delivery Status</h3>
+<div class="relative pl-6 space-y-6">
+<!-- Vertical Line Background -->
+<div class="absolute left-[11px] top-2 bottom-6 w-[2px] bg-surface-variant"></div>
+<!-- Active Progress Line -->
+<div class="absolute left-[11px] top-2 h-[60%] w-[2px] bg-primary"></div>
+<!-- Step 1: Placed -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute -left-6 w-6 h-6 rounded-full bg-primary flex items-center justify-center z-10 border-2 border-surface-lowest">
+<span class="material-symbols-outlined text-[14px] text-on-primary" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md text-on-surface">Order Placed</h4>
+<p class="font-body-md text-sm text-secondary">10:30 AM</p>
+</div>
+</div>
+<!-- Step 2: Processing -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute -left-6 w-6 h-6 rounded-full bg-primary flex items-center justify-center z-10 border-2 border-surface-lowest">
+<span class="material-symbols-outlined text-[14px] text-on-primary" data-icon="check">check</span>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md text-on-surface">Processing</h4>
+<p class="font-body-md text-sm text-secondary">11:45 AM</p>
+</div>
+</div>
+<!-- Step 3: Out for Delivery (Active) -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute -left-6 w-6 h-6 rounded-full bg-surface-lowest border-2 border-primary flex items-center justify-center z-10 shadow-[0_0_10px_rgba(0,104,95,0.3)]">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="flex-1">
+<h4 class="font-label-md text-label-md text-primary font-bold">Out for Delivery</h4>
+<p class="font-body-md text-sm text-primary/80">2:15 PM</p>
+<div class="mt-2 bg-surface-container-low rounded-lg p-3 text-sm text-on-surface-variant flex gap-2 items-start">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="local_shipping">local_shipping</span>
+<span class="">Driver is completing another drop-off nearby.</span>
+</div>
+</div>
+</div>
+<!-- Step 4: Delivered (Pending) -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute -left-6 w-6 h-6 rounded-full bg-surface-lowest border-2 border-surface-variant flex items-center justify-center z-10">
+</div>
+<div class="flex-1 opacity-50">
+<h4 class="font-label-md text-label-md text-on-surface">Delivered</h4>
+<p class="font-body-md text-sm text-secondary">Pending</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Delivery Address Card -->
+<div class="bg-surface-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md flex flex-col gap-4">
+<div>
+<p class="font-label-sm text-label-sm text-secondary uppercase tracking-wider mb-1">Pickup Location</p>
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-outline mt-0.5" data-icon="storefront">storefront</span>
+<div>
+<p class="font-body-md text-on-surface font-medium">Central Pharmacy Hub</p>
+<p class="font-body-md text-sm text-secondary">124 Medical Way, Suite A</p>
+</div>
+</div>
+</div>
+<div class="h-px bg-surface-variant w-full"></div>
+<div>
+<p class="font-label-sm text-label-sm text-secondary uppercase tracking-wider mb-1">Delivery Address</p>
+<div class="flex items-start gap-2">
+<span class="material-symbols-outlined text-primary mt-0.5" data-icon="home">home</span>
+<div>
+<p class="font-body-md text-on-surface font-medium">Home</p>
+<p class="font-body-md text-sm text-secondary">4521 Oakwood Drive, Apt 3B<br>Springfield, IL 62704</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-3 pb-6 bg-surface dark:bg-on-secondary-fixed shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] border-t border-outline-variant/30 rounded-t-xl z-50">
+  <!-- Home -->
+  <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-150" href="#">
+    <span class="material-symbols-outlined" data-icon="home">home</span>
+    <span class="font-label-sm text-[10px] mt-1">Home</span>
+  </a>
+  <!-- Overview (Active) -->
+  <a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary text-on-primary-container dark:text-on-primary rounded-full px-3 py-1 active:scale-90 transition-transform duration-150" href="#">
+    <span class="material-symbols-outlined" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+    <span class="font-label-sm text-[10px] mt-1">Overview</span>
+  </a>
+  <!-- Inbox -->
+  <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-150" href="#">
+    <span class="material-symbols-outlined" data-icon="mail">mail</span>
+    <span class="font-label-sm text-[10px] mt-1">Inbox</span>
+  </a>
+  <!-- Community -->
+  <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-150" href="#">
+    <span class="material-symbols-outlined" data-icon="group">group</span>
+    <span class="font-label-sm text-[10px] mt-1">Community</span>
+  </a>
+  <!-- Lifestyle -->
+  <a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary dark:hover:text-primary-fixed transition-colors active:scale-90 duration-150" href="#">
+    <span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+    <span class="font-label-sm text-[10px] mt-1">Lifestyle</span>
+  </a>
+</nav>
+
+
+</body></html>

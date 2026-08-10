@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Verification &amp; Credentials</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#f5faf8",
+                        "secondary": "#515f74",
+                        "inverse-on-surface": "#edf2f0",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-tertiary-container": "#fefcff",
+                        "on-tertiary-fixed": "#001a42",
+                        "background": "#f5faf8",
+                        "surface-dim": "#d6dbd9",
+                        "error": "#ba1a1a",
+                        "on-primary-container": "#f4fffc",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#d5e3fc",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "on-error-container": "#93000a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "surface-container-high": "#e4e9e7",
+                        "primary-container": "#008378",
+                        "primary": "#00685f",
+                        "on-secondary-container": "#57657a",
+                        "surface-container-highest": "#dee4e1",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#dee4e1",
+                        "secondary-fixed": "#d5e3fc",
+                        "outline-variant": "#bcc9c6",
+                        "error-container": "#ffdad6",
+                        "tertiary-container": "#2170e4",
+                        "inverse-primary": "#6bd8cb",
+                        "surface-tint": "#006a61",
+                        "on-primary-fixed": "#00201d",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "surface-container-low": "#f0f5f2",
+                        "surface": "#f5faf8",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#2c3130",
+                        "surface-container": "#eaefed",
+                        "tertiary-fixed": "#d8e2ff",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "outline": "#6d7a77",
+                        "tertiary": "#0058be",
+                        "primary-fixed": "#89f5e7",
+                        "on-background": "#171d1c",
+                        "on-surface": "#171d1c",
+                        "on-surface-variant": "#3d4947",
+                        "on-primary-fixed-variant": "#005049"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "80px",
+                        "lg": "48px",
+                        "container-max": "1280px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "sm": "12px",
+                        "xs": "4px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Inter"],
+                        "label-md": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "headline-xl": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #f5faf8; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface antialiased flex flex-col md:flex-row min-h-screen">
+<!-- TopAppBar (Mobile & Desktop) -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md bg-surface dark:bg-surface-dim shadow-[0px_4px_20px_rgba(71,85,105,0.05)] shadow-sm md:hidden">
+<div class="max-w-7xl mx-auto flex justify-between items-center h-16 px-gutter md:px-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary dark:text-primary-fixed-dim" style="font-variation-settings: 'FILL' 1;">medical_services</span>
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp Partner</span>
+</div>
+<div>
+<img alt="Healthcare Professional Profile" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDZUMfZcvZQCnQEOwFxu7JQHuwCenfB3TT_xLR9GffU8K--HE13oD2UlGR6HkbP3wjYmSQ-5JFtqfe-4Ff0Xmz73NRSvWnjht17_o4pGurDT7UODofTpLZ2yZIu_o0ssQ08nqeP2PAtOvpfByByN_2HcD6tVO9GNFlFr4OTjJ1qAHr8t2_2fu3hqX5PxKpPxcCxSB0ndDhoFtwtcxtr6sIK9Wywv-lAfhab8O_n5nHDDYO95jeCEMMJ0ogHm-58b65mY98rhCNAx8As"/>
+</div>
+</div>
+</header>
+<header class="fixed top-0 w-full z-50 bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md bg-surface dark:bg-surface-dim shadow-[0px_4px_20px_rgba(71,85,105,0.05)] shadow-sm hidden md:block">
+<div class="max-w-7xl mx-auto flex justify-between items-center h-16 px-gutter md:px-lg pl-80">
+<div class="flex items-center gap-2">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp Partner</span>
+</div>
+<div>
+<img alt="Healthcare Professional Profile" class="w-10 h-10 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAh7lIncZdi6GVae-kK9xI2b37urKq3QAvcMH-wXQEu-OLMNInLJnujiEXgjbIRRmcw83mujcgGUHcJgVVuu3u-MrqLLbr7frwN88UKAqZXyFx3hGbtm-72iHvwvIEcqjqP-wgyRZxU09HYEDBYuCsuNAS3970sO9RVFTYApLy6Q_LczEVoiqn6nPQ0HcX_qckgVF8DBO_vNtnl5YZQnn2RKoPUnF93y96msvGUHs4v9-NE0crU9PenyqL-iVCqzJO7rr370WPQRq61"/>
+</div>
+</div>
+</header>
+<!-- NavigationDrawer (Desktop) -->
+<aside class="fixed left-0 top-0 h-screen z-40 hidden lg:flex flex-col p-md h-full w-80 rounded-r-xl bg-surface-container-low dark:bg-surface-container-lowest bg-surface-container dark:bg-surface-container-high shadow-xl shadow-lg transition-all duration-300 ease-in-out">
+<div class="flex items-center gap-3 mb-10 mt-4 px-4">
+<img alt="Partner Admin" class="w-12 h-12 rounded-full border-2 border-primary" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXBzTMZMf5sR8R3hBpizKzgNKZn70-vCoOhU8rcWSC-dWhY6ziEalN5WEftlrdeaeiL8IHsFdhYGJD_FMYkRNRXc89IN6qk_onKg2UovFRRWdxTTKn_d9Hwcxh-aZSfhHV1LmWuA_NxkKnF_pNFN9oVXZh4ixU5UnxFvhe3AnMCwNM1upX171V7gz1oOcaRaAZSkbAY--nuYFbJ9wgC2BMmJNQfDnKAKlGREB4kXRnvmzex3cB4Swjnh4RJFUFcuWmAUkskmUzLq_-"/>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Partner Portal</h2>
+<p class="font-body-md text-body-md text-secondary">MedApp Management</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary-container dark:bg-secondary text-on-secondary-container dark:text-on-secondary font-bold rounded-lg hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-label-md text-label-md">Credentials</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">assignment</span>
+<span class="font-label-md text-label-md">Submissions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-on-surface-variant dark:text-outline hover:bg-surface-container-highest hover:bg-surface-container-high dark:hover:bg-surface-variant transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">contact_support</span>
+<span class="font-label-md text-label-md">Support</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full max-w-[1280px] mx-auto pt-24 pb-32 md:pl-80 px-4 md:px-gutter lg:px-lg transition-all duration-300">
+<!-- Header Section -->
+<div class="mb-lg">
+<h1 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Verification &amp; Credentials</h1>
+<p class="font-body-md text-body-md text-secondary max-w-2xl">Securely upload and manage your professional credentials. All documents are encrypted and handled in strict compliance with HIPAA privacy standards to protect both practitioner and patient data.</p>
+</div>
+<!-- Privacy & Security Notice -->
+<div class="bg-surface-container-low rounded-xl p-6 mb-lg border border-primary/20 flex gap-4 items-start shadow-[0px_4px_20px_rgba(71,85,105,0.02)]">
+<span class="material-symbols-outlined text-primary mt-1" style="font-variation-settings: 'FILL' 1;">lock</span>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface mb-1">HIPAA Compliant Data Storage</h3>
+<p class="font-body-md text-body-md text-secondary">Your credentials are securely encrypted at rest and in transit. Access is strictly limited to authorized verification personnel. We never share your personal identification with unauthorized third parties.</p>
+</div>
+</div>
+<!-- Credentials Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-gutter mb-lg">
+<!-- Document Card: Medical License -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-[#E2E8F0] flex flex-col h-full relative overflow-hidden group">
+<div class="absolute top-0 left-0 w-1 h-full bg-primary"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">badge</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">State Medical License</h3>
+<p class="font-label-sm text-label-sm text-secondary mt-1">Required • PDF, JPG, PNG</p>
+</div>
+</div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm">
+                        Pending Upload
+                    </span>
+</div>
+<div class="flex-1 flex flex-col justify-center items-center p-8 border-2 border-dashed border-outline-variant rounded-lg bg-surface-bright hover:bg-surface-container-low hover:border-primary transition-colors cursor-pointer mb-4">
+<span class="material-symbols-outlined text-secondary mb-2 text-3xl">upload_file</span>
+<p class="font-label-md text-label-md text-primary text-center">Click to browse or drag document here</p>
+<p class="font-label-sm text-label-sm text-secondary mt-1 text-center">Maximum file size: 10MB</p>
+</div>
+</div>
+<!-- Document Card: Board Certification -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-[#E2E8F0] flex flex-col h-full relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-[#10b981]"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">workspace_premium</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Board Certification</h3>
+<p class="font-label-sm text-label-sm text-secondary mt-1">Specialty Board Document</p>
+</div>
+</div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-[#ecfdf5] text-[#059669] font-label-sm text-label-sm gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Verified
+                    </span>
+</div>
+<div class="flex-1 bg-surface-bright rounded-lg p-4 border border-outline-variant flex items-center gap-4">
+<div class="w-10 h-10 bg-error/10 text-error rounded flex items-center justify-center">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface">ABIM_Certification_2023.pdf</p>
+<p class="font-label-sm text-label-sm text-secondary mt-1">Uploaded Oct 12, 2023 • 2.4 MB</p>
+</div>
+<button class="text-secondary hover:text-primary transition-colors p-2">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Document Card: Government ID -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-[#E2E8F0] flex flex-col h-full relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-[#f59e0b]"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">id_card</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">Government Issued ID</h3>
+<p class="font-label-sm text-label-sm text-secondary mt-1">Passport or Driver's License</p>
+</div>
+</div>
+<span class="inline-flex items-center px-3 py-1 rounded-full bg-[#fffbeb] text-[#d97706] font-label-sm text-label-sm gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> In Review
+                    </span>
+</div>
+<div class="flex-1 bg-surface-bright rounded-lg p-4 border border-outline-variant flex items-center gap-4 opacity-80">
+<div class="w-16 h-12 bg-secondary/10 text-secondary rounded flex items-center justify-center overflow-hidden">
+<div class="w-full h-full bg-cover bg-center" data-alt="A blurred abstract representation of a modern identification card lying flat on a clean white surface. Soft studio lighting highlights the security hologram patterns. The color palette consists of pale blues, off-whites, and muted greys, fitting a secure medical application aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAmk_LzRQ4GSbU1v_CMTIAmYYsJeHUHYlEosG5BPouQT63NKVN6nqmbx4cpimiDG7Kn8yenjzQhBj-cUSHw-Ft4JNXRvyLZbsCYTVlYlDHyMWdJs6dZctWKxYCaP04BRegFCar18KUDB7QLNQ2n7ivhf52taLoqy7wdIR1k9LWF1L9IOimnpL9N8bY_WYCH8kNWFpr2kZ1lZg8Pn9h9o6PugeOcdVvEiIzwkNU0gunoLmYajxAfFGAW3Frni3c9hLSqkOzXyo0lE3Nl');"></div>
+</div>
+<div class="flex-1">
+<p class="font-label-md text-label-md text-on-surface">DL_Front_Scan.jpg</p>
+<p class="font-label-sm text-label-sm text-secondary mt-1">Uploaded Today • 1.1 MB</p>
+</div>
+</div>
+</div>
+<!-- Document Card: NPI Number -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-[#E2E8F0] flex flex-col h-full relative overflow-hidden group">
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-lg bg-surface-container-low flex items-center justify-center text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">numbers</span>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface">NPI Registry Check</h3>
+<p class="font-label-sm text-label-sm text-secondary mt-1">National Provider Identifier</p>
+</div>
+</div>
+</div>
+<div class="mt-2">
+<label class="block font-label-sm text-label-sm text-on-surface mb-1">Enter your 10-digit NPI</label>
+<div class="flex gap-2">
+<input class="flex-1 bg-surface-bright border border-outline-variant rounded-lg px-4 py-2 text-body-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all" placeholder="e.g. 1234567890" type="text"/>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-6 py-2 rounded-lg hover:bg-surface-tint transition-colors shadow-sm">Verify</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Area -->
+<div class="flex justify-end pt-6 border-t border-outline-variant/30">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-8 py-3 rounded-lg hover:bg-surface-tint transition-colors shadow-md flex items-center gap-2">
+                Submit for Verification
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-3 lg:hidden bg-surface/90 dark:bg-surface-dim/90 backdrop-blur-lg bg-surface dark:bg-surface-dim shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] shadow-lg fixed bottom-0 w-full z-50 rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-secondary dark:text-on-secondary-fixed-variant active:bg-surface-container-highest transition-all scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-container text-on-primary-container dark:text-on-primary-container rounded-2xl px-4 py-1.5 active:bg-surface-container-highest transition-all scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">fact_check</span>
+<span class="font-label-sm text-label-sm mt-1">Verify</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary dark:text-on-secondary-fixed-variant active:bg-surface-container-highest transition-all scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-sm text-label-sm mt-1">History</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary dark:text-on-secondary-fixed-variant active:bg-surface-container-highest transition-all scale-90 active:scale-100 transition-transform" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-sm text-label-sm mt-1">Profile</span>
+</a>
+</nav>
+</body></html>

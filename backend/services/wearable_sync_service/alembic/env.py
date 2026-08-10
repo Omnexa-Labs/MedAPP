@@ -8,10 +8,20 @@ import sys
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
+# `BACKEND_DIR = BASE_DIR.parents[1]` used to be here and it CANNOT WORK IN THE
+# CONTAINER: the service is copied to /app, so BASE_DIR is "/app" and
+# parents[1] raises IndexError before alembic gets anywhere. Migrations for
+# this service have therefore never run in Docker.
+#
+# The repo checkout has enough depth for it, which is why it survived — it only
+# fails where it matters. Guarded rather than assumed: add the shared package
+# only if that directory actually exists at the expected depth.
 BASE_DIR = Path(__file__).resolve().parents[1]
-BACKEND_DIR = BASE_DIR.parents[1]
-for path in (BACKEND_DIR / "shared", BASE_DIR):
-    if str(path) not in sys.path:
+_candidates = [BASE_DIR]
+if len(BASE_DIR.parents) > 1:
+    _candidates.insert(0, BASE_DIR.parents[1] / "shared")
+for path in _candidates:
+    if path.exists() and str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
 from app import models  # noqa: F401,E402

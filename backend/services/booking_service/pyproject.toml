@@ -4,6 +4,8 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
+  # Service-to-service: room provisioning against telemedicine_service.
+  "httpx>=0.27",
   "uvicorn[standard]>=0.30",
   "alembic>=1.13",
   "asyncpg>=0.29",

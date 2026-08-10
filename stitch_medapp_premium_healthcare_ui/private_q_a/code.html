@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Messages - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface": "#f5faf8",
+                      "on-tertiary-fixed": "#001a42",
+                      "on-secondary": "#ffffff",
+                      "on-surface": "#171d1c",
+                      "tertiary": "#0058be",
+                      "on-tertiary-container": "#fefcff",
+                      "on-primary": "#ffffff",
+                      "secondary": "#515f74",
+                      "primary-fixed": "#89f5e7",
+                      "on-background": "#171d1c",
+                      "on-secondary-container": "#57657a",
+                      "secondary-container": "#d5e3fc",
+                      "surface-variant": "#dee4e1",
+                      "error": "#ba1a1a",
+                      "inverse-surface": "#2c3130",
+                      "surface-container-low": "#f0f5f2",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "on-primary-container": "#f4fffc",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "secondary-fixed": "#d5e3fc",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "outline": "#6d7a77",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "tertiary-fixed": "#d8e2ff",
+                      "on-error-container": "#93000a",
+                      "tertiary-container": "#2170e4",
+                      "surface-container-highest": "#dee4e1",
+                      "inverse-on-surface": "#edf2f0",
+                      "surface-dim": "#d6dbd9",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "inverse-primary": "#6bd8cb",
+                      "surface-container": "#eaefed",
+                      "primary": "#00685f",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "on-primary-fixed": "#00201d",
+                      "surface-bright": "#f5faf8",
+                      "surface-tint": "#006a61",
+                      "surface-container-lowest": "#ffffff",
+                      "outline-variant": "#bcc9c6",
+                      "error-container": "#ffdad6",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#005049",
+                      "primary-container": "#008378",
+                      "on-tertiary": "#ffffff",
+                      "background": "#f5faf8",
+                      "on-surface-variant": "#3d4947",
+                      "surface-container-high": "#e4e9e7"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "md": "24px",
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "lg": "48px",
+                      "xl": "80px",
+                      "sm": "12px",
+                      "container-max": "1280px",
+                      "base": "8px"
+              },
+              "fontFamily": {
+                      "label-sm": [
+                              "Inter"
+                      ],
+                      "headline-lg": [
+                              "Manrope"
+                      ],
+                      "headline-lg-mobile": [
+                              "Manrope"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Manrope"
+                      ],
+                      "headline-xl": [
+                              "Manrope"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl": [
+                              "40px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex font-body-md antialiased">
+<!-- Sidebar Navigation (Desktop) -->
+<aside class="hidden md:flex flex-col bg-surface dark:bg-surface-dim h-full w-72 rounded-r-xl border-r border-surface-container-low shadow-[0px_10px_30px_rgba(71,85,105,0.1)] fixed left-0 top-0 z-40">
+<div class="flex flex-col gap-base p-md h-full">
+<div class="flex items-center gap-sm mb-lg">
+<img alt="Healthcare Professional Avatar" class="w-12 h-12 rounded-full object-cover" data-alt="A close-up portrait of a professional female doctor in a modern clinic. She is wearing a white coat and smiling gently. Soft, natural light illuminates her face, conveying a sense of trust and competence in a medical setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvYcIh0RR5IT-POhiv5bsQJ2IFhTZgF6o8EVzEJkPX5aLx605kV4vwmVH6MCEzvD8rgx980Urjsm-oHpTi4w9hHLM0jbSSHa4rayFkaQMHtY8lBIeCo0GR-3cFC4JQ4TCqRHeeodSWhzGZLI2MTeUu4lP0LCNFC-kA-KWVlOtLlfA3YJU6C1n-wzURTPnbnIzgOlsbQoENwSdizVeo3ooUFga7R5s1RsO3awFRF7kwlfdAzCt4R9aM8l0lKCsX0fRJCn-WZnFYp4Mb"/>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim text-[16px] leading-tight">Dr. Julian Vance</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant dark:text-outline mt-1">Chief Medical Officer</p>
+<p class="font-label-sm text-label-sm text-outline text-[10px] mt-0.5">MedApp Health</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-sm px-4 py-3 font-label-md text-label-md text-on-surface-variant dark:text-outline hover:bg-surface-container-highest rounded-full transition-all duration-150" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-sm px-4 py-3 font-label-md text-label-md text-on-surface-variant dark:text-outline hover:bg-surface-container-highest rounded-full transition-all duration-150" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+                    Appointments
+                </a>
+<a class="flex items-center gap-sm px-4 py-3 font-label-md text-label-md text-on-surface-variant dark:text-outline hover:bg-surface-container-highest rounded-full transition-all duration-150" href="#">
+<span class="material-symbols-outlined">groups</span>
+                    Patients
+                </a>
+<a class="flex items-center gap-sm px-4 py-3 font-label-md text-label-md bg-primary-container text-on-primary-container dark:bg-primary-fixed dark:text-on-primary-fixed rounded-full transition-all duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">chat</span>
+                    Messages
+                </a>
+<a class="flex items-center gap-sm px-4 py-3 font-label-md text-label-md text-on-surface-variant dark:text-outline hover:bg-surface-container-highest rounded-full transition-all duration-150 mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-72 flex flex-col min-h-screen">
+<!-- Top App Bar -->
+<header class="bg-surface-bright/80 dark:bg-surface-dim/80 backdrop-blur-md w-full top-0 sticky z-30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border-b border-surface-container-low md:border-none">
+<div class="flex items-center justify-between px-md py-sm w-full max-w-container-max mx-auto">
+<div class="flex items-center gap-sm md:hidden">
+<img alt="user_profile_photo" class="w-10 h-10 rounded-full object-cover" data-alt="A close-up portrait of a professional female doctor in a modern clinic. She is wearing a white coat and smiling gently. Soft, natural light illuminates her face, conveying a sense of trust and competence in a medical setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHrGJ1VAQFpLrFA6Up-x4ZFdrT9j8YaWPj9-qjIDklk9lFvrg81lPW00wFrSmjw3d8vhHZJtp-g_gezxRyehF94C2aiicExJ3JdRsZktIGqF2oyD5tFQg3shFAf6I9_c285aebIX8bz6kvHvE8ODMQ4ASUfmwXiAhUj5ywnvLX_7PSzAtyblUGfKsZEArblQ3FS2Bez8x01Q5gGuBDREBOvzUOgOASnI_vacfAjWH5JJFfPMqJaJaG9PslrqbXbQJEY61DRCa9gzrG"/>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">MedApp</h1>
+</div>
+<h1 class="hidden md:block font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">Messages</h1>
+<button class="p-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container transition-colors active:scale-95 duration-200 text-on-surface-variant dark:text-outline">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<!-- Canvas -->
+<div class="flex-1 p-md md:p-lg max-w-container-max mx-auto w-full pb-32 md:pb-lg flex gap-lg">
+<!-- Left Column: Thread List -->
+<div class="w-full lg:w-1/3 flex flex-col gap-md border-r border-surface-container-low pr-0 lg:pr-md">
+<div class="flex items-center justify-between mb-sm">
+<h2 class="font-headline-md text-[20px] text-on-surface">Active Threads</h2>
+<span class="material-symbols-outlined text-outline">search</span>
+</div>
+<div class="space-y-sm">
+<!-- Active Thread -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border-l-4 border-primary cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-label-md text-label-md text-on-surface">Sarah Jenkins</h3>
+<span class="font-label-sm text-label-sm text-outline">10:42 AM</span>
+</div>
+<p class="font-body-md text-[14px] text-on-surface-variant line-clamp-2">Dr. Vance, the rash hasn't improved since applying the hydrocortisone cream. Should I come in?</p>
+<div class="mt-3 flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px] text-error">lock</span>
+<span class="font-label-sm text-label-sm text-error">Secure &amp; Private</span>
+</div>
+</div>
+<!-- Read Thread -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-label-md text-label-md text-on-surface">Michael Chen</h3>
+<span class="font-label-sm text-label-sm text-outline">Yesterday</span>
+</div>
+<p class="font-body-md text-[14px] text-outline line-clamp-2">Thank you for reviewing my lab results so quickly. I will start the new dosage tomorrow.</p>
+</div>
+<!-- Read Thread -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex items-center justify-between mb-2">
+<h3 class="font-label-md text-label-md text-on-surface">Emily Davis</h3>
+<span class="font-label-sm text-label-sm text-outline">Tuesday</span>
+</div>
+<p class="font-body-md text-[14px] text-outline line-clamp-2">Just confirming my follow-up appointment is still scheduled for next week?</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Chat View & Experts -->
+<div class="hidden lg:flex flex-1 flex-col bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-surface-container-low overflow-hidden">
+<!-- Chat Header -->
+<div class="p-md border-b border-surface-container-low flex items-center justify-between bg-surface-bright">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-headline-md text-[18px]">
+                            SJ
+                        </div>
+<div>
+<h2 class="font-label-md text-[16px] text-on-surface">Sarah Jenkins</h2>
+<p class="font-label-sm text-label-sm text-outline">Patient ID: #99281</p>
+</div>
+</div>
+<div class="flex gap-sm">
+<button class="p-2 rounded-full hover:bg-surface-container-low transition-colors text-outline">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Chat Body -->
+<div class="flex-1 p-md overflow-y-auto space-y-lg bg-surface-bright">
+<div class="flex justify-center">
+<span class="font-label-sm text-label-sm text-outline bg-surface-container-low px-3 py-1 rounded-full">Today</span>
+</div>
+<!-- Patient Message -->
+<div class="flex gap-sm max-w-[80%]">
+<div class="w-8 h-8 rounded-full bg-tertiary-container text-on-tertiary-container flex items-center justify-center font-label-sm shrink-0">SJ</div>
+<div class="bg-surface-container-low text-on-surface p-sm rounded-2xl rounded-tl-sm">
+<p class="font-body-md text-[15px]">Dr. Vance, the rash hasn't improved since applying the hydrocortisone cream. Should I come in?</p>
+<span class="font-label-sm text-[10px] text-outline mt-1 block">10:42 AM</span>
+</div>
+</div>
+<!-- Doctor Message (Placeholder) -->
+<div class="flex gap-sm max-w-[80%] ml-auto flex-row-reverse">
+<img alt="Doctor" class="w-8 h-8 rounded-full object-cover shrink-0" data-alt="A close-up portrait of a professional female doctor in a modern clinic. She is wearing a white coat and smiling gently. Soft, natural light illuminates her face, conveying a sense of trust and competence in a medical setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQltRLUaK2N_a8AcuhTkpigC-U9SwQrt3uHTvdoo18npIE4TWq9dTUTyV1Skf3mLPD1ehicLJOnTldRuHZeX-gf1UOlnuvSv-IIg07W1iqvCbPt9aBO6XofkZNoHEEY36Na5WiT8s348282XhfgpAjde-m6hIzfZJff2W7B-jWB5LHepcwGeKde1akBnnBJ6Wl9WVi6R4WqWDOyPb0gILbTgkH94THhMsh_2P8EnUl4_x5z362Mu74szPhZl2yXccrLS3yKQiek39q"/>
+<div class="bg-primary text-on-primary p-sm rounded-2xl rounded-tr-sm">
+<p class="font-body-md text-[15px]">I see. Let's schedule a brief video call to look at it before having you come all the way to the clinic. Are you available at 2 PM today?</p>
+<span class="font-label-sm text-[10px] text-primary-fixed-dim mt-1 block text-right">10:45 AM</span>
+</div>
+</div>
+</div>
+<!-- Chat Input -->
+<div class="p-md border-t border-surface-container-low bg-surface-bright">
+<div class="flex items-end gap-sm bg-surface-container-low p-2 rounded-xl border border-transparent focus-within:border-primary transition-colors">
+<button class="p-2 text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined">attach_file</span>
+</button>
+<textarea class="flex-1 bg-transparent border-none focus:ring-0 resize-none font-body-md text-on-surface placeholder:text-outline py-2" placeholder="Type a secure message..." rows="1"></textarea>
+<button class="p-2 bg-primary text-on-primary rounded-lg hover:bg-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation (Mobile) -->
+<nav class="md:hidden fixed bottom-0 w-full rounded-t-xl bg-surface-bright/90 dark:bg-surface-dim/90 backdrop-blur-lg shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] z-50">
+<div class="flex justify-around items-center px-gutter py-sm pb-safe">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary transition-all active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm mt-1">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary transition-all active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">event_note</span>
+<span class="font-label-sm text-label-sm mt-1">Schedule</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:text-primary transition-all active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined">clinical_notes</span>
+<span class="font-label-sm text-label-sm mt-1">Health Log</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container dark:bg-primary-fixed text-on-primary-container dark:text-on-primary-fixed rounded-xl px-4 py-1 active:scale-90 duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<span class="font-label-sm text-label-sm mt-1">Profile</span>
+</a>
+</div>
+</nav>
+</body></html>

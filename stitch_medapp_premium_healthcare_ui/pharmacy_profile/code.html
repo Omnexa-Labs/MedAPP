@@ -1,0 +1,272 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Pharmacy Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#6bd8cb",
+                    "on-primary-container": "#f4fffc",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "on-error": "#ffffff",
+                    "outline": "#6d7a77",
+                    "on-tertiary-container": "#fefcff",
+                    "on-secondary-container": "#57657a",
+                    "on-secondary": "#ffffff",
+                    "surface-bright": "#f5faf8",
+                    "on-background": "#171d1c",
+                    "secondary-container": "#d5e3fc",
+                    "primary-container": "#008378",
+                    "outline-variant": "#bcc9c6",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary-fixed": "#00201d",
+                    "primary-fixed": "#89f5e7",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "background": "#f5faf8",
+                    "tertiary-fixed": "#d8e2ff",
+                    "tertiary-container": "#2170e4",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary": "#ffffff",
+                    "surface-tint": "#006a61",
+                    "secondary-fixed": "#d5e3fc",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "surface-container-highest": "#dee4e1",
+                    "inverse-surface": "#2c3130",
+                    "surface-variant": "#dee4e1",
+                    "surface-container-low": "#f0f5f2",
+                    "on-surface-variant": "#3d4947",
+                    "secondary": "#515f74",
+                    "on-surface": "#171d1c",
+                    "tertiary": "#0058be",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface-container-high": "#e4e9e7",
+                    "surface-container": "#eaefed",
+                    "primary": "#00685f",
+                    "surface": "#f5faf8",
+                    "on-error-container": "#93000a",
+                    "on-primary-fixed-variant": "#005049",
+                    "error-container": "#ffdad6",
+                    "surface-dim": "#d6dbd9",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "gutter": "24px",
+                    "base": "8px",
+                    "md": "24px",
+                    "xs": "4px",
+                    "lg": "48px",
+                    "sm": "12px",
+                    "container-max": "1280px"
+            },
+            "fontFamily": {
+                    "label-md": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-xl": ["Manrope"],
+                    "headline-lg": ["Manrope"],
+                    "body-md": ["Inter"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen pb-[100px] md:pb-0 font-body-md text-body-md pt-16">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 backdrop-blur-md bg-surface/80 dark:bg-surface-dim/80 bg-surface-container dark:bg-surface-container-high shadow-sm">
+<div class="flex items-center justify-between px-md h-16 w-full max-w-container-max mx-auto">
+<button class="flex items-center justify-center p-2 text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-full active:scale-95 transition-transform duration-200">
+<span aria-label="Go back" class="material-symbols-outlined">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim font-bold truncate px-4">Pharmacy Profile</h1>
+<button class="flex items-center justify-center p-2 text-primary dark:text-primary-fixed-dim hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors rounded-full active:scale-95 transition-transform duration-200">
+<span aria-label="Share" class="material-symbols-outlined">share</span>
+</button>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-4 md:px-md md:grid md:grid-cols-12 md:gap-gutter pt-6">
+<!-- Left Column / Full Mobile -->
+<div class="md:col-span-8 space-y-6">
+<!-- Hero Header & Badge -->
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background">MediCare Central</h2>
+<span class="inline-flex items-center gap-1 bg-surface-container-highest text-primary px-3 py-1 rounded-full font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+                        Verified
+                    </span>
+</div>
+</div>
+<!-- Hero Images (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="md:col-span-2 rounded-xl overflow-hidden shadow-[0px_4px_20px_rgba(71,85,105,0.05)] bg-surface-container-lowest h-[250px] relative border border-outline-variant/30">
+<img alt="Professional modern pharmacy exterior" class="w-full h-full object-cover" data-alt="A bright, modern pharmacy exterior during daytime. The building features clean architectural lines, large glass windows, and a welcoming entrance. Soft natural sunlight creates a calming, clinical yet approachable atmosphere. The color palette incorporates subtle teal accents against pristine white and light gray walls, aligning perfectly with a premium healthcare brand aesthetic. High-quality corporate photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuACxs-w8bs05kblSzoma9VIFtMJlj4jepH3TV05vqKasqt4Oe2sXaAdnY1oiGuf3zsUS1OJqDoi09bZKUJJlcTk65pewp2NIAdW7UfAp5NPsnY1B3z4h2-bqMzWAkGJAT8clJhQ_8Rfv2gJv8qUq7akaVJMKfJql4LMu8UhuUIV1hDF_Ap9VYa4Txo0x7jkbE1ptV3W5o4asLUBYDolWcIT-EY2b8o9jmTJnrvBWllc55ASQRAKfDVeczIIEajHKlTQKkHlbNNDqWNU">
+</div>
+<div class="rounded-xl overflow-hidden shadow-[0px_4px_20px_rgba(71,85,105,0.05)] bg-surface-container-lowest h-[150px] md:h-[250px] relative border border-outline-variant/30">
+<img alt="Map snippet showing location" class="w-full h-full object-cover" data-alt="A clean, minimalist digital map interface showing a location pin. The map features soft, desaturated colors with a light gray and white base. The location pin is highlighted in a vibrant, primary teal color. The overall style is modern, clinical, and easy to read, focusing on high contrast and clarity suitable for a premium healthcare application." data-location="New York" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7071hrOV8Kj_kjykHMXP1HrAbnkIcYRhPJFo3j1z8TeJjJ-BoCi4RX9l2-RSmTKRBK8djA05w1l46a3uO116GHpmP3J9jhfT6lsIJJblBcmGpq9c57C8h78XGIZXGIeUXt2aaLKpvKcQAiOypKrqL_BiWwsqkEJn4FS6ACTCmtNHiaCB_D70gbQfOM8hof0aMkJZpoSjeBuJt8zHz8qOzhQIEOwImd9AU7Kd4cGCBrZA4cZeY7quCOlvAKTOngm1U_DhqT0WCf5m5">
+</div>
+</div>
+<!-- Quick Info Bar -->
+<div class="flex flex-wrap items-center gap-4 py-4 px-6 bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary">location_on</span>
+<span class="font-label-md text-label-md">0.8 miles</span>
+</div>
+<div class="w-px h-6 bg-outline-variant/50 hidden sm:block"></div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[#F59E0B]" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-md text-label-md">4.8 (124 reviews)</span>
+</div>
+<div class="w-px h-6 bg-outline-variant/50 hidden sm:block"></div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary">schedule</span>
+<span class="font-label-md text-label-md text-primary">Open until 9:00 PM</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex items-center gap-3 w-full">
+<button class="flex-1 bg-primary text-on-primary py-3 px-6 rounded-xl font-label-md text-label-md shadow-[0px_10px_30px_rgba(71,85,105,0.1)] hover:bg-surface-tint transition-colors active:scale-95">
+                    Set as Preferred
+                </button>
+<button class="flex-1 bg-surface-container text-on-surface py-3 px-6 rounded-xl font-label-md text-label-md border border-outline-variant/50 hover:bg-surface-container-high transition-colors active:scale-95">
+                    Get Directions
+                </button>
+<button aria-label="Call pharmacy" class="bg-surface-container text-primary p-3 rounded-xl border border-outline-variant/50 hover:bg-surface-container-high transition-colors active:scale-95 flex items-center justify-center">
+<span class="material-symbols-outlined">call</span>
+</button>
+</div>
+<!-- Information Sections -->
+<div class="space-y-6">
+<!-- Address & Hours Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-3">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Address</h3>
+<p class="font-body-md text-body-md text-on-background">
+                            123 Healthway Blvd, Suite 100<br>
+                            Medical District, NY 10001
+                        </p>
+</div>
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex justify-between items-center cursor-pointer">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Hours</h3>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</div>
+<div class="flex justify-between items-center font-body-md text-body-md">
+<span class="font-medium text-on-background">Today</span>
+<span class="text-on-surface-variant">8:00 AM - 9:00 PM</span>
+</div>
+</div>
+</div>
+<!-- Services -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4">Services Available</h3>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">medication</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-background">Prescription Refills</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">vaccines</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-background">Vaccinations</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">local_shipping</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-background">Home Delivery</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">directions_car</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-background">24/7 Drive-thru</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (Desktop Rail) -->
+<div class="hidden md:block md:col-span-4 space-y-6">
+<!-- Pharmacist Profile -->
+<div class="bg-surface-container-lowest p-6 rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col items-center text-center gap-4">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider w-full text-left">Head Pharmacist</h3>
+<div class="w-24 h-24 rounded-full overflow-hidden border-4 border-surface-container">
+<img alt="Dr. Elena Rossi" class="w-full h-full object-cover" data-alt="A professional headshot of a female pharmacist, Dr. Elena Rossi, wearing a crisp white lab coat over professional attire. She has a warm, reassuring, and intelligent expression, looking directly at the camera. The background is a soft, blurred, clinical white and light gray setting, conveying trust and medical expertise. The lighting is bright, soft, and flattering, aligning with a premium healthcare aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8oyPVswR6by8emvM8YECioPgb1HbwE2idn7bnNam3sC4-WIRoGonjlJxSvgy4TKD77OVqkzSyXKpOwDPucASarJp6Ha2releHZE3IXUsf_SUICR5unObGrWlfC9ZFVcwLb-9cGL8cBkKyQqUv3IxRWRLRorLBPMSjQbCXBJekEtf-mOQL9w3BaFh8zyCdHb5RhXLSSYX1xgOaBoB8_wPKE4zIwo-sO-424pXuKE4emuwbrB_b9PflCqIBEv-MhH7rKyGUgp-Y40gm">
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-on-background font-semibold">Dr. Elena Rossi, PharmD</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">15+ years experience in clinical pharmacy and patient care counseling.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface-container-lowest fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-2 pb-6 z-50 rounded-t-xl shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] border-t border-outline-variant/30">
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 py-1 hover:bg-primary/5 active:scale-90 transition-all duration-150 rounded-lg">
+    <span class="material-symbols-outlined mb-1">home</span>
+    <span class="text-[10px] font-label-sm">Home</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-primary flex-1 py-1 hover:bg-primary/5 active:scale-90 transition-all duration-150 rounded-lg">
+    <span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+    <span class="text-[10px] font-label-sm font-semibold">Overview</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 py-1 hover:bg-primary/5 active:scale-90 transition-all duration-150 rounded-lg">
+    <span class="material-symbols-outlined mb-1">mail</span>
+    <span class="text-[10px] font-label-sm">Inbox</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 py-1 hover:bg-primary/5 active:scale-90 transition-all duration-150 rounded-lg">
+    <span class="material-symbols-outlined mb-1">group</span>
+    <span class="text-[10px] font-label-sm">Community</span>
+  </button>
+  <button class="flex flex-col items-center justify-center text-on-surface-variant flex-1 py-1 hover:bg-primary/5 active:scale-90 transition-all duration-150 rounded-lg">
+    <span class="material-symbols-outlined mb-1">auto_awesome</span>
+    <span class="text-[10px] font-label-sm">Lifestyle</span>
+  </button>
+</nav>
+
+
+</body></html>

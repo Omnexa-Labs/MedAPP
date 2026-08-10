@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     # Audit finding #2: no default secret. Set SOCIAL_JWT_SECRET in env.
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
+    # Service-to-service identity lookup. Internal only - this route is
+    # deliberately absent from the api_gateway ROUTES table.
+    user_service_url: str = "http://user_service:8001"
+    # Off in tests and anywhere without a broker. Matches the publish_events
+    # flag the publishing services carry.
+    consume_events: bool = True
+    rabbitmq_url: str = "amqp://medapp:medapp@rabbitmq:5672/"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
 

@@ -1,0 +1,468 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Health Overview Hub - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-container": "#fefcff",
+                        "surface-container-highest": "#dee4e1",
+                        "surface-bright": "#f5faf8",
+                        "surface-variant": "#dee4e1",
+                        "outline": "#6d7a77",
+                        "inverse-primary": "#6bd8cb",
+                        "on-error": "#ffffff",
+                        "surface-container-high": "#e4e9e7",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "primary-fixed-dim": "#6bd8cb",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-surface": "#171d1c",
+                        "on-secondary-container": "#57657a",
+                        "tertiary-fixed": "#d8e2ff",
+                        "outline-variant": "#bcc9c6",
+                        "on-primary-container": "#f4fffc",
+                        "surface-container": "#eaefed",
+                        "on-primary-fixed": "#00201d",
+                        "on-primary-fixed-variant": "#005049",
+                        "on-primary": "#ffffff",
+                        "surface": "#f5faf8",
+                        "background": "#f5faf8",
+                        "tertiary": "#0058be",
+                        "secondary-fixed": "#d5e3fc",
+                        "error": "#ba1a1a",
+                        "secondary": "#515f74",
+                        "inverse-surface": "#2c3130",
+                        "on-secondary-fixed": "#0d1c2e",
+                        "surface-tint": "#006a61",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "primary-fixed": "#89f5e7",
+                        "on-surface-variant": "#3d4947",
+                        "on-secondary-fixed-variant": "#3a485b",
+                        "on-error-container": "#93000a",
+                        "surface-container-low": "#f0f5f2",
+                        "secondary-fixed-dim": "#b9c7df",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "surface-dim": "#d6dbd9",
+                        "secondary-container": "#d5e3fc",
+                        "inverse-on-surface": "#edf2f0",
+                        "on-background": "#171d1c",
+                        "primary-container": "#008378",
+                        "primary": "#00685f",
+                        "tertiary-container": "#2170e4",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "gutter": "24px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "xl": "80px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-lg-mobile": ["Manrope"],
+                        "headline-xl": ["Manrope"],
+                        "label-md": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            min-height: max(884px, 100dvh);
+        }
+        .mini-chart {
+            height: 40px;
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+        }
+        .chart-bar {
+            flex: 1;
+            background: currentColor;
+            opacity: 0.3;
+            border-radius: 1px;
+            transition: opacity 0.2s;
+        }
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen flex flex-col pt-[88px] pb-[80px]">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md fixed full-width top-0 sticky z-50 shadow-sm flex justify-between items-center w-full px-gutter py-md max-w-container-max mx-auto">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-surface-container-high">
+<img alt="User profile photo" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLitwX1Wr066dNe6iFnfpr21hgTTZ-Hkv6-a3EZStvnga4SY94Gt0P8lEeLQ4C4s6tf_7c3MAaeVdoEEyrRIFKFILW4WoVHQW8eFg9xkbX64gK0ZqDnJbCYUc-Fx2mTWXQG9kdV-cuAOord-4alTi-u9-2axy0D0KRwRolI0IiAohjQ1KQ8kh48V1BLyWs6QoM06vq8NQocry-uoo8Nw2MWzI0n6d2DNvs7xJv3YObMI_Id960RSPxCDXlwt4Ryg4suoycif9DQNaV">
+</div>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">Health Hub</h1>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors text-primary dark:text-primary-fixed-dim opacity-80">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="flex-1 w-full max-w-container-max mx-auto px-4 md:px-gutter flex flex-col gap-6 pt-4"><div class="bg-tertiary-container text-on-tertiary-container p-4 rounded-2xl flex items-center justify-between shadow-md border border-tertiary/20">
+<div class="flex items-center gap-4">
+<div class="bg-white/20 p-2 rounded-full">
+<span class="material-symbols-outlined text-white" data-icon="new_releases">new_releases</span>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-white">New Prescription Issued</h4>
+<p class="text-label-sm text-white/90">Dr. Sarah Jenkins sent a new script for Metformin.</p>
+</div>
+</div>
+<button class="bg-white text-tertiary px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-white/90 transition-colors">
+    View &amp; Schedule
+  </button>
+</div>
+<!-- 4. AI-Powered Insight Card -->
+<section class="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex gap-4 items-start relative overflow-hidden">
+<div class="absolute top-0 right-0 p-1">
+<span class="material-symbols-outlined text-primary/10 text-6xl" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="bg-primary/10 p-2 rounded-xl text-primary">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<div class="flex-1">
+<h3 class="font-label-md text-label-md text-primary mb-1">Health Insight</h3>
+<p class="font-body-md text-body-md text-on-surface">Your sleep quality improved by <span class="font-bold text-primary">12%</span> after starting your new medication routine. Consistency is key!</p>
+</div>
+</section>
+<!-- Quick Actions -->
+<section class="flex gap-3">
+<button class="flex-1 bg-primary text-on-primary py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md hover:bg-primary/90 transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="download">download</span>
+<span class="font-label-md text-label-md">Report</span>
+</button>
+<button class="flex-1 bg-surface-container-lowest text-on-surface py-3 px-4 rounded-xl flex items-center justify-center gap-2 border border-outline-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="share">share</span>
+<span class="font-label-md text-label-md">Export</span>
+</button>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+<!-- 1 & 2. Health Trends Section with Selector & Charts -->
+<section class="md:col-span-12 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 flex flex-col gap-6">
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="monitor_heart">monitor_heart</span>
+                        Health Trends
+                    </h2>
+<div class="flex bg-surface-container-low rounded-lg p-1">
+<button class="px-3 py-1 text-label-sm font-label-sm rounded-md bg-primary text-on-primary">7D</button>
+<button class="px-3 py-1 text-label-sm font-label-sm rounded-md text-on-surface-variant hover:bg-surface-container-high">1M</button>
+<button class="px-3 py-1 text-label-sm font-label-sm rounded-md text-on-surface-variant hover:bg-surface-container-high">3M</button>
+<button class="px-3 py-1 text-label-sm font-label-sm rounded-md text-on-surface-variant hover:bg-surface-container-high">1Y</button>
+</div>
+</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Heart Rate Chart -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Heart Rate</span>
+<span class="material-symbols-outlined text-error text-[18px]" data-icon="favorite" style="font-variation-settings: &quot;FILL&quot; 1;">favorite</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-headline-md">72</span>
+<span class="font-body-md text-body-md opacity-60">bpm</span>
+</div>
+<div class="mini-chart text-error">
+<div class="chart-bar" style="height: 60%"></div>
+<div class="chart-bar" style="height: 45%"></div>
+<div class="chart-bar" style="height: 80%"></div>
+<div class="chart-bar" style="height: 55%"></div>
+<div class="chart-bar" style="height: 90%"></div>
+<div class="chart-bar" style="height: 70%"></div>
+<div class="chart-bar" style="height: 65%"></div>
+</div>
+</div>
+<!-- Blood Pressure Chart -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Blood Pressure</span>
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="blood_pressure">blood_pressure</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-headline-md">118</span>
+<span class="font-body-md text-body-md opacity-60">/76</span>
+</div>
+<div class="mini-chart text-primary">
+<div class="chart-bar" style="height: 40%"></div>
+<div class="chart-bar" style="height: 35%"></div>
+<div class="chart-bar" style="height: 50%"></div>
+<div class="chart-bar" style="height: 45%"></div>
+<div class="chart-bar" style="height: 30%"></div>
+<div class="chart-bar" style="height: 35%"></div>
+<div class="chart-bar" style="height: 40%"></div>
+</div>
+</div>
+<!-- Sleep Chart -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Sleep</span>
+<span class="material-symbols-outlined text-tertiary text-[18px]" data-icon="bedtime" style="font-variation-settings: &quot;FILL&quot; 1;">bedtime</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-headline-md">7.2</span>
+<span class="font-body-md text-body-md opacity-60">hrs</span>
+</div>
+<div class="mini-chart text-tertiary">
+<div class="chart-bar" style="height: 70%"></div>
+<div class="chart-bar" style="height: 85%"></div>
+<div class="chart-bar" style="height: 40%"></div>
+<div class="chart-bar" style="height: 95%"></div>
+<div class="chart-bar" style="height: 80%"></div>
+<div class="chart-bar" style="height: 85%"></div>
+<div class="chart-bar" style="height: 90%"></div>
+</div>
+</div>
+<!-- Hydration Chart -->
+<div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/30 flex flex-col gap-3">
+<div class="flex justify-between items-center text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Hydration</span>
+<span class="material-symbols-outlined text-inverse-primary text-[18px]" data-icon="water_drop" style="font-variation-settings: &quot;FILL&quot; 1;">water_drop</span>
+</div>
+<div class="flex items-baseline gap-1">
+<span class="font-headline-md text-headline-md">1.8</span>
+<span class="font-body-md text-body-md opacity-60">L</span>
+</div>
+<div class="mini-chart text-inverse-primary">
+<div class="chart-bar" style="height: 30%"></div>
+<div class="chart-bar" style="height: 45%"></div>
+<div class="chart-bar" style="height: 60%"></div>
+<div class="chart-bar" style="height: 80%"></div>
+<div class="chart-bar" style="height: 60%"></div>
+<div class="chart-bar" style="height: 75%"></div>
+<div class="chart-bar" style="height: 100%"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 3. Clinical Milestone Timeline -->
+<section class="md:col-span-12 lg:col-span-7 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-6">Clinical Milestones</h2>
+<div class="relative pl-8 before:content-[''] before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-surface-container-high">
+<div class="relative mb-8 last:mb-0">
+<div class="absolute -left-[29px] top-1 w-5 h-5 bg-primary rounded-full ring-4 ring-surface-container-lowest flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[12px]" data-icon="medication">medication</span>
+</div>
+<div>
+<span class="text-label-sm font-label-sm text-primary">Nov 12, 2023</span>
+<h4 class="font-label-md text-label-md text-on-surface mt-1">Dosage Adjustment</h4>
+<p class="text-body-md text-on-surface-variant mt-1 italic">"Started Lisinopril 10mg morning routine. BP stabilized to 120/80 within 7 days."</p>
+</div>
+</div>
+<div class="relative mb-8 last:mb-0">
+<div class="absolute -left-[29px] top-1 w-5 h-5 bg-tertiary rounded-full ring-4 ring-surface-container-lowest flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[12px]" data-icon="event">event</span>
+</div>
+<div>
+<span class="text-label-sm font-label-sm text-tertiary">Oct 28, 2023</span>
+<h4 class="font-label-md text-label-md text-on-surface mt-1">Cardiology Consultation</h4>
+<p class="text-body-md text-on-surface-variant mt-1">Follow-up with Dr. Jenkins. Heart rate variability improving.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- 5. Data Integrity Section -->
+<section class="md:col-span-12 lg:col-span-5 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface">Data Integrity</h2>
+<span class="material-symbols-outlined text-primary/40" data-icon="sync_saved_locally">sync_saved_locally</span>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-black text-white rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="watch">watch</span>
+</div>
+<div>
+<p class="font-label-md text-label-md">Apple Watch Ultra</p>
+<p class="text-label-sm text-on-surface-variant">Last synced: 2m ago</p>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-outline-variant/30">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-slate-800 text-white rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="brightness_5">brightness_5</span>
+</div>
+<div>
+<p class="font-label-md text-label-md">Oura Ring Gen 3</p>
+<p class="text-label-sm text-on-surface-variant">Last synced: 45m ago</p>
+</div>
+</div>
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+</div>
+</section>
+<!-- 6. Integrated Medication & Prescriptions -->
+<section class="md:col-span-12 lg:col-span-8 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 flex flex-col gap-5">
+<div class="flex justify-between items-center">
+<h2 class="font-headline-md text-headline-md text-on-surface">Medication Adherence</h2>
+<div class="bg-primary/10 text-primary px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1 border border-primary/20">
+<span class="material-symbols-outlined text-[16px]" data-icon="check_circle">check_circle</span>
+                    85% Compliance
+                </div>
+</div>
+<div class="grid md:grid-cols-2 gap-4">
+<div class="p-4 rounded-xl border-l-4 border-primary bg-surface-container-low flex justify-between items-center">
+<div>
+<span class="font-label-md text-label-md block">Lisinopril 10mg</span>
+<span class="text-body-md text-on-surface-variant">08:00 AM</span>
+</div>
+<button class="w-8 h-8 rounded-full border border-primary text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="done">done</span>
+</button>
+</div>
+<div class="p-4 rounded-xl border-l-4 border-surface-variant bg-surface-container-low flex justify-between items-center opacity-60">
+<div>
+<span class="font-label-md text-label-md block">Atorvastatin 20mg</span>
+<span class="text-body-md text-on-surface-variant">09:00 PM</span>
+</div>
+<button class="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]" data-icon="hourglass_empty">hourglass_empty</span>
+</button>
+</div>
+</div>
+</section>
+<section class="md:col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 flex flex-col gap-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Active Scripts</h2>
+<div class="flex flex-col gap-4">
+<div class="flex flex-col p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="person_clinical">person_clinical</span>
+<span class="font-label-md text-label-md">Dr. Sarah Jenkins</span>
+</div>
+<div class="flex justify-between items-center"><span class="text-label-sm text-on-surface-variant">Cardiology • Oct 12</span>
+<div class="flex gap-3">
+<button class="text-primary font-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="share">share</span>
+        Share
+    </button>
+<button class="text-primary font-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+        View Rx
+    </button>
+</div></div>
+</div>
+<div class="flex flex-col p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 gap-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]" data-icon="person_clinical">person_clinical</span>
+<span class="font-label-md text-label-md">Dr. Mark Chen</span>
+</div>
+<div class="flex justify-between items-center"><span class="text-label-sm text-on-surface-variant">GP • Sep 05</span>
+<div class="flex gap-3">
+<button class="text-primary font-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="share">share</span>
+        Share
+    </button>
+<button class="text-primary font-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="visibility">visibility</span>
+        View Rx
+    </button>
+</div></div>
+</div>
+</div>
+</section><section class="md:col-span-12 bg-surface-container-lowest rounded-2xl border border-outline-variant p-5 flex flex-col gap-6">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<h2 class="font-headline-md text-headline-md text-on-surface">Prescriptions</h2>
+<div class="flex bg-surface-container-low rounded-lg p-1 w-fit">
+<button class="px-4 py-1 text-label-sm font-label-sm rounded-md bg-primary text-on-primary">Active</button>
+<button class="px-4 py-1 text-label-sm font-label-sm rounded-md text-on-surface-variant hover:bg-surface-container-high">Past</button>
+</div>
+<button class="text-primary font-label-md hover:underline transition-colors">View All</button></div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- Active Prescription 1 -->
+<div class="p-4 rounded-xl border border-outline-variant/30 bg-surface-container-low flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-label-md text-label-md">Lisinopril 10mg</h4>
+<p class="text-label-sm text-on-surface-variant">1 tablet daily • 30 days remaining</p>
+</div>
+<span class="text-primary material-symbols-outlined" data-icon="prescriptions">prescriptions</span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/20">
+<a class="text-primary font-label-sm hover:underline" href="#">View Details</a>
+
+</div>
+</div>
+<!-- Active Prescription 2 -->
+<div class="p-4 rounded-xl border border-outline-variant/30 bg-surface-container-low flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div>
+<h4 class="font-label-md text-label-md">Atorvastatin 20mg</h4>
+<p class="text-label-sm text-on-surface-variant">1 tablet nightly • 15 days remaining</p>
+</div>
+<span class="text-primary material-symbols-outlined" data-icon="prescriptions">prescriptions</span>
+</div>
+<div class="flex items-center justify-between pt-2 border-t border-outline-variant/20">
+<a class="text-primary font-label-sm hover:underline" href="#">View Details</a>
+
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3"><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="home">home</span><span class="font-label-sm text-label-sm mt-1">Home</span></a><a class="flex flex-col items-center justify-center text-primary p-2" href="#"><span class="material-symbols-outlined" data-icon="grid_view" style="font-variation-settings: &quot;FILL&quot; 1;">grid_view</span><span class="font-label-sm text-label-sm mt-1 font-bold">Overview</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="mail">mail</span><span class="font-label-sm text-label-sm mt-1">Inbox</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="group">group</span><span class="font-label-sm text-label-sm mt-1">Community</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span><span class="font-label-sm text-label-sm mt-1">Lifestyle</span></a></nav>
+<!-- SideNav (Desktop) -->
+<aside class="hidden md:flex flex-col w-64 fixed left-0 top-[88px] h-[calc(100vh-88px)] bg-surface border-r border-surface-container-high py-6 px-4 gap-2">
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-md text-label-md">Home</span>
+</a>
+<a class="flex items-center gap-3 p-3 rounded-lg bg-primary-container text-on-primary-container font-bold" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view" data-weight="fill" style="font-variation-settings: &quot;FILL&quot; 1;">grid_view</span>
+<span class="font-label-md text-label-md">Overview Hub</span>
+</a>
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="mail">mail</span>
+<span class="font-label-md text-label-md">Inbox</span>
+</a>
+<a class="flex items-center gap-3 p-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-md text-label-md">Lifestyle AI</span>
+</a>
+</aside>
+
+
+</body></html>

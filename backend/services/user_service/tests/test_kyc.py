@@ -3,7 +3,12 @@ import pytest
 pytestmark = pytest.mark.asyncio
 
 
-async def _signup_login(client, email="doc@b.com", role="doctor"):
+# Signs up a PLAIN USER. Public signup cannot grant a clinician role any more
+# (schemas/auth.py), and it never should have: KYC approval is what sets
+# `User.role`, via `review_submission`. These tests exercise that path, so the
+# account they start from is exactly what a real applicant has - a `user` asking
+# to become something else.
+async def _signup_login(client, email="doc@b.com", role="user"):
     await client.post(
         "/auth/signup",
         json={

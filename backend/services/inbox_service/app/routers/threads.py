@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..deps import CurrentPrincipalDep, DbSession
 from ..schemas.thread import HandoffCreate, ThreadCreate, ThreadList, ThreadMessageCreate, ThreadMessageOut, ThreadOut, ThreadParticipantOut
-from ..services.thread_service import create_direct_thread, create_handoff_thread, get_thread, list_messages, list_threads, mark_thread_read, post_message
+from ..services.thread_service import create_direct_thread, create_handoff_thread, list_messages, list_threads, mark_thread_read, post_message, read_thread_detail
 
 router = APIRouter(prefix="/v1/threads", tags=["Threads"])
 
@@ -22,7 +22,8 @@ async def index(session: AsyncSession = DbSession, principal=CurrentPrincipalDep
 
 @router.get("/{thread_id}", response_model=ThreadOut)
 async def read(thread_id: UUID, session: AsyncSession = DbSession, principal=CurrentPrincipalDep):
-    return await get_thread(session, principal, thread_id)
+    # `read_thread_detail`, not `get_thread`: the audited entry point.
+    return await read_thread_detail(session, principal, thread_id)
 
 
 @router.get("/{thread_id}/messages", response_model=list[ThreadMessageOut])

@@ -1,3 +1,3 @@
-from . import root, threads
+from . import attachments, root, threads
 
-__all__ = ["root", "threads"]
+__all__ = ["attachments", "root", "threads"]

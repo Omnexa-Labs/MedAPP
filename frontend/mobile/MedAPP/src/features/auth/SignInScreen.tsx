@@ -1,26 +1,87 @@
-// Sign-in screen — translated from the Stitch HTML.
+// Sign-in screen — rebuilt against the APPROVED Figma frame "Login"
+// (file kRifcg1KCEAlTXy4aimotK, page "Onboarding & Auth", node 57:102).
 //
-// RHF + zod for the form, useLogin for the network call, useAuthStore for the
-// success side-effect (handled inside useLogin). The screen itself just
-// renders the form and surfaces errors.
+// The previous version was translated from the Stitch HTML before the design
+// system existed; per the product owner's call, Figma is the source of truth,
+// so the layout, spacing, radii, colours and copy below come from the frame,
+// not from the old screen. What was preserved is the behaviour the design
+// cannot express: RHF + zod validation, useLogin for the network call,
+// useBiometricLogin/useBiometricCapability, the onSuccess side-effect and the
+// error copy.
 //
-// Translation rules applied (see splash for the full list):
-//  - filter blur on hero image and corner blobs → low-opacity solid (RN blur
-//    is expensive; visually equivalent at these opacities).
-//  - hover:* / group-hover:* → dropped.
-//  - focus:ring-2 focus:border-primary → onFocus toggles border color.
-//  - cursor:pointer → drop (RN has no cursor).
-//  - <input type=checkbox> → custom Pressable checkbox; no checkbox primitive
-//    in core RN.
+// Frame structure (all values read from get_design_context / get_variable_defs,
+// not eyeballed):
+//   screen      bg `background`, 24px padding, column, centred
+//   Header      64px logo tile (radius 24) · "MedApp" headline-lg 24/Manrope
+//               Bold `primary` · "Secure Healthcare Access" body-md
+//               `on-surface-variant`; 4px gaps
+//   Spacer      32
+//   Card        <Card> — radius 24, `card-surface` fill, 32px inset, 24px gaps,
+//               1px `outline-variant` hairline, and NO drop shadow
+//               (docs/BRAND.md: "cards do NOT cast a drop shadow" — the local
+//               `CARD_SHADOW` this screen once carried is gone for good)
+//     fields    label-md label + 52px input (radius 12, 16px inset,
+//               `field-surface` fill)
+//     remember  <ConsentRow> — 20px checkbox (radius 4, 1.5px hairline),
+//               12px gap, label-md, aligned to the label's first line
+//     CTA       56px, radius 12, `primary` fill, arrow-right 20
+//     divider   1px hairlines + "OR CONTINUE WITH" label-sm `on-surface-variant`
+//     biometric two flex-1 tiles, radius 24, 12px inset, `field-surface` fill
+//   Spacer      48
+//   Footer      signup row · HIPAA badge · Privacy/Terms links
+//               (all tertiary type on `on-surface-variant`)
+//
+// The card, the field fill and the consent row now come from the shared
+// primitives (`<Card>`, `<Input>`, `<ConsentRow>`) rather than being hand-rolled
+// here — the recessed-field / hairline-separated-card treatment is a
+// design-system concern, not a per-screen one, and hand-rolling it here is what
+// let this screen drift (it is how the rejected card shadow got in twice).
+//
+// Deviations from the frame are marked FLAGGED inline below, and are:
+//   1. The frame's Email Input carries an "Eye Toggle Target (44x44)"
+//      (I57:115;318:654) identical to the password field's. An email field has
+//      nothing to mask, so this is an unoverridden default on the shared Input
+//      component instance, not intent — omitted here.
+//   2. `radius/4` on the Checkbox conflicts with BRAND's 12/24/full scale. Owned
+//      by <ConsentRow> now; still an open designer question.
+//   3. Field-level validation, the form-level error banner and the
+//      "no enrolled credential" case have no state in the frame.
+//   4. FaceID uses the chrome icon fallback — Health Icons has no face glyph.
+//   5. The frame has no single-tile biometric variant; a fingerprint-only
+//      Android device renders one full-width tile. Undesigned — see the report.
+//
+// NOT deviations any more (the frame was re-read; the old notes were stale):
+//   - the divider label, the HIPAA row and the footer links are
+//     `color/on-surface-variant` (#3D4947) in the frame, not `outline-variant`.
+//     The old TERTIARY_TEXT mitigation is deleted — there is no contrast
+//     conflict left to mitigate (8.9:1).
+//   - the Remember Me Row is node 437:1162, an instance of the `ConsentRow`
+//     design-system component (434:1161), not the old 57:137.
+//
+// RN translation rules: no hover/cursor states, the checkbox is a Pressable
+// (core RN has no checkbox), and the frame's "filled" inputs are rendered as
+// real placeholders.
+//
+// ACCESSIBILITY (not expressible in the frame, so not a deviation):
+//  - Every tappable string — "Forgot Password?", "Sign Up", "Privacy Policy",
+//    "Terms of Service" — goes through <TextLink>, which reaches the 44pt
+//    minimum target via `hitSlop` rather than padding, because padding would
+//    change the frame's metrics (the Password label row and the footer rows are
+//    hug-height). `label-sm` is 12px on lineHeight 1, so 16 top + 16 bottom is
+//    exactly 44; "Forgot Password?" uses 24/8 so its target doesn't reach into
+//    the password field 4px below it.
+//  - Both text fields carry an explicit `accessibilityLabel` plus an
+//    `accessibilityHint` carrying the validation message, because RN does not
+//    associate the visible label <Text> with the TextInput the way <label for>
+//    does; <Input> also sets `aria-invalid` from `hasError`.
+//
+// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
 
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,7 +89,19 @@ import { StatusBar } from "expo-status-bar";
 import { Link } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { MaterialIcons } from "@expo/vector-icons";
+import {
+  Button,
+  Card,
+  ConsentRow,
+  Icon,
+  InfoCallout,
+  Input,
+  Logo,
+  type InfoCalloutTone,
+  KeyboardInset,
+} from "@/components/ui";
+import { useResolvedScheme } from "@/lib/theme";
+import { useTokenColor } from "@/lib/tokens";
 import { ApiError } from "@/types/api";
 import { LoginSchema, type LoginFormValues } from "@/features/auth/schema";
 import { useLogin } from "@/features/auth/hooks/use-login";
@@ -37,6 +110,18 @@ import {
   useBiometricCapability,
   useBiometricLogin,
 } from "@/features/auth/hooks/use-biometric-login";
+
+/**
+ * The Card's inset on node 57:112 is `spacing/32`, but the <Card> primitive
+ * defaults to `p-md` (24) and src/lib/cn.ts has no tailwind-merge — passing
+ * `p-8` in `className` would leave two competing padding utilities whose
+ * resolution order NativeWind does not guarantee. The `style` prop is merged
+ * last by <Card>, so it wins deterministically.
+ *
+ * FLAGGED for the Card owner: the primitive should carry the frame's 32px inset
+ * (or expose an inset variant) so this override can go away.
+ */
+const CARD_INSET = 32;
 
 interface Props {
   onSuccess?: () => void;
@@ -47,22 +132,59 @@ export function SignInScreen({ onSuccess }: Props) {
   const biometric = useBiometricLogin();
   const biometricCapability = useBiometricCapability();
   const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  /**
+   * The form-level message, WITH ITS REGISTER.
+   *
+   * It used to be a bare string rendered unconditionally in `error-container` /
+   * `on-error-container`, which meant one of the four things that could land in
+   * it was mis-typed: "Sign in with your password first to enable biometric." is
+   * GUIDANCE about a feature the user has not used yet — nothing has failed, no
+   * credential was rejected, and there is nothing to correct. Painting it as an
+   * error on the first screen every user meets reports a fault that does not
+   * exist, and it devalues the register for the message that follows it, which
+   * genuinely is one ("Email or password is incorrect").
+   *
+   * WHY A TONE RATHER THAN SUPPRESSING IT. The alternative was to show it only
+   * after a biometric attempt — but it ALREADY is only shown then: `onBiometric`
+   * is the sole writer of the `no_credentials` branch, and the tiles that call it
+   * are gated on device capability. So "show it later" would change nothing. What
+   * is actually wrong is the styling of a message that has to appear at exactly
+   * the moment it appears: the user just tapped Fingerprint and is owed an
+   * explanation of why nothing happened. It stays, in the informational register.
+   */
+  const [formMessage, setFormMessage] = useState<{
+    text: string;
+    tone: InfoCalloutTone;
+  } | null>(null);
+  const setFormError = (text: string) => setFormMessage({ text, tone: "error" });
+  const setFormNotice = (text: string) => setFormMessage({ text, tone: "info" });
+  const clearFormMessage = () => setFormMessage(null);
+  const { scheme } = useResolvedScheme();
+  // Icon colours can't be Tailwind classes (react-native-svg / MaterialIcons
+  // take a colour string), so they're resolved by token name for the mode.
+  const onSurfaceVariant = useTokenColor("on-surface-variant");
+  const primary = useTokenColor("primary");
 
   // Run the biometric flow. user_cancel is silent (the user changed
   // their mind); refresh_failed clears the stale token and tells the
   // user to use password; biometric_failed shows a non-fatal hint.
   const onBiometric = async (kind: "face" | "fingerprint") => {
-    setFormError(null);
+    clearFormMessage();
     try {
       await biometric.mutateAsync(kind);
       onSuccess?.();
     } catch (e) {
       if (e instanceof BiometricLoginAbort) {
         if (e.kind === "user_cancel") return; // silent
-        if (e.kind === "no_credentials") setFormError("Sign in with your password first to enable biometric.");
-        else if (e.kind === "biometric_failed") setFormError("Biometric not recognised. Try again or use your password.");
-        else if (e.kind === "refresh_failed") setFormError("Your session expired. Please sign in with your password.");
+        if (e.kind === "no_credentials")
+          // INFORMATIONAL. There is no stored credential to unlock yet, which is
+          // simply where a new device starts. The sentence tells the user what to
+          // do next; it is not reporting a failure.
+          setFormNotice("Sign in with your password first to enable biometric.");
+        else if (e.kind === "biometric_failed")
+          setFormError("Biometric not recognised. Try again or use your password.");
+        else if (e.kind === "refresh_failed")
+          setFormError("Your session expired. Please sign in with your password.");
         return;
       }
       setFormError("Something went wrong. Please try again.");
@@ -80,7 +202,7 @@ export function SignInScreen({ onSuccess }: Props) {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
+    clearFormMessage();
     try {
       await login.mutateAsync({ email: values.email, password: values.password });
       onSuccess?.();
@@ -97,112 +219,64 @@ export function SignInScreen({ onSuccess }: Props) {
 
   return (
     <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-
-      {/* Decorative corner blobs — Stitch uses heavy blur + low opacity.
-          Solid low-opacity circles read identically at these scales. */}
-      <View
-        pointerEvents={Platform.OS === "web" ? undefined : "none"}
-        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
-        className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-fixed opacity-10"
-      />
-      <View
-        pointerEvents={Platform.OS === "web" ? undefined : "none"}
-        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
-        className="absolute -bottom-32 -left-24 h-96 w-96 rounded-full bg-tertiary-fixed opacity-[0.05]"
-      />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
 
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
-        >
+        {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
+          from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
+          silently does nothing there. Proven on device on the chat composer. */}
+      <KeyboardInset className="flex-1">
           <ScrollView
-            // No justifyContent here — on Android, flexGrow + justifyContent
-            // center clips bottom-overflow content (the footer with HIPAA +
-            // Privacy/Terms was getting cut off below the fold without being
-            // reachable by scrolling). Top-aligned with generous top padding
-            // gives the visual breathing room without breaking overflow.
+            // The frame centres its column, but at 393px the content is ~850px
+            // tall — taller than the viewport on the target devices — so it has
+            // to scroll. `justifyContent: center` here clips the overflow on
+            // Android (the footer became unreachable), so the column is
+            // top-aligned with the frame's own 24px padding on all sides.
             contentContainerStyle={{
-              // flexGrow lets the inner view fill the viewport and lets
-              // scrolling kick in when the form is taller than the screen.
-              // paddingBottom is generous so the HIPAA + Privacy/Terms block
-              // clears the Pixel 5's gesture nav bar even when keyboard is
-              // closed.
               flexGrow: 1,
               paddingHorizontal: 24,
-              paddingTop: 32,
-              paddingBottom: 64,
+              paddingVertical: 24,
             }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View className="mx-auto w-full max-w-[440px]">
-              {/* Logo + header.
-                  Stitch ships mb-xl (80px) — too much on a phone. mb-lg keeps
-                  the breathing room without blowing past the fold. */}
-              <View className="mb-lg items-center">
-                <View
-                  className="mb-md h-16 w-16 items-center justify-center rounded-xl bg-primary-container active:scale-95"
-                  style={{
-                    ...Platform.select({
-                      ios: {
-                        shadowColor: "#475569",
-                        shadowOpacity: 0.15,
-                        shadowRadius: 12,
-                        shadowOffset: { width: 0, height: 4 },
-                      },
-                      web: {
-                        boxShadow: "0px 4px 12px rgba(71, 85, 105, 0.15)",
-                      },
-                      android: {
-                        elevation: 4,
-                      },
-                    }),
-                  }}
-                >
-                  <MaterialIcons name="medical-services" size={32} color="#f4fffc" />
-                </View>
-                <Text className="font-headline-lg text-headline-lg tracking-tight text-primary">
+            <View className="mx-auto w-full max-w-[440px] items-center">
+              {/* ---------------- Header (57:107) ---------------- */}
+              <View className="w-full items-center gap-xs">
+                {/* Logo Tile (57:108) — the real exported brand asset, which is
+                    already the teal tile + white mark, clipped to the frame's
+                    24px radius. The tile doesn't follow the theme, so the
+                    variant is explicit per docs/BRAND.md. */}
+                <Logo variant="icon" height={64} className="overflow-hidden rounded-card" />
+                <Text className="font-headline-lg-mobile text-headline-lg-mobile text-center text-primary">
                   MedApp
                 </Text>
-                <Text className="font-body-md text-body-md mt-xs text-on-surface-variant">
+                <Text className="font-body-md text-body-md text-center text-on-surface-variant">
                   Secure Healthcare Access
                 </Text>
               </View>
 
-              {/* Login card.
-                  Stitch uses p-xl (80px) — comically huge on a phone. p-md
-                  (24px) is the standard card inset across Material 3 mobile. */}
-              <View
-                className="rounded-xl border border-outline-variant/30 bg-surface-container-lowest p-md"
-                style={{
-                  ...Platform.select({
-                    ios: {
-                      shadowColor: "#475569",
-                      shadowOpacity: 0.05,
-                      shadowRadius: 20,
-                      shadowOffset: { width: 0, height: 4 },
-                    },
-                    web: {
-                      boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)",
-                    },
-                    android: {
-                      elevation: 2,
-                    },
-                  }),
-                }}
-              >
-                {/* Email field */}
-                <View className="space-y-xs">
-                  <Text className="font-label-md text-label-md ml-xs text-on-surface-variant">
+              {/* Spacer xl (57:111) */}
+              <View className="h-8" />
+
+              {/* ---------------- Card (57:112) ----------------
+                  The <Card> primitive now carries the frame's treatment: radius
+                  24, the `card-surface` ROLE (so dark mode steps UP a tone
+                  instead of rendering near-black, which is what
+                  `bg-surface-container-lowest` did here), the full-strength
+                  `outline-variant` hairline and `elevation/card`. Only the 32px
+                  inset is overridden — see CARD_INSET. */}
+              <Card className="w-full gap-md" style={{ padding: CARD_INSET }}>
+                {/* Email Field Group (57:113) */}
+                <View className="w-full gap-xs">
+                  <Text className="font-label-md text-label-md text-on-surface-variant">
                     Email Address
                   </Text>
                   <Controller
                     control={control}
                     name="email"
                     render={({ field }) => (
-                      <InputWithIcon
+                      <Input
                         icon="mail-outline"
                         placeholder="name@example.com"
                         autoCapitalize="none"
@@ -214,31 +288,45 @@ export function SignInScreen({ onSuccess }: Props) {
                         onChangeText={field.onChange}
                         onBlur={field.onBlur}
                         hasError={!!errors.email}
+                        accessibilityLabel="Email Address"
+                        accessibilityHint={errors.email?.message}
                       />
                     )}
                   />
+                  {/* Field-level validation isn't in the frame (FLAGGED); it's
+                      required behaviour, so it's styled on the error token. */}
                   {errors.email && (
-                    <Text className="font-label-sm text-label-sm ml-xs text-error">
+                    <Text
+                      className="font-label-sm text-label-sm text-error"
+                      accessibilityLiveRegion="polite"
+                    >
                       {errors.email.message}
                     </Text>
                   )}
                 </View>
 
-                {/* Password field */}
-                <View className="mt-md space-y-xs">
-                  <View className="ml-xs flex-row items-center justify-between">
+                {/* Password Field Group (57:123) */}
+                <View className="w-full gap-xs">
+                  <View className="w-full flex-row items-center justify-between">
                     <Text className="font-label-md text-label-md text-on-surface-variant">
                       Password
                     </Text>
-                    <Text className="font-label-sm text-label-sm text-primary">
-                      Forgot Password?
-                    </Text>
+                    {/* Asymmetric on purpose: this row sits only 4px above the
+                        52px password input, so a symmetric 16px expansion would
+                        eat the top of the field. 24 up lands in the card's 24px
+                        group gap (nothing tappable there); 12 + 24 + 8 = 44. */}
+                    <TextLink
+                      href="/(public)/forgot-password"
+                      label="Forgot Password?"
+                      className="font-label-sm text-label-sm text-primary"
+                      hitSlop={{ top: 24, bottom: 8, left: 12, right: 12 }}
+                    />
                   </View>
                   <Controller
                     control={control}
                     name="password"
                     render={({ field }) => (
-                      <InputWithIcon
+                      <Input
                         icon="lock-outline"
                         placeholder="Enter your password"
                         autoCapitalize="none"
@@ -250,17 +338,21 @@ export function SignInScreen({ onSuccess }: Props) {
                         onChangeText={field.onChange}
                         onBlur={field.onBlur}
                         hasError={!!errors.password}
+                        accessibilityLabel="Password"
+                        accessibilityHint={errors.password?.message}
                         trailing={
                           <Pressable
                             onPress={() => setShowPassword((s) => !s)}
-                            hitSlop={8}
+                            hitSlop={12}
                             accessibilityRole="button"
-                            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                            accessibilityLabel={
+                              showPassword ? "Hide password" : "Show password"
+                            }
                           >
-                            <MaterialIcons
-                              name={showPassword ? "visibility-off" : "visibility"}
+                            <Icon
+                              chrome={showPassword ? "visibility-off" : "visibility"}
                               size={20}
-                              color="#6d7a77"
+                              color={onSurfaceVariant}
                             />
                           </Pressable>
                         }
@@ -268,117 +360,114 @@ export function SignInScreen({ onSuccess }: Props) {
                     )}
                   />
                   {errors.password && (
-                    <Text className="font-label-sm text-label-sm ml-xs text-error">
+                    <Text
+                      className="font-label-sm text-label-sm text-error"
+                      accessibilityLiveRegion="polite"
+                    >
                       {errors.password.message}
                     </Text>
                   )}
                 </View>
 
-                {/* Remember me */}
-                <View className="mt-md flex-row items-center justify-between py-xs">
-                  <Controller
-                    control={control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <Pressable
-                        className="flex-row items-center"
-                        onPress={() => field.onChange(!field.value)}
-                        accessibilityRole="checkbox"
-                        accessibilityState={{ checked: !!field.value }}
-                      >
-                        <View
-                          className={`h-4 w-4 items-center justify-center rounded border ${
-                            field.value
-                              ? "border-primary bg-primary"
-                              : "border-outline-variant bg-transparent"
-                          }`}
-                        >
-                          {field.value ? (
-                            <MaterialIcons name="check" size={12} color="#ffffff" />
-                          ) : null}
-                        </View>
-                        <Text className="font-label-md text-label-md ml-base text-on-surface-variant">
-                          Remember me
-                        </Text>
-                      </Pressable>
-                    )}
-                  />
-                </View>
-
-                {/* Form-level error */}
-                {formError && (
-                  <View className="mt-sm rounded-lg bg-error-container px-md py-sm">
-                    <Text
-                      className="font-label-sm text-label-sm text-on-error-container"
-                      accessibilityLiveRegion="polite"
+                {/* Remember Me Row (437:1162 — an instance of the `ConsentRow`
+                    design-system component 434:1161, NOT the old hand-rolled
+                    row). <ConsentRow> owns the frame's geometry: 20x20 checkbox
+                    at radius 4 with a 1.5px hairline, `spacing/12` gap (the row
+                    used to use 8), `counterAxisAlignItems: MIN` via items-start,
+                    label always `label-md`, and a 44x44 target from hitSlop.
+                    `labelPressable` because this label is inert text — unlike
+                    sign-up step 1's, which carries two navigating links. */}
+                <Controller
+                  control={control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <ConsentRow
+                      checked={!!field.value}
+                      onChange={field.onChange}
+                      accessibilityLabel="Remember me"
+                      labelPressable
                     >
-                      {formError}
-                    </Text>
+                      Remember me
+                    </ConsentRow>
+                  )}
+                />
+
+                {/* Form-level message — not in the frame (FLAGGED), kept because
+                    the screen has to surface a failed sign-in.
+
+                    Now the shared `InfoCallout` rather than a sixth private
+                    tinted box: it owns both registers (`info` = `primary-tint`
+                    with a `primary` glyph, `error` = `error-container` with its
+                    own `on-` pair), and it always draws a glyph, so the tone is
+                    never carried by fill colour alone (docs/BRAND.md §Colour
+                    rules, WCAG 1.4.1). The live region moves onto the wrapper so
+                    a screen reader still announces the message the moment it
+                    appears — the callout renders a plain <Text> otherwise. */}
+                {formMessage && (
+                  <View className="w-full" accessibilityLiveRegion="polite">
+                    <InfoCallout tone={formMessage.tone}>{formMessage.text}</InfoCallout>
                   </View>
                 )}
 
-                {/* Submit */}
-                <Pressable
+                {/* Log In Button (57:140) — 56px, radius 12, arrow-right.
+                    The node carries NO effect, so the elevation the `primary`
+                    variant inherits from the Splash frame is opted out of. */}
+                <Button
                   testID="signin.submit"
-                  accessibilityRole="button"
-                  accessibilityLabel="Log in"
+                  className="h-14"
+                  size="cta"
+                  pill={false}
+                  shadow={false}
+                  label={isSubmitting ? "Signing in…" : "Log In"}
+                  trailingIcon="arrow-forward"
+                  loading={isSubmitting}
                   onPress={onSubmit}
                   disabled={isSubmitting}
-                  className="mt-md w-full flex-row items-center justify-center gap-base rounded-lg bg-primary py-md active:scale-[0.98]"
-                  style={({ pressed }) => ({
-                    opacity: isSubmitting ? 0.6 : 1,
-                    backgroundColor: pressed ? "#008378" : "#00685f",
-                    ...Platform.select({
-                      ios: {
-                        shadowColor: "#00685f",
-                        shadowOpacity: 0.15,
-                        shadowRadius: 6,
-                        shadowOffset: { width: 0, height: 2 },
-                      },
-                      web: {
-                        boxShadow: "0px 2px 6px rgba(0, 104, 95, 0.15)",
-                      },
-                      android: {
-                        elevation: 3,
-                      },
-                    }),
-                  })}
-                >
-                  <Text className="font-label-md text-label-md text-on-primary">
-                    {isSubmitting ? "Signing in…" : "Log In"}
-                  </Text>
-                  {!isSubmitting && (
-                    <MaterialIcons name="arrow-forward" size={20} color="#ffffff" />
-                  )}
-                </Pressable>
+                />
 
-                {/* Biometric grid — only renders when the device has the
-                    sensor enrolled AND a refresh token is stored locally
-                    (i.e. the user has signed in with their password at
-                    least once on this device). Hiding the buttons rather
-                    than showing them disabled avoids a confusing "tap
-                    does nothing" path. */}
-                {biometricCapability.ready && biometricCapability.available && (
+                {/* Divider (57:144) + Biometric Row (57:148).
+                    The frame draws these unconditionally. They are now gated on
+                    DEVICE CAPABILITY only (`deviceCapable` = hardware + an
+                    enrolled biometric), not on a stored refresh token: gating on
+                    the token meant a fresh install or any post-sign-out session
+                    showed no biometric affordance on the only screen where a
+                    first-time user could discover it, and it made the
+                    `no_credentials` branch in onBiometric unreachable. With the
+                    tiles rendered, tapping one now produces exactly the copy
+                    that branch was written for. Still conditional on hardware,
+                    because tapping a tile on an unenrolled device can only fail
+                    — the frame has no state for that, which is correct. */}
+                {biometricCapability.ready && biometricCapability.deviceCapable && (
                   <>
-                    <View className="my-sm flex-row items-center gap-sm py-sm">
-                      <View className="h-px flex-1 bg-outline-variant/30" />
-                      <Text className="font-label-sm text-label-sm uppercase tracking-wider text-outline">
-                        Or continue with
+                    {/* The hairlines ARE `outline-variant` per the frame — that's
+                        the token's documented job. The label between them is
+                        `on-surface-variant` (#3D4947), which is what the frame
+                        actually paints; the old `outline` substitution was
+                        working around a value the frame no longer uses. */}
+                    <View className="w-full flex-row items-center gap-sm">
+                      <View className="h-px flex-1 bg-outline-variant" />
+                      <Text className="font-label-sm text-label-sm text-center text-on-surface-variant">
+                        OR CONTINUE WITH
                       </Text>
-                      <View className="h-px flex-1 bg-outline-variant/30" />
+                      <View className="h-px flex-1 bg-outline-variant" />
                     </View>
-                    <View className="flex-row gap-sm">
+                    <View className="w-full flex-row items-start gap-sm">
                       {biometricCapability.kinds.includes("face") && (
-                        <BiometricButton
-                          icon="face"
+                        <BiometricTile
+                          // FLAGGED: face recognition has no Health Icons glyph
+                          // (checked symbols/ and people/), so this is the
+                          // documented chrome escape hatch, matching the frame's
+                          // `icon/faceid`. Fingerprint below is NOT chrome —
+                          // the registry has the real Health Icon.
+                          icon={<Icon chrome="face" size={24} color={primary} />}
                           label="FaceID"
                           disabled={biometric.isPending}
                           onPress={() => onBiometric("face")}
                         />
                       )}
                       {biometricCapability.kinds.includes("fingerprint") && (
-                        <BiometricButton
-                          icon="fingerprint"
+                        <BiometricTile
+                          icon={<Icon name="fingerprint" size={24} color={primary} />}
                           label="Fingerprint"
                           disabled={biometric.isPending}
                           onPress={() => onBiometric("fingerprint")}
@@ -387,100 +476,90 @@ export function SignInScreen({ onSuccess }: Props) {
                     </View>
                   </>
                 )}
-              </View>
+              </Card>
 
-              {/* Footer */}
-              <View className="mt-lg items-center">
-                <View className="flex-row items-center">
+              {/* Spacer lg (58:121) */}
+              <View className="h-12" />
+
+              {/* ---------------- Footer (58:122) ---------------- */}
+              <View className="w-full items-center gap-xs">
+                {/* Signup Row (58:123) */}
+                <View className="flex-row items-center gap-xs">
                   <Text className="font-body-md text-body-md text-on-surface-variant">
-                    Don&apos;t have an account?{" "}
+                    Don&apos;t have an account?
                   </Text>
-                  <Link
+                  <TextLink
                     href="/(public)/sign-up"
-                    className="font-label-md text-label-md ml-xs text-primary"
-                  >
-                    Sign Up
-                  </Link>
+                    label="Sign Up"
+                    className="font-label-md text-label-md text-primary"
+                  />
                 </View>
 
-                <View className="mt-md items-center">
-                  <View className="flex-row items-center gap-xs">
-                    <MaterialIcons name="verified-user" size={16} color="#6d7a77" />
-                    <Text className="font-label-sm text-label-sm text-outline">
-                      HIPAA Compliant &amp; Secure
-                    </Text>
-                  </View>
-                  <View className="mt-xs flex-row gap-md">
-                    <Text className="font-label-sm text-label-sm text-outline">
-                      Privacy Policy
-                    </Text>
-                    <Text className="font-label-sm text-label-sm text-outline">
-                      Terms of Service
-                    </Text>
-                  </View>
+                {/* Spacer xl (58:126) */}
+                <View className="h-8" />
+
+                {/* HIPAA Badge Row (58:127). The frame's `icon/shield-check-small`
+                    is a domain concept (data security), and the registry already
+                    has it — `secure` = healthicons symbols/ui_secure — so this
+                    is a real Health Icon, not the chrome fallback. */}
+                <View className="flex-row items-center gap-xs">
+                  <Icon name="secure" size={16} color={onSurfaceVariant} />
+                  <Text className="font-label-sm text-label-sm text-on-surface-variant">
+                    HIPAA Compliant &amp; Secure
+                  </Text>
+                </View>
+
+                {/* Spacer xs (58:132) */}
+                <View className="h-1" />
+
+                {/* Links Row (58:133) */}
+                <View className="flex-row items-start gap-md">
+                  <TextLink
+                    href="/(public)/privacy"
+                    label="Privacy Policy"
+                    className="font-label-sm text-label-sm text-on-surface-variant"
+                  />
+                  <TextLink
+                    href="/(public)/terms"
+                    label="Terms of Service"
+                    className="font-label-sm text-label-sm text-on-surface-variant"
+                  />
                 </View>
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardInset>
       </SafeAreaView>
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Local primitives. Promote to components/ui/ once a second screen needs them.
+// Local primitive. One screen uses it, so it stays local per the house rule in
+// components/ui/README.md (extract at 2+ call sites).
 // ---------------------------------------------------------------------------
 
-type InputProps = React.ComponentProps<typeof TextInput> & {
-  icon: React.ComponentProps<typeof MaterialIcons>["name"];
-  hasError?: boolean;
-  trailing?: React.ReactNode;
-};
-
-function InputWithIcon({ icon, hasError, trailing, ...inputProps }: InputProps) {
-  const [focused, setFocused] = useState(false);
-  const borderColor = hasError ? "#ba1a1a" : focused ? "#00685f" : "#bcc9c6";
-
-  return (
-    <View
-      className="flex-row items-center rounded-lg bg-surface px-sm"
-      style={{ borderWidth: focused ? 2 : 1, borderColor }}
-    >
-      <MaterialIcons name={icon} size={20} color="#6d7a77" />
-      <TextInput
-        {...inputProps}
-        placeholderTextColor="#bcc9c6"
-        onFocus={(e) => {
-          setFocused(true);
-          inputProps.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          inputProps.onBlur?.(e);
-        }}
-        style={{
-          flex: 1,
-          marginLeft: 8,
-          paddingVertical: 12,
-          color: "#171d1c",
-          fontSize: 16,
-          lineHeight: 20,
-        }}
-      />
-      {trailing}
-    </View>
-  );
-}
-
-interface BiometricButtonProps {
-  icon: React.ComponentProps<typeof MaterialIcons>["name"];
+interface BiometricTileProps {
+  /**
+   * Rendered <Icon /> element rather than a glyph name, because the two tiles
+   * come from different sets: Fingerprint is a Health Icon (`name`), FaceID has
+   * no Health Icons equivalent and falls back to chrome. The caller passes the
+   * already-resolved `primary` colour — the tile sits on `field-surface`.
+   */
+  icon: React.ReactNode;
   label: string;
   onPress: () => void;
   disabled?: boolean;
 }
 
-function BiometricButton({ icon, label, onPress, disabled }: BiometricButtonProps) {
+/**
+ * FaceID / Fingerprint tile (57:149, 57:156): flex-1, radius 24, 12px inset.
+ *
+ * Fill is `field-surface` per the frame — the same recessed role the inputs use.
+ * It used to be `bg-surface`, which is the PAGE colour: inside a `card-surface`
+ * card the tiles had no fill of their own and read as empty space.
+ */
+function BiometricTile({ icon, label, onPress, disabled }: BiometricTileProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -489,10 +568,50 @@ function BiometricButton({ icon, label, onPress, disabled }: BiometricButtonProp
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
       style={{ opacity: disabled ? 0.5 : 1 }}
-      className="flex-1 items-center justify-center rounded-xl border border-outline-variant bg-surface p-sm active:scale-95"
+      className="flex-1 items-center justify-center gap-xs rounded-card border border-outline-variant bg-field-surface p-3 active:scale-[0.98]"
     >
-      <MaterialIcons name={icon} size={24} color="#00685f" />
-      <Text className="font-label-sm text-label-sm mt-xs text-on-surface-variant">{label}</Text>
+      {icon}
+      <Text className="font-label-sm text-label-sm text-on-surface-variant">{label}</Text>
     </Pressable>
+  );
+}
+
+/**
+ * Default expansion for an inline link. The smallest tappable string on this
+ * screen is `label-sm` = 12px text on a lineHeight of 1, so 16px top + 16px
+ * bottom takes the target to exactly the 44pt minimum (label-md rows get 46).
+ * Horizontal is 12 because the narrowest label ("Sign Up") is already ~60px
+ * wide, and 12 is exactly half the frame's 24px Links Row gap — so the two
+ * footer targets meet without overlapping each other.
+ */
+const LINK_HIT_SLOP = { top: 16, bottom: 16, left: 12, right: 12 } as const;
+
+interface TextLinkProps {
+  /** expo-router path. */
+  href: React.ComponentProps<typeof Link>["href"];
+  label: string;
+  /** Type/colour classes — the caller owns them so each row keeps the frame's ramp. */
+  className?: string;
+  /**
+   * Overrides `LINK_HIT_SLOP` where a symmetric expansion would reach into a
+   * neighbouring target. Must still total ≥ 44pt with the text height.
+   */
+  hitSlop?: React.ComponentProps<typeof Pressable>["hitSlop"];
+}
+
+/**
+ * Inline tappable string ("Forgot Password?", "Sign Up", the footer links).
+ *
+ * Reaches the 44pt minimum target via `hitSlop` rather than padding: padding
+ * would change the frame's metrics, since the Password label row and the footer
+ * rows are hug-height in the design.
+ */
+function TextLink({ href, label, className, hitSlop = LINK_HIT_SLOP }: TextLinkProps) {
+  return (
+    <Link href={href} asChild>
+      <Pressable accessibilityRole="link" accessibilityLabel={label} hitSlop={hitSlop}>
+        <Text className={className}>{label}</Text>
+      </Pressable>
+    </Link>
   );
 }

@@ -1,0 +1,79 @@
+# Host-port overrides, so MedApp can run alongside other projects on this machine.
+#
+# Why this file exists: MedApp's compose publishes 5432, 6379, 8000 and 8001, and
+# on a developer box those are the four most contended ports there are. On the
+# machine this was written for, another project's containers already held all
+# four — so `docker compose up` failed with "Bind for 0.0.0.0:5432 failed: port
+# is already allocated" and MedApp simply could not start. Stopping someone
+# else's running work to free a port is not an acceptable fix.
+#
+# Nothing INSIDE the compose network changes: services still reach each other on
+# their own names and original ports, so no service URL, env var or migration
+# needs touching. Only the host-side mapping moves.
+#
+# Usage — pass BOTH files, base first:
+#
+#   docker compose -f infra/docker/docker-compose.yml \
+#                  -f infra/docker/docker-compose.ports.yml up -d <services>
+#
+# or export it once so every compose call picks it up:
+#
+#   COMPOSE_FILE=infra/docker/docker-compose.yml:infra/docker/docker-compose.ports.yml
+#
+# The mobile app then needs API_BASE_URL pointed at the gateway's new port:
+#
+#   emulator          http://10.0.2.2:8010
+#   physical device   http://<your-lan-ip>:8010
+#
+# Ports are offset by +10 rather than picked at random, so the mapping stays
+# guessable: 8000 -> 8010, 5432 -> 5442, 6379 -> 6389, 8001 -> 8011.
+#
+# THE RULE THIS FILE KEEPS BREAKING: an override host port must not be a port
+# any BASE service already publishes. +10 is only a convention, and it has now
+# collided three times - api_gateway 8010 vs ehr_service, ehr 8020 vs
+# hms_service, user_service 8011 vs social_service. Before adding or changing a
+# mapping here, list every effective host port (base merged with this file) and
+# check the target is free. A collision does not surface until the two services
+# happen to be started together, which is why these survived so long.
+#
+# `!override` is load-bearing. Compose MERGES list fields across files rather
+# than replacing them, so a plain `ports:` here appended a second mapping and
+# left the original in place — the bind failed on exactly the port this file
+# exists to vacate. Requires Compose 2.24+.
+
+services:
+  postgres:
+    ports: !override ["5442:5432"]
+
+  redis:
+    ports: !override ["6389:6379"]
+
+  # The only one the mobile app actually talks to.
+  api_gateway:
+    ports: !override ["8010:8000"]
+
+  # Published only for direct debugging; the app always goes through the
+  # gateway. Moved because another project holds 8001.
+  #
+  # 8019, NOT 8011. The +10 convention lands on 8011, which social_service
+  # already publishes in the base compose - so starting social and user_service
+  # together failed with "port is already allocated". Third time this file has
+  # done that (ehr on 8020 vs hms, and this one), hence the rule below.
+  user_service:
+    ports: !override ["8019:8001"]
+
+  # COLLISION CREATED BY THIS FILE, not by another project: ehr_service already
+  # publishes 8010:8010 in the base compose, and moving api_gateway 8000 -> 8010
+  # above lands squarely on it. Starting the gateway and ehr_service together
+  # failed with "Bind for 0.0.0.0:8010 failed: port is already allocated".
+  #
+  # ehr_service moves rather than the gateway, because the gateway's 8010 is the
+  # one baked into API_BASE_URL, the adb reverse tunnel and this file's own
+  # header.
+  #
+  # 8021, NOT 8020. The +10 convention used everywhere else in this file lands
+  # on 8020, which hms_service already publishes in the base compose — so the
+  # first fix for one collision created another. +11 is the smallest free step
+  # that keeps the mapping guessable.
+  ehr_service:
+    ports: !override ["8021:8010"]

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-container": "#f4fffc",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "secondary-fixed": "#d5e3fc",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "outline": "#6d7a77",
+                      "tertiary-fixed": "#d8e2ff",
+                      "on-error-container": "#93000a",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "secondary-container": "#d5e3fc",
+                      "error": "#ba1a1a",
+                      "surface-variant": "#dee4e1",
+                      "inverse-surface": "#2c3130",
+                      "surface-container-low": "#f0f5f2",
+                      "on-tertiary-container": "#fefcff",
+                      "on-primary": "#ffffff",
+                      "secondary": "#515f74",
+                      "primary-fixed": "#89f5e7",
+                      "on-background": "#171d1c",
+                      "on-secondary-container": "#57657a",
+                      "surface": "#f5faf8",
+                      "on-tertiary-fixed": "#001a42",
+                      "on-surface": "#171d1c",
+                      "on-secondary": "#ffffff",
+                      "tertiary": "#0058be",
+                      "on-error": "#ffffff",
+                      "on-primary-fixed-variant": "#005049",
+                      "primary-container": "#008378",
+                      "on-tertiary": "#ffffff",
+                      "background": "#f5faf8",
+                      "surface-container-high": "#e4e9e7",
+                      "on-surface-variant": "#3d4947",
+                      "surface-bright": "#f5faf8",
+                      "on-primary-fixed": "#00201d",
+                      "surface-tint": "#006a61",
+                      "surface-container-lowest": "#ffffff",
+                      "outline-variant": "#bcc9c6",
+                      "error-container": "#ffdad6",
+                      "surface-container-highest": "#dee4e1",
+                      "inverse-on-surface": "#edf2f0",
+                      "surface-dim": "#d6dbd9",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "inverse-primary": "#6bd8cb",
+                      "surface-container": "#eaefed",
+                      "primary": "#00685f",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "tertiary-container": "#2170e4"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "xs": "4px",
+                      "gutter": "24px",
+                      "lg": "48px",
+                      "xl": "80px",
+                      "sm": "12px",
+                      "container-max": "1280px",
+                      "base": "8px",
+                      "md": "24px"
+              },
+              "fontFamily": {
+                      "headline-xl": ["Manrope"],
+                      "body-md": ["Inter"],
+                      "label-md": ["Inter"],
+                      "headline-md": ["Manrope"],
+                      "headline-lg-mobile": ["Manrope"],
+                      "body-lg": ["Inter"],
+                      "label-sm": ["Inter"],
+                      "headline-lg": ["Manrope"]
+              },
+              "fontSize": {
+                      "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                      "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                      "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                      "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f5faf8;
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md docked full-width top-0 sticky z-40 border-b border-outline-variant/30 shadow-sm">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant/30">
+<img alt="User profile picture" class="w-full h-full object-cover" data-alt="A professional close-up portrait of a medical professional in a brightly lit, modern clinical environment. The lighting is soft and high-key, emphasizing a clean and clinical atmosphere. The doctor is wearing a crisp white coat over a subtle teal undershirt, reflecting the MedApp primary color palette. The background is a soft-focus laboratory or hospital hallway with neutral tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrwKZb_wFOyeG1vIpxHyB0Yj_pdLIukGFe40e9Fuytzzd0wkn_BtxiMsBujSLQktCXN5f_oHkuNyb9XpdXd8FS7th4dpGhFI3A5YA7othUqt-cK0iaGmgVWyB8rDGGFE7j7KTavscfr2eID6qZmbgtWTMCFj832MacbVwd_ffOViSGIMkQ6wGdU7PtIwrw8UHKf1rxdsNkAoFM-GqKJ199L2xVfUGU-4rWHLV24R9mfNcm0aGGlZ2feFmsDRMiI4wwCsBZAYh5yNax"/>
+</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">MedApp</h1>
+</div>
+<div class="flex items-center gap-md">
+<div class="cursor-pointer active:scale-95 duration-200 p-2 rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-primary" data-icon="notifications">notifications</span>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter py-lg pb-xl">
+<!-- Message Page Header -->
+<div class="mb-lg">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-sm">Messages</h2>
+<div class="relative max-w-md">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full pl-12 pr-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none font-body-md text-body-md" placeholder="Search conversations..." type="text"/>
+</div>
+</div>
+<!-- Filter Tabs -->
+<div class="flex gap-sm mb-md overflow-x-auto pb-2 scrollbar-hide">
+<button class="bg-primary text-on-primary px-md py-2.5 rounded-full font-label-md text-label-md shadow-md active:scale-95 transition-transform">
+                All
+            </button>
+<button class="bg-surface-container-highest text-on-surface-variant hover:bg-surface-container-high px-md py-2.5 rounded-full font-label-md text-label-md transition-colors active:scale-95">
+                Patients
+            </button>
+<button class="bg-surface-container-highest text-on-surface-variant hover:bg-surface-container-high px-md py-2.5 rounded-full font-label-md text-label-md transition-colors active:scale-95">
+                Clinical Teams
+            </button>
+<button class="bg-surface-container-highest text-on-surface-variant hover:bg-surface-container-high px-md py-2.5 rounded-full font-label-md text-label-md transition-colors active:scale-95">
+                Support
+            </button>
+</div>
+<!-- Chat List Layout -->
+<div class="grid grid-cols-1 gap-base">
+<!-- Chat Item: Patient (Active/Unread) -->
+<div class="group flex items-center gap-md p-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl hover:shadow-[0px_4px_20px_rgba(71,85,105,0.05)] transition-all cursor-pointer">
+<div class="relative">
+<div class="w-14 h-14 rounded-full overflow-hidden bg-secondary-container">
+<img alt="Sarah Miller" class="w-full h-full object-cover" data-alt="A portrait of a young woman with a calm and healthy appearance, set against a soft, bright neutral background. The lighting is natural and airy, evoking a sense of well-being and clinical modernism. She is looking directly at the camera with a gentle, reassuring smile. The visual style is consistent with high-end healthcare photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDeJpe2eyE7VBbPwXD7m2u2so2Q3OUNPtsrGrSFmYPgs-ebEdihstJSB8oCR4b47ByY3B_O0tXJvybxrQFcMdbXyy9xqS7U_kZ8nFPNvIRhmjvEdFwtFcHJV0XGrYK9jh0GeoJZ1vPacpmlGzjtsCd5RCBzska_0hXM0ZEU9ysDTcXuwGisPFsqxaJkEiaMkAZ9kics4W18HE6lSAYeAoyEI8J_niTdEBQuVwViQn55GrLPUW-D2piEuATB6NuuoRLh-IK3SrUgmo-b"/>
+</div>
+<span class="absolute bottom-0 right-0 w-4 h-4 bg-primary border-2 border-surface-container-lowest rounded-full"></span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-center mb-xs">
+<h3 class="font-headline-md text-[18px] text-on-surface font-bold truncate">Sarah Miller</h3>
+<span class="font-label-sm text-label-sm text-primary font-bold">12:45 PM</span>
+</div>
+<div class="flex justify-between items-center">
+<p class="font-body-md text-body-md text-on-surface font-semibold truncate">I've attached the new lab results for review.</p>
+<span class="bg-primary text-on-primary text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full ml-base">2</span>
+</div>
+</div>
+</div>
+<!-- Chat Item: Clinical Team -->
+<div class="group flex items-center gap-md p-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl hover:shadow-[0px_4px_20px_rgba(71,85,105,0.05)] transition-all cursor-pointer">
+<div class="w-14 h-14 rounded-full flex items-center justify-center bg-tertiary-container text-on-tertiary-container">
+<span class="material-symbols-outlined text-[32px]" data-icon="groups">groups</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-center mb-xs">
+<h3 class="font-headline-md text-[18px] text-on-surface font-bold truncate">Cardiology Dept.</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">11:20 AM</span>
+</div>
+<div class="flex justify-between items-center">
+<p class="font-body-md text-body-md text-on-surface-variant truncate">Dr. Aris: Patient #402 is ready for discharge.</p>
+</div>
+</div>
+</div>
+<!-- Chat Item: Support -->
+<div class="group flex items-center gap-md p-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl hover:shadow-[0px_4px_20px_rgba(71,85,105,0.05)] transition-all cursor-pointer">
+<div class="w-14 h-14 rounded-full flex items-center justify-center bg-secondary-container text-on-secondary-container">
+<span class="material-symbols-outlined text-[32px]" data-icon="support_agent">support_agent</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-center mb-xs">
+<h3 class="font-headline-md text-[18px] text-on-surface font-bold truncate">IT Help Desk</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</span>
+</div>
+<div class="flex justify-between items-center">
+<p class="font-body-md text-body-md text-on-surface-variant truncate">Your access to the MRI portal has been restored.</p>
+</div>
+</div>
+</div>
+<!-- Chat Item: Doctor -->
+<div class="group flex items-center gap-md p-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl hover:shadow-[0px_4px_20px_rgba(71,85,105,0.05)] transition-all cursor-pointer">
+<div class="w-14 h-14 rounded-full overflow-hidden bg-primary-fixed">
+<img alt="Dr. James Carter" class="w-full h-full object-cover" data-alt="A portrait of a male physician in his late 40s, exuding confidence and warmth. He is wearing a blue surgical scrub top and a stethoscope. The setting is a clean, modern medical office with soft, diffused sunlight streaming in through a window. The overall aesthetic is bright, professional, and follows the Modern Humanism design principle with a clean Teal-influenced color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUTvo_vK-LY786nB9Qm8QiGjqsasFuR2oU7WApcRWvQ0on_UAABBqqsQFdzCINcrdvD58_y1rz0hZ8cwUUbsPKcOA8-Abv6QQ34Sv5Ge7dlq443hA1m6pD16C7g6e7HbIOTqKzNTgjRceQTwRpV_dlXc_d7CF2aHF6eF0LwCMXN1v7csE-m-WyZwzlBqWiTUb3AVMWogTUFh5hZKKDh7HbJKqZ3OSRYbsucTW2N2niIkZK0l0qLP9G2r-tYdezp3iR4TioNqVV2J4h"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-center mb-xs">
+<h3 class="font-headline-md text-[18px] text-on-surface font-bold truncate">Dr. James Carter</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Yesterday</span>
+</div>
+<div class="flex justify-between items-center">
+<p class="font-body-md text-body-md text-on-surface-variant truncate">Let's schedule a follow-up for next Tuesday.</p>
+</div>
+</div>
+</div>
+<!-- Chat Item: Patient -->
+<div class="group flex items-center gap-md p-md bg-surface-container-lowest border border-outline-variant/30 rounded-xl hover:shadow-[0px_4px_20px_rgba(71,85,105,0.05)] transition-all cursor-pointer">
+<div class="w-14 h-14 rounded-full overflow-hidden bg-secondary-container">
+<img alt="Michael Chen" class="w-full h-full object-cover" data-alt="A detailed portrait of a middle-aged man with a friendly expression. He is wearing a simple, clean linen shirt in a neutral tone. The background is a minimalist, brightly lit room with a soft green plant blurred in the corner, contributing to an airy and serene clinical vitality aesthetic. The lighting is balanced and professional, creating high-quality depth." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpQnYgmwJbUk1kc8GBBLGM0SQ8zHoVjaMjhlL8897rN83BcrCivpKpPaRODmJ5mVEdlJsycVW9dHJ-9d1wdtxUfewV-RUevP1FnI5MoNTSPLpQY1GJL9fgYiqqbGPM2vPGUMjJXt6qa5O4cCiZ9Ms-lluB78dSrjxXHD70umRHDUtuS350B2snrOxD2huqHz95c5X-19CDnJp_XJOVA9TZIkfu-2711VGs9Yysu8-omOv8BwVbiDE2PcYzwRzAYs8U-wB1uz0PKBwj"/>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-center mb-xs">
+<h3 class="font-headline-md text-[18px] text-on-surface font-bold truncate">Michael Chen</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Oct 24</span>
+</div>
+<div class="flex justify-between items-center">
+<p class="font-body-md text-body-md text-on-surface-variant truncate">Thank you for the prescription refill request.</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed right-6 bottom-24 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform z-40">
+<span class="material-symbols-outlined text-[28px]" data-icon="edit_square">edit_square</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-4 pt-2 bg-surface dark:bg-inverse-surface border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(71,85,105,0.05)] z-50 rounded-t-xl"><a class="flex flex-col items-center justify-center text-on-surface-variant px-2 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-2 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="mail" style="font-variation-settings: 'FILL' 1;">mail</span>
+<span class="font-label-sm text-label-sm font-bold">Inbox</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-2 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-2 py-1 hover:text-primary transition-colors cursor-pointer active:scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</a></nav>
+</body></html>

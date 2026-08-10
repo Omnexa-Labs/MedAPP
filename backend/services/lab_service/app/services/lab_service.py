@@ -10,10 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
 
+from shared.audit import audited_read
 from shared.auth import Principal
 
 from ..config import settings
-from ..models import LabOrder, LabResult
+from ..models import AccessAudit, LabOrder, LabResult
 from ..schemas.lab import LabOrderCreate, LabResultOut, LabResultUpload, LabSearchHitOut, LabSearchResultsOut, LabSummaryOut
 
 
@@ -97,13 +98,77 @@ def _ensure_role(principal: Principal, allowed_roles: set[str], message: str) ->
         raise HTTPException(status.HTTP_403_FORBIDDEN, message)
 
 
-def _can_access_result(principal: Principal, result: LabResult) -> None:
+async def _can_access_result(
+    db: AsyncSession, principal: Principal, result: LabResult
+) -> str:
+    """Who may read a lab result. Returns the ACCESS MODE that permitted it.
+
+    The return value exists for the audit trail: `"self"`,
+    `"ordering_clinician"` or `"admin_override"`. Same idea as
+    `ehr_service._authorize_patient_access`, which returns its mode for
+    the same reason — the caller cannot re-derive "was this an admin
+    override?" from a bare `None`, and guessing it from `principal.role`
+    at the call site would mislabel an admin reading their OWN results.
+    Authorization behaviour is unchanged; only the return type moved.
+
+    THE `role == "doctor"` BLANKET GRANT IS GONE (2026-08-05, security review).
+    It read:
+
+        if principal.role == "doctor":
+            return
+
+    — no ordering relationship, no consent, no care team. Any account holding the
+    doctor role could read ANY patient's result: `raw_text`, `parsed_values`,
+    `summary`, `external_url`. Special-category health data of every patient in
+    the system, behind a role claim.
+
+    It was not even hard to obtain that claim: `POST /v1/auth/signup` accepted a
+    client-supplied `role` and minted a token with it (fixed in the same pass), so
+    the two defects chained into an UNAUTHENTICATED read of any patient's labs.
+
+    The replacement is the predicate the ordering doctor genuinely has: they
+    ordered the test. `LabOrder.ordered_by_user_id` is the relationship the data
+    model already records, so no new column and no cross-service call is needed.
+
+    Deliberately NOT accepted as sufficient:
+      * role alone — the defect being removed.
+      * "any doctor at the same hospital" — `hospital_admin` and hospital staff
+        rows are self-assignable today (see the same review), so that would be a
+        second role-claim bypass wearing a relationship's clothes.
+
+    `ehr_service` already models this properly with an active `Consent` row
+    (`record_service.py:56`). Lab results should converge on that consent model
+    rather than keep a second, weaker rule — FLAGGED, and the reason this function
+    takes the order relationship as a narrow first step instead of inventing a
+    consent table here.
+
+    Regulation: Ghana Act 843 s.20 (purpose limitation — access outside the
+    treating relationship is a new purpose with no lawful basis) and s.28
+    (safeguards); HIPAA §164.312(a)(1) access control and §164.308(a)(4) minimum
+    necessary; GDPR Art. 9, which permits health-data processing for care only
+    under a treating relationship (Art. 9(2)(h)).
+    """
     if principal.role == "admin":
-        return
+        # An admin reading someone else's result is an override and is
+        # tagged as one; an admin reading their own is just "self".
+        return "self" if result.patient_id == _principal_uuid(principal) else "admin_override"
     if result.patient_id == _principal_uuid(principal):
-        return
-    if principal.role == "doctor":
-        return
+        return "self"
+    # The ordering clinician, and only for the order this result belongs to.
+    #
+    # Loaded EXPLICITLY, because `LabResult` has no `relationship()` to its order
+    # - only a nullable `lab_order_id` FK. A first version of this reached for
+    # `result.order`, which does not exist: `getattr` would have returned None
+    # forever and 403'd the ordering doctor on every request. It would have failed
+    # closed, which is the right direction to fail, but it would have been broken.
+    #
+    # A result with no `lab_order_id` has no clinician who can claim a
+    # relationship to it, so it never enters this branch. Absence of a
+    # relationship must not read as permission.
+    if principal.role == "doctor" and result.lab_order_id is not None:
+        order = await db.get(LabOrder, result.lab_order_id)
+        if order is not None and order.ordered_by_user_id == _principal_uuid(principal):
+            return "ordering_clinician"
     raise HTTPException(status.HTTP_403_FORBIDDEN, "you can only access your own lab results")
 
 
@@ -169,22 +234,74 @@ async def upload_lab_result(db: AsyncSession, principal: Principal, payload: Lab
 
 
 async def get_lab_result(db: AsyncSession, principal: Principal, result_id: UUID) -> LabResult:
+    """Read one lab result. AUDITED — both outcomes.
+
+    A clinician read is exactly the access worth logging: `_can_access_result`
+    now admits the ORDERING clinician, so a doctor can legitimately read a
+    result belonging to someone who is not them, and the only record that this
+    happened is the row written here.
+
+    The `db.get` sits OUTSIDE the audited block on purpose. A `result_id` that
+    does not exist has no patient to attribute an attempt to, so it produces no
+    row — see `shared.audit.recorder.audited_read`. The `LabError` also carries
+    no subject, so nothing is lost.
+    """
     result = await db.get(LabResult, result_id)
     if result is None:
         raise LabError("lab result not found")
-    _can_access_result(principal, result)
+    async with audited_read(db, AccessAudit, principal, "lab_result", resource_id=result_id) as audit:
+        # Set BEFORE the authorization check, so a 403 records *whose* result
+        # was refused and not merely that something was refused.
+        audit.patient_id = result.patient_id
+        mode = await _can_access_result(db, principal, result)
+        audit.admin_override = mode == "admin_override"
     return result
 
 
 async def list_my_results(db: AsyncSession, principal: Principal) -> list[LabResult]:
+    """AUDITED. A self-read is still a disclosure and still gets a row.
+
+    `record_count` is the number of results handed over — a count, not
+    content. It is what makes this row useful for scoping a breach
+    notification instead of just proving the endpoint was called.
+    """
     patient_id = _principal_uuid(principal)
-    stmt = select(LabResult).where(LabResult.patient_id == patient_id).order_by(LabResult.resulted_at.desc().nullslast(), LabResult.created_at.desc())
-    result = await db.scalars(stmt)
-    return list(result.all())
+    async with audited_read(db, AccessAudit, principal, "lab_result_list") as audit:
+        audit.patient_id = patient_id
+        stmt = select(LabResult).where(LabResult.patient_id == patient_id).order_by(LabResult.resulted_at.desc().nullslast(), LabResult.created_at.desc())
+        result = await db.scalars(stmt)
+        results = list(result.all())
+        audit.record_count = len(results)
+    return results
 
 
 async def search_my_results(db: AsyncSession, principal: Principal, query: str, qdrant_client: QdrantClient, *, limit: int = 5) -> LabSearchResultsOut:
+    """AUDITED.
+
+    **`query` is NOT recorded.** A search over one's own lab results is a
+    sentence about a symptom or a diagnosis — "hiv", "biopsy", "hcg" — and it is
+    frequently more sensitive than the results it finds. Putting it in the audit
+    table would make the audit table the most sensitive store in the platform,
+    with the longest retention. The row says a search happened, by whom, over
+    whose data, and how many results came back. That is enough to answer "who
+    read this patient's record?" and no more than that.
+    """
     patient_id = _principal_uuid(principal)
+    async with audited_read(db, AccessAudit, principal, "lab_result_search") as audit:
+        audit.patient_id = patient_id
+        results = await _search_my_results(db, query, qdrant_client, patient_id, limit=limit)
+        audit.record_count = len(results.items)
+    return results
+
+
+async def _search_my_results(
+    db: AsyncSession,
+    query: str,
+    qdrant_client: QdrantClient,
+    patient_id: UUID,
+    *,
+    limit: int = 5,
+) -> LabSearchResultsOut:
     response = qdrant_client.query_points(
         collection_name=settings.qdrant_collection,
         query=_embed_text(query),
@@ -222,8 +339,19 @@ async def search_my_results(db: AsyncSession, principal: Principal, query: str, 
 
 
 async def get_lab_summary(db: AsyncSession, principal: Principal) -> LabSummaryOut:
+    """AUDITED. Not in the brief's minimum list, added because it returns
+    the three most recent results in full, which is a PHI read by any
+    reading of it — leaving it out would have been an arbitrary hole in
+    the same service."""
     patient_id = _principal_uuid(principal)
+    async with audited_read(db, AccessAudit, principal, "lab_summary") as audit:
+        audit.patient_id = patient_id
+        summary = await _lab_summary(db, patient_id)
+        audit.record_count = len(summary.recent_results)
+    return summary
 
+
+async def _lab_summary(db: AsyncSession, patient_id: UUID) -> LabSummaryOut:
     totals_stmt = select(
         func.count(LabOrder.id),
         func.count(LabOrder.id).filter(LabOrder.status == "ordered"),

@@ -28,7 +28,7 @@ def _compile_uuid_sqlite(element, compiler, **kw):  # noqa: ARG001
     return "CHAR(36)"
 
 
-from app.deps import get_current_principal, get_db  # noqa: E402
+from app.deps import get_current_principal, get_db, get_optional_principal  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
 from shared.auth import Principal  # noqa: E402
@@ -83,6 +83,13 @@ async def _make_client(application, sessionmaker, principal):
 
     application.dependency_overrides[get_db] = _db_override
     application.dependency_overrides[get_current_principal] = _principal_override
+    # BOTH principal dependencies must be overridden. These fixtures send no
+    # Authorization header, so a route depending on `get_optional_principal`
+    # (the feed, the single-post read) would see None and report `liked_by_me`
+    # false for a user who had just liked the post - a per-viewer flag silently
+    # stuck off for every signed-in reader, in a suite that was otherwise green.
+    # Use `anonymous_client` to exercise the genuinely tokenless path.
+    application.dependency_overrides[get_optional_principal] = _principal_override
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -115,6 +122,33 @@ async def platform_admin_client(sessionmaker, principal_platform_admin):
     application = create_app()
     async for client in _make_client(application, sessionmaker, principal_platform_admin):
         yield client
+
+
+@pytest_asyncio.fixture
+async def anonymous_client(sessionmaker):
+    """A client with NO token at all, for the routes that allow one.
+
+    Only `get_db` is overridden, so `get_optional_principal` runs for real
+    against a missing Authorization header. That is the path a logged-out reader
+    takes through the feed, and it must return 200 with both viewer flags false
+    rather than 401.
+    """
+    application = create_app()
+
+    async def _db_override():
+        async with sessionmaker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    application.dependency_overrides[get_db] = _db_override
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    application.dependency_overrides.clear()
 
 
 @pytest.fixture

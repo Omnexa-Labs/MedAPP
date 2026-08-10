@@ -6,9 +6,10 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.audit import audited_collection_read
 from shared.auth import Principal
 
-from ..models import HospitalProfile, HospitalReview, HospitalStaff, StaffRole
+from ..models import AccessAudit, HospitalProfile, HospitalReview, HospitalStaff, StaffRole
 from ..schemas.hospital import HospitalCreate, HospitalStaffCreate
 
 
@@ -123,6 +124,103 @@ async def add_staff_member(db: AsyncSession, principal: Principal, hospital_id: 
     db.add(staff)
     await db.flush()
     await db.refresh(staff)
+    return staff
+
+
+def may_see_staff_user_ids(principal: Principal) -> bool:
+    """Whether this caller gets `user_id` on roster rows.
+
+    Same role set as `_require_staff_writer`: whoever may edit the roster
+    already knows who is on it, so returning the ids they wrote back to them
+    discloses nothing new. Everyone else gets the roster without them.
+    """
+    return principal.role in {"hospital_admin", "platform_admin"}
+
+
+async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) -> list[HospitalStaff]:
+    """Active staff of one hospital, for an AUTHENTICATED caller.
+
+    THE ACCESS RULE, AND WHY IT IS NOT PUBLIC
+    -----------------------------------------
+    Any authenticated principal may read a hospital's roster; anonymous callers
+    may not. That is stricter than the sibling reads on this router
+    (`GET /v1/hospitals`, `/{id}`, `/{id}/reviews` are all public) and the
+    difference is deliberate. Those return facts about an institution. This
+    returns a list of people and where each of them works, which is personal
+    data under Act 843 even without names attached — an employment graph, and a
+    ready-made target list for anyone phoning a hospital pretending to be a
+    colleague. Requiring a token does not make the data secret, but it makes
+    every read attributable to an identified account, which is the precondition
+    for the access log this system still owes (see PIPELINE entry) and it stops
+    anonymous bulk scraping of every hospital in the directory.
+
+    It is NOT narrowed to the hospital's own staff or admins: a patient
+    choosing a facility has a legitimate purpose for seeing which departments
+    and roles it staffs, that is what the `hospital_detail` frame shows, and a
+    rule of "only insiders may look" would leave that screen permanently empty
+    for the people it was designed for.
+
+    Two further minimisations, both enforced here rather than left to callers:
+      * inactive rows are excluded — a former employee's placement at a
+        hospital is history, not a current fact, and nothing on the screen needs
+        it. Admins do not get an override; a leavers list is a different
+        endpoint with a different purpose.
+      * `user_id` is filtered at the serialisation boundary by
+        `may_see_staff_user_ids`.
+
+    Raises `HospitalError` for an unknown hospital, so the router can answer 404
+    instead of an empty roster — `list_reviews` returns `[]` for a nonexistent
+    hospital, which cannot distinguish "no staff published" from "wrong id", and
+    that ambiguity is what put an EmptyState on the screen in the first place.
+
+    AUDITED — this is the access log the docstring above promised and could not
+    yet point at. Requiring a token made every read attributable; this makes it
+    recorded.
+
+    The row carries `patient_id = NULL`, deliberately. There is no patient here:
+    the data subjects are the staff, and the hospital is an institution, not a
+    data subject. `resource_id` is the hospital and `record_count` is the size
+    of the roster handed over — which is the number that matters for this
+    endpoint, because the risk it carries is bulk enumeration of an employment
+    graph, not the exposure of one clinical record. `accessor_user_id` plus
+    `created_at` is what turns "someone scraped the directory" into a name and a
+    timestamp.
+    """
+    async with audited_collection_read(
+        db, AccessAudit, principal, "hospital_staff_roster", resource_id=hospital_id
+    ) as audit:
+        if not principal.role:
+            # Defensive: an unauthenticated caller cannot reach here (the router
+            # depends on `get_current_principal`), but a role-less principal must
+            # never fall through to a successful read. Inside the audited block,
+            # so the refusal is recorded rather than merely returned.
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "authentication required")
+
+        hospital = await db.get(HospitalProfile, hospital_id)
+        if hospital is None:
+            # Outside the audit trail by design: `HospitalError` is not a
+            # denial, and a roster that does not exist was not disclosed.
+            raise HospitalError("hospital not found")
+
+        stmt = (
+            select(HospitalStaff)
+            .where(HospitalStaff.hospital_id == hospital_id)
+            .where(HospitalStaff.is_active.is_(True))
+            # Stable ordering so a client can diff two reads: role groups the list
+            # the way the frame renders it, created_at breaks ties deterministically.
+            .order_by(HospitalStaff.role.asc(), HospitalStaff.created_at.asc())
+        )
+        result = await db.scalars(stmt)
+        staff = list(result.all())
+        audit.record_count = len(staff)
+        # `admin_override` is left False even for a `hospital_admin`, and that is
+        # a considered choice. Nobody bypasses a rule here — every authenticated
+        # role may read this roster. Admins do get the staff `user_id`s
+        # (`may_see_staff_user_ids`), i.e. a WIDER projection, which is a
+        # different fact from an override. Setting the flag for it would make
+        # `WHERE admin_override IS TRUE` stop meaning "someone bypassed
+        # authorization", which is the one query the column exists for.
+        # Recording projection width needs its own column; flagged, not faked.
     return staff
 
 

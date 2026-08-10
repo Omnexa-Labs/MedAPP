@@ -1,0 +1,13 @@
+Emulator — this is the corrected one:
+
+& "$env:LOCALAPPDATA\Android\Sdk\emulator\emulator.exe" -avd Pixel_6 -no-boot-anim
+Metro, in a second window. Note the ; — Windows PowerShell 5.1 has no &&:
+
+cd "C:\Users\MelchizedekTettehNar\OneDrive - AmaliTech gGmbH\Desktop\Omexa_Labs\MedAPP\frontend\mobile\MedAPP"; npx expo start
+If Metro says port 8081 is busy and offers 8082, say no — kill the orphan and rerun:
+
+Get-NetTCPConnection -LocalPort 8081 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+For the Itel over USB, once it's plugged in with File transfer / MTP selected:
+
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" -d reverse tcp:8081 tcp:8081
+The -d targets the USB device rather than the emulator, since both will be attached.

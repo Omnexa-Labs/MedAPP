@@ -8,24 +8,42 @@
 -- path is `docker compose down -v` (destroys the pgdata volume).
 --
 -- All databases share the `medapp` role declared via POSTGRES_USER on
--- the postgres service. `IF NOT EXISTS` is not legal for `CREATE
--- DATABASE` in plain SQL, so we use the dollar-quoted DO block pattern
--- to keep this script idempotent in case it's re-run by hand.
+-- the postgres service.
+--
+-- IMPLEMENTATION NOTE: this file used to wrap the CREATE DATABASE calls
+-- in a PL/pgSQL DO block. That does not work — Postgres refuses
+-- `CREATE DATABASE` from inside a function or multi-statement
+-- transaction ("CREATE DATABASE cannot be executed from a function"),
+-- so the init script errored and the postgres container exited 3 on
+-- every clean `docker compose up`. The psql `\gexec` idiom below runs
+-- each CREATE as its own top-level statement, and the SELECT that
+-- feeds it filters out databases that already exist — so the script
+-- stays idempotent AND legal.
 
-DO $$
-DECLARE
-    db_name TEXT;
-    db_list TEXT[] := ARRAY[
-        'medapp_pms',
-        'medapp_hms_mgmt',
-        'medapp_pharmacies',
-        'medapp_pharmacists'
-    ];
-BEGIN
-    FOREACH db_name IN ARRAY db_list LOOP
-        IF NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = db_name) THEN
-            EXECUTE format('CREATE DATABASE %I OWNER medapp', db_name);
-        END IF;
-    END LOOP;
-END
-$$;
+SELECT format('CREATE DATABASE %I OWNER medapp', datname)
+FROM (
+    VALUES
+        ('medapp_users'),
+        ('medapp_doctors'),
+        ('medapp_nurses'),
+        ('medapp_hospitals'),
+        ('medapp_bookings'),
+        ('medapp_payments'),
+        ('medapp_telemedicines'),
+        ('medapp_notifications'),
+        ('medapp_inbox'),
+        ('medapp_labs'),
+        ('medapp_ehrs'),
+        ('medapp_social'),
+        ('medapp_analytics'),
+        ('medapp_onboarding'),
+        ('medapp_wearables'),
+        ('medapp_pms'),
+        ('medapp_hms_mgmt'),
+        ('medapp_pharmacies'),
+        ('medapp_pharmacists')
+) AS wanted(datname)
+WHERE NOT EXISTS (
+    SELECT 1 FROM pg_database WHERE pg_database.datname = wanted.datname
+)
+\gexec

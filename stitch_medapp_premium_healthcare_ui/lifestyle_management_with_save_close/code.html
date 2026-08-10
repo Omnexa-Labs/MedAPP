@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Lifestyle Management - MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed": "#0d1c2e",
+            "surface-tint": "#006a61",
+            "secondary": "#515f74",
+            "inverse-surface": "#2c3130",
+            "surface-container-lowest": "#ffffff",
+            "on-tertiary": "#ffffff",
+            "on-surface-variant": "#3d4947",
+            "primary-fixed": "#89f5e7",
+            "surface-container-low": "#f0f5f2",
+            "secondary-fixed-dim": "#b9c7df",
+            "on-secondary-fixed-variant": "#3a485b",
+            "on-error-container": "#93000a",
+            "surface-dim": "#d6dbd9",
+            "secondary-container": "#d5e3fc",
+            "inverse-on-surface": "#edf2f0",
+            "tertiary-fixed-dim": "#adc6ff",
+            "primary-container": "#008378",
+            "on-background": "#171d1c",
+            "primary": "#00685f",
+            "tertiary-container": "#2170e4",
+            "error-container": "#ffdad6",
+            "surface-container-highest": "#dee4e1",
+            "surface-bright": "#f5faf8",
+            "surface-variant": "#dee4e1",
+            "on-secondary": "#ffffff",
+            "on-tertiary-container": "#fefcff",
+            "inverse-primary": "#6bd8cb",
+            "outline": "#6d7a77",
+            "on-error": "#ffffff",
+            "primary-fixed-dim": "#6bd8cb",
+            "on-tertiary-fixed": "#001a42",
+            "on-surface": "#171d1c",
+            "surface-container-high": "#e4e9e7",
+            "on-tertiary-fixed-variant": "#004395",
+            "tertiary-fixed": "#d8e2ff",
+            "outline-variant": "#bcc9c6",
+            "on-primary-container": "#f4fffc",
+            "on-secondary-container": "#57657a",
+            "surface": "#f5faf8",
+            "background": "#f5faf8",
+            "surface-container": "#eaefed",
+            "on-primary-fixed": "#00201d",
+            "on-primary-fixed-variant": "#005049",
+            "on-primary": "#ffffff",
+            "tertiary": "#0058be",
+            "secondary-fixed": "#d5e3fc",
+            "error": "#ba1a1a"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "sm": "12px",
+            "container-max": "1280px",
+            "base": "8px",
+            "gutter": "24px",
+            "xs": "4px",
+            "lg": "48px",
+            "xl": "80px",
+            "md": "24px"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "headline-lg": ["Manrope"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-md": ["Manrope"],
+            "headline-xl": ["Manrope"],
+            "headline-lg-mobile": ["Manrope"]
+          },
+          "fontSize": {
+            "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+            "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+            "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+            "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+            "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+            "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+            "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+            "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      background-color: #f5faf8;
+      -webkit-font-smoothing: antialiased;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 24px;
+    }
+    .bento-item {
+      grid-column: span 12;
+    }
+    @media (min-width: 768px) {
+      .bento-item-md-8 { grid-column: span 8; }
+      .bento-item-md-4 { grid-column: span 4; }
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="pb-32">
+<!-- Top AppBar -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter h-16 bg-surface/80 backdrop-blur-md shadow-sm">
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary">close</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Lifestyle Management</h1>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low transition-colors active:scale-95 duration-200">
+<span class="material-symbols-outlined text-primary">close</span>
+</button>
+</header>
+<main class="max-w-[1280px] mx-auto px-gutter pt-24">
+<div class="bento-grid">
+<!-- AI Meal Planner Section -->
+<section class="bento-item bento-item-md-8 flex flex-col gap-6">
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">AI Meal Planner</h2>
+</div>
+<div class="relative group mb-6">
+<textarea class="w-full bg-surface-container-low border-2 border-transparent focus:border-primary-container rounded-xl p-4 text-on-surface placeholder:text-outline font-body-md transition-all outline-none resize-none h-24" placeholder="Ask AI to plan a meal (e.g., 'High protein dinner for post-workout')"></textarea>
+<button class="absolute bottom-3 right-3 bg-primary text-on-primary px-6 py-2 rounded-full font-label-md hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
+              Generate with AI
+              <span class="material-symbols-outlined text-[18px]">bolt</span>
+</button>
+</div><div class="mb-6">
+<p class="font-label-md text-on-surface-variant mb-3">Analyze Meal via Photo:</p>
+<div class="border-2 border-dashed border-outline-variant rounded-xl p-6 bg-surface-container-low hover:bg-surface-container transition-colors cursor-pointer flex flex-col items-center justify-center gap-3">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-2xl">photo_camera</span>
+</div>
+<div class="text-center">
+<p class="font-label-md text-on-surface">Upload Food Photo</p>
+<p class="text-xs text-outline">AI will identify ingredients automatically</p>
+</div>
+</div>
+</div>
+<div class="mb-6">
+<p class="font-label-md text-on-surface-variant mb-3">Add ingredients to your meal:</p>
+<div class="flex overflow-x-auto gap-3 pb-2 custom-scrollbar">
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Avocado</div>
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Quinoa</div>
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Salmon</div>
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Sweet Potato</div>
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Kale</div>
+<div class="flex-none bg-surface-container-high px-4 py-2 rounded-full cursor-grab active:cursor-grabbing hover:bg-primary-container hover:text-on-primary-container transition-colors font-label-md">Blueberries</div>
+</div><div class="mt-4 flex gap-2 mb-4">
+<input class="flex-1 bg-surface-container-low border border-outline-variant rounded-lg px-4 py-2 text-on-surface font-body-md focus:ring-2 focus:ring-primary-container outline-none transition-all" placeholder="Add specific ingredients manually..." type="text"/>
+<button class="bg-secondary-container text-on-secondary-container px-4 py-2 rounded-lg font-label-md hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">add</span>
+    Add
+  </button>
+</div>
+</div>
+<!-- Recommendation Card -->
+<div class="bg-primary-container/10 border border-primary/20 rounded-xl overflow-hidden">
+<div class="flex flex-col md:flex-row">
+<div class="md:w-1/3">
+<img alt="Healthy Meal" class="h-full w-full object-cover min-h-[200px]" data-alt="A professionally photographed gourmet healthy meal featuring a succulent grilled salmon fillet resting on a bed of fluffy white quinoa. The dish is garnished with roasted asparagus spears and a vibrant lemon wedge. The scene is brightly lit with natural morning sunlight in a clean, modern kitchen setting, utilizing a fresh teal and white color palette to evoke health and premium wellness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnHEFuNHtnQDzxBBuwRAslqPoQR1RoO2UeI4A6xoy4NbFgbOcALRiBnmXOoh8UFBT58u2LhC7KW_itP-znuEI9e2Bhj4cdlfBCZKsLBlVMto5a6tCRuYKweB4FObgkRxR8dDp4XSOw5iPtsECooncA9ailipFAxmyVthrVlIh4fh2XZJYarmHyF_JuZOhiDaHD0_u4SdjuWioYWR9OP_ub1dIotY3Ukf-7mdanEXb9payPNaVA9wUpDt7zoyAy48Eul2f23kI9kwfd"/>
+</div>
+<div class="p-6 md:w-2/3 flex flex-col gap-4">
+<div>
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-headline-md text-primary">Grilled Salmon &amp; Quinoa</h3>
+<span class="bg-primary-container text-on-primary-container text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded">Optimal Choice</span>
+</div>
+<p class="text-on-surface-variant font-body-md mt-1 italic">"High protein, omega-3 rich dinner for muscular recovery."</p>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<div class="bg-white/50 p-2 rounded-lg text-center">
+<p class="text-[10px] text-outline uppercase font-bold">Protein</p>
+<p class="font-headline-md text-primary">45g</p>
+</div>
+<div class="bg-white/50 p-2 rounded-lg text-center">
+<p class="text-[10px] text-outline uppercase font-bold">Carbs</p>
+<p class="font-headline-md text-primary">30g</p>
+</div>
+<div class="bg-white/50 p-2 rounded-lg text-center">
+<p class="text-[10px] text-outline uppercase font-bold">Fats</p>
+<p class="font-headline-md text-primary">18g</p>
+</div>
+</div>
+<div class="bg-white/40 p-3 rounded-lg border border-white/60">
+<p class="font-label-md text-primary flex items-center gap-1 mb-1">
+<span class="material-symbols-outlined text-[16px]">psychology</span>
+                    AI Reasoning
+                  </p>
+<p class="text-on-surface-variant text-[13px] leading-relaxed">
+                    Based on your intense morning workout, your muscles require high-quality protein and complex carbohydrates for glycogen replenishment. Salmon provides essential DHA for cardiovascular health.
+                  </p>
+</div>
+<div class="pt-2 border-t border-white/20 mt-2">
+<button class="w-full bg-primary text-on-primary py-3 rounded-lg font-headline-md hover:bg-primary-container transition-all flex items-center justify-center gap-2 shadow-sm hover:scale-[1.02]"><span class="material-symbols-outlined">save</span> Save &amp; Close</button>
+</div></div>
+</div>
+</div>
+</div>
+</section>
+<!-- Side Column -->
+<aside class="bento-item bento-item-md-4 flex flex-col gap-6">
+<!-- Daily Log Bar -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant">
+<h2 class="font-label-md text-outline uppercase mb-4 tracking-widest">Daily Vitality Log</h2>
+<div class="space-y-6">
+<!-- Sleep Duration -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">bedtime</span>
+                Sleep Duration
+              </label>
+<div class="flex items-center justify-between bg-surface-container-low p-3 rounded-xl">
+<button class="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<div class="text-center">
+<span class="font-headline-md text-on-surface">07:30</span>
+<span class="font-label-sm text-outline">hrs</span>
+</div>
+<button class="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+</div>
+<!-- Water Intake -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">water_drop</span>
+                Water Intake
+              </label>
+<div class="flex items-center justify-between bg-surface-container-low p-3 rounded-xl">
+<button class="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<div class="text-center">
+<span class="font-headline-md text-on-surface">1.8</span>
+<span class="font-label-sm text-outline">Liters</span>
+</div>
+<button class="w-8 h-8 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary/10 transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+</div>
+<div class="w-full bg-surface-container-highest h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full transition-all duration-500" style="width: 65%;"></div>
+</div>
+</div>
+<!-- Workout Plan -->
+<div class="flex flex-col gap-2">
+<label class="font-label-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">fitness_center</span>
+                Workout Plan
+              </label>
+<select class="w-full bg-surface-container-low border-none rounded-xl p-3 font-body-md text-on-surface focus:ring-2 focus:ring-primary-container outline-none">
+<option>Active Recovery (Walk/Yoga)</option>
+<option>Strength Training (Upper Body)</option>
+<option>Cardio Blast (HIIT)</option>
+<option>Full Body Resistance</option>
+<option>Rest Day</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Mood & Stress Tracker -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant">
+<h2 class="font-label-md text-outline uppercase mb-4 tracking-widest">Mindset Check-in</h2>
+<div class="mb-6">
+<p class="font-label-md text-on-surface mb-3">Current Mood</p>
+<div class="flex justify-between items-center gap-1">
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-low hover:bg-primary-container/20 transition-all border border-transparent hover:border-primary-container/40">
+<span class="text-2xl">😫</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-low hover:bg-primary-container/20 transition-all border border-transparent hover:border-primary-container/40">
+<span class="text-2xl">😕</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-primary-container text-white transition-all border-2 border-primary-container shadow-md">
+<span class="text-2xl">😐</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-low hover:bg-primary-container/20 transition-all border border-transparent hover:border-primary-container/40">
+<span class="text-2xl">🙂</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container-low hover:bg-primary-container/20 transition-all border border-transparent hover:border-primary-container/40">
+<span class="text-2xl">🤩</span>
+</button>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-2">
+<p class="font-label-md text-on-surface">Stress Level</p>
+<span class="text-primary font-bold">Low</span>
+</div>
+<input class="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary" max="10" min="1" type="range" value="4"/>
+<div class="flex justify-between mt-1">
+<span class="text-[10px] text-outline font-bold">CALM</span>
+<span class="text-[10px] text-outline font-bold">INTENSE</span>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Sticky Quick Log Button -->
+<div class="fixed bottom-24 right-gutter md:right-8 z-40">
+<button class="flex items-center gap-3 bg-primary text-on-primary px-8 py-4 rounded-full shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all font-headline-md"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">task_alt</span> Save &amp; Close</button>
+</div>
+<!-- Bottom Navigation -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 py-2 pb-safe bg-surface/90 backdrop-blur-lg shadow-lg rounded-t-xl">
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-sm text-label-sm">Home</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined">insights</span>
+<span class="font-label-sm text-label-sm">Overview</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined">mail</span>
+<span class="font-label-sm text-label-sm">Inbox</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150">
+<span class="material-symbols-outlined">groups</span>
+<span class="font-label-sm text-label-sm">Community</span>
+</button>
+<button class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-full px-4 py-1 active:scale-90 duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">health_metrics</span>
+<span class="font-label-sm text-label-sm">Lifestyle</span>
+</button>
+</nav>
+<script>
+    // Micro-interaction for range input color shift
+    const rangeInput = document.querySelector('input[type="range"]');
+    rangeInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      const label = document.querySelector('span.text-primary.font-bold');
+      if (val < 4) label.innerText = 'Low';
+      else if (val < 7) label.innerText = 'Moderate';
+      else label.innerText = 'High';
+    });
+
+    // Horizontal scroll drag interaction simulation (visual only)
+    const scrollContainer = document.querySelector('.custom-scrollbar');
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    scrollContainer.addEventListener('mousedown', (e) => {
+      isDown = true;
+      startX = e.pageX - scrollContainer.offsetLeft;
+      scrollLeft = scrollContainer.scrollLeft;
+    });
+    scrollContainer.addEventListener('mouseleave', () => isDown = false);
+    scrollContainer.addEventListener('mouseup', () => isDown = false);
+    scrollContainer.addEventListener('mousemove', (e) => {
+      if(!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - scrollContainer.offsetLeft;
+      const walk = (x - startX) * 2;
+      scrollContainer.scrollLeft = scrollLeft - walk;
+    });
+  </script>
+</body></html>

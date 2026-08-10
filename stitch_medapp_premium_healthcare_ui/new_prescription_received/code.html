@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedApp - New Prescription</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "inverse-primary": "#6bd8cb",
+                      "on-primary-container": "#f4fffc",
+                      "inverse-on-surface": "#edf2f0",
+                      "on-secondary-fixed": "#0d1c2e",
+                      "on-error": "#ffffff",
+                      "outline": "#6d7a77",
+                      "on-tertiary-container": "#fefcff",
+                      "on-secondary-container": "#57657a",
+                      "on-secondary": "#ffffff",
+                      "surface-bright": "#f5faf8",
+                      "on-background": "#171d1c",
+                      "secondary-container": "#d5e3fc",
+                      "primary-container": "#008378",
+                      "outline-variant": "#bcc9c6",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-fixed": "#00201d",
+                      "primary-fixed": "#89f5e7",
+                      "on-tertiary": "#ffffff",
+                      "on-secondary-fixed-variant": "#3a485b",
+                      "background": "#f5faf8",
+                      "tertiary-fixed": "#d8e2ff",
+                      "tertiary-container": "#2170e4",
+                      "secondary-fixed-dim": "#b9c7df",
+                      "on-tertiary-fixed": "#001a42",
+                      "on-primary": "#ffffff",
+                      "surface-tint": "#006a61",
+                      "secondary-fixed": "#d5e3fc",
+                      "on-tertiary-fixed-variant": "#004395",
+                      "surface-container-highest": "#dee4e1",
+                      "inverse-surface": "#2c3130",
+                      "surface-variant": "#dee4e1",
+                      "surface-container-low": "#f0f5f2",
+                      "on-surface-variant": "#3d4947",
+                      "secondary": "#515f74",
+                      "on-surface": "#171d1c",
+                      "tertiary": "#0058be",
+                      "primary-fixed-dim": "#6bd8cb",
+                      "tertiary-fixed-dim": "#adc6ff",
+                      "surface-container-high": "#e4e9e7",
+                      "surface-container": "#eaefed",
+                      "primary": "#00685f",
+                      "surface": "#f5faf8",
+                      "on-error-container": "#93000a",
+                      "on-primary-fixed-variant": "#005049",
+                      "error-container": "#ffdad6",
+                      "surface-dim": "#d6dbd9",
+                      "error": "#ba1a1a"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "sm": "12px",
+                      "container-max": "1280px",
+                      "xs": "4px",
+                      "lg": "48px",
+                      "gutter": "24px",
+                      "base": "8px",
+                      "md": "24px",
+                      "xl": "80px"
+              },
+              "fontFamily": {
+                      "label-md": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Manrope"
+                      ],
+                      "headline-xl": [
+                              "Manrope"
+                      ],
+                      "headline-lg": [
+                              "Manrope"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "headline-lg-mobile": [
+                              "Manrope"
+                      ],
+                      "label-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl": [
+                              "40px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased pb-xl">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 shadow-sm dark:shadow-none docked full-width top-0 sticky z-40">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-xs">
+<button class="p-xs rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 text-on-surface-variant dark:text-outline-variant">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+</div>
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">
+                MedApp
+            </div>
+<div class="flex items-center">
+<button class="p-xs rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 text-primary dark:text-primary-fixed-dim">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<main class="px-gutter py-md max-w-container-max mx-auto">
+<!-- Status Header -->
+<section class="mb-lg flex flex-col items-center text-center">
+<div class="w-16 h-16 rounded-full bg-primary-container text-primary flex items-center justify-center mb-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)]">
+<span class="material-symbols-outlined text-[32px] icon-fill">check_circle</span>
+</div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-xs">New Prescription Issued</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Dr. Vance has prescribed <span class="font-semibold text-on-surface">Amoxicillin 500mg</span></p>
+</section>
+<!-- Prescription Details Card -->
+<section class="mb-lg">
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md">
+<div class="flex items-start justify-between mb-md">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full bg-secondary-container text-secondary flex items-center justify-center">
+<span class="material-symbols-outlined icon-fill">medication</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Amoxicillin</h2>
+<p class="font-label-md text-label-md text-on-surface-variant">500mg Capsule</p>
+</div>
+</div>
+<span class="px-3 py-1 rounded-full bg-primary-container/20 text-primary font-label-sm text-label-sm">Antibiotic</span>
+</div>
+<div class="grid grid-cols-3 gap-sm pt-sm border-t border-outline-variant/30">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Dosage</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">1 tablet</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Frequency</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">3x daily</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant mb-xs">Duration</span>
+<span class="font-body-md text-body-md text-on-surface font-medium">7 days</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Pharmacy & Status -->
+<section class="mb-lg">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-sm">Pharmacy Status</h3>
+<div class="bg-surface-container-lowest rounded-xl shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 p-md">
+<!-- Timeline -->
+<div class="relative pl-sm mb-md border-l-2 border-outline-variant/30">
+<div class="relative mb-md">
+<div class="absolute -left-[21px] top-1 w-4 h-4 rounded-full bg-primary border-2 border-surface-container-lowest"></div>
+<p class="font-label-md text-label-md text-on-surface">Sent to Pharmacy</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">10:45 AM, Today</p>
+</div>
+<div class="relative">
+<div class="absolute -left-[21px] top-1 w-4 h-4 rounded-full bg-outline-variant border-2 border-surface-container-lowest"></div>
+<p class="font-label-md text-label-md text-on-surface-variant">Processing</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Estimated pickup: 1:00 PM</p>
+</div>
+</div>
+<div class="flex items-start justify-between pt-sm border-t border-outline-variant/30">
+<div>
+<p class="font-label-md text-label-md text-on-surface">CVS Pharmacy</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">123 Main St, Springfield</p>
+</div>
+<button class="flex items-center gap-xs text-primary font-label-sm text-label-sm hover:underline">
+<span class="material-symbols-outlined text-[16px]">directions</span>
+                        Directions
+                    </button>
+</div>
+</div>
+</section>
+<!-- Education -->
+<section class="mb-lg">
+<div class="bg-surface-container-low rounded-xl p-md">
+<div class="flex items-center gap-sm mb-sm text-on-surface">
+<span class="material-symbols-outlined text-[20px]">info</span>
+<h3 class="font-label-md text-label-md font-bold">About this Medication</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-sm">
+                    Amoxicillin is a penicillin antibiotic used to treat various types of bacterial infections.
+                </p>
+<div class="bg-surface-container-lowest p-sm rounded-lg border border-outline-variant/20">
+<p class="font-label-sm text-label-sm text-on-surface font-semibold mb-xs">Common side effects:</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Nausea, vomiting, diarrhea. Take with food to reduce stomach upset.</p>
+</div>
+</div>
+</section>
+<!-- Actions -->
+<section class="flex flex-col gap-sm">
+<button class="w-full py-sm rounded-full bg-primary text-on-primary font-label-md text-label-md shadow-[0px_4px_20px_rgba(71,85,105,0.05)] hover:bg-primary/90 transition-colors active:scale-[0.98]">
+                Add to Medication Tracker
+            </button>
+<div class="flex gap-sm">
+<button class="flex-1 py-sm rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-colors active:scale-[0.98]">
+                    Message Doctor
+                </button>
+<button class="flex-1 py-sm rounded-full bg-surface-container-lowest border border-outline-variant/50 text-on-surface font-label-md text-label-md hover:bg-surface-container-low transition-colors active:scale-[0.98]">
+                    Chat with Pharmacist
+                </button>
+</div>
+</section>
+</main>
+</body></html>

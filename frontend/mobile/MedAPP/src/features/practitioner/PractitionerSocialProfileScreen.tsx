@@ -13,7 +13,7 @@
 //         Seed data stands in until the practitioner service endpoint ships.
 //
 // Translation calls:
-//   - backdrop-blur header   → opaque bg-surface/80 + border + shadow.
+//   - backdrop-blur header   → the shared DetailAppBar; no blur, no shadow.
 //   - bg-gradient-to-r cover → bg-primary-container + two decorative
 //     positioned View blobs (RN can't cheaply composite a CSS gradient).
 //   - -mt-20 profile card    → marginTop: -80 in RN style.
@@ -33,25 +33,45 @@
 import { useState } from "react";
 import {
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { BottomNav } from "@/features/home/components/BottomNav";
+import { DetailShell } from "@/components/shell";
+import { Card, Icon } from "@/components/ui";
+import { useTokenColor } from "@/lib/tokens";
 
-type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type Tab = "posts" | "certifications" | "reviews" | "services";
+
+/**
+ * The scroll reserve, after the forbidden `<BottomNav>` was deleted.
+ *
+ * It used to be 120 = the nav's 80 outer height (8 + 48 + 24, per BottomNav.tsx)
+ * + 40 under the "Load More Reviews" button. Nothing is pinned to the bottom of
+ * this screen and DetailShell claims the bottom inset, so only the 40 remains.
+ */
+const SCROLL_RESERVE = 40;
 
 // ---------------------------------------------------------------------------
 // Seed data — mirrors the Stitch comp. Replace with an API call once the
 // practitioner service exposes GET /v1/practitioners/:id.
+//
+// The practitioner is Dr. Abena Owusu, Nutrition & Dietetics, and she is a real
+// row in scripts/seed_dev_data.py — added there for this screen rather than
+// invented here. The comp shipped with "Dr. Sarah Jenkins", who exists nowhere
+// in the seed, so a tester who had just scrolled Find Care (Efua Asante, Adjoa
+// Boateng, Yaw Darko, Kwabena Osei, Nii Tetteh) met a sixth clinician who could
+// not be booked. This screen is a nutrition practice end to end — bio, services,
+// and both reviews talk about nutrition plans and gut health — so it needed a
+// nutritionist, not a re-label onto one of the existing five.
 // ---------------------------------------------------------------------------
+
+const PRACTITIONER_NAME = "Dr. Abena Owusu";
+/** Surname alone, for review copy that addresses her directly. */
+const PRACTITIONER_SURNAME = "Dr. Owusu";
 
 interface Review {
   id: string;
@@ -72,7 +92,7 @@ const SEED_REVIEWS: Review[] = [
     name: "James S.",
     rating: 5,
     timeAgo: "2 days ago",
-    body: "Dr. Jenkins is incredibly knowledgeable and patient. She took the time to understand my lifestyle and helped me create a realistic nutrition plan that I can actually stick to.",
+    body: `${PRACTITIONER_SURNAME} is incredibly knowledgeable and patient. She took the time to understand my lifestyle and helped me create a realistic nutrition plan that I can actually stick to.`,
     helpfulCount: 12,
   },
   {
@@ -112,233 +132,208 @@ const AVATAR_URI =
 
 export function PractitionerSocialProfileScreen() {
   const [activeTab, setActiveTab] = useState<Tab>("reviews");
+  // The bar's overflow glyph, by token name rather than the `#3d4947` the
+  // hand-rolled bar froze (the LIGHT value of color/on-surface-variant).
+  const mutedGlyph = useTokenColor("on-surface-variant");
 
   return (
-    <View className="flex-1 bg-background">
-      <StatusBar style="dark" />
-      <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        {/* App bar */}
-        <View
-          className="flex-row items-center justify-between border-b border-outline-variant/30 bg-surface/80 px-gutter py-sm"
-          style={appBarShadow}
+    // App bar — the shared detail bar (Figma 193:120), now via DetailShell.
+    // FLAGGED (unchanged by this pass): the hand-rolled bar set "MedApp" as
+    // `<Text>` — the wordmark re-typeset (docs/BRAND.md §Logo rules), and
+    // 193:120 forbids a logo on a detail bar. Retitled to the screen's role; the
+    // copy needs a designer/PO call. The practitioner's own name is not a param
+    // here (only reviewer names are), so it cannot go in the title today.
+    <DetailShell
+      title="Provider Profile"
+      actions={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+          className="h-full w-full items-center justify-center rounded-full active:opacity-70"
         >
-          <View className="flex-row items-center gap-sm">
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-              hitSlop={8}
-              onPress={() => router.back()}
-              className="rounded-full p-xs active:scale-95"
-            >
-              <MaterialIcons name="arrow-back" size={24} color="#00685f" />
-            </Pressable>
-            <Text className="font-headline-md text-headline-md text-primary">MedApp</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="More options"
-            hitSlop={8}
-            className="rounded-full p-xs active:scale-95"
-          >
-            <MaterialIcons name="more-vert" size={24} color="#3d4947" />
-          </Pressable>
+          <Icon chrome="more-vert" size={24} color={mutedGlyph} />
+        </Pressable>
+      }
+    >
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: SCROLL_RESERVE }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Cover area — gradient simulated with primary-container + decorative blobs */}
+        <View
+          className="h-48 w-full overflow-hidden bg-primary-container"
+          style={{ borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              top: -40,
+              right: -40,
+              height: 200,
+              width: 200,
+              borderRadius: 100,
+              backgroundColor: "rgba(255,255,255,0.12)",
+            }}
+          />
+          <View
+            style={{
+              position: "absolute",
+              bottom: -30,
+              left: -30,
+              height: 140,
+              width: 140,
+              borderRadius: 70,
+              backgroundColor: "rgba(0,131,120,0.25)",
+            }}
+          />
         </View>
 
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Cover area — gradient simulated with primary-container + decorative blobs */}
-          <View
-            className="h-48 w-full overflow-hidden bg-primary-container"
-            style={{ borderBottomLeftRadius: 24, borderBottomRightRadius: 24 }}
-          >
-            <View
-              style={{
-                position: "absolute",
-                top: -40,
-                right: -40,
-                height: 200,
-                width: 200,
-                borderRadius: 100,
-                backgroundColor: "rgba(255,255,255,0.12)",
-              }}
-            />
-            <View
-              style={{
-                position: "absolute",
-                bottom: -30,
-                left: -30,
-                height: 140,
-                width: 140,
-                borderRadius: 70,
-                backgroundColor: "rgba(0,131,120,0.25)",
-              }}
-            />
-          </View>
-
-          {/* Profile card — overlaps the cover via negative marginTop */}
-          <View className="px-md" style={{ marginTop: -80 }}>
-            <View
-              className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-md"
-              style={profileCardShadow}
-            >
-              {/* Avatar row */}
-              <View className="flex-row items-end gap-md mb-md">
-                {/* Avatar with verified badge */}
-                <View>
-                  <View
-                    className="h-28 w-28 overflow-hidden rounded-full border-4 border-surface-container-lowest"
-                    style={avatarShadow}
-                  >
-                    <Image
-                      source={{ uri: AVATAR_URI }}
-                      className="h-full w-full"
-                      accessibilityLabel="Dr. Sarah Jenkins"
-                    />
-                  </View>
-                  <View
-                    className="absolute bottom-1 right-1 rounded-full bg-surface-container-lowest p-xs"
-                    style={{ shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 }}
-                  >
-                    <MaterialIcons name="check-circle" size={20} color="#00685f" />
-                  </View>
+        {/* Profile card — overlaps the cover via negative marginTop */}
+        <View className="px-md" style={{ marginTop: -80 }}>
+          {/* The shared Card: `card-surface` + a full-strength
+              `outline-variant` hairline + `radius/24`, and NO drop shadow
+              (docs/BRAND.md §Elevation). It still overlaps the cover by
+              -80px, so the overlap — not a blur — is what lifts it. */}
+          <Card>
+            {/* Avatar row */}
+            <View className="flex-row items-end gap-md mb-md">
+              {/* Avatar with verified badge */}
+              <View>
+                {/* The 4px surface-coloured ring is the avatar's separation
+                    against the cover; the old blur was a second signal. */}
+                <View className="h-28 w-28 overflow-hidden rounded-full border-4 border-surface-container-lowest">
+                  <Image
+                    source={{ uri: AVATAR_URI }}
+                    className="h-full w-full"
+                    accessibilityLabel={PRACTITIONER_NAME}
+                  />
                 </View>
-
-                {/* Stats */}
-                <View className="flex-1 flex-row justify-center gap-lg pb-sm">
-                  <View className="items-center">
-                    <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
-                      12k
-                    </Text>
-                    <Text className="font-label-sm text-label-sm text-on-surface-variant mt-xs">
-                      Followers
-                    </Text>
-                  </View>
-                  <View className="w-px bg-surface-container-highest" />
-                  <View className="items-center">
-                    <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
-                      4.9
-                    </Text>
-                    <Text className="font-label-sm text-label-sm text-on-surface-variant mt-xs">
-                      Rating
-                    </Text>
-                  </View>
+                <View className="absolute bottom-1 right-1 rounded-full bg-surface-container-lowest p-xs">
+                  <MaterialIcons name="check-circle" size={20} color="#00685f" />
                 </View>
               </View>
 
-              {/* Name + specialty + badge */}
-              <View className="flex-row items-start justify-between mb-sm">
-                <View className="flex-1 mr-sm">
+              {/* Stats */}
+              <View className="flex-1 flex-row justify-center gap-lg pb-sm">
+                <View className="items-center">
                   <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
-                    Dr. Sarah Jenkins
+                    12k
                   </Text>
-                  <Text className="font-label-md text-label-md text-primary mt-xs">
-                    Clinical Nutritionist, RDN
-                  </Text>
-                </View>
-                <View className="rounded-full bg-primary-fixed/20 px-sm py-xs">
-                  <Text
-                    className="font-label-sm text-label-sm text-primary-container"
-                    style={{ fontSize: 11 }}
-                  >
-                    Accepting Patients
+                  <Text className="font-label-sm text-label-sm text-on-surface-variant mt-xs">
+                    Followers
                   </Text>
                 </View>
-              </View>
-
-              {/* Bio */}
-              <Text className="font-body-md text-body-md text-on-surface-variant mb-md">
-                Passionate about holistic health and functional nutrition. I help individuals
-                optimize their energy, manage chronic conditions, and build sustainable
-                relationships with food. With over 10 years of clinical experience, I believe
-                in evidence-based, personalized care that fits your lifestyle.
-              </Text>
-
-              {/* Action buttons */}
-              <View className="flex-row gap-sm">
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Follow Dr. Sarah Jenkins"
-                  className="flex-1 flex-row items-center justify-center gap-xs rounded-lg bg-primary py-sm active:scale-[0.98]"
-                  style={primaryBtnShadow}
-                >
-                  <MaterialIcons name="person-add" size={18} color="#ffffff" />
-                  <Text className="font-label-md text-label-md text-white">Follow</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Send private message"
-                  className="flex-1 flex-row items-center justify-center gap-xs rounded-lg border border-surface-container-highest bg-surface-container py-sm active:scale-[0.98]"
-                  onPress={() => router.push("/(app)/chat-thread" as Href)}
-                >
-                  <MaterialIcons name="chat" size={18} color="#171d1c" />
-                  <Text className="font-label-md text-label-md text-on-surface">Message</Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="More options"
-                  className="items-center justify-center rounded-lg border border-surface-container-highest bg-surface-container px-md py-sm active:scale-95"
-                >
-                  <MaterialIcons name="more-horiz" size={20} color="#171d1c" />
-                </Pressable>
+                <View className="w-px bg-surface-container-highest" />
+                <View className="items-center">
+                  <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
+                    4.9
+                  </Text>
+                  <Text className="font-label-sm text-label-sm text-on-surface-variant mt-xs">
+                    Rating
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Tab bar */}
-          <View className="mt-lg border-b border-surface-container-highest px-md">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 24 }}
-            >
-              {TABS.map((t) => (
-                <Pressable
-                  key={t.key}
-                  accessibilityRole="tab"
-                  accessibilityLabel={t.label}
-                  accessibilityState={{ selected: activeTab === t.key }}
-                  onPress={() => setActiveTab(t.key)}
-                  className="pb-sm"
-                  style={{
-                    borderBottomWidth: 2,
-                    borderBottomColor: activeTab === t.key ? "#00685f" : "transparent",
-                  }}
+            {/* Name + specialty + badge */}
+            <View className="flex-row items-start justify-between mb-sm">
+              <View className="flex-1 mr-sm">
+                <Text className="font-headline-md text-on-surface" style={{ fontSize: 22 }}>
+                  {PRACTITIONER_NAME}
+                </Text>
+                <Text className="font-label-md text-label-md text-primary mt-xs">
+                  Clinical Nutritionist, RDN
+                </Text>
+              </View>
+              <View className="rounded-full bg-primary-fixed/20 px-sm py-xs">
+                <Text
+                  className="font-label-sm text-label-sm text-primary-container"
+                  style={{ fontSize: 11 }}
                 >
-                  <Text
-                    className="font-label-md text-label-md"
-                    style={{ color: activeTab === t.key ? "#00685f" : "#3d4947" }}
-                  >
-                    {t.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+                  Accepting Patients
+                </Text>
+              </View>
+            </View>
 
-          {/* Tab content */}
-          <View className="mt-lg px-md gap-md">
-            {activeTab === "reviews" ? (
-              <ReviewsTab />
-            ) : (
-              <TabPlaceholder tab={activeTab} />
-            )}
-          </View>
-        </ScrollView>
+            {/* Bio */}
+            <Text className="font-body-md text-body-md text-on-surface-variant mb-md">
+              Passionate about holistic health and functional nutrition. I help individuals
+              optimize their energy, manage chronic conditions, and build sustainable
+              relationships with food. With over 10 years of clinical experience, I believe
+              in evidence-based, personalized care that fits your lifestyle.
+            </Text>
 
-        <BottomNav
-          active="community"
-          onTabPress={(key) => {
-            if (key === "home") router.replace("/(app)" as Href);
-            else if (key === "overview") router.push("/(app)/overview" as Href);
-            else if (key === "inbox") router.push("/(app)/inbox" as Href);
-            else if (key === "community") router.push("/(app)/community" as Href);
-            else if (key === "lifestyle") router.push("/(app)/lifestyle" as Href);
-          }}
-        />
-      </SafeAreaView>
-    </View>
+            {/* Action buttons */}
+            <View className="flex-row gap-sm">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Follow ${PRACTITIONER_NAME}`}
+                className="flex-1 flex-row items-center justify-center gap-xs rounded-lg bg-primary py-sm active:scale-[0.98]"
+              >
+                <MaterialIcons name="person-add" size={18} color="#ffffff" />
+                <Text className="font-label-md text-label-md text-white">Follow</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Send private message"
+                className="flex-1 flex-row items-center justify-center gap-xs rounded-lg border border-surface-container-highest bg-surface-container py-sm active:scale-[0.98]"
+                onPress={() => router.push("/(app)/chat-thread" as Href)}
+              >
+                <MaterialIcons name="chat" size={18} color="#171d1c" />
+                <Text className="font-label-md text-label-md text-on-surface">Message</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="More options"
+                className="items-center justify-center rounded-lg border border-surface-container-highest bg-surface-container px-md py-sm active:scale-95"
+              >
+                <MaterialIcons name="more-horiz" size={20} color="#171d1c" />
+              </Pressable>
+            </View>
+          </Card>
+        </View>
+
+        {/* Tab bar */}
+        <View className="mt-lg border-b border-surface-container-highest px-md">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 24 }}
+          >
+            {TABS.map((t) => (
+              <Pressable
+                key={t.key}
+                accessibilityRole="tab"
+                accessibilityLabel={t.label}
+                accessibilityState={{ selected: activeTab === t.key }}
+                onPress={() => setActiveTab(t.key)}
+                className="pb-sm"
+                style={{
+                  borderBottomWidth: 2,
+                  borderBottomColor: activeTab === t.key ? "#00685f" : "transparent",
+                }}
+              >
+                <Text
+                  className="font-label-md text-label-md"
+                  style={{ color: activeTab === t.key ? "#00685f" : "#3d4947" }}
+                >
+                  {t.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Tab content */}
+        <View className="mt-lg px-md gap-md">
+          {activeTab === "reviews" ? (
+            <ReviewsTab />
+          ) : (
+            <TabPlaceholder tab={activeTab} />
+          )}
+        </View>
+      </ScrollView>
+    </DetailShell>
   );
 }
 
@@ -350,10 +345,7 @@ function ReviewsTab() {
   return (
     <View className="gap-md">
       {/* Rating summary */}
-      <View
-        className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-md"
-        style={cardShadow}
-      >
+      <Card>
         <View className="flex-row items-center gap-lg">
           {/* Big number + stars */}
           <View className="items-center">
@@ -391,7 +383,7 @@ function ReviewsTab() {
             ))}
           </View>
         </View>
-      </View>
+      </Card>
 
       {/* Individual review cards */}
       {SEED_REVIEWS.map((r) => (
@@ -404,7 +396,6 @@ function ReviewsTab() {
           accessibilityRole="button"
           accessibilityLabel="Load more reviews"
           className="rounded-full border border-surface-container-highest bg-surface-container-lowest px-xl py-sm active:scale-95"
-          style={cardShadow}
         >
           <Text className="font-label-md text-label-md text-on-surface">Load More Reviews</Text>
         </Pressable>
@@ -421,10 +412,7 @@ function ReviewCard({ review }: { review: Review }) {
   const { bg, fg } = avatarColors[review.avatarTint];
 
   return (
-    <View
-      className="rounded-2xl border border-surface-container-highest bg-surface-container-lowest p-md"
-      style={cardShadow}
-    >
+    <Card>
       {/* Header row */}
       <View className="flex-row items-start justify-between mb-sm">
         <View className="flex-row items-center gap-sm">
@@ -494,7 +482,7 @@ function ReviewCard({ review }: { review: Review }) {
           </Pressable>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
@@ -520,65 +508,12 @@ function TabPlaceholder({ tab }: { tab: Tab }) {
 }
 
 // ---------------------------------------------------------------------------
-// Local primitives. Promote to components/ui once a second screen needs them.
+// Elevation — nothing on this screen floats.
+//
+// `cardShadow`, `profileCardShadow`, `avatarShadow` and `primaryBtnShadow` are
+// all gone, along with the earlier `appBarShadow`. Every surface they were
+// applied to is a card, an avatar, a badge or an in-flow button — none of them
+// the sheet/menu/dialog/toast/FAB role that docs/BRAND.md §Elevation scopes the
+// sanctioned `0 1px 2px` / `0 2px 6px` pair to. Separation is surface tone plus
+// the `outline-variant` hairline, which the shared `Card` now supplies.
 // ---------------------------------------------------------------------------
-
-const cardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.05,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 4 },
-    },
-    web: { boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)" },
-    android: { elevation: 2 },
-  }) || {};
-
-const profileCardShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.1,
-      shadowRadius: 30,
-      shadowOffset: { width: 0, height: 10 },
-    },
-    web: { boxShadow: "0px 10px 30px rgba(71, 85, 105, 0.1)" },
-    android: { elevation: 4 },
-  }) || {};
-
-const avatarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#475569",
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(71, 85, 105, 0.12)" },
-    android: { elevation: 3 },
-  }) || {};
-
-const primaryBtnShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#00685f",
-      shadowOpacity: 0.25,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-    },
-    web: { boxShadow: "0px 6px 12px rgba(0, 104, 95, 0.25)" },
-    android: { elevation: 6 },
-  }) || {};
-
-const appBarShadow =
-  Platform.select({
-    ios: {
-      shadowColor: "#000000",
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
-    },
-    web: { boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.04)" },
-    android: { elevation: 3 },
-  }) || {};

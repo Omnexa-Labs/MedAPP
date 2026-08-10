@@ -34,8 +34,27 @@ async def test_signup_duplicate_email_returns_409(client):
     assert r2.status_code == 409
 
 
-async def test_signup_doctor_starts_pending_kyc(client):
+async def test_signup_refuses_to_grant_a_clinician_role(client):
+    """Public signup cannot mint a doctor. This is a security boundary.
+
+    It used to return 201 with role=doctor, and `issue_tokens_for_user` stamped
+    that into the access token while nothing gated on `kyc_status`. Chained with
+    lab_service's old `role == "doctor"` early return, an anonymous attacker could
+    sign up and read ANY patient's lab results.
+
+    422, not a silent downgrade to `user`: a caller who asked to be a clinician
+    and got a plain account without being told would reasonably believe otherwise.
+    """
     r = await _signup(client, email="d@b.com", role="doctor")
+    assert r.status_code == 422
+    assert "authenticated provisioning" in r.text
+
+
+async def test_signup_starts_kyc_pending(client):
+    # kyc_status is still "pending" on a fresh account - that is what a KYC
+    # applicant's starting state looks like, and the field is unrelated to the
+    # role the caller may request.
+    r = await _signup(client, email="pending@b.com")
     assert r.status_code == 201
     assert r.json()["kyc_status"] == "pending"
 

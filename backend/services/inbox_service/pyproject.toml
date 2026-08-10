@@ -12,6 +12,13 @@ dependencies = [
   "pyjwt[crypto]>=2.9",
   "structlog>=24.1",
   "uvicorn[standard]>=0.30",
+  # Multipart attachment upload (POST /v1/threads/{id}/attachments).
+  # FastAPI does NOT pull this in itself: without it, importing a route that
+  # declares `UploadFile`/`File(...)` raises at APP STARTUP with
+  # "Form data requires 'python-multipart' to be installed" — the container
+  # never becomes healthy. It is a hard runtime dependency of the route, not a
+  # nicety.
+  "python-multipart>=0.0.9",
 ]
 
 [tool.setuptools]

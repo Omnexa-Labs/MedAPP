@@ -45,3 +45,18 @@ ml/models/*
 !ml/models/.gitkeep
 packages/clients/dart/lib/generated/
 packages/clients/typescript/src/generated/
+
+# Transient verification screenshots. Design/build agents download Figma renders
+# to eyeball them; those belong in a scratch dir, not the repo root. Anything
+# genuinely needed as an asset goes under frontend/mobile/MedAPP/assets/.
+/*.png
+scratch_*
+scratchpad_*
+
+# Temporary capture harness — auth-bypass routes and the store seeder used to
+# reach guarded screens on a device/emulator with no backend. Deliberately never
+# committed: they defeat the (app) auth guard. Ignored rather than merely
+# untracked because a broad `git add src` swept them into three separate commits
+# before this line existed.
+frontend/mobile/MedAPP/src/app/(public)/zp*.tsx
+frontend/mobile/MedAPP/src/features/auth/__preview-seed.ts

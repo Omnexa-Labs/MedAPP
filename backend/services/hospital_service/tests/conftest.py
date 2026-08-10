@@ -117,6 +117,33 @@ async def doctor_client(sessionmaker, principal_doctor):
         yield client
 
 
+@pytest_asyncio.fixture
+async def anonymous_client(sessionmaker):
+    """A client with NO principal override — the real auth dependency runs.
+
+    Needed because the staff roster is the first read on this router that is not
+    public, and "authentication is required" is only actually tested if some
+    client can arrive without a token. Every other client fixture overrides the
+    dependency away, so none of them can prove it.
+    """
+
+    async def _db_override():
+        async with sessionmaker() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    application = create_app()
+    application.dependency_overrides[get_db] = _db_override
+    transport = ASGITransport(app=application)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+    application.dependency_overrides.clear()
+
+
 @pytest.fixture
 def hospital_sample():
     return {

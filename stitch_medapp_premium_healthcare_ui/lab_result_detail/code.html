@@ -1,0 +1,307 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Annual Blood Panel Results | MedApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary": "#00685f",
+                    "on-tertiary": "#ffffff",
+                    "surface-dim": "#d6dbd9",
+                    "secondary": "#515f74",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "tertiary-fixed": "#d8e2ff",
+                    "on-error-container": "#93000a",
+                    "tertiary": "#0058be",
+                    "secondary-fixed": "#d5e3fc",
+                    "primary-container": "#008378",
+                    "surface": "#f5faf8",
+                    "inverse-primary": "#6bd8cb",
+                    "surface-bright": "#f5faf8",
+                    "on-surface-variant": "#3d4947",
+                    "inverse-surface": "#2c3130",
+                    "tertiary-container": "#2170e4",
+                    "on-surface": "#171d1c",
+                    "surface-container-lowest": "#ffffff",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f0f5f2",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "secondary-container": "#d5e3fc",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "surface-container-high": "#e4e9e7",
+                    "outline": "#6d7a77",
+                    "inverse-on-surface": "#edf2f0",
+                    "on-primary-container": "#f4fffc",
+                    "outline-variant": "#bcc9c6",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-error": "#ffffff",
+                    "on-secondary-container": "#57657a",
+                    "surface-container-highest": "#dee4e1",
+                    "surface-container": "#eaefed",
+                    "primary-fixed": "#89f5e7",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary-fixed": "#00201d",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "surface-variant": "#dee4e1",
+                    "background": "#f5faf8",
+                    "on-tertiary-container": "#fefcff",
+                    "on-secondary": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#005049",
+                    "on-background": "#171d1c",
+                    "surface-tint": "#006a61",
+                    "error": "#ba1a1a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "base": "8px",
+                    "gutter": "24px",
+                    "xl": "80px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "sm": "12px",
+                    "md": "24px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "headline-md": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "body-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f5faf8;
+            color: #171d1c;
+        }
+        .glass-header {
+            backdrop-filter: blur(12px);
+        }
+        .custom-shadow {
+            shadow-sm: 0px 4px 20px rgba(71, 85, 105, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md text-body-md overflow-x-hidden">
+<!-- TopAppBar from JSON -->
+<header class="bg-surface/80 dark:bg-surface/80 backdrop-blur-md text-primary dark:text-primary-fixed-dim docked full-width top-0 sticky z-40 bg-surface/80 dark:bg-surface/80 border-b border-outline-variant/30 shadow-sm dark:shadow-none">
+<div class="flex justify-between items-center w-full px-gutter py-sm max-w-container-max mx-auto">
+<div class="flex items-center gap-md">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover border-2 border-primary-fixed cursor-pointer active:scale-95 transition-transform" data-alt="A professional headshot of a friendly man in his late 30s with short dark hair and a warm smile. He is set against a soft-focus clinical office background with muted teal and white tones. The lighting is bright and airy, reflecting a modern healthcare environment with a clean, premium aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZaEvGmA_VoIyxUrIjSOT7D3mD2vnYx5s-sPpQxwovETRnb0e0D1D6aSFqh7RHzsYjLwPH-j4pexoG9u92RaDyMWHjHQ12KRe8rFAfQuyQQ4zjYlNFQDJD9f6z6GLs0-wJzxSOZcQ_ewjigw68wFrOgp9dBpzPkX47B22RygKYG2jkrqsbbSVWjZGZU8WGD3RR_lkPoIJZy36NcaPbuWyF0VbJUa8lZZ7z3ywHDXMYlCpkUD2HbGtR4xA-4lqvsui0ZGvylr1HLhop">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">MedApp</span>
+</div>
+<div class="flex items-center gap-base">
+<div class="hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors cursor-pointer active:scale-95 duration-200 p-2 rounded-full">
+<span class="material-symbols-outlined text-primary" data-icon="notifications">notifications</span>
+</div>
+</div>
+</div>
+</header>
+<main class="max-w-container-max mx-auto px-gutter py-lg flex flex-col gap-lg">
+<!-- Back Navigation (Contextual) -->
+<nav class="flex items-center gap-xs text-on-surface-variant hover:text-primary cursor-pointer transition-colors group">
+<span class="material-symbols-outlined text-[18px]">arrow_back</span>
+<span class="font-label-md text-label-md">Back to Medical Records</span>
+</nav>
+<!-- Summary Header Section -->
+<section class="flex flex-col md:flex-row justify-between items-start md:items-end gap-md">
+<div>
+<h1 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Annual Blood Panel</h1>
+<div class="flex items-center gap-sm mt-xs">
+<span class="text-on-surface-variant font-body-md">Collected on October 24, 2023</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<div class="flex items-center gap-xs px-3 py-1 bg-primary/10 text-primary rounded-full border border-primary/20">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-sm text-label-sm">Reviewed by Dr. Sarah Chen</span>
+</div>
+</div>
+</div>
+<button class="flex items-center gap-base bg-primary hover:bg-primary-container text-on-primary px-gutter py-sm rounded-xl shadow-lg transition-all active:scale-95 font-label-md text-label-md">
+<span class="material-symbols-outlined">download</span>
+                Download PDF Report
+            </button>
+</section>
+<!-- Bento Grid Layout for Results -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-md items-start">
+<!-- Main Results Table Card -->
+<div class="lg:col-span-8 bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] overflow-hidden">
+<div class="p-md border-b border-outline-variant/20 flex justify-between items-center bg-surface-container-low/30">
+<h2 class="font-headline-md text-headline-md text-on-surface">Comprehensive Results</h2>
+<span class="font-label-sm text-label-sm text-on-surface-variant">4 Tests Performed</span>
+</div>
+<div class="flex flex-col">
+<!-- Table Header -->
+<div class="grid grid-cols-12 px-md py-sm bg-surface-container-low/20 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
+<div class="col-span-5">Test Name</div>
+<div class="col-span-3 text-right">Result</div>
+<div class="col-span-4 text-right">Reference / Trend</div>
+</div>
+<!-- Result Row 1: Glucose -->
+<div class="grid grid-cols-12 px-md py-md border-b border-outline-variant/10 hover:bg-surface-container-low/40 transition-colors">
+<div class="col-span-5 flex flex-col">
+<span class="font-headline-md text-body-md font-bold text-on-surface">Glucose, Serum</span>
+<span class="text-label-sm text-on-surface-variant">Fasting plasma glucose</span>
+</div>
+<div class="col-span-3 flex flex-col items-end justify-center">
+<span class="font-headline-md text-body-lg font-bold text-on-surface">92</span>
+<span class="text-label-sm text-on-surface-variant">mg/dL</span>
+</div>
+<div class="col-span-4 flex flex-col items-end justify-center gap-xs">
+<div class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-label-sm text-label-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">check</span>
+                                Normal
+                            </div>
+<span class="text-label-sm text-on-surface-variant">Ref: 65 - 99</span>
+</div>
+</div>
+<!-- Result Row 2: LDL Cholesterol -->
+<div class="grid grid-cols-12 px-md py-md border-b border-outline-variant/10 hover:bg-surface-container-low/40 transition-colors">
+<div class="col-span-5 flex flex-col">
+<span class="font-headline-md text-body-md font-bold text-on-surface">LDL Cholesterol</span>
+<span class="text-label-sm text-on-surface-variant">Calculated LDL</span>
+</div>
+<div class="col-span-3 flex flex-col items-end justify-center">
+<span class="font-headline-md text-body-lg font-bold text-error">138</span>
+<span class="text-label-sm text-on-surface-variant">mg/dL</span>
+</div>
+<div class="col-span-4 flex flex-col items-end justify-center gap-xs">
+<div class="px-3 py-1 bg-error-container text-on-error-container rounded-full font-label-sm text-label-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+                                High
+                            </div>
+<span class="text-label-sm text-on-surface-variant">Ref: &lt; 100</span>
+</div>
+</div>
+<!-- Result Row 3: Hemoglobin -->
+<div class="grid grid-cols-12 px-md py-md border-b border-outline-variant/10 hover:bg-surface-container-low/40 transition-colors">
+<div class="col-span-5 flex flex-col">
+<span class="font-headline-md text-body-md font-bold text-on-surface">Hemoglobin</span>
+<span class="text-label-sm text-on-surface-variant">Hgb A1c</span>
+</div>
+<div class="col-span-3 flex flex-col items-end justify-center">
+<span class="font-headline-md text-body-lg font-bold text-on-surface">5.4</span>
+<span class="text-label-sm text-on-surface-variant">%</span>
+</div>
+<div class="col-span-4 flex flex-col items-end justify-center gap-xs">
+<div class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-label-sm text-label-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">video_stable</span>
+                                Normal
+                            </div>
+<span class="text-label-sm text-on-surface-variant">Ref: 4.8 - 5.6</span>
+</div>
+</div>
+<!-- Result Row 4: Vitamin D -->
+<div class="grid grid-cols-12 px-md py-md hover:bg-surface-container-low/40 transition-colors">
+<div class="col-span-5 flex flex-col">
+<span class="font-headline-md text-body-md font-bold text-on-surface">Vitamin D</span>
+<span class="text-label-sm text-on-surface-variant">25-Hydroxyvitamin D</span>
+</div>
+<div class="col-span-3 flex flex-col items-end justify-center">
+<span class="font-headline-md text-body-lg font-bold text-tertiary">18</span>
+<span class="text-label-sm text-on-surface-variant">ng/mL</span>
+</div>
+<div class="col-span-4 flex flex-col items-end justify-center gap-xs">
+<div class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed-variant rounded-full font-label-sm text-label-sm flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]">trending_down</span>
+                                Low
+                            </div>
+<span class="text-label-sm text-on-surface-variant">Ref: 30 - 100</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Side Cards Column -->
+<div class="lg:col-span-4 flex flex-col gap-md">
+<!-- Doctor's Note Card -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] p-md flex flex-col gap-sm">
+<div class="flex items-center gap-sm">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[28px]">medical_information</span>
+</div>
+<div>
+<h3 class="font-headline-md text-label-md font-bold text-on-surface">Doctor's Note</h3>
+<span class="text-label-sm text-on-surface-variant">Dr. Sarah Chen, MD</span>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-sm italic text-on-surface-variant text-body-md border-l-4 border-primary">
+                        "Overall, your blood sugar and hemoglobin levels remain excellent. However, your LDL cholesterol is slightly elevated and Vitamin D is quite low. I recommend a daily 2000 IU supplement and focusing on more fiber-rich foods over the next 3 months. We will re-test in February."
+                    </div>
+<button class="text-primary font-label-md text-label-md flex items-center gap-xs hover:underline pt-xs self-start">
+                        Schedule Follow-up
+                        <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+<!-- Laboratory Info Card -->
+<div class="bg-surface-container-highest/40 rounded-xl border border-outline-variant/30 p-md flex flex-col gap-sm">
+<h3 class="font-label-md text-label-md text-on-surface">Testing Facility</h3>
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-secondary" data-icon="home_health">home_health</span>
+<div class="flex flex-col">
+<span class="font-label-md text-on-surface">City Central Diagnostics</span>
+<span class="text-label-sm text-on-surface-variant leading-tight">452 Medical Parkway, Suite 100<br>North Austin, TX 78758</span>
+</div>
+</div>
+<div class="mt-sm pt-sm border-t border-outline-variant/30 flex justify-between items-center">
+<span class="text-label-sm text-on-surface-variant">Report ID: 2023-B7721</span>
+<div class="flex items-center gap-xs cursor-pointer text-primary">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+<span class="font-label-sm">Certified</span>
+</div>
+</div>
+</div>
+<!-- Historical Comparison Image/Chart -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant/30 shadow-[0px_4px_20px_rgba(71,85,105,0.05)] overflow-hidden">
+<img alt="Health Trends Chart" class="w-full h-40 object-cover" data-alt="A clean, minimalist digital health trend dashboard showing smooth line graphs comparing cholesterol levels over a 12-month period. The background is a soft white healthcare interface with subtle teal accents and elegant, legible typography. The lighting is bright and professionally calibrated to evoke a sense of clinical precision and modern technology." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAk5sN3nWvAHoMjoTr10zUdIZcz0A5WWO4_OYE-DDIUoteNGd-bE6mI3ntyOYldCyGPMTb54HRioHqBXJkA_crFeBaC1kpEGj9fruRXETh6aJS5gjJsUeNJLEdt3qdEmlpaYkpI2oUIXC7SKPzavwsnr-NFcgUI9-u0g4kP7Yil8j7_R-8L0NkNyy8vfvID3AMvmS95bgEw7o2UWvteIGD5ODkspjydmBqeeyCMKde3vQksvYUcqZ2rkHuLMnzvxquq93nj08wgfdEF">
+<div class="p-sm text-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">View Historical Trend Comparison</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar Suppressed for Detail Screen per UX Logic -->
+<!-- But if required by JSON hierarchy as a "top-level" feeling page, it would be here -->
+<!-- Given this is a specific test result, we prioritize the content canvas -->
+<div class="h-lg"></div> <!-- Spacer for scrolling breathing room -->
+
+
+<nav class="md:hidden bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3"><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="home">home</span><span class="font-label-sm text-label-sm mt-1">Home</span></a><a class="flex flex-col items-center justify-center text-primary p-2" href="#"><span class="material-symbols-outlined" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span><span class="font-label-sm text-label-sm mt-1 font-bold">Overview</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="mail">mail</span><span class="font-label-sm text-label-sm mt-1">Inbox</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="group">group</span><span class="font-label-sm text-label-sm mt-1">Community</span></a><a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#"><span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span><span class="font-label-sm text-label-sm mt-1">Lifestyle</span></a></nav></body></html>

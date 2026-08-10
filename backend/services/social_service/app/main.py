@@ -5,13 +5,18 @@ from fastapi import FastAPI
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
+from .events import close_consumer, init_consumer
 from .routers import social, root
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging(settings.log_level)
+    # Subscribes to user.profile.updated so denormalised author names do not go
+    # stale. Non-fatal by design — see app/events/__init__.py.
+    await init_consumer(app)
     yield
+    await close_consumer(app)
 
 
 def create_app() -> FastAPI:

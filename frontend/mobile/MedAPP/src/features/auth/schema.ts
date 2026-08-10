@@ -29,11 +29,24 @@ export type LoginFormValues = z.infer<typeof LoginSchema>;
 
 export const SignUpStep1Schema = z
   .object({
-    firstName: z.string().trim().min(1, "First name is required"),
-    middleName: z.string().trim().optional(),
-    lastName: z.string().trim().min(1, "Surname is required"),
+    // Collapsed from firstName / middleName / lastName to one field, because
+    // the approved Figma frame (1:34, node 301:628) draws a single "Full Name"
+    // input. Consequences, FLAGGED for a product decision and NOT yet resolved:
+    //   - middleName is no longer captured anywhere in the app. There is no
+    //     profile-completion screen that re-collects it; treat this as a
+    //     dropped capability until one is designed.
+    //   - `authApi.signUpFull` whitespace-splits this string back into
+    //     first_name / last_name for the backend, which is lossy for mononyms
+    //     and 3+ part names. See the note there.
+    fullName: z.string().trim().min(1, "Full name is required"),
     email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
-    password: z.string().min(8, "At least 8 characters"),
+    // Tightened from length-only: the frame shows the hint "Min 8 characters,
+    // 1 number, 1 symbol" (301:655), so the rule has to enforce what it says.
+    password: z
+      .string()
+      .min(8, "At least 8 characters")
+      .regex(/\d/, "Include at least 1 number")
+      .regex(/[^A-Za-z0-9]/, "Include at least 1 symbol"),
     confirmPassword: z.string(),
     agreeToTerms: z.boolean(),
   })

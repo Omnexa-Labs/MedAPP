@@ -64,6 +64,32 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     predictiveBackGestureEnabled: false,
+    // Reported from the device: "when a bottom input like the chat input is
+    // active the keyboard overlays it" — on EVERY screen with a bottom-anchored
+    // input, not one, which is what rules out any individual composer.
+    //
+    // This maps to `android:windowSoftInputMode` in the generated manifest.
+    // Thirteen files already use `KeyboardAvoidingView`, so the screens ARE
+    // trying to get out of the keyboard's way; under SDK 55's default Android
+    // edge-to-edge the window is no longer resized when the keyboard opens, so a
+    // `behavior="padding"` KAV has nothing to react to and the input stays put.
+    //
+    // "resize" asks Android for the old behaviour back. FLAGGED as unproven: on
+    // Android 15 with edge-to-edge this is known to be unreliable, and the
+    // current recommended fix is `react-native-keyboard-controller`, which reads
+    // the IME inset directly. Trying the one-line change first because it is
+    // cheap and reversible, and because a new dependency plus rewriting thirteen
+    // call sites is not something to do on a guess.
+    //
+    // NOT TESTABLE IN EXPO GO. This is native configuration: Expo Go runs its own
+    // AndroidManifest, so the setting only takes effect in a development build.
+    softwareKeyboardLayoutMode: "resize",
+    // "Add to Calendar" on the booking confirmation (expo-calendar, SDK 55).
+    // Declared here rather than in a raw AndroidManifest so the string lives in
+    // version control. READ is required alongside WRITE because the flow has to
+    // enumerate calendars to find a writable one — Android has no notion of a
+    // default calendar the way iOS does.
+    permissions: ["android.permission.READ_CALENDAR", "android.permission.WRITE_CALENDAR"],
   },
   web: {
     output: "static",
@@ -83,6 +109,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     "expo-font",
     "expo-secure-store",
+    // Voice input in the AI assistant / chat composer. The permission STRING is
+    // the point of registering the plugin: iOS refuses to prompt for the mic
+    // without NSMicrophoneUsageDescription, and a health app asking for a
+    // microphone with no stated reason is the kind of prompt users decline.
+    // Android's RECORD_AUDIO is merged in by the package itself.
+    [
+      "expo-audio",
+      {
+        microphonePermission:
+          "MedApp uses the microphone only while you hold the mic button to dictate a message.",
+      },
+    ],
+    // Sharing and saving records (prescriptions, medication lists, reports).
+    "expo-sharing",
     // Biometric sign-in. iOS requires NSFaceIDUsageDescription before
     // FaceID can be prompted; the config plugin sets it so the string
     // lives in version control rather than in raw Info.plist. Android
@@ -92,6 +132,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "expo-local-authentication",
       {
         faceIDPermission: "Allow MedApp to use FaceID to sign you in.",
+      },
+    ],
+    // "Add to Calendar" on BookingConfirmedScreen. The plugin writes iOS's
+    // NSCalendarsUsageDescription (and, on the SDK 55 line, the write-only
+    // variant) from `calendarPermission`, so the copy is reviewable here rather
+    // than buried in a generated Info.plist. Reminders are NOT requested — the
+    // app writes events only, and asking for a scope you never use is how an
+    // App Review rejection happens.
+    [
+      "expo-calendar",
+      {
+        calendarPermission: "Allow MedApp to add your confirmed appointments to your calendar.",
       },
     ],
   ],

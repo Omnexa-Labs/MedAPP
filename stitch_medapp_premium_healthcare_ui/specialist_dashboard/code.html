@@ -1,0 +1,429 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Specialist Dashboard | MedApp</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#006a61",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "on-secondary-container": "#57657a",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-high": "#e4e9e7",
+                    "secondary-fixed": "#d5e3fc",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "inverse-primary": "#6bd8cb",
+                    "on-primary": "#ffffff",
+                    "clinical-info": "#0058be",
+                    "on-primary-fixed": "#00201d",
+                    "surface": "#f5faf8",
+                    "error-container": "#ffdad6",
+                    "primary-fixed": "#89f5e7",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#3d4947",
+                    "surface-container-highest": "#dee4e1",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "on-error-container": "#93000a",
+                    "surface-variant": "#dee4e1",
+                    "tertiary-fixed": "#d8e2ff",
+                    "surface-dim": "#d6dbd9",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "error": "#ba1a1a",
+                    "clinical-error": "#ba1a1a",
+                    "on-primary-container": "#f4fffc",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "on-primary-fixed-variant": "#005049",
+                    "surface-container": "#eaefed",
+                    "on-tertiary-container": "#fefcff",
+                    "on-tertiary-fixed": "#001a42",
+                    "primary-container": "#008378",
+                    "outline-variant": "#bcc9c6",
+                    "tertiary": "#0058be",
+                    "surface-container-low": "#f0f5f2",
+                    "secondary": "#515f74",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "inverse-on-surface": "#edf2f0",
+                    "surface-bright": "#f5faf8",
+                    "inverse-surface": "#2c3130",
+                    "clinical-success": "#00685f",
+                    "secondary-container": "#d5e3fc",
+                    "primary": "#00685f",
+                    "outline": "#6d7a77",
+                    "on-background": "#171d1c",
+                    "background": "#f5faf8",
+                    "tertiary-container": "#2170e4",
+                    "surface-bg": "#f5faf8",
+                    "on-surface": "#171d1c",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "80px",
+                    "md": "24px",
+                    "xs": "4px",
+                    "gutter": "24px",
+                    "sm": "12px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "label-md": ["Inter"],
+                    "headline-xl": ["Manrope"],
+                    "body-md": ["Inter"],
+                    "caption": ["Inter"],
+                    "headline-lg-mobile": ["Manrope"]
+            },
+            "fontSize": {
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "1.0", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.0", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "caption": ["10px", {"lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f5faf8; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 0.5px solid rgba(188, 201, 198, 0.4);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .chart-bar { transition: height 1s ease-in-out; }
+    </style>
+</head>
+<body class="text-on-surface antialiased pb-24">
+<!-- Top App Bar -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b-[0.5px] border-outline-variant shadow-sm h-16 flex items-center">
+<div class="flex justify-between items-center w-full px-gutter max-w-container-max mx-auto h-16">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container">
+<img alt="Specialist Profile" class="w-full h-full object-cover" data-alt="A professional headshot of a middle-aged medical specialist in clinical attire, set against a soft, out-of-focus hospital corridor background. The lighting is bright and clinical yet warm, reflecting a professional trust and modern healthcare aesthetic. The overall mood is reliable, calm, and sophisticated, matching the MedApp brand identity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsQ4bouSnc9tjU1wxR9JBrjD3dCiVyKnRgOeOlDoYCkGhmLX6_nXptiwcO5FyTDCRNyQ9ZQ21579ttB1iQQ4nKvR9m5-zxRHQsodJv07pDyIy_9xf_4ErbuFlwSE-sPUbSmGqADt_vjbdQWB3lxAbn16fnkWC1zlZMSogGZI9QxE3Hnee1xHgB3lblV4hLsJCZJrBMoj3UCCxUwZiEmMzZ8JEww1mjgw9LVXnW76bt8LVwTJDBZzUaDlL4ibprsA6dcpPV5qnekJPk">
+</div>
+<div class="hidden md:block">
+<h1 class="text-headline-md font-headline-md text-primary leading-tight">MedApp Specialist</h1>
+<p class="text-label-sm font-label-sm text-secondary">Dr. Julian Vance, MD</p>
+</div>
+<div class="md:hidden">
+<h1 class="text-headline-md font-headline-md text-primary">MedApp</h1>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-primary-container/10 transition-colors relative active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-primary">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="hidden md:flex items-center gap-2 bg-primary px-4 py-2 rounded-xl text-on-primary font-label-md hover:shadow-md transition-shadow active:scale-95">
+<span class="material-symbols-outlined">video_call</span>
+<span class="">Join Session</span>
+</button>
+</div>
+</div>
+</header>
+<main class="mt-20 px-gutter max-w-container-max mx-auto space-y-md">
+<!-- Clinical Stats Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<div class="glass-card p-6 rounded-xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+<div class="flex justify-between items-start">
+<div class="bg-primary-container/20 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary">stethoscope</span>
+</div>
+<span class="text-label-sm font-label-sm text-clinical-success">+2 since morning</span>
+</div>
+<div class="mt-4">
+<p class="text-label-md font-label-md text-secondary">Active Consultations</p>
+<p class="text-headline-xl font-headline-xl text-primary">12</p>
+</div>
+</div>
+<div class="glass-card p-6 rounded-xl flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-secondary">
+<div class="flex justify-between items-start">
+<div class="bg-secondary-container/20 p-2 rounded-lg">
+<span class="material-symbols-outlined text-secondary">lab_research</span>
+</div>
+<span class="text-label-sm font-label-sm text-secondary-fixed-dim">Finalized: 04</span>
+</div>
+<div class="mt-4">
+<p class="text-label-md font-label-md text-secondary">Pending Reports</p>
+<p class="text-headline-xl font-headline-xl text-on-surface">08</p>
+</div>
+</div>
+<div class="bg-primary p-6 rounded-xl flex flex-col justify-between shadow-md text-on-primary active:scale-[0.98] transition-transform cursor-pointer">
+<div class="flex justify-between items-start">
+<div class="bg-white/10 p-2 rounded-lg">
+<span class="material-symbols-outlined">calendar_month</span>
+</div>
+<span class="text-label-sm font-label-sm opacity-80">Next: 14:30 PM</span>
+</div>
+<div class="mt-4">
+<p class="text-label-md font-label-md opacity-90">Scheduled Today</p>
+<p class="text-headline-xl font-headline-xl">15</p>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-md">
+<!-- Urgent Alerts -->
+<section class="lg:col-span-7 space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-clinical-error">error</span>
+                        Urgent Alerts
+                    </h2>
+<span class="bg-error-container text-on-error-container px-3 py-1 rounded-full text-label-sm font-label-sm">2 Priority</span>
+</div>
+<div class="space-y-3">
+<!-- Alert Item 1 -->
+<div class="glass-card p-4 rounded-xl flex items-center gap-4 bg-error-container/10 border-l-4 border-l-error">
+<div class="w-12 h-12 flex-shrink-0 bg-error-container rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">ecg_heart</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between">
+<h3 class="text-label-md font-label-md text-on-surface">Patient #8210</h3>
+<span class="text-caption font-caption text-secondary">14m ago</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">Abnormal ECG reading detected via wearable integration.</p>
+</div>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-secondary">chevron_right</span>
+</button>
+</div>
+<!-- Alert Item 2 -->
+<div class="glass-card p-4 rounded-xl flex items-center gap-4 border-l-4 border-l-clinical-info">
+<div class="w-12 h-12 flex-shrink-0 bg-clinical-info/10 rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-clinical-info">biotech</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between">
+<h3 class="text-label-md font-label-md text-on-surface">Critical Lab Results</h3>
+<span class="text-caption font-caption text-secondary">2h ago</span>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant">Elena Rossi - Hemoglobin levels significantly below baseline.</p>
+</div>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-secondary">chevron_right</span>
+</button>
+</div>
+</div>
+</section><section class="lg:col-span-7 space-y-4">
+  <div class="flex items-center justify-between">
+    <h2 class="text-headline-md font-headline-md text-on-surface flex items-center gap-2">
+      <span class="material-symbols-outlined text-clinical-info">biotech</span>
+      Pending Labs Review
+    </h2>
+    <span class="bg-secondary-container/20 text-on-secondary-container px-3 py-1 rounded-full text-label-sm font-label-sm">2 Pending</span>
+  </div>
+  <div class="space-y-3">
+    <!-- Lab Item 1 -->
+    <div class="glass-card p-4 rounded-xl flex items-center gap-4 border-l-4 border-l-secondary">
+      <div class="w-12 h-12 flex-shrink-0 bg-secondary-container/20 rounded-lg flex items-center justify-center">
+        <span class="material-symbols-outlined text-secondary">science</span>
+      </div>
+      <div class="flex-grow">
+        <div class="flex justify-between">
+          <h3 class="text-label-md font-label-md text-on-surface">Metabolic Panel - Patient #4492</h3>
+          <span class="text-caption font-caption text-secondary">30m ago</span>
+        </div>
+        <p class="text-body-md font-body-md text-clinical-info">Awaiting Review</p>
+      </div>
+      <button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+        <span class="material-symbols-outlined text-secondary">chevron_right</span>
+      </button>
+    </div>
+    <!-- Lab Item 2 -->
+    <div class="glass-card p-4 rounded-xl flex items-center gap-4 border-l-4 border-l-secondary">
+      <div class="w-12 h-12 flex-shrink-0 bg-secondary-container/20 rounded-lg flex items-center justify-center">
+        <span class="material-symbols-outlined text-secondary">bloodtype</span>
+      </div>
+      <div class="flex-grow">
+        <div class="flex justify-between">
+          <h3 class="text-label-md font-label-md text-on-surface">Lipid Profile - Marcus Thorne</h3>
+          <span class="text-caption font-caption text-secondary">1h ago</span>
+        </div>
+        <p class="text-body-md font-body-md text-clinical-success">Ready for Analysis</p>
+      </div>
+      <button class="p-2 hover:bg-surface-container-high rounded-full transition-colors">
+        <span class="material-symbols-outlined text-secondary">chevron_right</span>
+      </button>
+    </div>
+  </div>
+</section>
+<!-- Today's Workload Visualization -->
+<section class="lg:col-span-5 space-y-4">
+<h2 class="text-headline-md font-headline-md text-on-surface">Today's Workload</h2>
+<div class="glass-card p-6 rounded-xl space-y-6 h-[calc(100%-48px)] flex flex-col justify-between">
+<div class="flex items-end justify-between h-40 gap-4">
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="chart-bar w-full bg-primary rounded-t-lg" style="height: 60%;"></div>
+<span class="text-caption font-caption text-secondary">Consults</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="chart-bar w-full bg-secondary rounded-t-lg" style="height: 25%;"></div>
+<span class="text-caption font-caption text-secondary">Admin</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="chart-bar w-full bg-clinical-info rounded-t-lg" style="height: 40%;"></div>
+<span class="text-caption font-caption text-secondary">Rounds</span>
+</div>
+<div class="flex flex-col items-center gap-2 flex-1">
+<div class="chart-bar w-full bg-surface-tint/40 rounded-t-lg" style="height: 15%;"></div>
+<span class="text-caption font-caption text-secondary">Research</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="text-label-sm font-label-sm text-on-surface-variant">4.5h Clinical</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<span class="text-label-sm font-label-sm text-on-surface-variant">2h Admin</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Upcoming Appointments -->
+<section class="space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="text-headline-md font-headline-md text-on-surface">Next Appointments</h2>
+<button class="text-primary text-label-md font-label-md hover:underline">View Schedule</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<!-- Appointment Card 1 -->
+<div class="glass-card p-4 rounded-xl space-y-4 border-t-4 border-t-primary shadow-sm">
+<div class="flex justify-between items-center">
+<span class="text-label-md font-label-md text-primary">14:30 - 15:00</span>
+<span class="bg-primary-container/20 text-primary-fixed-dim px-2 py-0.5 rounded text-caption uppercase tracking-wider">Telehealth</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img alt="Patient Photo" class="w-full h-full object-cover" data-alt="A portrait of a young adult female patient with a calm and hopeful expression. The background is a soft, minimalist interior with warm, natural sunlight filtering through, creating a clean and modern healthcare environment. The style is professional and consistent with a high-end medical application's visual language." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVJpAqJwCTtvWcGS4b7Cy1wVJHvoucZIhc3IGEdI2IA0CzDPBuvF9KYHpe9-vgbhVFH_lEuSlR5wdJIwGcPgbN3EPg3E34RxmFbh2bkqrLVNzPMFge2pk9cO0dAIBjcf7YzSmedKaCKIE_FIy6T5iakPhMb8mdbotYPntJKOj2htgwT1c7-BNM0nkz2d6D8tqRtqvsMiHsKMcBOAwSPZxd7ScX9fOeBJkql_2OH2pip-T8ciaXyu8GJI4UFDMK6PC6Fh9NdfoczG-E">
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Elena Rossi</p>
+<p class="text-caption font-caption text-secondary">ID: 9942-B</p>
+</div>
+</div>
+<button class="w-full bg-surface-container-high py-2 rounded-lg text-label-md font-label-md text-primary hover:bg-primary/5 transition-colors">Launch Call</button>
+</div>
+<!-- Appointment Card 2 -->
+<div class="glass-card p-4 rounded-xl space-y-4 border-t-4 border-t-secondary shadow-sm">
+<div class="flex justify-between items-center">
+<span class="text-label-md font-label-md text-secondary">15:15 - 15:45</span>
+<span class="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded text-caption uppercase tracking-wider">In-Person</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img alt="Patient Photo" class="w-full h-full object-cover" data-alt="A high-resolution professional portrait of a senior male patient looking forward with a serene, confident expression. The lighting is balanced and soft, emphasizing skin textures in a clinical yet gentle way. The setting is clean and brightly lit, representing a high-standard medical facility or doctor's office." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFUVuhP1GQlBW2jStTSn-tCxQvPUpvm-06J8Zro-DmHIdkp-ALG39fQ9zes3wa3VVZS99E6A2yA1NILZlMRz5AaJYV_--r80h1dRxq6_-p66wORiO1jUETi9HHl_qnZe-xLy6xosm8-kAFZL7NV_ibJL8pJ7U2-yzGMfGaWCXFCbp_7rV06adCbBmusYvvwx5A1wOVoB6d8urs6qTrW73Kd8Wa5OCANW4biTwL0uqHLM2NOWUezOKOYBFCicsKbSCxtSGrztDGHk6q">
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Marcus Thorne</p>
+<p class="text-caption font-caption text-secondary">ID: 1284-A</p>
+</div>
+</div>
+<button class="w-full bg-surface-container-high py-2 rounded-lg text-label-md font-label-md text-secondary hover:bg-secondary/5 transition-colors">Prep Charts</button>
+</div>
+<!-- Appointment Card 3 -->
+<div class="glass-card p-4 rounded-xl space-y-4 border-t-4 border-t-primary shadow-sm opacity-75 grayscale-[0.2]">
+<div class="flex justify-between items-center">
+<span class="text-label-md font-label-md text-primary">16:00 - 16:30</span>
+<span class="bg-primary-container/20 text-primary-fixed-dim px-2 py-0.5 rounded text-caption uppercase tracking-wider">Telehealth</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
+<img alt="Patient Photo" class="w-full h-full object-cover" data-alt="A studio portrait of a young male patient with a friendly and open demeanor. The shot uses soft-box lighting to create even tones and a clean, modern aesthetic. The background is a solid light teal color, harmonizing with the clinical teal brand palette of the medical application." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCF0uU_wYqES0Qb2G0SFTJ7hKYri2QD1PGzFhb7rVypBRPQu30WD4uiP6oGweC-VAdesBK8EuXL0BFDI-B8cvMiybpzQ7e35SfAQoR-4NK0zA5pZRljPUkMaQLmwNCv9QCBzh0uPb894utNbz1aXk-5sY8-_hd2lsCXseEQCMfCKusl8zutQ6SXNvVABMK56PnCFEtscE2xPbQmJY1kfG6XWmeXlF4ETFuZq0sTOZdmgEAz23GtJbUURjtItmnf_iIyLKNcXLbQSgb_">
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Liam Nguyen</p>
+<p class="text-caption font-caption text-secondary">ID: 5521-C</p>
+</div>
+</div>
+<button class="w-full bg-surface-container-low py-2 rounded-lg text-label-md font-label-md text-secondary/50 cursor-not-allowed">Waiting Room</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-3 bg-surface border-t-[0.5px] border-outline-variant shadow-sm z-50">
+<a class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1.5 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="text-label-sm font-label-sm mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:bg-surface-container-high rounded-xl transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">person_filled</span>
+<span class="text-label-sm font-label-sm mt-1">Patients</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:bg-surface-container-high rounded-xl transition-colors relative active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">chat</span>
+<span class="text-label-sm font-label-sm mt-1">Messages</span>
+<span class="absolute top-1.5 right-4 w-2 h-2 bg-clinical-info rounded-full"></span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:bg-surface-container-high rounded-xl transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+<span class="text-label-sm font-label-sm mt-1">Schedule</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:bg-surface-container-high rounded-xl transition-colors active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined">folder_shared</span>
+<span class="text-label-sm font-label-sm mt-1">Records</span>
+</a>
+</nav>
+<!-- Interactions & Atmosphere -->
+<script>
+        // Micro-interaction for charts
+        document.addEventListener('DOMContentLoaded', () => {
+            const bars = document.querySelectorAll('.chart-bar');
+            bars.forEach(bar => {
+                const finalHeight = bar.style.height;
+                bar.style.height = '0%';
+                setTimeout(() => {
+                    bar.style.height = finalHeight;
+                }, 100);
+            });
+        });
+
+        // Toggle navigation active states (Mock logic)
+        const navItems = document.querySelectorAll('nav a');
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                navItems.forEach(i => {
+                    i.className = "flex flex-col items-center justify-center text-secondary px-4 py-1.5 hover:bg-surface-container-high rounded-xl transition-colors active:scale-90 transition-transform";
+                });
+                item.className = "flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl px-4 py-1.5 active:scale-90 transition-transform";
+            });
+        });
+    </script>
+
+
+</body></html>

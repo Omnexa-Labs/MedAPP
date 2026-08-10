@@ -1,0 +1,266 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>MedCheck AI - Interaction Checker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#e4e9e7",
+                    "on-surface": "#171d1c",
+                    "on-error-container": "#93000a",
+                    "inverse-surface": "#2c3130",
+                    "on-primary-fixed-variant": "#005049",
+                    "surface-variant": "#dee4e1",
+                    "background": "#f5faf8",
+                    "outline-variant": "#bcc9c6",
+                    "tertiary-container": "#2170e4",
+                    "primary-fixed-dim": "#6bd8cb",
+                    "primary": "#00685f",
+                    "on-secondary-container": "#57657a",
+                    "secondary-fixed": "#d5e3fc",
+                    "outline": "#6d7a77",
+                    "surface-dim": "#d6dbd9",
+                    "error": "#ba1a1a",
+                    "on-secondary-fixed-variant": "#3a485b",
+                    "surface-container": "#eaefed",
+                    "on-tertiary-container": "#fefcff",
+                    "error-container": "#ffdad6",
+                    "secondary": "#515f74",
+                    "surface": "#f5faf8",
+                    "surface-container-low": "#f0f5f2",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#3d4947",
+                    "on-primary": "#ffffff",
+                    "on-secondary-fixed": "#0d1c2e",
+                    "primary-fixed": "#89f5e7",
+                    "on-tertiary-fixed-variant": "#004395",
+                    "surface-bright": "#f5faf8",
+                    "on-background": "#171d1c",
+                    "inverse-on-surface": "#edf2f0",
+                    "secondary-container": "#d5e3fc",
+                    "on-tertiary-fixed": "#001a42",
+                    "on-primary-container": "#f4fffc",
+                    "primary-container": "#008378",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed": "#00201d",
+                    "tertiary": "#0058be",
+                    "on-secondary": "#ffffff",
+                    "surface-container-highest": "#dee4e1",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-primary": "#6bd8cb",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "secondary-fixed-dim": "#b9c7df",
+                    "surface-tint": "#006a61",
+                    "tertiary-fixed": "#d8e2ff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "lg": "48px",
+                    "container-max": "1280px",
+                    "xs": "4px",
+                    "xl": "80px",
+                    "base": "8px",
+                    "sm": "12px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "headline-xl": ["Manrope"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Manrope"],
+                    "headline-lg-mobile": ["Manrope"],
+                    "label-sm": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Manrope"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl": ["40px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "headline-lg-mobile": ["24px", {"lineHeight": "1.3", "fontWeight": "700"}],
+                    "label-sm": ["12px", {"lineHeight": "1", "fontWeight": "500"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pt-16 pb-20 md:pb-0">
+<!-- TopAppBar -->
+<header class="bg-surface/80 dark:bg-surface-dim/80 backdrop-blur-md fixed top-0 w-full z-50 border-b border-outline-variant/30 shadow-sm">
+<div class="flex items-center justify-between px-md h-16 w-full max-w-container-max mx-auto">
+<button class="text-on-surface-variant hover:bg-surface-container active:scale-95 duration-200 transition-colors p-2 rounded-full">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile font-bold text-primary">MedCheck AI</h1>
+<button class="hover:bg-surface-container active:scale-95 duration-200 transition-colors p-1 rounded-full">
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant/30" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlJyJG0n58atD7xCVMPBWRNX4HpkLAn95i9q5k7PpJp-LMzWjEMJjH_Tnayh0Ek04xkP5tHt0Pdi4nVwSOMO_IhFU8MwPtf6ViR-njfk51L97ohi4tKaErzb-h2-fyEsUwujsdVEc98pQx8idUYMWazzyWtBUAU1Sppe-XSuJA4bFClALL2cZuriygMn21djSmZdDUjQ5p1pG70-f3dyygX6FWvMGfBZogAbCFVkOoEHwZY0RBbIBB9tVWI-aGWDUegdBgHvoi3vgK">
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-md py-lg md:px-gutter flex flex-col gap-lg">
+<!-- Header Section -->
+<section class="flex flex-col gap-sm">
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Interaction Checker</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">
+                Add your current medications, supplements, or herbs to check for potential interactions and safeguard your health.
+            </p>
+</section>
+<!-- Bento Grid Layout for Tool -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Input & Active List -->
+<div class="lg:col-span-5 flex flex-col gap-md">
+<!-- Search Input Card -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-sm">
+<label class="font-label-md text-label-md text-on-surface-variant" for="med-search">Add Medication</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-sm text-outline">search</span>
+<input class="w-full pl-[40px] pr-sm py-sm bg-surface rounded-lg border border-outline-variant/50 focus:border-primary focus:ring-1 focus:ring-primary transition-colors font-body-md text-body-md text-on-surface placeholder:text-outline-variant" id="med-search" placeholder="e.g., Amoxicillin, St. John's Wort..." type="text">
+<button class="absolute right-sm text-primary hover:bg-primary/10 rounded-full p-1 transition-colors">
+<span class="material-symbols-outlined">add_circle</span>
+</button>
+</div>
+</div>
+<!-- Active List Card -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 flex flex-col gap-sm">
+<div class="flex justify-between items-center border-b border-outline-variant/30 pb-xs mb-xs">
+<h3 class="font-headline-md text-headline-md text-on-surface">Active List</h3>
+<span class="font-label-sm text-label-sm bg-surface-container text-on-surface-variant px-2 py-1 rounded-full">2 Items</span>
+</div>
+<ul class="flex flex-col gap-sm">
+<!-- Med Item 1 -->
+<li class="flex items-center justify-between bg-surface p-sm rounded-lg border border-outline-variant/20 hover:border-outline-variant/50 transition-colors group">
+<div class="flex items-center gap-sm">
+<div class="bg-primary/10 text-primary p-2 rounded-full">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pill</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Amoxicillin</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">500mg Capsule</span>
+</div>
+</div>
+<button class="text-outline hover:text-error transition-colors p-1 rounded-full group-hover:bg-error/10">
+<span class="material-symbols-outlined">close</span>
+</button>
+</li>
+<!-- Med Item 2 -->
+<li class="flex items-center justify-between bg-surface p-sm rounded-lg border border-outline-variant/20 hover:border-outline-variant/50 transition-colors group">
+<div class="flex items-center gap-sm">
+<div class="bg-secondary-container/50 text-secondary p-2 rounded-full">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pill</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Ibuprofen</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">400mg Tablet</span>
+</div>
+</div>
+<button class="text-outline hover:text-error transition-colors p-1 rounded-full group-hover:bg-error/10">
+<span class="material-symbols-outlined">close</span>
+</button>
+</li>
+</ul>
+<button class="mt-sm font-label-md text-label-md text-primary hover:bg-primary/5 py-2 rounded-lg transition-colors border border-transparent hover:border-primary/20">
+                        + Add another medication
+                    </button>
+</div>
+</div>
+<!-- Right Column: Results Analysis -->
+<div class="lg:col-span-7 flex flex-col gap-md">
+<!-- Interaction Result Card (Warning State) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 overflow-hidden flex flex-col h-full">
+<!-- Result Header -->
+<div class="bg-[#FFF4E5] border-b border-[#FFD8A8] p-md flex items-start gap-sm">
+<span class="material-symbols-outlined text-[#E65100] mt-1" style="font-variation-settings: 'FILL' 1;">warning</span>
+<div class="flex flex-col gap-xs">
+<h3 class="font-headline-md text-headline-md text-[#E65100]">Moderate Interaction</h3>
+<p class="font-body-md text-body-md text-[#B26A00]">
+                                Potential interaction detected between <strong>Amoxicillin</strong> and <strong>Ibuprofen</strong>.
+                            </p>
+</div>
+</div>
+<!-- Result Body -->
+<div class="p-md flex flex-col gap-md flex-grow bg-surface">
+<div class="flex flex-col gap-xs">
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Clinical Description</h4>
+<p class="font-body-md text-body-md text-on-surface">
+                                Concurrent use of NSAIDs (like Ibuprofen) and Penicillins (like Amoxicillin) can sometimes alter the excretion rate of the antibiotic, potentially leading to increased blood levels of the penicillin. While often not clinically significant in healthy individuals, it warrants attention.
+                            </p>
+</div>
+<div class="flex flex-col gap-xs p-sm bg-surface-container-low rounded-lg border border-outline-variant/20 border-l-4 border-l-[#E65100]">
+<h4 class="font-label-md text-label-md text-on-surface">Advice</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                                May increase risk of stomach irritation. Take both medications with food. Monitor for unusual gastrointestinal discomfort. Consult your pharmacist if you have impaired renal function.
+                            </p>
+</div>
+</div>
+</div>
+<!-- Example Empty/Success State (Hidden visually, structural reference) -->
+<!-- 
+                <div class="bg-surface-container-lowest rounded-xl shadow-[0_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 overflow-hidden flex flex-col h-full hidden">
+                    <div class="bg-[#E8F5E9] border-b border-[#A5D6A7] p-md flex items-center justify-center gap-sm flex-col py-lg text-center h-full">
+                        <span class="material-symbols-outlined text-[#2E7D32] text-5xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        <h3 class="font-headline-md text-headline-md text-[#2E7D32]">No Known Interactions</h3>
+                        <p class="font-body-md text-body-md text-[#388E3C] max-w-md mx-auto">
+                            We did not find any known interactions between the medications in your active list.
+                        </p>
+                    </div>
+                </div>
+                -->
+</div>
+</div>
+<!-- Footer Disclaimer -->
+<footer class="mt-lg pt-md border-t border-outline-variant/30 flex items-start gap-sm bg-surface-container-low p-md rounded-xl">
+<span class="material-symbols-outlined text-outline mt-1">info</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant leading-relaxed">
+<strong>Disclaimer:</strong> This tool is intended for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition or medication interactions.
+            </p>
+</footer>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden bg-surface/95 backdrop-blur-md border-t border-outline-variant/30 fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3">
+    <a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+        <span class="material-symbols-outlined" data-icon="home">home</span>
+        <span class="font-label-sm text-label-sm mt-1">Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-primary p-2" href="#">
+        <span class="material-symbols-outlined" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+        <span class="font-label-sm text-label-sm mt-1 font-bold">Overview</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+        <span class="material-symbols-outlined" data-icon="mail">mail</span>
+        <span class="font-label-sm text-label-sm mt-1">Inbox</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+        <span class="material-symbols-outlined" data-icon="group">group</span>
+        <span class="font-label-sm text-label-sm mt-1">Community</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-on-surface-variant p-2" href="#">
+        <span class="material-symbols-outlined" data-icon="auto_awesome">auto_awesome</span>
+        <span class="font-label-sm text-label-sm mt-1">Lifestyle</span>
+    </a>
+</nav>
+
+
+</body></html>

@@ -1,145 +1,99 @@
-// Splash screen — translation of the Stitch HTML to React Native.
+// Splash / Welcome — rebuilt from the approved Figma frame
+// "Onboarding & Auth / Splash / Welcome" (node 50:105).
 //
-// Class strings stay as close to the Stitch source as possible so future
-// design tweaks paste back with minimal edits. The exceptions, called out
-// inline below, are the things RN can't render through Tailwind:
-//   - linear-gradient → expo-linear-gradient
-//   - shadow-[0px_4px_20px_...] → platform shadow props
-//   - blur-3xl → low-opacity solid (cheap, visually equivalent here)
-//   - hover:/group-hover: → dropped (no hover on touch)
-//   - active:scale-95 → Pressable `pressed` state
+// The frame is laid out absolutely on a 375×812 canvas; it's reproduced here as
+// a fluid column so it also fills the canonical 393px viewport and taller
+// devices:
+//   - Center Zone (flex-1, centred, 24px gaps): app-icon mark → "MedApp"
+//     (headline-xl / primary) → 280px-wide subtitle (body-md)
+//   - Bottom Zone (24px gutter, 48px bottom inset, 24px gaps): full-width pill
+//     CTA → "Trusted by…" caption → "Already have an account? Sign In"
+//
+// Product-owner revisions to the original frame (frame 50:105 updated to match):
+//   - the decorative 256px blob behind the mark is removed.
+//   - the 160px surface tile that framed the mark is removed; the app-icon
+//     already has its own rounded-square container, so the extra tile read as a
+//     stray background panel. The mark now sits at 128px on the background.
 
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Button, Logo } from "@/components/ui";
 import { useWelcomeStore } from "@/store/welcome-store";
 
 interface Props {
   onGetStarted?: () => void;
+  onSignIn?: () => void;
 }
 
-export function SplashScreen({ onGetStarted }: Props) {
+export function SplashScreen({ onGetStarted, onSignIn }: Props) {
   const completeWelcome = useWelcomeStore((s) => s.completeWelcome);
 
-  const handlePress = () => {
+  // Preserved from the previous implementation: leaving the splash marks the
+  // welcome flow as seen, so the root layout stops routing back here.
+  const handleGetStarted = () => {
     void completeWelcome();
     onGetStarted?.();
   };
 
+  const handleSignIn = () => {
+    void completeWelcome();
+    onSignIn?.();
+  };
+
   return (
-    <View className="splash-gradient relative h-full w-full flex-1 overflow-hidden bg-background">
-      <StatusBar style="dark" />
+    <View className="flex-1 bg-background">
+      <StatusBar style="auto" />
 
-      {/* Replaces the Stitch `splash-gradient` CSS:
-          background: linear-gradient(to bottom, transparent 0%, rgba(0,104,95,0.05) 100%) */}
-      <LinearGradient
-        colors={["transparent", "rgba(0,104,95,0.05)"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          ...(Platform.OS === "web" ? { pointerEvents: "none" } : {}),
-        }}
-        pointerEvents={Platform.OS === "web" ? undefined : "none"}
-      />
-
-      {/* Decorative top blob — Stitch uses `blur-3xl` over `bg-primary/10`. RN
-          can't blur cheaply, so we use a low-opacity solid circle which reads
-          the same at this scale. */}
-      <View
-        pointerEvents={Platform.OS === "web" ? undefined : "none"}
-        style={Platform.OS === "web" ? { pointerEvents: "none" } : undefined}
-        className="pointer-events-none absolute left-1/2 top-0 w-full max-w-container-max -translate-x-1/2 px-gutter pt-xl opacity-20"
-      >
-        <View className="mx-auto h-64 w-64 rounded-full bg-primary/10" />
-      </View>
-
-      {/* SafeAreaView replaces the implicit viewport padding Stitch gets for free. */}
       <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
-        <View className="relative flex-1 flex-col items-center justify-between">
-          {/* Center branding */}
-          <View className="z-10 flex-1 flex-col items-center justify-center">
-            {/* The icon "card" — Stitch:
-                p-lg rounded-[32px] bg-white shadow-[0px_4px_20px_rgba(71,85,105,0.05)] border border-outline-variant/30 */}
-            <View
-              className="mb-md rounded-[32px] border border-outline-variant/30 bg-white p-lg"
-              style={{
-                // Stitch shadow → RN platform shadow.
-                ...Platform.select({
-                  ios: {
-                    shadowColor: "#475569",
-                    shadowOpacity: 0.05,
-                    shadowRadius: 20,
-                    shadowOffset: { width: 0, height: 4 },
-                  },
-                  web: {
-                    boxShadow: "0px 4px 20px rgba(71, 85, 105, 0.05)",
-                  },
-                  android: {
-                    elevation: 3,
-                  },
-                }),
-              }}
-            >
-              <MaterialIcons name="health-and-safety" size={64} color="#00685f" />
-            </View>
+        {/* Center Zone — node 51:109 */}
+        <View className="flex-1 items-center justify-center gap-md">
+          {/* The app-icon mark, presented directly on the background.
+              Per the product owner: the decorative blob (was node 51:108) and
+              the surface tile that used to sit behind the mark (was node
+              51:110) are both removed — the mark carries its own rounded-square
+              container, so wrapping it in a second box read as a stray
+              background panel. Frame 50:105 is updated to match. */}
+          <Logo variant="icon" height={128} />
 
-            <View className="items-center">
-              <Text className="font-headline-xl text-headline-xl tracking-tight text-primary">
-                MedApp
-              </Text>
-              <Text className="font-body-lg text-body-lg mt-sm max-w-[280px] text-center text-on-surface-variant">
-                Personalized care for a modern world.
-              </Text>
-            </View>
-          </View>
+          <Text className="text-center font-headline-xl text-headline-xl text-primary">MedApp</Text>
 
-          {/* Bottom action */}
-          <View className="z-10 w-full max-w-[400px] px-gutter pb-xl">
-            <View className="flex-col items-center space-y-md">
-              <Pressable
-                testID="splash.getStarted"
-                accessibilityRole="button"
-                accessibilityLabel="Get started"
-                onPress={handlePress}
-                // Stitch: w-full py-4 px-lg bg-primary text-on-primary rounded-full shadow-lg
-                //         hover:bg-primary-container active:scale-95
-                className="w-full flex-row items-center justify-center gap-base rounded-full bg-primary px-lg py-4 active:scale-95"
-                style={({ pressed }) => ({
-                  // bg-primary → bg-primary-container on press (hover→press substitution).
-                  backgroundColor: pressed ? "#008378" : "#00685f",
-                  // shadow-lg ≈ this drop shadow on iOS; elevation 6 on Android.
-                  ...Platform.select({
-                    ios: {
-                      shadowColor: "#00685f",
-                      shadowOpacity: 0.25,
-                      shadowRadius: 12,
-                      shadowOffset: { width: 0, height: 6 },
-                    },
-                    web: {
-                      boxShadow: "0px 6px 12px rgba(0, 104, 95, 0.25)",
-                    },
-                    android: {
-                      elevation: 6,
-                    },
-                  }),
-                })}
-              >
-                <Text className="font-label-md text-label-md text-on-primary">Get Started</Text>
-                <MaterialIcons name="arrow-forward" size={18} color="#ffffff" />
-              </Pressable>
+          <Text className="w-[280px] text-center font-body-md text-body-md text-on-surface-variant">
+            Personalized care for a modern world.
+          </Text>
+        </View>
 
-              <Text className="font-label-sm text-label-sm mt-md text-outline">
-                Trusted by 2M+ medical professionals
-              </Text>
-            </View>
-          </View>
+        {/* Bottom Zone — node 51:113 */}
+        <View className="items-center justify-center gap-md px-md pb-lg">
+          <Button
+            testID="splash.getStarted"
+            label="Get Started"
+            variant="primary"
+            size="cta"
+            trailingIcon="arrow-forward"
+            onPress={handleGetStarted}
+          />
+
+          <Text className="text-center font-label-sm text-label-sm text-on-surface-variant">
+            Trusted by 2M+ medical professionals
+          </Text>
+
+          {/* The frame gives this link 12px padding around 12px text, which is a
+              ~36pt target. The padding is kept for fidelity and the row is
+              floored at the 44pt minimum instead. */}
+          <Pressable
+            testID="splash.signIn"
+            accessibilityRole="link"
+            accessibilityLabel="Already have an account? Sign in"
+            onPress={handleSignIn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ minHeight: 44 }}
+            className="items-center justify-center p-sm active:opacity-70"
+          >
+            <Text className="text-center font-label-sm text-label-sm text-primary">
+              Already have an account? Sign In
+            </Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     </View>

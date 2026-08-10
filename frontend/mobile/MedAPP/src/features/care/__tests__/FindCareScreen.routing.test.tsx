@@ -1,0 +1,295 @@
+// Find Care -> provider profile: the tap, and the params it carries.
+//
+// This is the defect the whole round exists to fix. `find-care` had no inbound
+// link and — one screen further along — a directory you can look at is not a
+// directory you can act on. A route that renders is not a route that is
+// REACHABLE, and a push that arrives without identifying params lands the
+// profile on DEFAULT_PROVIDER, i.e. a different clinician's name over the card
+// the user tapped. Both are invisible to a render test, so they are asserted
+// here as pushes.
+//
+// The suite also pins the per-kind decision: `useDirectory` returns a
+// `DirectoryEntry` union spanning five backend collections and they are not one
+// destination. Doctors and nurses are people and get a profile (the profile
+// decides bookability); hospitals and pharmacies are buildings and must never be
+// pushed at a practitioner profile.
+
+import { fireEvent, screen } from "@testing-library/react-native";
+// Not RNTL's bare `render`: the screen mounts PatientShell, whose AccountMenu
+// calls `useSafeAreaInsets()`, and that throws "No safe area value available"
+// without a provider. `renderWithSafeArea` is the project's helper for exactly
+// that (FindCareScreen.nav.test.tsx and CommunityScreen.nav.test.tsx already use
+// it) and it supplies synchronous metrics, which is what the library documents
+// for tests.
+import { renderWithSafeArea as render } from "@/test/safe-area";
+import type { DirectoryEntry, FacilityEntry, PersonEntry } from "../types";
+
+let mockEntries: DirectoryEntry[] = [];
+
+jest.mock("expo-router", () => ({
+  router: { back: jest.fn(), canGoBack: jest.fn(() => true), push: jest.fn(), replace: jest.fn() },
+}));
+
+jest.mock("nativewind", () => ({
+  useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
+}));
+
+// The screen is one of the three wired to a live backend. The seam is the hook,
+// not `client` — mocking the network would also exercise the adapters, which
+// have their own coverage and would make this suite fail for reasons that have
+// nothing to do with navigation.
+jest.mock("../hooks/use-directory", () => ({
+  useDirectory: () => ({
+    entries: mockEntries,
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+  }),
+}));
+
+jest.mock("@/hooks/use-current-user", () => ({
+  useCurrentUser: () => ({ displayName: "Ama Mensah", avatarUrl: undefined }),
+}));
+
+import { router } from "expo-router";
+import { FindCareScreen } from "../FindCareScreen";
+
+const doctor: PersonEntry = {
+  kind: "person",
+  category: "doctors",
+  id: "doc-7",
+  name: "Dr. Sarah Chen",
+  title: "Cardiology Specialist",
+  avatarUri: "https://example.test/sarah.png",
+  // No `availability`: the field is gone from PersonEntry. Every adapter set it
+  // to the literal "online", which drew a green presence dot on every clinician
+  // in the directory with no presence data behind it.
+  consultationFeeCents: 12000,
+  badges: [{ label: "Cardiology", tone: "secondary" }],
+};
+
+const nurse: PersonEntry = {
+  ...doctor,
+  category: "nurses",
+  id: "nurse-3",
+  name: "Kofi Boateng",
+  title: "Paediatric Nurse",
+  badges: [{ label: "Home Service", tone: "tertiary" }],
+};
+
+const pharmacist: PersonEntry = {
+  ...doctor,
+  category: "pharmacists",
+  id: "pharm-9",
+  name: "Naa Adjeley",
+  title: "Oncology Pharmacist",
+  badges: [],
+};
+
+const pharmacy: FacilityEntry = {
+  kind: "facility",
+  category: "pharmacies",
+  id: "store-2",
+  name: "Ridge Pharmacy",
+  subtitle: "Accra",
+  icon: "local-pharmacy",
+  iconTint: "secondary",
+  badges: [{ label: "Open 08:00-22:00", tone: "open" }],
+  cta: { label: "View Store", color: "info" },
+};
+
+const hospital: FacilityEntry = {
+  ...pharmacy,
+  category: "hospitals",
+  id: "hosp-1",
+  name: "Korle Bu Teaching Hospital",
+  icon: "local-hospital",
+  iconTint: "tertiary",
+  // Matches what adaptHospital actually emits. "View Staff" was the old label,
+  // dropped because hospital_service cannot return staff names at all - a
+  // fixture that outlives the adapter is how the invented-clinician names
+  // spread across three screens.
+  cta: { label: "View hospital", color: "tertiary" },
+};
+
+const PROFILE_ROUTE = "/(app)/practitioner-telehealth-profile";
+
+/** The push, as expo-router received it. */
+const lastPush = () => (router.push as jest.Mock).mock.calls.at(-1)?.[0];
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockEntries = [];
+});
+
+describe("FindCareScreen — a provider card opens that provider's profile", () => {
+  it("pushes the profile route when a doctor's View Profile is tapped", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Dr. Sarah Chen's profile"));
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(lastPush().pathname).toBe(PROFILE_ROUTE);
+  });
+
+  it("carries every param the profile needs to identify the practitioner", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Dr. Sarah Chen's profile"));
+
+    // `providerId` is the one that becomes `practitionerId` and then
+    // `doctor_id`; the rest are what the profile and the slot picker draw.
+    // Without the id and the name the profile now renders a no-data state — it
+    // used to render `DEFAULT_PROVIDER`, a named fictional cardiologist, under a
+    // live Book dock.
+    expect(lastPush().params).toEqual({
+      id: "doc-7",
+      providerId: "doc-7",
+      providerName: "Dr. Sarah Chen",
+      providerSpecialty: "Cardiology Specialist",
+      providerAvatar: "https://example.test/sarah.png",
+      providerKind: "doctors",
+      // The price, entering the funnel. `adaptDoctor` dropped
+      // `consultation_fee_cents` entirely until this pass, so the review screen
+      // had nothing to show and a patient committed without seeing a cost.
+      // MINOR UNITS all the way to the screen that prints it.
+      providerFeeCents: "12000",
+    });
+  });
+
+  it("omits the fee param when the clinician records no fee", () => {
+    mockEntries = [{ ...doctor, consultationFeeCents: null }];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Dr. Sarah Chen's profile"));
+
+    // Null means "no fee set", which is not "free" — so nothing is forwarded
+    // and the review screen omits the row rather than printing a zero.
+    expect(lastPush().params).not.toHaveProperty("providerFeeCents");
+  });
+
+  it("offers no message control on a provider card", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    // It was a filled primary square with a chat glyph and an empty `onPress` —
+    // the loudest control on the card and the only one that did nothing.
+    // `inbox_service` keys threads on a USER id; a directory entry carries a
+    // doctor PROFILE id, and there is no resolution between them from here.
+    expect(screen.queryByLabelText("Message Dr. Sarah Chen")).toBeNull();
+  });
+
+  it("makes no presence claim about a clinician", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    // Every adapter hardcoded `availability: "online"`, so this label was
+    // attached to every person in the directory, always, with no presence
+    // service, column or field behind it.
+    expect(screen.queryByLabelText(/is online/)).toBeNull();
+  });
+
+  it("tags the entry's kind so the profile can decide about booking", () => {
+    for (const entry of [nurse, pharmacist]) {
+      jest.clearAllMocks();
+      mockEntries = [entry];
+      const view = render(<FindCareScreen />);
+
+      fireEvent.press(screen.getByLabelText(`View ${entry.name}'s profile`));
+
+      expect(lastPush().pathname).toBe(PROFILE_ROUTE);
+      expect(lastPush().params.providerKind).toBe(entry.category);
+      expect(lastPush().params.providerId).toBe(entry.id);
+      view.unmount();
+    }
+  });
+
+  it("keeps the profile target above the 44pt floor", () => {
+    mockEntries = [doctor];
+    render(<FindCareScreen />);
+
+    const target = screen.getByLabelText("View Dr. Sarah Chen's profile");
+    expect(target.props.style).toEqual(expect.objectContaining({ minHeight: 44 }));
+  });
+});
+
+describe("FindCareScreen — a facility is not a practitioner", () => {
+  // These used to assert `router.push` was NOT called at all, because there was
+  // no facility screen to call it with and both practitioner profiles would
+  // have put a building's name over a person's page. That premise expired on
+  // 2026-08-06: `hospital-detail` and `pharmacy-detail` now exist. What the
+  // suite still locks is the part that was never about the missing route — a
+  // facility must not reach a PRACTITIONER profile — plus the two things the
+  // no-op could not be asked about before: that the destination is per kind,
+  // and that the id it carries is the wire id the detail GET wants.
+
+  it.each([
+    ["pharmacy", pharmacy, "View Store — Ridge Pharmacy"],
+    ["hospital", hospital, "View hospital — Korle Bu Teaching Hospital"],
+  ])("never pushes a %s into a practitioner profile", (_kind, entry, label) => {
+    mockEntries = [entry];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText(label));
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(lastPush().pathname).not.toBe(PROFILE_ROUTE);
+    // Not the OTHER practitioner profile either.
+    expect(lastPush().pathname).not.toBe("/(app)/practitioner-social-profile");
+  });
+
+  it("sends a hospital to hospital-detail with its hospital_id", () => {
+    mockEntries = [hospital];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View hospital — Korle Bu Teaching Hospital"));
+
+    expect(lastPush().pathname).toBe("/(app)/hospital-detail");
+    // `FacilityEntry.id` is `hospital_id` off the wire — the value
+    // `GET /v1/hospitals/{id}` takes. A slug or a name here 404s.
+    expect(lastPush().params).toEqual({ hospitalId: "hosp-1" });
+  });
+
+  it("sends a pharmacy to pharmacy-detail with its pharmacy id", () => {
+    mockEntries = [pharmacy];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View Store — Ridge Pharmacy"));
+
+    expect(lastPush().pathname).toBe("/(app)/pharmacy-detail");
+    expect(lastPush().params).toEqual({ pharmacyId: "store-2" });
+  });
+
+  it("keeps the two kinds on separate destinations", () => {
+    // The regression this guards is a "facility-detail" collapse: one screen
+    // that takes either kind and switches two thirds of itself off. The two
+    // records share three columns and live in two services with two different
+    // spellings of "phone".
+    mockEntries = [hospital, pharmacy];
+    render(<FindCareScreen />);
+
+    fireEvent.press(screen.getByLabelText("View hospital — Korle Bu Teaching Hospital"));
+    fireEvent.press(screen.getByLabelText("View Store — Ridge Pharmacy"));
+
+    const pushed = (router.push as jest.Mock).mock.calls.map((c) => c[0].pathname);
+    expect(new Set(pushed).size).toBe(2);
+  });
+});
+
+describe("FindCareScreen — icons come from the shared gate", () => {
+  // docs/BRAND.md §Iconography and src/components/ui/icons/Icon.tsx: Icon is the
+  // only file allowed to import an icon library. This screen had five direct
+  // MaterialIcons call sites, which is how an app ends up with three icon
+  // styles — and it is the same violation flagged in HomeScreen.
+  const source = require("node:fs")
+    .readFileSync(require("node:path").join(__dirname, "..", "FindCareScreen.tsx"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  it("imports no icon library", () => {
+    expect(source).not.toMatch(/@expo\/vector-icons/);
+    expect(source).not.toMatch(/<MaterialIcons/);
+  });
+});
