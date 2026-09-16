@@ -24,9 +24,8 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
-from agents.shared import LLMChatTurn, LLMProvider
+from agents.shared import LLMChatTurn, LLMProvider, prompt_path
 
 from .signals import Signal
 
@@ -39,9 +38,7 @@ class PersonalizedRecommendation:
     text: str  # what the patient actually sees
 
 
-_PERSONALIZER_PROMPT_PATH = (
-    Path(__file__).resolve().parents[3] / "prompts" / "_smart_recommend_personalizer.md"
-)
+_PERSONALIZER_PROMPT_PATH = prompt_path("_smart_recommend_personalizer.md")
 
 
 def _load_prompt() -> str:

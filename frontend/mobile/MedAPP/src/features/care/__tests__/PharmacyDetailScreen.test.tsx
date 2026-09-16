@@ -23,7 +23,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fireEvent, screen, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, within } from "@testing-library/react-native";
 import { Linking } from "react-native";
 import { renderWithSafeArea as render } from "@/test/safe-area";
 import type { PharmacyDetail, StockCheck } from "@/features/care/api";
@@ -63,7 +63,8 @@ jest.mock("@/lib/share", () => ({
 // builder returns null and a URL assertion would pass vacuously. Its own rules
 // are locked in src/lib/__tests__/share-links.test.ts.
 const mockShareLinkLine = jest.fn(
-  (t: { kind: string; id: string }) => `Open in MedApp: medapp://${t.kind}-detail?pharmacyId=${t.id}`,
+  (t: { kind: string; id: string }) =>
+    `Open in MedApp: medapp://${t.kind}-detail?pharmacyId=${t.id}`,
 );
 jest.mock("@/lib/share-links", () => ({
   shareLinkLine: (...a: unknown[]) => mockShareLinkLine(...(a as [{ kind: string; id: string }])),
@@ -157,6 +158,27 @@ beforeEach(() => {
   mockUsePharmacy.mockReturnValue(settled(CEDAR));
   mockUsePharmacists.mockReturnValue(settled([]));
   mockUseStockCheck.mockReturnValue(stockState());
+});
+it("shows published services and head pharmacist details without inventing a verified or bookable profile", async () => {
+  mockUsePharmacy.mockReturnValue(
+    settled({
+      ...CEDAR,
+      servicesOffered: ["Vaccinations"],
+      headPharmacistName: "Ama Mensah",
+      headPharmacistBio: "Community pharmacist.",
+    }),
+  );
+  render(<PharmacyDetailScreen />);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(screen.getByTestId("pharmacy-services")).toBeTruthy();
+  expect(screen.getByText("Ama Mensah")).toBeTruthy();
+  expect(screen.getByText("Community pharmacist.")).toBeTruthy();
+  expect(screen.queryByText("No pharmacists listed")).toBeNull();
+});
+it("labels overnight hours with the following day", () => {
+  expect(formatDayHours("20:00-06:00")).toBe("20:00 – 06:00 (next day)");
 });
 
 // -- Shell -----------------------------------------------------------------

@@ -3,6 +3,7 @@
 Usage:
     python -m app.cli.provision --hospital-id <uuid> --hospital-name "Name" --slug "name-slug"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,10 +26,13 @@ async def _main(hospital_id: UUID, hospital_name: str, slug: str) -> None:
         try:
             tenant = await provision_tenant(body, db)
             await db.commit()
-            print(f"Provisioned tenant: {tenant.id} (db=hms_{slug.replace('-', '_')})")
-        except Exception as exc:
+            print(f"Provisioned tenant: {tenant.id}")
+        except Exception:
             await db.rollback()
-            print(f"Error: {exc}", file=sys.stderr)
+            print(
+                "Tenant provisioning failed; review the tenant identity and database configuration.",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
 

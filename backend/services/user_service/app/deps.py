@@ -2,14 +2,15 @@ from collections.abc import AsyncIterator
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, Request, status
+from shared.auth import Principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.auth import Principal
-
+from .config import settings
 from .db import SessionLocal
 from .models import User
-from .services import EmailNotifier, LogEmailNotifier, LogSmsNotifier, SmsNotifier
+from .services import EmailNotifier, LogSmsNotifier, SmsNotifier
 from .services.auth_service import AuthError, decode_access_token
+from .services.notifiers import SmtpEmailNotifier
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -63,7 +64,7 @@ async def current_principal(
         claims = decode_access_token(token)
     except AuthError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from exc
     return Principal(subject=str(claims["sub"]), role=str(claims["role"]))
 
@@ -96,10 +97,18 @@ def get_sms_notifier() -> SmsNotifier:
 
 
 def get_email_notifier() -> EmailNotifier:
-    """Overridable in tests via app.dependency_overrides. Real impl (SES /
-    SendGrid / SMTP) wires in at deploy time; until then the log notifier
-    writes a structured event so dev/test flows work without provider keys."""
-    return LogEmailNotifier()
+    """Resolve transport before looking up an account; tests can override it."""
+    if not settings.smtp_host or not settings.smtp_from_email:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "email delivery is unavailable")
+    return SmtpEmailNotifier(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        sender=settings.smtp_from_email,
+        username=settings.smtp_username,
+        password=settings.smtp_password.get_secret_value() if settings.smtp_password else None,
+        security=settings.smtp_security,
+        timeout=settings.smtp_timeout_seconds,
+    )
 
 
 CurrentPrincipal = Depends(current_principal)

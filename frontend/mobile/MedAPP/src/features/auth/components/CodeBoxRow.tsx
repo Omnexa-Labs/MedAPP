@@ -31,7 +31,7 @@
 // behaviours work at all on React Native:
 //
 //   - PASTE / OTP AUTOFILL — `textContentType="oneTimeCode"` and
-//     `autoComplete="sms-otp"` deliver all six digits in one `onChangeText`.
+//     `autoComplete="one-time-code"` deliver all six digits in one `onChangeText`.
 //     Six maxLength={1} inputs receive only the first character (the platform
 //     respects maxLength before the handler sees the rest), which is the usual
 //     way a "paste your code" flow silently breaks.
@@ -151,7 +151,7 @@ export function CodeBoxRow({
           editable={!disabled}
           keyboardType="number-pad"
           maxLength={CODE_LENGTH}
-          autoComplete="sms-otp"
+          autoComplete="one-time-code"
           textContentType="oneTimeCode"
           caretHidden
           accessibilityLabel={accessibilityLabel}

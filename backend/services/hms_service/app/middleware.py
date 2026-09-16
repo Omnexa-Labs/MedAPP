@@ -6,10 +6,9 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from shared.auth.jwt import decode_token
-
 from .config import settings
 from .deps import verify_staff_membership
+from .session_tokens import workspace_claims
 from .tenant import tenant_context_var
 
 log = logging.getLogger(__name__)
@@ -51,9 +50,7 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
 
         token = auth_header.split(" ", 1)[1]
         try:
-            claims = decode_token(
-                token, secret=settings.jwt_secret, algorithm=settings.jwt_algorithm
-            )
+            claims = workspace_claims(token)
         except Exception:
             return await call_next(request)
 
@@ -75,7 +72,9 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
         if not verified:
             log.warning(
                 "tenant_middleware.staff_role_unverified sub=%s hospital_id=%s path=%s",
-                subject, hospital_id, path,
+                subject,
+                hospital_id,
+                path,
             )
             return await call_next(request)
 

@@ -46,5 +46,6 @@ class StockAvailabilityRow(BaseModel):
 
 
 class StockAvailabilityResponse(BaseModel):
+    pharmacy_id: UUID | None = None
     pharmacy_slug: str
     items: list[StockAvailabilityRow]

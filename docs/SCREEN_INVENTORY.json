@@ -1,0 +1,2797 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-16",
+  "scope": "Complete the existing patient-facing and specialist-facing screen sets.",
+  "planning_authority": "Product owner: patient UI largely implemented; specialist-facing screen set not implemented.",
+  "counts": {
+    "screen_references": 108,
+    "patient": 76,
+    "specialist": 32,
+    "html_files": 109,
+    "animation_html": 1,
+    "png_files": 126,
+    "reclassified_specialist_references": 17,
+    "route_entries": 63,
+    "layouts": 3
+  },
+  "status_rules": {
+    "specialist": "All specialist references begin not_implemented, even when partial reuse candidates exist.",
+    "existing_code_to_verify": "Related code exists; exact reference coverage and complete behavior are not established.",
+    "reference_to_reconcile": "No direct reuse route identified in this mapping; inspect combined screens/other surfaces before declaring code absent.",
+    "api_and_qa": "Not verified by this planning pass; this does not assert that an API is missing.",
+    "accepted": "Requires recorded implementation and journey validation evidence.",
+    "ids": "Retain assigned IDs when updating; append new IDs rather than renumbering existing entries.",
+    "in_progress": "Implementation has started; API/component evidence is partial and reference acceptance is still open."
+  },
+  "modules": {
+    "P01": {
+      "name": "Access and onboarding",
+      "batch": "B01",
+      "services": [
+        "user_service"
+      ],
+      "finish": "Complete recovery, verification, social sign-in, legal links, and session recovery using the existing authentication screens."
+    },
+    "P02": {
+      "name": "Home and personal profile",
+      "batch": "B01",
+      "services": [
+        "user_service",
+        "ehr_service",
+        "booking_service"
+      ],
+      "finish": "Finish the new-user and active-care states, profile editing, summaries, and navigation with real account data."
+    },
+    "P03": {
+      "name": "Find care and booking",
+      "batch": "B02",
+      "services": [
+        "doctor_service",
+        "nurse_service",
+        "hospital_service",
+        "booking_service"
+      ],
+      "finish": "Complete directory variants, provider profiles, hospital departments, authoritative slots, booking, cancellation, and rescheduling."
+    },
+    "P04": {
+      "name": "Patient messages and consultations",
+      "batch": "B06",
+      "services": [
+        "inbox_service",
+        "telemedicine_service"
+      ],
+      "finish": "Complete persistent messages, attachments, consented record sharing, waiting-room checks, and a real two-party consultation."
+    },
+    "P05": {
+      "name": "Records, labs, and reports",
+      "batch": "B07",
+      "services": [
+        "ehr_service",
+        "lab_service"
+      ],
+      "finish": "Complete history, uploads, lab detail, trends, report preview/export, and access controls using persisted records."
+    },
+    "P06": {
+      "name": "Medications and prescriptions",
+      "batch": "B08",
+      "services": [
+        "ehr_service",
+        "pms_service",
+        "lab_reader_agent"
+      ],
+      "finish": "Replace samples with patient-owned medication/prescription/adherence data; finish scan verification, prescription sharing, and interaction checking."
+    },
+    "P07": {
+      "name": "Lifestyle",
+      "batch": "B09",
+      "services": [
+        "ehr_service",
+        "smart_recommend_agent"
+      ],
+      "finish": "Define persisted lifestyle data, save daily entries, restore them across sessions, and derive summaries from saved entries."
+    },
+    "P08": {
+      "name": "Connected devices",
+      "batch": "B09",
+      "services": [
+        "wearable_sync_service",
+        "ehr_service"
+      ],
+      "finish": "Complete selection, consent, connection, sync progress/success/failure, disconnect, and actual supported-device ingestion."
+    },
+    "P09": {
+      "name": "AI, discovery, and community",
+      "batch": "B10",
+      "services": [
+        "social_service",
+        "inbox_service",
+        "concierge_agent",
+        "medical_chat_agent"
+      ],
+      "finish": "Complete AI conversations, Q&A, feed, group membership, content discovery, and their author/moderation counterparts."
+    },
+    "P10": {
+      "name": "Pharmacy discovery and orders",
+      "batch": "B11",
+      "services": [
+        "pharmacy_service",
+        "pharmacist_service",
+        "pms_service",
+        "payment_service"
+      ],
+      "finish": "Complete pharmacy lookup and the reference order/delivery flow after defining fulfillment ownership and provider integrations."
+    },
+    "P11": {
+      "name": "Settings, support, and billing",
+      "batch": "B01 / B09 / B11",
+      "services": [
+        "user_service",
+        "notification_service",
+        "payment_service"
+      ],
+      "finish": "Complete account/security/support first, persistent notification preferences with follow-up work, and billing with the commerce contract."
+    },
+    "S01": {
+      "name": "Professional onboarding and identity",
+      "batch": "B03",
+      "services": [
+        "onboarding_service",
+        "user_service",
+        "doctor_service",
+        "nurse_service"
+      ],
+      "finish": "Implement partner selection, credentials, applications/status, professional editing, and the approved specialist entry flow."
+    },
+    "S02": {
+      "name": "Doctor, nurse, and specialist dashboards",
+      "batch": "B04",
+      "services": [
+        "booking_service",
+        "doctor_service",
+        "nurse_service",
+        "notification_service"
+      ],
+      "finish": "Implement role-specific dashboard content, actions, navigation, and real work summaries."
+    },
+    "S03": {
+      "name": "Availability, schedules, and requests",
+      "batch": "B04",
+      "services": [
+        "doctor_service",
+        "nurse_service",
+        "booking_service"
+      ],
+      "finish": "Implement availability editing, working hours, schedule views, consultation request decisions, and conflict handling."
+    },
+    "S04": {
+      "name": "Patient roster and clinical records",
+      "batch": "B05",
+      "services": [
+        "ehr_service",
+        "booking_service",
+        "hms_service"
+      ],
+      "finish": "Implement an authorized roster with filters, patient details, intake, observations, and clinical actions backed by the owning service."
+    },
+    "S05": {
+      "name": "Consultation workspace and team chat",
+      "batch": "B06",
+      "services": [
+        "inbox_service",
+        "telemedicine_service",
+        "ehr_service"
+      ],
+      "finish": "Implement specialist consultation and team messaging, reviewed AI handoff, requested vitals, saved notes, and follow-up actions."
+    },
+    "S06": {
+      "name": "Prescription issuing",
+      "batch": "B08",
+      "services": [
+        "ehr_service",
+        "pms_service",
+        "hms_service"
+      ],
+      "finish": "Implement prescription composition, review, issue, cancellation/correction, and delivery into the patient's medication journey."
+    },
+    "S07": {
+      "name": "Publishing and community management",
+      "batch": "B10",
+      "services": [
+        "social_service",
+        "notification_service"
+      ],
+      "finish": "Implement post composition, group creation, membership approvals, moderation, and visibility to the right patient audience."
+    },
+    "S08": {
+      "name": "Hospital and pharmacy partner operations",
+      "batch": "B11",
+      "services": [
+        "hms_service",
+        "pms_service",
+        "hospital_service",
+        "pharmacy_service"
+      ],
+      "finish": "Implement the referenced partner dashboards and connect tenant-scoped staff/department/pharmacy operations, reusing web portal code where appropriate."
+    },
+    "S09": {
+      "name": "Clinical analytics",
+      "batch": "B09 / B11",
+      "services": [
+        "analytics_service",
+        "ehr_service",
+        "booking_service"
+      ],
+      "finish": "Implement scoped clinical activity and outcomes views, with defined metrics and drill-down access."
+    }
+  },
+  "screen_references": [
+    {
+      "id": "P-001",
+      "group": "patient",
+      "module": "P01",
+      "reference_slug": "login",
+      "source_path": "UI_screens/Patient_facing_screens/login/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/login/progress1.png",
+        "UI_screens/Patient_facing_screens/login/progress2.png",
+        "UI_screens/Patient_facing_screens/login/progress3.png",
+        "UI_screens/Patient_facing_screens/login/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(public)/sign-in.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Explicitly enrolled biometric sign-in now unlocks a protected credential before exchanging it. Cold starts cannot silently hydrate an enrolled account; password sign-in clears the prior device enrollment.",
+        "2026-09-13: Focused tests cover protected storage, rejected/cancelled unlocks, rotation persistence, duplicate attempts and late account responses. Native biometric enforcement, reference/theme acceptance and social sign-in remain open. See COMPLETION_BASELINE.md.",
+        "2026-09-13, authenticator work: password login now enters a token-free challenge for enrolled accounts, with authenticator/recovery proof, expired/lost-response handling and account-change guards. Focused mobile tests and real gateway verification pass; rendered/device acceptance remains pending.",
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-002",
+      "group": "patient",
+      "module": "P01",
+      "reference_slug": "sign_up_create_account",
+      "source_path": "UI_screens/Patient_facing_screens/sign_up_create_account/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/sign_up_create_account/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(public)/sign-up.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-003",
+      "group": "patient",
+      "module": "P01",
+      "reference_slug": "sign_up_personal_details",
+      "source_path": "UI_screens/Patient_facing_screens/sign_up_personal_details/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/sign_up_personal_details/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(public)/sign-up-step-2.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: DOB, gender, optional blood type and primary goal are validated and saved atomically with signup. Local gateway/SMTP checks restore them after logout and fresh login. PostgreSQL migration/API checks and the 100-test user-service suite pass.",
+        "Rendered reference comparison, keyboard and native-device acceptance remain pending."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-004",
+      "group": "patient",
+      "module": "P01",
+      "reference_slug": "sign_up_security_setup",
+      "source_path": "UI_screens/Patient_facing_screens/sign_up_security_setup/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/sign_up_security_setup/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(public)/sign-up-step-3.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Unavailable biometric/2FA/care-team setup stays disabled/off. Complete/Skip does not activate security or grant sharing/research consent. Component checks pass for these states and the sign-in action after confirmed account creation.",
+        "Actual enrollment and scoped care-team consent remain unimplemented; rendered/device acceptance remains pending.",
+        "2026-09-13: Signup still grants no security enrollment or sharing consent. Copy now points to post-login authenticator setup in Security & privacy.",
+        "2026-09-13, care-team work: signup remains off with no automatic consent. Copy points to Security & Privacy / Care-team sharing after account creation. Separate scoped consent is now implemented; rendered/device acceptance remains pending.",
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-005",
+      "group": "patient",
+      "module": "P01",
+      "reference_slug": "splash_screen",
+      "source_path": "UI_screens/Patient_facing_screens/splash_screen/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/splash_screen/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(public)/splash.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-006",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_dashboard",
+      "source_path": "UI_screens/Patient_facing_screens/patient_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_dashboard/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/index.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, Home reuse code: explicit loading/error/empty states, independent retries, account/session-scoped queries, focus/resume/pull refresh, expired-booking clock handling and Labs/Vitals/Records navigation implemented. Home component cases and source token checks pass within the recorded 79-case mobile evidence. Exact coverage of this reference variant, themes and native behavior remain unaccepted; Pharmacy discovery remains B11."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-007",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_home_active_care_focus",
+      "source_path": "UI_screens/Patient_facing_screens/patient_home_active_care_focus/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_home_active_care_focus/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/index.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, Home reuse code: explicit loading/error/empty states, independent retries, account/session-scoped queries, focus/resume/pull refresh, expired-booking clock handling and Labs/Vitals/Records navigation implemented. Home component cases and source token checks pass within the recorded 79-case mobile evidence. Exact coverage of this reference variant, themes and native behavior remain unaccepted; Pharmacy discovery remains B11."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-008",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_home_new_user_experience_updated_nav",
+      "source_path": "UI_screens/Patient_facing_screens/patient_home_new_user_experience_updated_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_home_new_user_experience_updated_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/index.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, Home reuse code: explicit loading/error/empty states, independent retries, account/session-scoped queries, focus/resume/pull refresh, expired-booking clock handling and Labs/Vitals/Records navigation implemented. Home component cases and source token checks pass within the recorded 79-case mobile evidence. Exact coverage of this reference variant, themes and native behavior remain unaccepted; Pharmacy discovery remains B11."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-009",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_home_premium_refinement_updated_nav",
+      "source_path": "UI_screens/Patient_facing_screens/patient_home_premium_refinement_updated_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_home_premium_refinement_updated_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/index.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, Home reuse code: explicit loading/error/empty states, independent retries, account/session-scoped queries, focus/resume/pull refresh, expired-booking clock handling and Labs/Vitals/Records navigation implemented. Home component cases and source token checks pass within the recorded 79-case mobile evidence. Exact coverage of this reference variant, themes and native behavior remain unaccepted; Pharmacy discovery remains B11."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-010",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_profile_overview",
+      "source_path": "UI_screens/Patient_facing_screens/patient_profile_overview/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_profile_overview/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/patient-profile-overview.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: PersonalDetailsCard displays restored DOB, gender, self-reported blood type and primary goal, with honest missing-field states. Profile component, navigation and theme-source checks pass. Real gateway and PostgreSQL API checks confirm persisted values.",
+        "2026-09-13: The patient profile editor loads /v1/me, PATCHes changed name/personal fields, clears optional values explicitly and refreshes the account store. Gateway/SMTP checks confirm saved edits after logout/fresh login and atomic rejection of invalid name/date/role changes.",
+        "Exact reference coverage and rendered/native-device acceptance remain pending. The reference PNG timed out while loading from OneDrive. Avatar/contact editing, emergency contacts and provider linking are still incomplete."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-011",
+      "group": "patient",
+      "module": "P02",
+      "reference_slug": "patient_profile_with_trends",
+      "source_path": "UI_screens/Patient_facing_screens/patient_profile_with_trends/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_profile_with_trends/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/patient-profile-overview.tsx",
+      "next_batch": "B01",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-012",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "appointment_management",
+      "source_path": "UI_screens/Patient_facing_screens/appointment_management/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/appointment_management/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/appointments.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02: real provider offerings and authoritative slot instants wired through selection/review; atomic reschedule endpoint, occupied-slot filtering, clinician identity checks and session-scoped appointment requests implemented. Backend/component evidence and outstanding PostgreSQL/native checks are recorded in COMPLETION_BASELINE.md. This reference remains unaccepted pending rendered/device and full journey verification.",
+        "2026-09-13 B02 discovery/saved-details follow-up: Upcoming and historical appointments open persisted booking details. Elapsed bookings are labelled Past rather than clinical completion; cancelled status is retained. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-013",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "booking_confirmed",
+      "source_path": "UI_screens/Patient_facing_screens/booking_confirmed/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/booking_confirmed/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/booking-confirmed.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02: real provider offerings and authoritative slot instants wired through selection/review; atomic reschedule endpoint, occupied-slot filtering, clinician identity checks and session-scoped appointment requests implemented. Backend/component evidence and outstanding PostgreSQL/native checks are recorded in COMPLETION_BASELINE.md. This reference remains unaccepted pending rendered/device and full journey verification.",
+        "2026-09-13 B02 discovery/saved-details follow-up: Confirmation reloads by booking ID, independently fetches clinician identity, rejects missing/invalid/inaccessible records, reflects cancellation and scopes calendar/share actions to the current account and screen. Explicit offsets and cross-midnight dates are covered. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-014",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "contacts_directory_standardized_nav",
+      "source_path": "UI_screens/Patient_facing_screens/contacts_directory_standardized_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/contacts_directory_standardized_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/find-care.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: All five directory categories load with partial-error retry; pharmacies/pharmacists support pagination. Home Service uses recorded nurse home-visit fees and supported specialty text filters call the server. Actual pharmacy IDs drive details; unsupported presence/proximity facets remain unfinished. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-015",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "doctor_profile",
+      "source_path": "UI_screens/Patient_facing_screens/doctor_profile/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/doctor_profile/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-telehealth-profile.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: Patient-facing profiles fetch doctor/nurse/pharmacist identity, biography, specialties and languages with loading/retry/refresh states. Only saved active and listed doctor profiles enter doctor booking; URL display hints cannot override the loaded profile. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-016",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "find_care_advanced_directory",
+      "source_path": "UI_screens/Patient_facing_screens/find_care_advanced_directory/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/find_care_advanced_directory/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/find-care.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: All five directory categories load with partial-error retry; pharmacies/pharmacists support pagination. Home Service uses recorded nurse home-visit fees and supported specialty text filters call the server. Actual pharmacy IDs drive details; unsupported presence/proximity facets remain unfinished. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-017",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "find_care_blue_theme_standardized_nav",
+      "source_path": "UI_screens/Patient_facing_screens/find_care_blue_theme_standardized_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/find_care_blue_theme_standardized_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/find-care.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: All five directory categories load with partial-error retry; pharmacies/pharmacists support pagination. Home Service uses recorded nurse home-visit fees and supported specialty text filters call the server. Actual pharmacy IDs drive details; unsupported presence/proximity facets remain unfinished. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-018",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "find_care_enhanced_directory_updated_nav",
+      "source_path": "UI_screens/Patient_facing_screens/find_care_enhanced_directory_updated_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/find_care_enhanced_directory_updated_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/find-care.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: All five directory categories load with partial-error retry; pharmacies/pharmacists support pagination. Home Service uses recorded nurse home-visit fees and supported specialty text filters call the server. Actual pharmacy IDs drive details; unsupported presence/proximity facets remain unfinished. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-019",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "hospital_department_directory",
+      "source_path": "UI_screens/Patient_facing_screens/hospital_department_directory/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/hospital_department_directory/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/hospital-detail.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-020",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "review_appointment",
+      "source_path": "UI_screens/Patient_facing_screens/review_appointment/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/review_appointment/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/review-appointment.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02: real provider offerings and authoritative slot instants wired through selection/review; atomic reschedule endpoint, occupied-slot filtering, clinician identity checks and session-scoped appointment requests implemented. Backend/component evidence and outstanding PostgreSQL/native checks are recorded in COMPLETION_BASELINE.md. This reference remains unaccepted pending rendered/device and full journey verification.",
+        "2026-09-13 B02 discovery/saved-details follow-up: Successful review navigates using only the saved booking ID; confirmation reloads authoritative details. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-021",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "select_time_consultation_type",
+      "source_path": "UI_screens/Patient_facing_screens/select_time_consultation_type/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/select_time_consultation_type/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/select-time-slot.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02: real provider offerings and authoritative slot instants wired through selection/review; atomic reschedule endpoint, occupied-slot filtering, clinician identity checks and session-scoped appointment requests implemented. Backend/component evidence and outstanding PostgreSQL/native checks are recorded in COMPLETION_BASELINE.md. This reference remains unaccepted pending rendered/device and full journey verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-022",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "specialist_profile",
+      "source_path": "UI_screens/Patient_facing_screens/specialist_profile/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/specialist_profile/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-social-profile.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-023",
+      "group": "patient",
+      "module": "P03",
+      "reference_slug": "specialist_profile_with_detailed_reviews",
+      "source_path": "UI_screens/Patient_facing_screens/specialist_profile_with_detailed_reviews/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/specialist_profile_with_detailed_reviews/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-telehealth-profile.tsx",
+      "next_batch": "B02",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13 B02 discovery/saved-details follow-up: Basic patient-facing profile data now comes from saved clinician records with loading/retry/refresh and booking eligibility checks. Detailed reviews, social content and credential-reference reconciliation remain unfinished. Latest combined per-suite mobile evidence: 228 tests across 17 suites, plus passing TypeScript. See COMPLETION_BASELINE.md for validation limits; this reference remains unaccepted pending full reference, live-gateway and native/theme verification."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-024",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "clinical_consultation_hub_rich_data_sharing",
+      "source_path": "UI_screens/Patient_facing_screens/clinical_consultation_hub_rich_data_sharing/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/clinical_consultation_hub_rich_data_sharing/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/chat-thread.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-025",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "clinical_consultation_refined_messaging_sharing",
+      "source_path": "UI_screens/Patient_facing_screens/clinical_consultation_refined_messaging_sharing/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/clinical_consultation_refined_messaging_sharing/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/chat-thread.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-026",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "messages_overview",
+      "source_path": "UI_screens/Patient_facing_screens/messages_overview/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/messages_overview/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/inbox.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-027",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "messages_overview_standardized_nav",
+      "source_path": "UI_screens/Patient_facing_screens/messages_overview_standardized_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/messages_overview_standardized_nav/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/inbox.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-028",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "telemedicine_consultation",
+      "source_path": "UI_screens/Patient_facing_screens/telemedicine_consultation/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/telemedicine_consultation/screen.png"
+      ],
+      "ui_status": "partial_no_media_transport",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/telemedicine-consultation.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-029",
+      "group": "patient",
+      "module": "P04",
+      "reference_slug": "waiting_room",
+      "source_path": "UI_screens/Patient_facing_screens/waiting_room/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/waiting_room/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/waiting-room.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-030",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "export_settings",
+      "source_path": "UI_screens/Patient_facing_screens/export_settings/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/export_settings/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-031",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "lab_result_detail",
+      "source_path": "UI_screens/Patient_facing_screens/lab_result_detail/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/lab_result_detail/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/lab-results.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-032",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "medical_history",
+      "source_path": "UI_screens/Patient_facing_screens/medical_history/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medical_history/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-033",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "medical_records_overview",
+      "source_path": "UI_screens/Patient_facing_screens/medical_records_overview/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medical_records_overview/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medical-records.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: New patient medical-records navigation hub links recorded vitals, overview, lab results and care-team sharing. All four navigation actions pass component checks. Full record history, document uploads/downloads, reference comparison and native acceptance remain B07 work."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-034",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "report_preview",
+      "source_path": "UI_screens/Patient_facing_screens/report_preview/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/report_preview/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-035",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "report_preview_with_detailed_charts",
+      "source_path": "UI_screens/Patient_facing_screens/report_preview_with_detailed_charts/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/report_preview_with_detailed_charts/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-036",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "report_preview_with_health_trends",
+      "source_path": "UI_screens/Patient_facing_screens/report_preview_with_health_trends/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/report_preview_with_health_trends/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-037",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "upload_medical_record",
+      "source_path": "UI_screens/Patient_facing_screens/upload_medical_record/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/upload_medical_record/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-038",
+      "group": "patient",
+      "module": "P05",
+      "reference_slug": "vitals_timeline",
+      "source_path": "UI_screens/Patient_facing_screens/vitals_timeline/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/vitals_timeline/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/vitals-timeline.tsx",
+      "next_batch": "B07",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Patient vitals timeline reads the EHR with 7/30/90-day or all-time filters, human-readable measurement search, dated values/units/notes, cursor paging and retry. Full EHR suite: 38 passed. TypeScript and relevant cases in the 79-case mobile evidence pass. PostgreSQL migration/index rollback, live gateway paging during insertion and patient/consent boundaries pass. Reference HTML read failed with OneDrive Invalid argument; no visual/device acceptance claimed."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-039",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "active_medications",
+      "source_path": "UI_screens/Patient_facing_screens/active_medications/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/active_medications/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-medications.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-040",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "add_medication_smart_scan_flow",
+      "source_path": "UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/add-medication.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-041",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "advanced_medication_timeline_tracker",
+      "source_path": "UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-042",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "digital_prescription_view",
+      "source_path": "UI_screens/Patient_facing_screens/digital_prescription_view/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/digital_prescription_view/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-script-view.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-043",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "full_prescription_history",
+      "source_path": "UI_screens/Patient_facing_screens/full_prescription_history/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/full_prescription_history/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/prescription-history.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-044",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "health_command_center_with_integrated_prescriptions",
+      "source_path": "UI_screens/Patient_facing_screens/health_command_center_with_integrated_prescriptions/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/health_command_center_with_integrated_prescriptions/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/overview.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-045",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "medication_detail",
+      "source_path": "UI_screens/Patient_facing_screens/medication_detail/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medication_detail/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-details.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-046",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "medication_interaction_checker",
+      "source_path": "UI_screens/Patient_facing_screens/medication_interaction_checker/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medication_interaction_checker/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-047",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "medication_tracker_1",
+      "source_path": "UI_screens/Patient_facing_screens/medication_tracker_1/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medication_tracker_1/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-048",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "medication_tracker_2",
+      "source_path": "UI_screens/Patient_facing_screens/medication_tracker_2/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/medication_tracker_2/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-049",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "new_prescription_received",
+      "source_path": "UI_screens/Patient_facing_screens/new_prescription_received/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/new_prescription_received/screen.png"
+      ],
+      "ui_status": "partial_sample_data",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/new-prescription.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-050",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "prescription_sharing_hub",
+      "source_path": "UI_screens/Patient_facing_screens/prescription_sharing_hub/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/prescription_sharing_hub/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-script-share.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-051",
+      "group": "patient",
+      "module": "P06",
+      "reference_slug": "smart_scan_preview_verification",
+      "source_path": "UI_screens/Patient_facing_screens/smart_scan_preview_verification/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/smart_scan_preview_verification/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-scan.tsx",
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-052",
+      "group": "patient",
+      "module": "P07",
+      "reference_slug": "lifestyle_hub",
+      "source_path": "UI_screens/Patient_facing_screens/lifestyle_hub/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/lifestyle_hub/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/lifestyle.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-053",
+      "group": "patient",
+      "module": "P07",
+      "reference_slug": "lifestyle_hub_with_medication_tracking",
+      "source_path": "UI_screens/Patient_facing_screens/lifestyle_hub_with_medication_tracking/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/lifestyle_hub_with_medication_tracking/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/lifestyle.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-054",
+      "group": "patient",
+      "module": "P07",
+      "reference_slug": "lifestyle_management_with_save_close",
+      "source_path": "UI_screens/Patient_facing_screens/lifestyle_management_with_save_close/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/lifestyle_management_with_save_close/screen.png"
+      ],
+      "ui_status": "partial_not_persisted",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/lifestyle-manage.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-055",
+      "group": "patient",
+      "module": "P08",
+      "reference_slug": "smart_sync_connect_devices",
+      "source_path": "UI_screens/Patient_facing_screens/smart_sync_connect_devices/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/smart_sync_connect_devices/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/connect-devices.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-056",
+      "group": "patient",
+      "module": "P08",
+      "reference_slug": "sync_complete_success_state",
+      "source_path": "UI_screens/Patient_facing_screens/sync_complete_success_state/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/sync_complete_success_state/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/connect-devices.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-057",
+      "group": "patient",
+      "module": "P08",
+      "reference_slug": "sync_preferences_data_selection",
+      "source_path": "UI_screens/Patient_facing_screens/sync_preferences_data_selection/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/sync_preferences_data_selection/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/connect-devices.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-058",
+      "group": "patient",
+      "module": "P08",
+      "reference_slug": "syncing_health_data_progress_state",
+      "source_path": "UI_screens/Patient_facing_screens/syncing_health_data_progress_state/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/syncing_health_data_progress_state/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/connect-devices.tsx",
+      "next_batch": "B09",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-059",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "ai_health_assistant",
+      "source_path": "UI_screens/Patient_facing_screens/ai_health_assistant/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/ai_health_assistant/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/ai-assistant.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-060",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "community_hub_with_group_management",
+      "source_path": "UI_screens/Patient_facing_screens/community_hub_with_group_management/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/community_hub_with_group_management/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-061",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "explore_discovery_directory_updated_actions",
+      "source_path": "UI_screens/Patient_facing_screens/explore_discovery_directory_updated_actions/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/explore_discovery_directory_updated_actions/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-062",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "health_groups",
+      "source_path": "UI_screens/Patient_facing_screens/health_groups/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/health_groups/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-063",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "private_q_a",
+      "source_path": "UI_screens/Patient_facing_screens/private_q_a/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/private_q_a/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/ask-a-doctor.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-064",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "production_community_hub",
+      "source_path": "UI_screens/Patient_facing_screens/production_community_hub/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/production_community_hub/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-065",
+      "group": "patient",
+      "module": "P09",
+      "reference_slug": "production_social_feed_for_you",
+      "source_path": "UI_screens/Patient_facing_screens/production_social_feed_for_you/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/production_social_feed_for_you/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-066",
+      "group": "patient",
+      "module": "P10",
+      "reference_slug": "pharmacy_hub",
+      "source_path": "UI_screens/Patient_facing_screens/pharmacy_hub/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/pharmacy_hub/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/find-care.tsx",
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-067",
+      "group": "patient",
+      "module": "P10",
+      "reference_slug": "pharmacy_profile",
+      "source_path": "UI_screens/Patient_facing_screens/pharmacy_profile/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/pharmacy_profile/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/pharmacy-detail.tsx",
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-15 pharmacy profile publication: versioned owner drafts, explicit publish/withdraw, current-public and saved previews, weekly hours and history are implemented. The directory verifies current approved ownership and PMS access; PostgreSQL HTTP tests cover concurrent edits, publication privacy and revocation. Patient details now include published services, head pharmacist information and overnight hours. Managed photo uploads and rendered/device/theme/reference acceptance remain open. See COMPLETION_BASELINE.md.",
+        "2026-09-15 managed pharmacy photos: owner file upload, private draft preview, versioned removal and separate publication are implemented. Validated images, draft revision and cleanup commit atomically; public reads require the exact current published photo. 223 distinct automated checks passed, including concurrent real PostgreSQL uploads and revoked-owner checks. See latest COMPLETION_BASELINE.md for final build/UI follow-up and limits. Rendered/device/theme/reference acceptance remains open; no screen accepted."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-068",
+      "group": "patient",
+      "module": "P10",
+      "reference_slug": "review_order",
+      "source_path": "UI_screens/Patient_facing_screens/review_order/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/review_order/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-069",
+      "group": "patient",
+      "module": "P10",
+      "reference_slug": "track_delivery",
+      "source_path": "UI_screens/Patient_facing_screens/track_delivery/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/track_delivery/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-070",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "contact_us",
+      "source_path": "UI_screens/Patient_facing_screens/contact_us/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/contact_us/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-071",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "help_center",
+      "source_path": "UI_screens/Patient_facing_screens/help_center/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/help_center/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-072",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "insurance_billing",
+      "source_path": "UI_screens/Patient_facing_screens/insurance_billing/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/insurance_billing/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/settings.tsx",
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-073",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "interaction_history",
+      "source_path": "UI_screens/Patient_facing_screens/interaction_history/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/interaction_history/screen.png"
+      ],
+      "ui_status": "reference_to_reconcile",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-074",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "notification_preferences",
+      "source_path": "UI_screens/Patient_facing_screens/notification_preferences/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/notification_preferences/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/settings.tsx",
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-075",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "security_privacy",
+      "source_path": "UI_screens/Patient_facing_screens/security_privacy/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/security_privacy/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/security-privacy.tsx",
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Active session list/revocation implemented through a dedicated detail route. Session families survive rotation; the UI explains the normal access-token expiry delay. Enrollment, two-factor setup and care-team consent remain open.",
+        "2026-09-13, subsequent account work: biometric enable/disable and explicit lock implemented using protected native credentials. Setup is off until confirmed; password-change success now offers a new sign-in. Two-factor setup and scoped care-team consent remain open.",
+        "2026-09-13: 72 distinct focused mobile cases pass across recorded runs. The final auth/password rerun passes 27/27. Device enforcement is not established by these mocked native tests, and this reference remains unaccepted.",
+        "2026-09-13: Final TypeScript, dependency version checks and Expo's read-only Face ID configuration check pass. Changed runtime files and manifests match the QA copy by hash; a new native build and physical-device acceptance remain required.",
+        "2026-09-13: 11 focused mobile tests pass across three suites and a targeted screen rerun. TypeScript passes; confirmation, revoke/retry, current sign-out, paging, empty state and late account changes are covered.",
+        "2026-09-13: 115 user-service tests pass. Disposable PostgreSQL 16 verifies legacy migration, competing refreshes, revocation during rotation and downgrade/re-upgrade. Live loopback gateway verifies remote/current revocation and preservation of unrelated sessions.",
+        "Rendered reference, theme and device acceptance remain pending. No full security-screen acceptance is claimed.",
+        "2026-09-13, authenticator work: enrollment, confirmed disable and recovery-code replacement are implemented. Final evidence covers 128 distinct backend cases across full/targeted runs, 37 mobile cases, TypeScript, PostgreSQL migration and overlapping requests, plus a live gateway journey. Production MFA key, native app handoff, themes and reference acceptance remain pending.",
+        "2026-09-13, care-team work: named doctor/nurse EHR read or add-vitals permissions, 7/30/90-day expiry, confirmation, revocation and history implemented. Full EHR suite: 28 passed. Focused mobile cases: 20 distinct passed across final screen and adapter/settings/signup runs. TypeScript, PostgreSQL migration/concurrency and live gateway checks pass. Scope excludes files, labs, prescribing, messages, research, HMS and PMS; rendered/theme/device acceptance remains pending.",
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "P-076",
+      "group": "patient",
+      "module": "P11",
+      "reference_slug": "settings_hub",
+      "source_path": "UI_screens/Patient_facing_screens/settings_hub/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/settings_hub/screen.png"
+      ],
+      "ui_status": "existing_code_to_verify",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/settings.tsx",
+      "next_batch": "B01 / B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-001",
+      "group": "specialist",
+      "module": "S01",
+      "reference_slug": "onboarding_status",
+      "source_path": "UI_screens/Patient_facing_screens/onboarding_status/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/onboarding_status/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/onboarding-status.tsx",
+      "next_batch": "B03",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14 B03: Professional application status now fetches the current account's saved applications, with loading/empty/draft/submitted/review/approved/rejected/unknown/error states, visible rejection feedback, real retry and account-change scoping. Patient Profile supplies an entry point. This is read-only status groundwork; the web application/credential journey, handoff, provisioning, exact reference and native acceptance remain incomplete. See COMPLETION_BASELINE.md for current software checks and their limits; not accepted.",
+        "2026-09-14 B03 partner website: application list, saved review status, reviewer feedback and retained history are implemented on the web. Browser/API checks use real onboarding handlers with explicit authentication, Redis and file-storage test doubles plus SQLite; full production and mobile handoff acceptance remain open.",
+        "2026-09-14 B03 authenticated handoff: mobile start/continue/correct actions, short-lived single-use proofs, explicit web account confirmation, validated return and saved-status reload are implemented. Validated warm/cold returns force the existing serialized JWT renewal, including when hydration already loaded the live role. A non-secret native return marker survives app termination; unmatched returns support manual server refresh. Final checks pass: 38 user-service/session/MFA/migration tests, 45 mobile tests, 52 website tests, mobile TypeScript and the website production build. CUA validates the web boundary through the real gateway/user service with SQLite, a Redis test double and an HTTP return receiver. Native deep-link, live infrastructure, reference and approval-provisioning acceptance remain open; not accepted.",
+        "2026-09-14 B03 clinician activation: approval atomically queues doctor/nurse profile provisioning followed by the account role, with immutable receiver receipts, audit, retry and conflicts that preserve inactive or later-revoked access. Separate real user/onboarding/doctor/nurse HTTP services verify both clinician journeys through token renewal and self-profile editing, using disposable SQLite and a document-storage double. Four migration round trips preserve existing data and refuse evidence loss. Reviewer and activation-progress UI, hospital/pharmacy workspace adapters, legacy reconciliation and live PostgreSQL/native/reference acceptance remain open; not accepted.",
+        "2026-09-14 B03 applicant activation display: approved partner applications distinguish setup states, poll pending/retry, recover from failed reads and retain the authenticated return to MedApp. All 72 website tests and the production build pass. Automatic approval review blocked local Next.js preview startup; rendered/theme/reference acceptance is unverified. Admin Workspace SSO backend is implemented for existing linked administrators, with the browser session and reviewer screens still pending. No screen accepted.",
+        "2026-09-14 B03 internal reviewer console: Workspace/MFA browser sessions, application queue, managed credential preview and explicit verification, saved-version decisions, history and activation status/retry are implemented. All 50 admin tests and the production build pass; checked source hashes match the project and dependency versions match the installed graph. Real Workspace consent, deployed Redis/gateway and rendered/reference acceptance remain unverified; preview startup and dependency repair/install were blocked by automatic approval review. This supporting workflow adds no reference screens and accepts none.",
+        "2026-09-15 B03 hospital staff: email-bound invitations, verified-account preview/acceptance, staff record creation/reuse, paged records and editing, versioned role changes/revocation, cancellation and access history are implemented as supporting portal workflows. The administrator shares a one-time code; application team details alone grant no access. See COMPLETION_BASELINE.md for actual automated results and pending PostgreSQL/rendered checks. No new reference or mobile route and no screen accepted.",
+        "2026-09-15 B03 hospital profile: current hospital administrators can save versioned directory drafts, inspect saved/public previews, explicitly publish or withdraw, and page recorded before/after history. Draft edits preserve the public listing; stale/uncertain writes require reload and hospital changes cancel old requests. Hospital migration 20260915_0005 retains drafts/publication evidence. See COMPLETION_BASELINE.md for actual API, component, migration and real-service results. This supporting portal workflow adds no reference or mobile route; rendered/reference acceptance remains open."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-002",
+      "group": "specialist",
+      "module": "S01",
+      "reference_slug": "partner_selection",
+      "source_path": "UI_screens/Patient_facing_screens/partner_selection/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/partner_selection/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/partner_web/src/features/selection.tsx",
+      "next_batch": "B03",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14 B03 partner website: Partner web provider selection now includes practitioner, pharmacy and facility/team entry. Browser checks exercised practitioner and hospital/team selection. Exact reference and mobile handoff acceptance remain open. See COMPLETION_BASELINE.md for test environments and limits.",
+        "2026-09-14 B03 handoff: the real gateway/user-service proof now opens provider selection under the verified applicant's separate website session. Returning closes that web session while preserving the mobile session. Browser checks cover 390px light/dark return layouts, and database readback confirms consumption and revocation. This does not establish native or production acceptance."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-003",
+      "group": "specialist",
+      "module": "S01",
+      "reference_slug": "pharmacy_onboarding_details",
+      "source_path": "UI_screens/Patient_facing_screens/pharmacy_onboarding_details/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/pharmacy_onboarding_details/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/partner_web/src/features/details.tsx",
+      "next_batch": "B03",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14 B03 partner website: Partner web business/professional details now save drafts with version checks and conflict recovery; facility team declarations persist. Browser checks exercised practitioner save/resume/merge and a facility/team draft. Pharmacy-specific NPI, primary administrator, state/ZIP and services reference fields remain unresolved; not accepted. See COMPLETION_BASELINE.md for test environments and limits.",
+        "2026-09-14 B03 internal reviewer console: Workspace/MFA browser sessions, application queue, managed credential preview and explicit verification, saved-version decisions, history and activation status/retry are implemented. All 50 admin tests and the production build pass; checked source hashes match the project and dependency versions match the installed graph. Real Workspace consent, deployed Redis/gateway and rendered/reference acceptance remain unverified; preview startup and dependency repair/install were blocked by automatic approval review. This supporting workflow adds no reference screens and accepts none.",
+        "2026-09-15 B03 pharmacy workspace handoff: owner workspace selection, deployment-bound single-use links, PMS account/pharmacy confirmation and separate browser sessions with return are implemented. 400 automated checks pass across identity, directory, portal/Redis, mobile and real PostgreSQL/HTTP journeys. See COMPLETION_BASELINE.md. This supporting route accepts no reference; device/deployed acceptance and S-031 dashboard fidelity remain pending.",
+        "2026-09-15 pharmacy profile publication: versioned owner drafts, explicit publish/withdraw, current-public and saved previews, weekly hours and history are implemented. The directory verifies current approved ownership and PMS access; PostgreSQL HTTP tests cover concurrent edits, publication privacy and revocation. Patient details now include published services, head pharmacist information and overnight hours. Managed photo uploads and rendered/device/theme/reference acceptance remain open. See COMPLETION_BASELINE.md.",
+        "2026-09-15 managed pharmacy photos: owner file upload, private draft preview, versioned removal and separate publication are implemented. Validated images, draft revision and cleanup commit atomically; public reads require the exact current published photo. 223 distinct automated checks passed, including concurrent real PostgreSQL uploads and revoked-owner checks. See latest COMPLETION_BASELINE.md for final build/UI follow-up and limits. Rendered/device/theme/reference acceptance remains open; no screen accepted."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-004",
+      "group": "specialist",
+      "module": "S01",
+      "reference_slug": "practitioner_credentials",
+      "source_path": "UI_screens/Patient_facing_screens/practitioner_credentials/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/practitioner_credentials/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/partner_web/src/features/documents.tsx",
+      "next_batch": "B03",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14 B03 partner website: Partner web credentials now use authenticated file upload/removal/download, server requirements and attested submission. Browser checks exercised required documents, empty-file rejection, submit, reviewer feedback, reopen, correction, removal/replacement and history. NPI registry verification and live storage/device acceptance remain open; not accepted. See COMPLETION_BASELINE.md for test environments and limits.",
+        "2026-09-14 B03 internal reviewer console: Workspace/MFA browser sessions, application queue, managed credential preview and explicit verification, saved-version decisions, history and activation status/retry are implemented. All 50 admin tests and the production build pass; checked source hashes match the project and dependency versions match the installed graph. Real Workspace consent, deployed Redis/gateway and rendered/reference acceptance remain unverified; preview startup and dependency repair/install were blocked by automatic approval review. This supporting workflow adds no reference screens and accepts none."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-005",
+      "group": "specialist",
+      "module": "S01",
+      "reference_slug": "professional_profile_settings",
+      "source_path": "UI_screens/Patient_facing_screens/professional_profile_settings/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/professional_profile_settings/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-profile.tsx",
+      "next_batch": "B03",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14 B03: A doctor/nurse professional editor now uses authenticated self-profile endpoints, persists changed name/specialty/biography/languages/listing fields, previews drafts, confirms saves and protects unsaved changes. Identity and request scopes separate account IDs from professional profile IDs. Inactive profiles and unrelated roles cannot edit. Consulting-hour readback and account/sign-out navigation are retained. Credential verification, photo management, fee/currency controls, affiliations, availability editing and full reference/native acceptance remain incomplete. See COMPLETION_BASELINE.md for current software checks and their limits; not accepted."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-006",
+      "group": "specialist",
+      "module": "S02",
+      "reference_slug": "doctor_dashboard",
+      "source_path": "UI_screens/Specialist_facing_screens/doctor_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/doctor_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-home.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-007",
+      "group": "specialist",
+      "module": "S02",
+      "reference_slug": "nurse_dashboard",
+      "source_path": "UI_screens/Specialist_facing_screens/nurse_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/nurse_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-home.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-008",
+      "group": "specialist",
+      "module": "S02",
+      "reference_slug": "practitioner_dashboard",
+      "source_path": "UI_screens/Patient_facing_screens/practitioner_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/practitioner_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-home.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-009",
+      "group": "specialist",
+      "module": "S02",
+      "reference_slug": "specialist_dashboard",
+      "source_path": "UI_screens/Specialist_facing_screens/specialist_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/specialist_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-home.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-010",
+      "group": "specialist",
+      "module": "S03",
+      "reference_slug": "clinical_schedule_hub_main_view",
+      "source_path": "UI_screens/Specialist_facing_screens/clinical_schedule_hub_main_view/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/clinical_schedule_hub_main_view/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/appointments.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-011",
+      "group": "specialist",
+      "module": "S03",
+      "reference_slug": "clinical_schedule_management",
+      "source_path": "UI_screens/Specialist_facing_screens/clinical_schedule_management/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/clinical_schedule_management/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/appointments.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-012",
+      "group": "specialist",
+      "module": "S03",
+      "reference_slug": "consultation_request_detail",
+      "source_path": "UI_screens/Specialist_facing_screens/consultation_request_detail/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/consultation_request_detail/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/appointments.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-013",
+      "group": "specialist",
+      "module": "S03",
+      "reference_slug": "specialist_availability_schedule",
+      "source_path": "UI_screens/Specialist_facing_screens/specialist_availability_schedule/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/specialist_availability_schedule/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/appointments.tsx",
+      "next_batch": "B04",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-014",
+      "group": "specialist",
+      "module": "S04",
+      "reference_slug": "active_patient_roster_1",
+      "source_path": "UI_screens/Patient_facing_screens/smart_sync_connect_devices/active_patient_roster_1/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/smart_sync_connect_devices/active_patient_roster_1/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-patient-roster-2.tsx",
+      "next_batch": "B05",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-015",
+      "group": "specialist",
+      "module": "S04",
+      "reference_slug": "active_patient_roster_2",
+      "source_path": "UI_screens/Specialist_facing_screens/active_patient_roster_2/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/active_patient_roster_2/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-patient-roster-2.tsx",
+      "next_batch": "B05",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-016",
+      "group": "specialist",
+      "module": "S04",
+      "reference_slug": "active_patient_roster_enhanced_filtering",
+      "source_path": "UI_screens/Patient_facing_screens/active_patient_roster_enhanced_filtering/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/active_patient_roster_enhanced_filtering/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-patient-roster-2.tsx",
+      "next_batch": "B05",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-017",
+      "group": "specialist",
+      "module": "S04",
+      "reference_slug": "patient_management_detail",
+      "source_path": "UI_screens/Patient_facing_screens/patient_management_detail/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_management_detail/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/patient-record.tsx",
+      "next_batch": "B05",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-018",
+      "group": "specialist",
+      "module": "S04",
+      "reference_slug": "patient_management_detail_clinical_actions",
+      "source_path": "UI_screens/Patient_facing_screens/patient_management_detail_clinical_actions/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_management_detail_clinical_actions/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/patient-record.tsx",
+      "next_batch": "B05",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-019",
+      "group": "specialist",
+      "module": "S05",
+      "reference_slug": "clinical_team_chat",
+      "source_path": "UI_screens/Specialist_facing_screens/clinical_team_chat/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/clinical_team_chat/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-chat.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-020",
+      "group": "specialist",
+      "module": "S05",
+      "reference_slug": "patient_consultation_1",
+      "source_path": "UI_screens/Patient_facing_screens/patient_consultation_1/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_consultation_1/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-chat.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-021",
+      "group": "specialist",
+      "module": "S05",
+      "reference_slug": "patient_consultation_2",
+      "source_path": "UI_screens/Patient_facing_screens/patient_consultation_2/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_consultation_2/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-chat.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-022",
+      "group": "specialist",
+      "module": "S05",
+      "reference_slug": "patient_consultation_standardized_nav",
+      "source_path": "UI_screens/Patient_facing_screens/patient_consultation_standardized_nav/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/patient_consultation_standardized_nav/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/practitioner-chat.tsx",
+      "next_batch": "B06",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-023",
+      "group": "specialist",
+      "module": "S06",
+      "reference_slug": "issue_prescription",
+      "source_path": "UI_screens/Specialist_facing_screens/issue_prescription/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/issue_prescription/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-024",
+      "group": "specialist",
+      "module": "S06",
+      "reference_slug": "issue_prescription_advanced_clinical_flow",
+      "source_path": "UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B08",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-025",
+      "group": "specialist",
+      "module": "S07",
+      "reference_slug": "community_manager",
+      "source_path": "UI_screens/Specialist_facing_screens/community_manager/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/community_manager/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-026",
+      "group": "specialist",
+      "module": "S07",
+      "reference_slug": "compose_health_post",
+      "source_path": "UI_screens/Specialist_facing_screens/compose_health_post/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/compose_health_post/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-027",
+      "group": "specialist",
+      "module": "S07",
+      "reference_slug": "create_health_group",
+      "source_path": "UI_screens/Specialist_facing_screens/create_health_group/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/create_health_group/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-028",
+      "group": "specialist",
+      "module": "S07",
+      "reference_slug": "group_approval_queue",
+      "source_path": "UI_screens/Specialist_facing_screens/group_approval_queue/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/group_approval_queue/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/community.tsx",
+      "next_batch": "B10",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-029",
+      "group": "specialist",
+      "module": "S08",
+      "reference_slug": "hospital_admin_dashboard",
+      "source_path": "UI_screens/Patient_facing_screens/hospital_admin_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/hospital_admin_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-030",
+      "group": "specialist",
+      "module": "S08",
+      "reference_slug": "hospital_partner_dashboard",
+      "source_path": "UI_screens/Patient_facing_screens/hospital_partner_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/hospital_partner_dashboard/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-031",
+      "group": "specialist",
+      "module": "S08",
+      "reference_slug": "pharmacy_partner_dashboard",
+      "source_path": "UI_screens/Patient_facing_screens/pharmacy_partner_dashboard/code.html",
+      "preview_paths": [
+        "UI_screens/Patient_facing_screens/pharmacy_partner_dashboard/screen.png"
+      ],
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/pms_web/src/app/(dashboard)/dashboard/page.tsx",
+      "next_batch": "B11",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-15 pharmacy inventory: live dashboard with prescription/stock queues and today/week sales, searchable paged catalog with revisioned edits/archiving, batch receipts/adjustments/expiry filters and staff-attributed movement history. PostgreSQL HTTP checks exercise duplicate receipts, competing adjustments, overselling, duplicate voids/dispensing/PO receipts and balance-to-ledger reconciliation. See COMPLETION_BASELINE.md and api/pms_service.md for final automated results and limits. Scanning, refills/orders/delivery, clinical interaction alerts, partial receipts and prescription corrections/refunds remain in scope. Rendered/theme/device and full reference acceptance remain pending; not accepted.",
+        "2026-09-15 purchasing: versioned purchase drafts, tracking externally placed orders, partial/split batch deliveries, outstanding/cancelled quantities, delivery records and before/after history are implemented. Request replay keys and PostgreSQL row locks protect retries and receipt/cancellation races. Administrators can reconcile recorded historical batches without altering stock; missing evidence stays flagged. The latest completion baseline records 228 passing checks, the production build and validation limits. Patient refills/fulfillment/delivery, clinical alerts, returns/refunds, browser-restart recovery and full rendered/device/theme/reference acceptance remain open; not accepted.",
+        "2026-09-15 POS/prescription recovery: batch-price review, saved receipts, paged ledgers, prescription entry, partial dispensing, reasoned cancellation and walk-in sale voids are implemented. Atomic request receipts protect retries while forms remain mounted and saved revisions protect competing changes. 263 automated checks plus TypeScript/lint and the production build pass; see the latest baseline for evidence and limits. Prescription corrections/refunds, durable MedApp confirmation, refill fulfillment/delivery, browser-restart recovery and rendered/device/theme/reference acceptance remain open. No reference accepted.",
+        "2026-09-16 corrections/refund records: partial credits preserve original receipts and capture reason, staff and disposition. Only never-collected units restore original batches and reduce verified prescription counts; customer returns stay outside usable stock and preserve clinical history. External completed refunds have credit limits, replay protection and administrator correction of mistaken entries. Explicit legacy line reconciliation handles repeated medicines; reports separate credit from settlement. See COMPLETION_BASELINE.md for passing checks and limits and apply PMS migration 0006_sale_corrections. Durable MedApp synchronization, provider refunds, supplier credits, fulfillment/delivery, clinical alerts, restart recovery and rendered/device/theme/reference acceptance remain open. No reference accepted."
+      ],
+      "source_folder_differs_from_group": true,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    },
+    {
+      "id": "S-032",
+      "group": "specialist",
+      "module": "S09",
+      "reference_slug": "clinical_analytics_insights",
+      "source_path": "UI_screens/Specialist_facing_screens/clinical_analytics_insights/code.html",
+      "preview_paths": [
+        "UI_screens/Specialist_facing_screens/clinical_analytics_insights/screen.png"
+      ],
+      "ui_status": "not_implemented",
+      "api_status": "not_verified",
+      "qa_status": "not_verified",
+      "reuse_route": null,
+      "next_batch": "B09 / B11",
+      "accepted": false,
+      "acceptance_evidence": [],
+      "source_folder_differs_from_group": false,
+      "disposition": "pending_reference_review",
+      "covered_by_id": null
+    }
+  ],
+  "application_only_routes": [
+    {
+      "group": "specialist",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/pharmacy-workspaces.tsx",
+      "module": "S01",
+      "next_batch": "B03",
+      "note": "Approved, activated owner workspace selection with deployment-bound pharmacy portal handoff, account confirmation and validated warm/cold return refresh. No global professional role is granted.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-15 B03 pharmacy workspace handoff: owner workspace selection, deployment-bound single-use links, PMS account/pharmacy confirmation and separate browser sessions with return are implemented. 400 automated checks pass across identity, directory, portal/Redis, mobile and real PostgreSQL/HTTP journeys. See COMPLETION_BASELINE.md. This supporting route accepts no reference; device/deployed acceptance and S-031 dashboard fidelity remain pending."
+      ]
+    },
+    {
+      "group": "specialist",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/hospital-workspaces.tsx",
+      "module": "S01",
+      "next_batch": "B03",
+      "note": "Live hospital memberships, authenticated portal handoff, explicit portal account/workspace confirmation and validated warm/cold return refresh. Supports hospital entry without granting a global professional role.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-14: 208 identity-service, 73 hospital-portal, 48 distinct focused mobile and five real HTTP/PostgreSQL integration cases pass. Portal build and mobile/HMS TypeScript pass. Includes four real Redis cases and concurrent single-use hospital proof redemption. See COMPLETION_BASELINE.md.",
+        "Native/deployed browser/provider and reference acceptance remain pending. This application-only route does not add to the 108 reference count."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/connected-accounts.tsx",
+      "module": "P11",
+      "next_batch": "B01",
+      "note": "Own provider connections with password/code-confirmed disconnection, session revocation and late-account-response guards. Extends P-075.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(public)/provider-sign-in.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Native provider selection, unavailable/cancel/retry states, explicit password/code account linking, signup handoff and existing two-factor challenge. Credentials and signed native builds pending.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13, provider sign-in: native Google/Apple flow, server identity verification, explicit password/code linking, email-verified signup and connected-account disconnection implemented. Final evidence: 144 distinct backend cases (full suite 143 plus final provider rerun 16), 45 distinct mobile cases across relevant final reruns, TypeScript, six PostgreSQL migration/concurrency scenarios and three live gateway checks. Credentials, signed native builds, provider/visual/device acceptance remain pending. See COMPLETION_BASELINE.md and PROVIDER_SIGN_IN_SETUP.md."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/care-team-sharing.tsx",
+      "module": "P11",
+      "next_batch": "B01",
+      "note": "Patient consent controls extending P-075: named clinician selection, read/add-vitals scope, duration, confirmation, history and revocation. Signup grants no access.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: 28 backend cases, 20 distinct focused mobile cases, TypeScript and disposable PostgreSQL/live gateway checks pass. See COMPLETION_BASELINE.md.",
+        "Rendered/native/theme acceptance and cross-service clinical sharing remain pending."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/two-factor.tsx",
+      "module": "P11",
+      "next_batch": "B01",
+      "note": "Authenticator enrollment, password/code-confirmed disable and recovery-code replacement extend P-075. Setup remains off until proof succeeds. The new sign-in challenge is a state of P-001.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Focused backend and mobile behavior tests pass for setup, proof/recovery handling, retry and account changes. See COMPLETION_BASELINE.md for final validation evidence.",
+        "Rendered/theme/device acceptance and production encryption-key configuration remain pending."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/active-sessions.tsx",
+      "module": "P11",
+      "next_batch": "B01",
+      "note": "Session management detail route reached from P-075. Lists actual account sessions and confirms refresh-family revocation, with loading, retry and paging. Existing access tokens keep their configured expiry.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: TypeScript passed. Backend privacy, ownership, rotation and legacy compatibility checks pass; live gateway and PostgreSQL concurrency checks pass.",
+        "2026-09-13: Seven screen tests and four adapter/settings-entry tests pass across the initial run and targeted rerun. Cold-render timing and async confirmation handling were corrected in the test harness; see COMPLETION_BASELINE.md.",
+        "Rendered browser and native-device acceptance remain pending."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/edit-patient-profile.tsx",
+      "module": "P02",
+      "next_batch": "B01",
+      "note": "Patient profile editing for names and optional personal details. Extends P-010 using shared form components; exact rendered and native-device acceptance pending.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Editor/route/API/form tests cover saved values, field validation, nullable updates, retry, unsaved navigation and account changes. The five editor tests passed again after tightening the submission guard.",
+        "2026-09-13: 108 user-service tests and TypeScript passed. Live gateway/SMTP edits and cleared fields survive logout and a fresh login; invalid name/date/role edits are rejected atomically.",
+        "Rendered/device acceptance remains pending; no reference PNG was accepted after the OneDrive timeout."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/index.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Shared launch/auth routing; verify both patient and professional landing destinations.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/notifications.tsx",
+      "module": "P11",
+      "next_batch": "B09",
+      "note": "Existing notifications route; finish inbox/preferences and follow-up integration.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/post-detail.tsx",
+      "module": "P09",
+      "next_batch": "B10",
+      "note": "Existing post-detail route; verify publishing-to-reading and interaction behavior.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/saved-posts.tsx",
+      "module": "P09",
+      "next_batch": "B10",
+      "note": "Existing saved-posts route; verify save/remove, refresh, and empty/error behavior.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(public)/forgot-password.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Recovery form and configurable SMTP transport implemented. Gateway-to-user-service recovery verified with a synthetic account and loopback SMTP; rendered and native-device QA pending. External email provider not configured.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-12: 14 focused password/SMTP tests passed; account-service suite passed 83 tests after baseline test/example corrections.",
+        "2026-09-12: TypeScript and new-file formatting checks passed. Seven recovery component tests passed with a 30-second test timeout after the initial default-timeout failure.",
+        "2026-09-12: Real HTTP gateway + user service + local SMTP delivery passed; invalid/reused codes rejected, old password rejected, new password accepted, old refresh token revoked, generic account responses and CORS preflight checked. SQLite QA store; PostgreSQL concurrency not exercised.",
+        "Rendered browser QA pending: automatic approval review rejected starting the Expo web server with 'blocked by policy'; no more specific reason supplied."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(public)/privacy.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Verify legal content, links, and navigation.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(public)/sign-up-verify.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Email signup verification implemented per the product owner's choice. Separate expiry/resend timers, delivery help and rejection/retry states. Local gateway/SMTP signup passes; rendered and native-device acceptance and external provider configuration remain pending.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-13: Real HTTP gateway + user service + loopback SMTP passed email delivery, separate timers, immediate-resend rejection, wrong/reused code rejection, verified account creation, login, profile, refresh and logout. Synthetic account and SQLite QA store; PostgreSQL concurrency not exercised.",
+        "2026-09-13: TypeScript passed in the actual repository. Session/hydration/API refresh regression suites passed 29/29 after five new session regressions failed against the old implementation.",
+        "2026-09-13: Complete user-service suite passed 89 tests. Focused auth UI/adapter checks cover 36 passing tests across the initial run and targeted rerun; the initial run had a cold-render timeout and a test-wrapper error corrected before the 17/17 signup/code-input rerun. No new full mobile-suite acceptance run is claimed.",
+        "Rendered browser QA pending: automatic approval review again rejected Expo startup with 'blocked by policy' and no specific reason. No theme or device acceptance is claimed."
+      ]
+    },
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(public)/terms.tsx",
+      "module": "P01",
+      "next_batch": "B01",
+      "note": "Verify legal content, links, and navigation.",
+      "qa_status": "not_verified",
+      "accepted": false,
+      "acceptance_evidence": []
+    }
+  ],
+  "supplemental_html": [
+    {
+      "path": ".stitch-html/1-select-time.html",
+      "screen_id": "P-021"
+    },
+    {
+      "path": ".stitch-html/2-review-appointment.html",
+      "screen_id": "P-020"
+    },
+    {
+      "path": ".stitch-html/3-booking-confirmed.html",
+      "screen_id": "P-013"
+    },
+    {
+      "path": ".stitch-html/4-appointment-mgmt.html",
+      "screen_id": "P-012"
+    },
+    {
+      "path": ".stitch-html/5-waiting-room.html",
+      "screen_id": "P-029"
+    },
+    {
+      "path": ".stitch-html/6-telemedicine.html",
+      "screen_id": "P-028"
+    }
+  ],
+  "supporting_assets": [
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/animated_svg/code.html",
+      "kind": "animation_reference"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/a_high_quality_3d_medical_icon_showing_a_smartphone_camera_viewfinder_scanning/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/clean_minimalist_illustration_of_a_person_sleeping_peacefully_representing/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/high_quality_3d_icon_of_a_smartwatch_and_a_health_heart_symbol_soft_clinical/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/high_quality_3d_medical_icon_of_a_pill_being_dropped_into_a_calendar_slot_soft/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/high_quality_3d_medical_illustration_of_a_pill_bottle_and_a_clinical_clipboard/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/high_quality_medical_illustration_of_a_3d_pill_bottle_and_schedule_icon_soft/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/minimalist_logo_of_apple_health_high_quality_rendering/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/minimalist_logo_of_fitbit_high_quality_rendering/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/minimalist_logo_of_google_fit_high_quality_rendering/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/professional_headshot_of_a_female_cardiologist_smiling_confidently_hospital/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/professional_lifestyle_photography_of_a_healthy_morning_routine_a_glass_of/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/professional_medical_app_banner_for_lifestyle_hub._a_clean_high_fidelity/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/professional_medical_banner_for_an_explore_health_hub_showing_a_magnifying/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/vibrant_photo_of_a_group_of_people_practicing_yoga_in_a_bright_studio/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "patient",
+      "path": "UI_screens/Patient_facing_screens/vibrant_professional_photo_of_a_healthy_salad_bowl_with_avocado_and_seeds/screen.png",
+      "kind": "supporting_image"
+    },
+    {
+      "group": "specialist",
+      "path": "UI_screens/Specialist_facing_screens/clinical_vitality/DESIGN.md",
+      "kind": "design_guidance"
+    }
+  ]
+}

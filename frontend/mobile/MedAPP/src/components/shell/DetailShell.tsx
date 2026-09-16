@@ -116,6 +116,7 @@ import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useResolvedScheme } from "@/lib/theme";
 import { DetailAppBar, type DetailAppBarProps } from "./DetailAppBar";
+import { WebColumn } from "./WebColumn";
 
 /**
  * Exported so a test — and a reviewer — can read the default off the component
@@ -161,9 +162,12 @@ export function DetailShell({
             : (DETAIL_SHELL_EDGES_WITHOUT_BOTTOM as Edge[])
         }
       >
-        <DetailAppBar {...appBarProps} testID={appBarTestID} />
-        <View className="flex-1">{children}</View>
-        {/* No bottom nav. Structural, not a prop — see the header. */}
+        {/* Web only; renders nothing on native. See WebColumn's header. */}
+        <WebColumn>
+          <DetailAppBar {...appBarProps} testID={appBarTestID} />
+          <View className="flex-1">{children}</View>
+          {/* No bottom nav. Structural, not a prop — see the header. */}
+        </WebColumn>
       </SafeAreaView>
     </View>
   );

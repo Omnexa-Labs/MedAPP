@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..deps import DbSession, get_principal, require_roles
-from ..models.core import Drug, DrugBatch
+from ..deps import DbSession, get_principal
+from ..models.core import Drug
+from ..models.workspace import MedAppWorkspace
 from ..schemas.integrations import (
     MedAppPrescriptionWebhook,
     MedAppWebhookAck,
@@ -15,7 +16,6 @@ from ..schemas.integrations import (
 )
 from ..services import inventory_service, medapp_integration
 
-
 _PARTNER_STOCK_ROLES = {"pharmacy_admin", "pharmacist", "cashier"}
 
 
@@ -23,6 +23,7 @@ async def _require_partner_or_staff(
     request: Request,
     x_medapp_signature: str | None = Header(default=None),
     authorization: str | None = Header(default=None),
+    db: AsyncSession = DbSession,
 ) -> None:
     """Accept EITHER a valid MedApp partner-token signature OR a
     pharmacy-staff JWT in one of the stock-read roles.
@@ -46,7 +47,7 @@ async def _require_partner_or_staff(
     if authorization:
         # Fall through to the existing JWT path — re-uses the same role
         # constraints the route had before partner tokens were added.
-        principal = await get_principal(authorization=authorization)
+        principal = await get_principal(authorization=authorization, db=db)
         if principal.role in _PARTNER_STOCK_ROLES:
             return
         raise HTTPException(
@@ -55,7 +56,9 @@ async def _require_partner_or_staff(
         )
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing partner signature or bearer token")
 
+
 router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
+PartnerOrStaff = Depends(_require_partner_or_staff)
 
 
 @router.post(
@@ -74,7 +77,7 @@ async def medapp_prescription_webhook(
     try:
         payload = MedAppPrescriptionWebhook.model_validate_json(raw)
     except Exception as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid payload: {exc}")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid payload: {exc}") from exc
     result = await medapp_integration.ingest_prescription(payload, db)
     return MedAppWebhookAck(**result)
 
@@ -86,7 +89,7 @@ async def medapp_prescription_webhook(
 async def stock_availability(
     drug_name: str | None = Query(default=None),
     db: AsyncSession = DbSession,
-    _=Depends(_require_partner_or_staff),
+    _=PartnerOrStaff,
 ):
     """Stock availability read endpoint.
 
@@ -125,7 +128,15 @@ async def stock_availability(
                 requires_prescription=d.requires_prescription,
             )
         )
+    workspace = await db.scalar(select(MedAppWorkspace))
+    if workspace and (
+        not workspace.is_active or workspace.deployment_key != settings.medapp_deployment_key
+    ):
+        raise HTTPException(404, "pharmacy workspace is unavailable")
     return StockAvailabilityResponse(
-        pharmacy_slug=settings.pharmacy_slug,
+        pharmacy_id=workspace.pharmacy_id if workspace else None,
+        pharmacy_slug=f"pharmacy-{workspace.pharmacy_id.hex}"
+        if workspace
+        else settings.pharmacy_slug,
         items=rows,
     )

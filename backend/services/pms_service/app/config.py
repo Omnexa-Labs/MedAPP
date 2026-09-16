@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,7 +14,16 @@ class Settings(BaseSettings):
     # Audit finding #2: no default secret. Set PMS_JWT_SECRET in env.
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
+    jwt_audience: str = "medapp.pms"
+    jwt_issuer: str = "medapp.pms"
     access_token_ttl_minutes: int = 60 * 12
+    medapp_deployment_key: str = ""
+    onboarding_activation_secret: SecretStr = SecretStr("")
+    medapp_jwt_secret: SecretStr = SecretStr("")
+    medapp_jwt_algorithm: str = "HS256"
+    medapp_jwt_audience: str = "medapp.platform"
+    medapp_jwt_issuer: str = "medapp"
+    user_service_url: str = "http://user_service:8001"
 
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
@@ -26,7 +36,7 @@ class Settings(BaseSettings):
     pharmacy_currency: str = "GHS"
     pharmacy_country: str = "GH"
 
-    medapp_webhook_secret: str = "set-a-real-secret-in-production"
+    medapp_webhook_secret: str = ""
     medapp_dispense_webhook_url: str | None = None
     medapp_partner_id: str | None = None
 

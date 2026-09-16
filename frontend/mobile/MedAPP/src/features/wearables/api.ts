@@ -24,7 +24,7 @@
 // vitals will not see it. Any UI claiming "shared with your doctor" must read
 // that flag, not merely the presence of a sample.
 
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
 
 export const WEARABLES_PATH = "/v1/wearables";
 
@@ -132,8 +132,8 @@ export const wearablesApi = {
     return (w.items ?? []).map(toDevice);
   },
 
-  async getSummary(): Promise<WearableSummary> {
-    const w = await client.get<SummaryWire>(`${WEARABLES_PATH}/summary`);
+  async getSummary(options?: RequestOptions): Promise<WearableSummary> {
+    const w = await client.get<SummaryWire>(`${WEARABLES_PATH}/summary`, options);
     return {
       totalDevices: w.total_devices ?? 0,
       activeDevices: w.active_devices ?? 0,

@@ -53,9 +53,7 @@ async def update_supplier(
     db: AsyncSession = DbSession,
     _=Depends(require_roles(*EDIT)),
 ):
-    s = (
-        await db.execute(select(Supplier).where(Supplier.id == supplier_id))
-    ).scalar_one_or_none()
+    s = (await db.execute(select(Supplier).where(Supplier.id == supplier_id))).scalar_one_or_none()
     if s is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "supplier not found")
     for field, value in body.model_dump(exclude_unset=True).items():

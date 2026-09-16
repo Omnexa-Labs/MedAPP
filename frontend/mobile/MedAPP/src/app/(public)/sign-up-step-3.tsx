@@ -3,28 +3,21 @@
 // flips isAuthenticated and the root layout swaps into the (app) group; the
 // draft is reset so a re-entry starts clean.
 
-import { useState } from "react";
-import { Redirect, router } from "expo-router";
+import { useRef, useState } from "react";
+import { Redirect, router, type Href } from "expo-router";
 import { SignUpStep3Screen } from "@/features/auth/SignUpStep3Screen";
 import { useSignUpDraft } from "@/features/auth/hooks/use-signup-draft";
 import { goBackOr } from "@/features/auth/signup-nav";
 import { useSignUp } from "@/features/auth/hooks/use-signup";
 import { ApiError } from "@/types/api";
-import type { SignUpStep3Values } from "@/features/auth/schema";
-
-// Skip defaults — biometric + data-sharing on, 2FA off, mirroring the form's
-// own defaultValues. "Skip for now" completes the account with these rather
-// than hard-gating onboarding on the security step (design brief Deviation 1).
-const SKIP_DEFAULTS: SignUpStep3Values = {
-  enableBiometric: true,
-  enableTwoFactor: false,
-  shareAnonymousData: true,
-};
+import { SignupSignInError } from "@/features/auth/api";
 
 export default function SignUpStep3Route() {
   const draft = useSignUpDraft();
   const signUp = useSignUp();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [accountCreated, setAccountCreated] = useState(false);
+  const inFlight = useRef(false);
 
   // Deep-link / restart guard: bounce to whichever step is missing, earliest
   // first. Declarative `<Redirect>` rather than a `useEffect` + `replace`, so
@@ -36,7 +29,9 @@ export default function SignUpStep3Route() {
   if (!draft.verification) return <Redirect href="/(public)/sign-up-verify" />;
   if (!draft.step2) return <Redirect href="/(public)/sign-up-step-2" />;
 
-  const completeSetup = async (step3: SignUpStep3Values) => {
+  const completeSetup = async () => {
+    if (inFlight.current || accountCreated) return;
+    inFlight.current = true;
     setErrorMessage(null);
     try {
       await signUp.mutateAsync({
@@ -48,12 +43,15 @@ export default function SignUpStep3Route() {
         gender: draft.step2!.gender,
         primaryGoal: draft.step2!.primaryGoal,
         verification: draft.verification!,
-        ...step3,
+        providerTicket: draft.provider?.ticket,
       });
       draft.reset();
       router.replace("/(app)");
     } catch (e) {
-      if (e instanceof ApiError) {
+      if (e instanceof SignupSignInError) {
+        setAccountCreated(true);
+        setErrorMessage(e.message);
+      } else if (e instanceof ApiError) {
         if (e.isNetwork) {
           setErrorMessage("Network error. Check your connection.");
         } else if (e.status === 409) {
@@ -80,6 +78,8 @@ export default function SignUpStep3Route() {
       } else {
         setErrorMessage("Something went wrong. Please try again.");
       }
+    } finally {
+      inFlight.current = false;
     }
   };
 
@@ -87,11 +87,24 @@ export default function SignUpStep3Route() {
     <SignUpStep3Screen
       isSubmitting={signUp.isPending}
       errorMessage={errorMessage}
+      accountCreated={accountCreated}
+      onRestartProvider={
+        draft.provider
+          ? () => {
+              draft.reset();
+              router.replace("/(public)/provider-sign-in" as Href);
+            }
+          : undefined
+      }
+      onSignIn={() => {
+        draft.reset();
+        router.replace("/(public)/sign-in");
+      }}
       // Every guard above has passed, so Step 2 is a legal destination even
       // when this screen was deep-linked and there is no stack to pop.
       onBack={() => goBackOr("/(public)/sign-up-step-2")}
       onSubmit={completeSetup}
-      onSkip={() => completeSetup(SKIP_DEFAULTS)}
+      onSkip={completeSetup}
     />
   );
 }

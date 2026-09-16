@@ -24,22 +24,38 @@ const NAV: NavItem[] = [
   { label: "Reports", href: "/reports" },
   { label: "Staff", href: "/staff", roles: ["pharmacy_admin"] },
   { label: "Settings", href: "/settings", roles: ["pharmacy_admin"] },
+  {
+    label: "Pharmacy profile",
+    href: "/pharmacy-profile",
+    roles: ["pharmacy_admin"],
+  },
 ];
 
-export function Sidebar() {
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
+  const mode = useAuthStore((s) => s.identity?.mode);
 
   const visible = NAV.filter(
-    (n) => !n.roles || (user?.role && n.roles.includes(user.role))
+    (n) =>
+      (n.href !== "/pharmacy-profile" || mode === "medapp") &&
+      (!n.roles || (user?.role && n.roles.includes(user.role))),
   );
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-6 py-4">
-        <h2 className="text-lg font-bold text-brand-700">MedApp PMS</h2>
-        <p className="text-xs text-slate-500">Pharmacy Management</p>
-      </div>
+    <aside
+      className={
+        mobile
+          ? "w-full bg-white"
+          : "hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex"
+      }
+    >
+      {!mobile && (
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-bold text-brand-700">MedApp PMS</h2>
+          <p className="text-xs text-slate-500">Pharmacy Management</p>
+        </div>
+      )}
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
@@ -51,10 +67,10 @@ export function Sidebar() {
                 <Link
                   href={item.href}
                   className={cn(
-                    "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    "flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-brand-50 text-brand-800"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
                   )}
                 >
                   {item.label}
@@ -65,14 +81,16 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-slate-200 px-4 py-3">
-        <p className="truncate text-sm font-medium text-slate-800">
-          {user?.fullName}
-        </p>
-        <p className="truncate text-xs capitalize text-slate-500">
-          {user?.role?.replace("_", " ")}
-        </p>
-      </div>
+      {!mobile && (
+        <div className="border-t border-slate-200 px-4 py-3">
+          <p className="truncate text-sm font-medium text-slate-800">
+            {user?.fullName}
+          </p>
+          <p className="truncate text-xs capitalize text-slate-500">
+            {user?.role?.replace("_", " ")}
+          </p>
+        </div>
+      )}
     </aside>
   );
 }

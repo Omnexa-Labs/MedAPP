@@ -1,9 +1,8 @@
 from collections.abc import AsyncIterator
 
 from fastapi import Depends
+from shared.auth import get_current_principal
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.auth import Principal, get_current_principal
 
 from .db import SessionLocal
 

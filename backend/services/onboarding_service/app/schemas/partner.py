@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class PartnerType(StrEnum):
@@ -37,16 +38,27 @@ class ApplicationDocumentCreate(BaseModel):
     kind: str = Field(min_length=1, max_length=64)
     url: str = Field(min_length=1, max_length=1024)
     label: str | None = Field(default=None, max_length=255)
+    model_config = ConfigDict(extra="forbid")
+    verified: Literal[False] = False
+
+
+class ApplicationDocumentOut(BaseModel):
+    kind: str
+    url: str
+    label: str | None = None
     verified: bool = False
-
-
-class ApplicationDocumentOut(ApplicationDocumentCreate):
+    content_type: str | None = None
+    size_bytes: int | None = None
+    sha256: str | None = None
+    verified_by_user_id: UUID | None = None
+    verified_at: datetime | None = None
     document_id: UUID
     uploaded_by_user_id: UUID
     uploaded_at: datetime
 
 
 class TeamMemberCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     full_name: str = Field(min_length=1, max_length=255)
     user_id: UUID | None = None
     role: str = Field(min_length=1, max_length=64)
@@ -56,6 +68,13 @@ class TeamMemberCreate(BaseModel):
     phone: str | None = Field(default=None, max_length=64)
     is_primary: bool = False
 
+    @field_validator("full_name", "role")
+    @classmethod
+    def nonblank_name_and_role(cls, value):
+        if not value.strip():
+            raise ValueError("team member name and role are required")
+        return value.strip()
+
 
 class TeamMemberOut(TeamMemberCreate):
     member_id: UUID
@@ -64,6 +83,10 @@ class TeamMemberOut(TeamMemberCreate):
 
 
 class PartnerApplicationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    practitioner_role: Literal["doctor", "nurse"] | None = None
+    professional_first_name: str | None = Field(default=None, max_length=255)
+    professional_last_name: str | None = Field(default=None, max_length=255)
     partner_type: PartnerType
     onboarding_mode: OnboardingMode | None = None
     legal_name: str = Field(min_length=1, max_length=255)
@@ -78,9 +101,9 @@ class PartnerApplicationCreate(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     phone: str | None = Field(default=None, max_length=64)
     website_url: str | None = Field(default=None, max_length=512)
-    notes: str | None = None
-    documents: list[ApplicationDocumentCreate] = Field(default_factory=list)
-    team_members: list[TeamMemberCreate] = Field(default_factory=list)
+    notes: str | None = Field(default=None, max_length=10000)
+    documents: list[ApplicationDocumentCreate] = Field(default_factory=list, max_length=0)
+    team_members: list[TeamMemberCreate] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
     def _validate_onboarding_mode(self):
@@ -88,7 +111,65 @@ class PartnerApplicationCreate(BaseModel):
             raise ValueError("hospital onboarding requires onboarding_mode")
         if self.partner_type != PartnerType.HOSPITAL and self.onboarding_mode is not None:
             raise ValueError("only hospital partners can use onboarding_mode")
+        if self.partner_type != PartnerType.PRACTITIONER and any(
+            value is not None
+            for value in (
+                self.practitioner_role,
+                self.professional_first_name,
+                self.professional_last_name,
+            )
+        ):
+            raise ValueError("professional identity applies only to practitioner applications")
         return self
+
+
+class PartnerApplicationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    practitioner_role: Literal["doctor", "nurse"] | None = None
+    professional_first_name: str | None = Field(default=None, max_length=255)
+    professional_last_name: str | None = Field(default=None, max_length=255)
+    legal_name: str | None = Field(default=None, min_length=1, max_length=255)
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    specialty: str | None = Field(default=None, max_length=255)
+    license_number: str | None = Field(default=None, max_length=255)
+    registration_number: str | None = Field(default=None, max_length=255)
+    tax_id: str | None = Field(default=None, max_length=255)
+    country: str | None = Field(default=None, max_length=128)
+    city: str | None = Field(default=None, max_length=128)
+    address_line1: str | None = Field(default=None, max_length=255)
+    email: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=64)
+    website_url: str | None = Field(default=None, max_length=512)
+    notes: str | None = Field(default=None, max_length=10000)
+
+    @field_validator("legal_name", "display_name", mode="before")
+    @classmethod
+    def name_when_present(cls, value):
+        if value is None or not str(value).strip():
+            raise ValueError("name cannot be empty")
+        return value.strip()
+
+
+class ApplicationSubmitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    attestation_accepted: Literal[True]
+    attestation_version: Literal["professional-application-v1"]
+
+    @field_validator("attestation_accepted", mode="before")
+    @classmethod
+    def explicit_attestation(cls, value):
+        if value is not True:
+            raise ValueError("explicit acceptance of the attestation is required")
+        return value
+
+
+class ApplicationEventOut(BaseModel):
+    event_id: UUID
+    actor_id: UUID
+    action: str
+    application_version: int
+    created_at: datetime
+    details: dict[str, object]
 
 
 class ApplicationStatusUpdateRequest(BaseModel):
@@ -96,14 +177,32 @@ class ApplicationStatusUpdateRequest(BaseModel):
 
 
 class ApplicationReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verified_document_ids: list[UUID] = Field(default_factory=list, max_length=20)
     action: ReviewAction
     rejection_reason: str | None = Field(default=None, max_length=2000)
+
+
+class ApplicationActivationOut(BaseModel):
+    state: Literal[
+        "not_started", "pending", "retry", "attention_required", "setup_required", "active"
+    ]
+    attempts: int = Field(ge=0)
+    reason: str | None = None
+    profile_id: UUID | None = None
+    activated_at: datetime | None = None
 
 
 class PartnerApplicationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     application_id: UUID
+    version: int
+    practitioner_role: str | None = None
+    professional_first_name: str | None = None
+    professional_last_name: str | None = None
+    attested_at: datetime | None = None
+    attestation_version: str | None = None
     partner_type: str
     onboarding_mode: str | None = None
     legal_name: str

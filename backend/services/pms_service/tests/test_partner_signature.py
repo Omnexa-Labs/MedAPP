@@ -4,7 +4,8 @@ Cross-service contract: pharmacy_service signs requests with the
 canonical form `(METHOD\\npath?query\\nbody)` and posts the hex digest
 in `X-MedApp-Signature`. The shared secret on each side maps to the
 *same* value in deployment, even though the env var names differ
-(`PMS_MEDAPP_WEBHOOK_SECRET` vs `PHARMACY_MEDAPP_PARTNER_SECRET`).
+(`PMS_MEDAPP_WEBHOOK_SECRET` vs the assigned deployment's `stock_secret`
+in `PHARMACY_PMS_DEPLOYMENTS`).
 If these tests drift, look at:
 
   - backend/services/pms_service/app/services/medapp_integration.py
@@ -32,11 +33,13 @@ def _dev_env() -> None:
 
 
 @pytest.fixture
-async def client() -> AsyncClient:
+async def client(monkeypatch) -> AsyncClient:
     # `app.db.engine` is created at module-import time using whatever
     # env values were present then. Create tables on that exact engine
     # before each test so the in-memory SQLite DB has the schema.
     from app.db import engine
+    from app.config import settings
+    monkeypatch.setattr(settings, "medapp_webhook_secret", "test-pharmacy-stock-only-secret-2026")
     # Importing core registers tables on shared.db.Base.metadata.
     from app.models import core  # noqa: F401
     from shared.db import Base

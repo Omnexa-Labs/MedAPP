@@ -10,6 +10,7 @@ dependencies = [
   "asyncpg>=0.29",
   "psycopg[binary]>=3.2",
   "pydantic-settings>=2.3",
+  "pydantic[email]>=2.9",
   "pyjwt[crypto]>=2.9",
   "passlib[bcrypt]>=1.7.4",
   "bcrypt<5",
@@ -44,3 +45,10 @@ include = ["app*"]
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+extend = "../../../pyproject.toml"
+
+[tool.ruff.lint.flake8-bugbear]
+# These dependency factories intentionally return immutable FastAPI declarations.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query", "app.deps.require_roles", "require_roles"]

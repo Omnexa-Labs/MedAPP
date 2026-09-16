@@ -1,0 +1,58 @@
+# Build context exclusions for the repo-root context used by
+# `infra/docker/docker-compose.yml` (`context: ../..`).
+#
+# Every service image is built from the repository root, so without this file
+# each of the ~30 builds tars up the entire working tree — including `.git`,
+# every `node_modules`, and the local `.venv` dirs under `backend/services/` —
+# and ships it to the Docker daemon before a single layer is evaluated. On a
+# OneDrive-backed checkout that dominates total build time.
+#
+# Only paths that no Dockerfile COPYs are listed. The root-context images need
+# `backend/shared`, `backend/services/<svc>`, and `agents/{pyproject.toml,
+# shared,prompts,services/<agent>/app}` — none of which are touched below.
+#
+# NOTE: this file does NOT apply to `pms_web`, which declares its own context
+# (`frontend/pms_web`); that build reads a .dockerignore from that directory.
+
+# Version control and CI metadata.
+.git
+.gitignore
+.github
+
+# Python virtualenvs. Images install dependencies with uv at build time; a
+# host venv is both useless in the image and enormous (site-packages).
+**/.venv
+**/venv
+**/.tox
+
+# Node dependency trees — the single largest contributor to context size.
+**/node_modules
+
+# Compiled Python and tool caches.
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+.benchmarks
+
+# Expo / Metro / bundler output.
+**/.expo
+**/.expo-shared
+**/dist
+**/.next
+
+# Design-source scratch directories, not referenced by any build.
+stitch_medapp_premium_healthcare_ui
+.stitch-html
+
+# Editor and agent-harness config.
+.vscode
+.claude
+.codex
+
+# Local env files — secrets must arrive via compose `environment:`, never
+# baked into an image layer.
+**/.env
+**/.env.*
+!**/.env.example

@@ -1,81 +1,5 @@
-// Practitioner self-service API — the clinician's own schedule and own profile.
-//
-// ============================================================================
-// WHY THIS FILE EXISTS
-// ============================================================================
-// `GET /v1/bookings/schedule` and `/schedule/summary` shipped doctor-scoped and
-// had NO CLIENT AT ALL. This module is their first consumer, and the two screens
-// it backs (practitioner-home, practitioner-profile) are the first practitioner
-// surfaces in the app that read live data rather than seed constants — compare
-// `features/practitioner/PractitionerSocialProfileScreen.tsx`, whose header still
-// says "Seed data stands in until the practitioner service endpoint ships".
-//
-// It follows `features/appointments/api.ts`: wire types are private and
-// snake_case, app-facing types are camelCase and exported, and every adaptation
-// is a named function so the shape mismatch is documented rather than inlined.
-//
-// ============================================================================
-// THE SCHEDULE IS A MINIMISED PROJECTION, AND THAT IS NOT A BUG TO ROUTE AROUND
-// ============================================================================
-// `BookingScheduleOut` deliberately WITHHOLDS `reason`, `notes` and
-// `cancellation_reason` — its docstring cites Act 843 data minimisation and the
-// HIPAA "minimum necessary" standard, and names `notes` as the highest-
-// sensitivity field on the row. A list endpoint that sprayed every patient's
-// clinical free text into one response body is exactly what it refuses to be.
-//
-// So there is no `reason` on `ScheduleEntry`, and the home card does not render
-// one, even though the Figma frame draws "Persistent cough · follow-up" under the
-// patient's name. Hydrating it back with a fan-out of `GET /v1/bookings/{id}`
-// would defeat the minimisation on purpose and is NOT done here. See the FLAG
-// block in PractitionerHomeScreen.tsx.
-//
-// ============================================================================
-// PATIENTS ARE OPAQUE IDS. THERE IS NO NAME TO FETCH.
-// ============================================================================
-// `patient_id` is a user id and booking_service has no name for anyone — its own
-// docstring: "resolving one here would turn a schedule into a patient list".
-// There is also no client-side route to a name: `/v1/doctors` is the only
-// person-directory the gateway exposes to this app, and a PATIENT is not in it.
-// `careApi.getDoctor` resolves CLINICIANS, which is the opposite direction.
-//
-// So `ScheduleEntry.patientId` is carried raw and the screen renders a
-// deterministic reference derived from it, never an invented name. The seeded
-// roster's patient is Ama Mensah; putting that string on the card would be a
-// hardcoded lie the moment a second patient books.
-//
-// ============================================================================
-// THERE IS NO `GET /v1/doctors/me`. THIS IS THE WORKAROUND, AND IT IS A GAP.
-// ============================================================================
-// A signed-in clinician holds their `user_id` (the JWT `sub`, surfaced as
-// `useCurrentUser().id`). Every doctor_service route is keyed by `doctor_id`,
-// which is a DIFFERENT identifier, and nothing maps one to the other:
-//
-//   POST   /v1/doctors                  returns doctor_id — at creation only
-//   GET    /v1/doctors?only_listable=   the list; no `user_id` filter
-//   GET    /v1/doctors/{doctor_id}      needs the id we are trying to find
-//   PATCH  /v1/doctors/{doctor_id}      ownership-enforced, needs it too
-//
-// `GET /v1/doctors/me` would 422, not 404 — `{doctor_id}` is typed `UUID` and
-// swallows the literal segment.
-//
-// `findMyProfile` therefore lists with `only_listable=false` and scans for the
-// row whose `user_id` matches the caller's. That is a REAL endpoint used as
-// specified, not an invented one, and it is the only path that exists. Two
-// consequences, both real and both flagged rather than hidden:
-//
-//   * it downloads the whole active-doctor roster to find one row. Fine at
-//     seed scale (six clinicians), wrong at any real scale.
-//   * `list_doctor_profiles` filters on `is_active`, so a deactivated clinician
-//     finds nothing and the screen renders its "profile unavailable" state
-//     rather than a half-populated one.
-//
-// The fix is a backend one — `GET /v1/doctors/me`, or a `user_id` filter on the
-// list — and it is the single largest gap behind these two screens.
-//
-// No expo-* API is used in this module. Read
-// https://docs.expo.dev/versions/v55.0.0/ before adding one.
-
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
+import { ApiError } from "@/types/api";
 
 // ---- Wire ----------------------------------------------------------------
 
@@ -120,10 +44,6 @@ interface DoctorProfileWire {
   is_active: boolean;
 }
 
-interface DoctorListWire {
-  items: DoctorProfileWire[];
-}
-
 /** `AvailabilityRuleOut`. `start_time`/`end_time` are bare times, not instants. */
 interface AvailabilityRuleWire {
   rule_id: string;
@@ -152,7 +72,7 @@ export type ConsultationMode = "in-person" | "video";
 /**
  * `BookingStatus` has exactly two values and neither is derived. Note the
  * contrast with `AppointmentStatus` on the patient side, which synthesises
- * "completed" from the clock: a clinician's schedule renders a cancelled row
+ * "past" from the clock: a clinician's schedule renders a cancelled row
  * struck through rather than hiding it, because — per `BookingScheduleOut` —
  * "a cancelled row must render struck through, not silently vanish, or the
  * clinician cannot tell 'cancelled' from 'never booked'".
@@ -284,29 +204,24 @@ export const practitionerApi = {
    *
    * Returns every entry, both statuses, unsorted-by-contract. Callers narrow.
    */
-  async listSchedule(): Promise<ScheduleEntry[]> {
-    const wire = await client.get<BookingScheduleListWire>(SCHEDULE_PATH);
+  async listSchedule(options?: RequestOptions): Promise<ScheduleEntry[]> {
+    const wire = await client.get<BookingScheduleListWire>(SCHEDULE_PATH, options);
     return (wire.items ?? []).map(adaptScheduleEntry);
   },
 
-  /**
-   * The caller's own doctor profile, found by scanning the directory for their
-   * `user_id`. See the header for why this is a scan and not a lookup.
-   *
-   * `only_listable=false` is essential, not an optimisation: the default is
-   * `true`, and a clinician who has switched their Find Care listing OFF would
-   * otherwise disappear from their own profile screen — precisely the state
-   * frame 1022:918 exists to render.
-   *
-   * Returns `null` rather than throwing when no row matches. "This user has no
-   * doctor profile" is a legitimate answer (an approved partner whose profile
-   * was never created, or a deactivated one), and it is a different thing from
-   * a network failure, which still rejects.
-   */
-  async findMyProfile(userId: string): Promise<PractitionerProfile | null> {
-    const wire = await client.get<DoctorListWire>(`${DOCTORS_PATH}?only_listable=false`);
-    const match = (wire.items ?? []).find((d) => d.user_id === userId);
-    return match ? adaptProfile(match) : null;
+  /** The authenticated doctor's record, including an unlisted profile. */
+  async findMyProfile(
+    userId: string,
+    options?: RequestOptions,
+  ): Promise<PractitionerProfile | null> {
+    try {
+      const wire = await client.get<DoctorProfileWire>(`${DOCTORS_PATH}/me`, options);
+      if (wire.user_id !== userId) throw new ApiError("Profile identity mismatch", 502);
+      return wire.is_active ? adaptProfile(wire) : null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
   },
 
   /**
@@ -337,9 +252,10 @@ export const practitionerApi = {
    * means the rule is not in force, and a consulting-hours line that included it
    * would tell a clinician they are open at a time patients cannot book.
    */
-  async listAvailability(doctorId: string): Promise<AvailabilityRule[]> {
+  async listAvailability(doctorId: string, options?: RequestOptions): Promise<AvailabilityRule[]> {
     const wire = await client.get<AvailabilityRulesWire>(
       `${DOCTORS_PATH}/${doctorId}/availability`,
+      options,
     );
     return (wire.items ?? []).filter((r) => r.is_active).map(adaptRule);
   },

@@ -77,16 +77,11 @@
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
 
-import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useRef, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Link } from "expo-router";
+import { Link, type Href } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -105,6 +100,9 @@ import { useTokenColor } from "@/lib/tokens";
 import { ApiError } from "@/types/api";
 import { LoginSchema, type LoginFormValues } from "@/features/auth/schema";
 import { useLogin } from "@/features/auth/hooks/use-login";
+import { TwoFactorRequired } from "./api";
+import { TwoFactorSignIn } from "./TwoFactorSignIn";
+import { useAuthStore } from "@/store/auth-store";
 import {
   BiometricLoginAbort,
   useBiometricCapability,
@@ -129,8 +127,12 @@ interface Props {
 
 export function SignInScreen({ onSuccess }: Props) {
   const login = useLogin();
+  const [factor, setFactor] = useState<{ challenge: TwoFactorRequired; revision: number } | null>(
+    null,
+  );
   const biometric = useBiometricLogin();
   const biometricCapability = useBiometricCapability();
+  const authAttempt = useRef(false);
   const [showPassword, setShowPassword] = useState(false);
   /**
    * The form-level message, WITH ITS REGISTER.
@@ -169,6 +171,8 @@ export function SignInScreen({ onSuccess }: Props) {
   // their mind); refresh_failed clears the stale token and tells the
   // user to use password; biometric_failed shows a non-fatal hint.
   const onBiometric = async (kind: "face" | "fingerprint") => {
+    if (authAttempt.current) return;
+    authAttempt.current = true;
     clearFormMessage();
     try {
       await biometric.mutateAsync(kind);
@@ -180,20 +184,29 @@ export function SignInScreen({ onSuccess }: Props) {
           // INFORMATIONAL. There is no stored credential to unlock yet, which is
           // simply where a new device starts. The sentence tells the user what to
           // do next; it is not reporting a failure.
-          setFormNotice("Sign in with your password first to enable biometric.");
+          setFormNotice(
+            "Sign in with your password, then enable biometric sign-in in Security & privacy.",
+          );
         else if (e.kind === "biometric_failed")
-          setFormError("Biometric not recognised. Try again or use your password.");
+          setFormError(
+            "Couldn't unlock this device's sign-in. Try again or use your password to set up biometrics again.",
+          );
         else if (e.kind === "refresh_failed")
           setFormError("Your session expired. Please sign in with your password.");
+        else if (e.kind === "network_failed")
+          setFormError("Couldn't connect. Check your connection and try biometric sign-in again.");
         return;
       }
       setFormError("Something went wrong. Please try again.");
+    } finally {
+      authAttempt.current = false;
     }
   };
 
   const {
     control,
     handleSubmit,
+    resetField,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(LoginSchema),
@@ -202,20 +215,31 @@ export function SignInScreen({ onSuccess }: Props) {
   });
 
   const onSubmit = handleSubmit(async (values) => {
+    if (authAttempt.current) return;
+    authAttempt.current = true;
     clearFormMessage();
     try {
       await login.mutateAsync({ email: values.email, password: values.password });
       onSuccess?.();
     } catch (e) {
-      if (e instanceof ApiError) {
+      if (e instanceof TwoFactorRequired) {
+        setFactor({ challenge: e, revision: useAuthStore.getState().revision });
+        resetField("password");
+        login.reset();
+      } else if (e instanceof ApiError) {
         if (e.isUnauthorized) setFormError("Email or password is incorrect.");
         else if (e.isNetwork) setFormError("Network error. Check your connection.");
         else setFormError(e.message);
       } else {
         setFormError("Something went wrong. Please try again.");
       }
+    } finally {
+      authAttempt.current = false;
     }
   });
+
+  if (factor)
+    return <TwoFactorSignIn {...factor} onCancel={() => setFactor(null)} onSuccess={onSuccess} />;
 
   return (
     <View className="flex-1 bg-background">
@@ -225,7 +249,7 @@ export function SignInScreen({ onSuccess }: Props) {
         {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
           from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
           silently does nothing there. Proven on device on the chat composer. */}
-      <KeyboardInset className="flex-1">
+        <KeyboardInset className="flex-1">
           <ScrollView
             // The frame centres its column, but at 393px the content is ~850px
             // tall — taller than the viewport on the target devices — so it has
@@ -248,10 +272,10 @@ export function SignInScreen({ onSuccess }: Props) {
                     24px radius. The tile doesn't follow the theme, so the
                     variant is explicit per docs/BRAND.md. */}
                 <Logo variant="icon" height={64} className="overflow-hidden rounded-card" />
-                <Text className="font-headline-lg-mobile text-headline-lg-mobile text-center text-primary">
+                <Text className="text-center font-headline-lg-mobile text-headline-lg-mobile text-primary">
                   MedApp
                 </Text>
-                <Text className="font-body-md text-body-md text-center text-on-surface-variant">
+                <Text className="text-center font-body-md text-body-md text-on-surface-variant">
                   Secure Healthcare Access
                 </Text>
               </View>
@@ -345,9 +369,7 @@ export function SignInScreen({ onSuccess }: Props) {
                             onPress={() => setShowPassword((s) => !s)}
                             hitSlop={12}
                             accessibilityRole="button"
-                            accessibilityLabel={
-                              showPassword ? "Hide password" : "Show password"
-                            }
+                            accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                           >
                             <Icon
                               chrome={showPassword ? "visibility-off" : "visibility"}
@@ -422,7 +444,7 @@ export function SignInScreen({ onSuccess }: Props) {
                   trailingIcon="arrow-forward"
                   loading={isSubmitting}
                   onPress={onSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || biometric.isPending}
                 />
 
                 {/* Divider (57:144) + Biometric Row (57:148).
@@ -446,7 +468,7 @@ export function SignInScreen({ onSuccess }: Props) {
                         working around a value the frame no longer uses. */}
                     <View className="w-full flex-row items-center gap-sm">
                       <View className="h-px flex-1 bg-outline-variant" />
-                      <Text className="font-label-sm text-label-sm text-center text-on-surface-variant">
+                      <Text className="text-center font-label-sm text-label-sm text-on-surface-variant">
                         OR CONTINUE WITH
                       </Text>
                       <View className="h-px flex-1 bg-outline-variant" />
@@ -461,7 +483,7 @@ export function SignInScreen({ onSuccess }: Props) {
                           // the registry has the real Health Icon.
                           icon={<Icon chrome="face" size={24} color={primary} />}
                           label="FaceID"
-                          disabled={biometric.isPending}
+                          disabled={biometric.isPending || isSubmitting}
                           onPress={() => onBiometric("face")}
                         />
                       )}
@@ -469,13 +491,20 @@ export function SignInScreen({ onSuccess }: Props) {
                         <BiometricTile
                           icon={<Icon name="fingerprint" size={24} color={primary} />}
                           label="Fingerprint"
-                          disabled={biometric.isPending}
+                          disabled={biometric.isPending || isSubmitting}
                           onPress={() => onBiometric("fingerprint")}
                         />
                       )}
                     </View>
                   </>
                 )}
+                <Link href={"/(public)/provider-sign-in" as Href} asChild>
+                  <Button
+                    label="Google or Apple sign-in"
+                    variant="outline"
+                    disabled={isSubmitting || biometric.isPending}
+                  />
+                </Link>
               </Card>
 
               {/* Spacer lg (58:121) */}

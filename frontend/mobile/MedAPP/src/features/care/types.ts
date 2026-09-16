@@ -22,12 +22,7 @@ export type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 // `category` mirrors the main chip values so chip filtering is a
 // simple equality check rather than parsing free-text fields. Keep
 // it in sync with MAIN_CHIPS.value in FindCareScreen.
-export type DirectoryCategory =
-  | "doctors"
-  | "nurses"
-  | "hospitals"
-  | "pharmacies"
-  | "pharmacists";
+export type DirectoryCategory = "doctors" | "nurses" | "hospitals" | "pharmacies" | "pharmacists";
 
 export interface PersonEntry {
   kind: "person";
@@ -51,6 +46,10 @@ export interface PersonEntry {
    * wire; see `consultationFee` in features/practitioner/format.ts.
    */
   consultationFeeCents?: number | null;
+  specialties?: string[];
+  languages?: string[];
+  /** A listed home-visit fee, not a claim about current availability. */
+  homeVisitFeeCents?: number | null;
   badges: { label: string; tone: "primary" | "secondary" | "tertiary" | "warn" }[];
 }
 

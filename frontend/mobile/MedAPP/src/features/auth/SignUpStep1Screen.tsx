@@ -51,7 +51,7 @@
 //      rules (no icon font can be: the mark is four-colour). They now render the
 //      vendored artwork the primitives added, `<BrandMark name="google" />` /
 //      `name="apple"`, which lives in src/components/ui/brand/ rather than the
-//      Health Icons registry. STILL OPEN: social sign-in is unwired (as before),
+//      Health Icons registry. These entries now open the provider sign-in flow;
 //      and the frame's `brand/google-*` colour variables have no Figma
 //      counterpart for the new Brand Marks set.
 //   4. `radius/4` on the checkbox contradicts BRAND's 12/24/full scale — the
@@ -91,7 +91,7 @@ import { useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Link, router } from "expo-router";
+import { Link, router, type Href } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -103,6 +103,7 @@ import {
   Input,
   type BrandMarkName,
   KeyboardInset,
+  InfoCallout,
 } from "@/components/ui";
 import { useResolvedScheme } from "@/lib/theme";
 import { useTokenColor } from "@/lib/tokens";
@@ -116,9 +117,19 @@ import { SignUpStep1Schema, type SignUpStep1Values } from "@/features/auth/schem
 
 interface Props {
   onNext?: (values: SignUpStep1Values) => void;
+  initialName?: string;
+  initialEmail?: string;
+  providerMessage?: string;
+  onEmailOnly?: () => void;
 }
 
-export function SignUpStep1Screen({ onNext }: Props) {
+export function SignUpStep1Screen({
+  onNext,
+  initialName = "",
+  initialEmail = "",
+  providerMessage,
+  onEmailOnly,
+}: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const { scheme } = useResolvedScheme();
@@ -133,8 +144,8 @@ export function SignUpStep1Screen({ onNext }: Props) {
   } = useForm<SignUpStep1Values>({
     resolver: zodResolver(SignUpStep1Schema),
     defaultValues: {
-      fullName: "",
-      email: "",
+      fullName: initialName,
+      email: initialEmail,
       password: "",
       confirmPassword: "",
       agreeToTerms: false,
@@ -154,7 +165,7 @@ export function SignUpStep1Screen({ onNext }: Props) {
         {/* KeyboardInset, NOT KeyboardAvoidingView — the KAV infers the keyboard
           from a WINDOW RESIZE that Android edge-to-edge no longer performs, so it
           silently does nothing there. Proven on device on the chat composer. */}
-      <KeyboardInset className="flex-1">
+        <KeyboardInset className="flex-1">
           {/* ---------------- AppBar + Stepper (292:157) ----------------
               Outside the ScrollView: the frame pins it above the body, and it
               carries the only way back out of the flow. Extracted to
@@ -398,6 +409,16 @@ export function SignUpStep1Screen({ onNext }: Props) {
                 />
               </Card>
 
+              {providerMessage ? (
+                <>
+                  <InfoCallout>{providerMessage}</InfoCallout>
+                  <Button
+                    label="Continue with email only"
+                    variant="outline"
+                    onPress={onEmailOnly}
+                  />
+                </>
+              ) : null}
               {/* Divider / or continue with (301:678) */}
               <View className="w-full flex-row items-center gap-3">
                 <View className="h-px flex-1 bg-outline-variant" />
@@ -414,14 +435,14 @@ export function SignUpStep1Screen({ onNext }: Props) {
                   mark="google"
                   label="Google"
                   onPress={() => {
-                    /* TODO: Google OAuth wire-up (FLAGGED 3, still unwired). */
+                    router.push("/(public)/provider-sign-in" as Href);
                   }}
                 />
                 <SocialButton
                   mark="apple"
                   label="Apple"
                   onPress={() => {
-                    /* TODO: Apple sign-in wire-up (FLAGGED 3, still unwired). */
+                    router.push("/(public)/provider-sign-in" as Href);
                   }}
                 />
               </View>

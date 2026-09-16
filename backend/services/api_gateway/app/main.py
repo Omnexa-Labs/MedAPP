@@ -1,18 +1,18 @@
 import os
+import re
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import structlog
 from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
-
 from shared.auth import Principal, decode_token, validate_jwt_secret
 from shared.observability import configure_logging, instrument_app
+from starlette.responses import JSONResponse
 
 from .config import ROUTES, settings
 
@@ -52,7 +52,9 @@ def _normalize_path(path: str) -> str:
 
 def _resolve_upstream(path: str) -> str | None:
     normalized = _normalize_path(path)
-    matches = [prefix for prefix in ROUTES if normalized == prefix or normalized.startswith(prefix + "/")]
+    matches = [
+        prefix for prefix in ROUTES if normalized == prefix or normalized.startswith(prefix + "/")
+    ]
     if not matches:
         return None
     return ROUTES[max(matches, key=len)]
@@ -84,8 +86,12 @@ def _rewrite_path(path: str, upstream: str) -> str:
     return normalized
 
 
-def _route_allows_public_access(path: str) -> bool:
-    return path.startswith(PUBLIC_ROUTE_PREFIXES)
+def _route_allows_public_access(path: str, method: str = "GET") -> bool:
+    uuid = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    return path.startswith(PUBLIC_ROUTE_PREFIXES) or (
+        method == "GET"
+        and re.fullmatch(rf"/v1/pharmacies/{uuid}/photos/{uuid}", path) is not None
+    )
 
 
 def _route_requires_admin(path: str) -> bool:
@@ -96,14 +102,29 @@ def _body_size_is_allowed(path: str) -> bool:
     return path.startswith(BODY_SIZE_WHITELIST_PREFIXES)
 
 
-def _extract_principal_from_token(token: str) -> Principal:
-    claims = decode_token(
-        token,
-        secret=settings.jwt_secret,
-        algorithm=settings.jwt_algorithm,
-        audience=_EXPECTED_AUDIENCE,
-        issuer=_EXPECTED_ISSUER,
-    )
+def _extract_principal_from_token(token: str, path: str = "") -> Principal:
+    try:
+        claims = decode_token(
+            token, secret=settings.jwt_secret, algorithm=settings.jwt_algorithm,
+            audience=_EXPECTED_AUDIENCE, issuer=_EXPECTED_ISSUER,
+        )
+    except Exception:
+        secret = settings.hms_workspace_session_secret.get_secret_value()
+        if (
+            not (path == "/v1/hms" or path.startswith("/v1/hms/"))
+            or len(secret) < 32
+            or secret == settings.jwt_secret
+        ):
+            raise
+        claims = decode_token(
+            token, secret=secret, algorithm="HS256",
+            audience=settings.hms_workspace_session_audience,
+            issuer=settings.hms_workspace_session_issuer,
+        )
+        UUID(claims["sub"])
+        UUID(claims["hospital_id"])
+        if claims.get("role") != "hms_staff" or claims.get("typ") != "access" or "exp" not in claims:
+            raise ValueError("invalid workspace token") from None
     return Principal(subject=str(claims["sub"]), role=str(claims["role"]))
 
 
@@ -140,23 +161,36 @@ async def _allow_auth_route(request: Request) -> bool:
         return True
 
 
-async def _forward_request(request: Request, full_path: str, *, require_auth: bool = True) -> Response:
+async def _forward_request(
+    request: Request, full_path: str, *, require_auth: bool = True
+) -> Response:
     upstream = _resolve_upstream(full_path)
     if upstream is None:
-        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"error": "unknown route"})
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND, content={"error": "unknown route"}
+        )
 
     normalized_path = "/" + full_path.lstrip("/")
-    if require_auth and not _route_allows_public_access(normalized_path):
+    if require_auth and not _route_allows_public_access(normalized_path, request.method):
         authorization = request.headers.get("authorization")
         if not authorization or not authorization.lower().startswith("bearer "):
-            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "missing bearer token"})
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "missing bearer token"}
+            )
         token = authorization.split(" ", 1)[1]
         try:
-            principal = _extract_principal_from_token(token)
-        except Exception:  # noqa: BLE001
-            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "invalid token"})
-        if _route_requires_admin(normalized_path) and principal.role not in {"admin", "platform_admin"}:
-            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"error": "admin access required"})
+            principal = _extract_principal_from_token(token, normalized_path)
+        except Exception:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "invalid token"}
+            )
+        if _route_requires_admin(normalized_path) and principal.role not in {
+            "admin",
+            "platform_admin",
+        }:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN, content={"error": "admin access required"}
+            )
 
     path = _rewrite_path(full_path, upstream)
     url = f"{upstream}/{path}"
@@ -165,13 +199,45 @@ async def _forward_request(request: Request, full_path: str, *, require_auth: bo
         if key.lower() == "x-request-id":
             headers.pop(key)
     headers["X-Request-Id"] = request.state.request_id
-    body = await request.body()
+    onboarding_request = normalized_path == "/v1/onboarding" or normalized_path.startswith(
+        "/v1/onboarding/"
+    )
+    if onboarding_request:
+        # Content-Length may be absent or incorrect. Bound credential bodies here,
+        # before the gateway buffers them; the owning service also enforces its cap.
+        body_buffer = bytearray()
+        async for chunk in request.stream():
+            if len(body_buffer) + len(chunk) > MAX_BODY_BYTES:
+                return JSONResponse(status_code=413, content={"error": "request body too large"})
+            body_buffer.extend(chunk)
+        body = bytes(body_buffer)
+        headers.pop("transfer-encoding", None)
+    else:
+        body = await request.body()
     client: httpx.AsyncClient = request.app.state.http
-    resp = await client.request(request.method, url, headers=headers, content=body, params=request.query_params)
+    options = {"timeout": httpx.Timeout(70.0, connect=10.0)} if onboarding_request else {}
+    try:
+        resp = await client.request(
+            request.method,
+            url,
+            headers=headers,
+            content=body,
+            params=request.query_params,
+            **options,
+        )
+    except httpx.TimeoutException:
+        if not onboarding_request:
+            raise
+        return JSONResponse(
+            status_code=504,
+            content={"error": "application service timed out; reload before retrying"},
+            headers={"Cache-Control": "private, no-store"},
+        )
     forwarded_headers = {
         key: value
         for key, value in resp.headers.items()
-        if key.lower() not in {"content-length", "connection", "transfer-encoding", "content-encoding"}
+        if key.lower()
+        not in {"content-length", "connection", "transfer-encoding", "content-encoding"}
     }
     return Response(content=resp.content, status_code=resp.status_code, headers=forwarded_headers)
 
@@ -200,7 +266,10 @@ def create_app() -> FastAPI:
         if content_length and not _body_size_is_allowed(request.url.path):
             try:
                 if int(content_length) > MAX_BODY_BYTES:
-                    return JSONResponse(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, content={"error": "request body too large"})
+                    return JSONResponse(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        content={"error": "request body too large"},
+                    )
             except ValueError:
                 pass
         response = await call_next(request)
@@ -214,7 +283,10 @@ def create_app() -> FastAPI:
             and request.url.path.startswith("/v1/auth")
             and not await _allow_auth_route(request)
         ):
-            return JSONResponse(status_code=status.HTTP_429_TOO_MANY_REQUESTS, content={"error": "rate limit exceeded"})
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={"error": "rate limit exceeded"},
+            )
         return await call_next(request)
 
     # Added last so it's the outermost middleware.
@@ -223,7 +295,7 @@ def create_app() -> FastAPI:
         "allow_credentials": True,
         "allow_methods": ["*"],
         "allow_headers": ["*"],
-        "expose_headers": ["*"],
+        "expose_headers": ["*", "ETag", "Content-Disposition"],
         "max_age": 3600,
     }
     if settings.cors_origin_regex:
@@ -249,7 +321,9 @@ def create_app() -> FastAPI:
     async def auth_root(request: Request) -> Response:
         return await _forward_request(request, "v1/auth", require_auth=False)
 
-    @app.api_route("/v1/auth/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"])
+    @app.api_route(
+        "/v1/auth/{full_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]
+    )
     async def auth_proxy(full_path: str, request: Request) -> Response:
         return await _forward_request(request, f"v1/auth/{full_path}", require_auth=False)
 

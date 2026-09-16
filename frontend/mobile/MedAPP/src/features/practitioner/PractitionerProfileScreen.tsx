@@ -1,251 +1,400 @@
-// Practitioner Profile — the clinician's OWN profile, and the tab that was dead.
-//
-// Figma: `practitioner_profile — listed` 1020:16094, with state frames
-// `— not listed in Find Care` 1022:918 and `— account & sign out (scrolled)`
-// 1022:16587 (page "Practitioner Shell" 1018:640).
-//
-// ---------------------------------------------------------------------------
-// THIS IS NOT `practitioner-social-profile`, AND THE DISTINCTION IS THE POINT
-// ---------------------------------------------------------------------------
-// Two other screens have "practitioner profile" in their name and both are
-// PATIENT-FACING views of a specialist:
-//
-//   practitioner-social-profile     reached from Explore / Community; renders a
-//                                   seeded dietitian and her reviews
-//   practitioner-telehealth-profile reached from Find Care; carries the
-//                                   "Book appointment" dock
-//
-// This one is the clinician looking at themselves: their listing, their hours,
-// their account. Nothing here is a booking surface, and the file exists partly
-// so nobody "reuses" one of those two and quietly shows a doctor the marketing
-// page patients see.
-//
-// ---------------------------------------------------------------------------
-// WHY THE ACCOUNT SECTION IS HERE AND NOT BEHIND AN AVATAR
-// ---------------------------------------------------------------------------
-// PO ruling, 2026-08-05. `AccountMenu` was mounted only by `PatientShell`,
-// behind the patient app bar's avatar; `PractitionerShell` never mounted it and
-// `PractitionerAppBar` has no avatar slot. The consequence was not cosmetic:
-// **a clinician could not sign out of MedApp at all**, and could not change
-// appearance. The options were an avatar in the practitioner bar or the menu's
-// contents on this screen. The PO chose this screen, so the bar keeps no avatar
-// and `1022:16587` is the frame that proves the controls are reachable.
-//
-// `AccountMenu` is REUSED, not copied. It was parameterised for exactly this:
-// `profileHref={null}` omits its Profile row — a link to "profile" from the
-// profile screen is a loop — and `initialView` lets this screen open it
-// directly. A second copy of a sign-out flow is how two audiences end up with
-// two different confirmation semantics on a destructive action.
-//
-// ---------------------------------------------------------------------------
-// DATA, AND THE ONE HONEST GAP
-// ---------------------------------------------------------------------------
-// `practitionerApi.findMyProfile` SCANS the doctor directory for the caller's
-// `user_id` — there is no "my profile" endpoint. It passes `only_listable=false`
-// deliberately: the default is `true`, so a clinician who has switched their
-// listing off would vanish from their own profile screen, which is precisely
-// the state 1022:918 exists to draw.
-//
-// The Find Care listing toggle writes through `setFindCareListing`, so it is a
-// real mutation and not a local boolean. `1022:918` is what the off state looks
-// like, and it is a real product state — not an error.
-//
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API
-// here. Only expo-router is used, through the shell and AccountMenu.
-
-import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AccountMenu, PractitionerShell } from "@/components/shell";
-import { AvatarWithFallback, Card, Icon } from "@/components/ui";
-import { useCurrentUser } from "@/hooks/use-current-user";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Modal, ScrollView, Switch, Text, View } from "react-native";
+import { router, type Href } from "expo-router";
+import { useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DetailShell } from "@/components/shell";
+import {
+  AvatarWithFallback,
+  Button,
+  Card,
+  InfoCallout,
+  Input,
+  KeyboardInset,
+} from "@/components/ui";
+import { ApiError } from "@/types/api";
 import { useTokenColor } from "@/lib/tokens";
+import { ProfessionalNotice } from "./ProfessionalAccess";
+import {
+  professionalApi,
+  type ProfessionalProfile,
+  type ProfessionalChanges,
+} from "./professional-api";
+import {
+  professionalChanges,
+  professionalDefaults,
+  professionalErrors,
+  type ProfessionalForm,
+} from "./professional-profile-form";
+import { useProfessionalProfile } from "./use-professional-profile";
 import { practitionerApi } from "./api";
-import { consultationFee, initialsFor, weeklyHours } from "./format";
-
-/** Matches the home screen's reserve; the tab bar is an overlay and claims no layout. */
-const SCROLL_RESERVE = 120;
+import { weeklyHours } from "./format";
 
 export function PractitionerProfileScreen() {
-  const user = useCurrentUser();
-  const queryClient = useQueryClient();
-  const [accountOpen, setAccountOpen] = useState(false);
-
-  const onSurfaceVariant = useTokenColor("on-surface-variant");
-  const primary = useTokenColor("primary");
-
-  const profileQuery = useQuery({
-    queryKey: ["practitioner", "profile", user?.id],
-    queryFn: () => practitionerApi.findMyProfile(user!.id),
-    enabled: Boolean(user?.id),
-  });
-  const profile = profileQuery.data ?? null;
-
-  const availabilityQuery = useQuery({
-    queryKey: ["practitioner", "availability", profile?.doctorId],
-    queryFn: () => practitionerApi.listAvailability(profile!.doctorId),
-    enabled: Boolean(profile?.doctorId),
-  });
-
-  const listing = useMutation({
-    mutationFn: (next: boolean) => practitionerApi.setFindCareListing(profile!.doctorId, next),
-    // Refetch rather than patch the cache: `setFindCareListing` returns the
-    // server's view of the profile, and the server is the one that decides
-    // whether a listing actually took.
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["practitioner", "profile"] });
-    },
-  });
-
-  const hours = weeklyHours(availabilityQuery.data ?? []);
-  const fee = consultationFee(profile?.consultationFeeCents);
-  const displayName = profile?.name ?? user?.displayName ?? "Your profile";
-
-  return (
-    <PractitionerShell activeTab="profile" hideBack testID="practitioner-profile">
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 24, paddingBottom: SCROLL_RESERVE }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Identity */}
-        <View className="items-center gap-sm">
-          <AvatarWithFallback
-            uri={profile?.photoUrl ?? null}
-            initials={initialsFor(displayName)}
-            label={displayName}
-            size={96}
-          />
-          <Text className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
-            {displayName}
-          </Text>
-          {profile?.specialty ? (
-            <Text className="font-body-md text-body-md text-on-surface-variant">
-              {profile.specialty}
-            </Text>
-          ) : null}
-        </View>
-
-        {profileQuery.isLoading ? (
-          <View className="mt-lg items-center">
-            <ActivityIndicator color={primary} />
-          </View>
-        ) : null}
-
-        {/* Find Care listing — a real mutation, not a local toggle. */}
-        <Card className="mt-lg gap-sm">
-          <View className="flex-row items-center justify-between gap-sm">
-            <View className="flex-1">
-              <Text className="font-label-md text-label-md text-on-surface">Visible in Find Care</Text>
-              <Text className="mt-xs font-body-sm text-body-sm text-on-surface-variant">
-                {profile?.isListable
-                  ? "Patients can find and book you."
-                  : "You are hidden from search. Existing appointments are unaffected."}
-              </Text>
-            </View>
-            <Switch
-              accessibilityLabel="Visible in Find Care"
-              value={Boolean(profile?.isListable)}
-              disabled={!profile || listing.isPending}
-              onValueChange={(next) => listing.mutate(next)}
-            />
-          </View>
-          {listing.isError ? (
-            // Never leave the switch showing a state the server did not accept.
-            <Text className="font-body-sm text-body-sm text-error">
-              Could not update your listing. Try again.
-            </Text>
-          ) : null}
-        </Card>
-
-        {/* Practice */}
-        <Text className="mt-lg font-headline-md text-headline-md text-on-surface">Practice</Text>
-        <Card className="mt-sm gap-sm">
-          {profile?.bio ? (
-            <Text className="font-body-md text-body-md text-on-surface-variant">{profile.bio}</Text>
-          ) : (
-            <Text className="font-body-md text-body-md text-on-surface-variant">
-              No bio yet.
-            </Text>
-          )}
-          {fee ? <Row label="Consultation fee" value={fee} /> : null}
-          {profile?.languages.length ? (
-            <Row label="Languages" value={profile.languages.join(", ")} />
-          ) : null}
-        </Card>
-
-        {/* Weekly hours */}
-        <Text className="mt-lg font-headline-md text-headline-md text-on-surface">Weekly hours</Text>
-        {/* `weeklyHours` returns the frame's ONE-LINE summary, not a day list —
-            "Mon – Fri · 09:00–17:00", widening to a per-day list only when the
-            days genuinely differ. That collapsing is the formatter's job and is
-            argued in its docstring: a clinician must never be shown hours they
-            do not keep, so a summary that cannot be honest becomes a list. */}
-        <Card className="mt-sm gap-xs">
-          {hours.label === null ? (
-            <Text className="font-body-md text-body-md text-on-surface-variant">
-              No availability set.
-            </Text>
-          ) : (
-            <>
-              <View className="flex-row items-start justify-between gap-sm">
-                <Text className="flex-1 font-body-md text-body-md text-on-surface">
-                  {hours.label}
-                </Text>
-                {hours.timezone ? (
-                  <Text className="font-label-sm text-label-sm text-on-surface-variant">
-                    {hours.timezone}
-                  </Text>
-                ) : null}
-              </View>
-              {hours.closedLabel ? (
-                <Text className="font-body-sm text-body-sm text-on-surface-variant">
-                  {hours.closedLabel}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </Card>
-
-        {/* Account — the reason a clinician can sign out at all. */}
-        <Text className="mt-lg font-headline-md text-headline-md text-on-surface">Account</Text>
-        <Card className="mt-sm">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Account settings"
-            accessibilityHint="Appearance and sign out"
-            onPress={() => setAccountOpen(true)}
-            className="flex-row items-center justify-between gap-sm active:opacity-70"
-            style={{ minHeight: 44 }}
-          >
-            <Text className="font-label-md text-label-md text-on-surface">
-              Appearance and sign out
-            </Text>
-            <Icon chrome="chevron-right" size={24} color={onSurfaceVariant} />
-          </Pressable>
-        </Card>
-      </ScrollView>
-
-      {/* `profileHref={null}` OMITS the Profile row — linking to the profile from
-          the profile screen is a loop. The component omits rather than disables
-          it, which is why null is the right value and not a disabled flag. */}
-      <AccountMenu
-        visible={accountOpen}
-        onClose={() => setAccountOpen(false)}
-        accountName={displayName}
-        avatarUri={profile?.photoUrl ?? null}
-        avatarInitials={initialsFor(displayName)}
-        profileHref={null}
+  const scope = useProfessionalProfile();
+  const client = useQueryClient();
+  const { query, kind, owner, revision, isCurrent } = scope;
+  if (!owner || !kind)
+    return (
+      <ProfessionalNotice
+        title="Professional account required"
+        message="A doctor or nurse account must be activated before you can edit a professional profile. Application approval alone does not activate professional access."
       />
-    </PractitionerShell>
+    );
+  if (query.isPending)
+    return (
+      <ProfessionalNotice
+        title="Loading professional profile"
+        message="Retrieving your saved details…"
+        loading
+      />
+    );
+  if (query.error)
+    return (
+      <ProfessionalNotice
+        title={
+          query.error instanceof ApiError && query.error.status === 404
+            ? "Profile activation needed"
+            : "Could not load your profile"
+        }
+        message="Your saved profile could not be retrieved. Check your application status or try again."
+        onRetry={() => void query.refetch()}
+      />
+    );
+  if (!query.data?.isActive)
+    return (
+      <ProfessionalNotice
+        title="Professional profile inactive"
+        message="You can review your application status. Editing is unavailable while your profile is inactive."
+        onRetry={() => void query.refetch()}
+      />
+    );
+  return (
+    <ProfessionalProfileEditor
+      key={`${owner}:${revision}:${kind}`}
+      profile={query.data}
+      isCurrent={isCurrent}
+      refreshing={query.isFetching}
+      onSave={async (changes, signal) => {
+        const updated = await professionalApi.updateSelf(kind, owner, changes, {
+          signal,
+          isSessionCurrent: isCurrent,
+        });
+        if (signal.aborted || !isCurrent()) throw new Error("Profile session ended");
+        client.setQueryData(scope.queryKey, updated);
+        void client.invalidateQueries({ queryKey: ["care"] });
+        void client.invalidateQueries({ queryKey: ["practitioner", "profile", owner, revision] });
+        return updated;
+      }}
+    >
+      {kind === "doctors" ? <ProfessionalHours profileId={query.data.id} scope={scope} /> : null}
+    </ProfessionalProfileEditor>
   );
 }
 
-/** Label/value pair. Local because it is three lines and used only here. */
-function Row({ label, value }: { label: string; value: string }) {
+function ProfessionalHours({
+  profileId,
+  scope,
+}: {
+  profileId: string;
+  scope: ReturnType<typeof useProfessionalProfile>;
+}) {
+  const query = useQuery({
+    queryKey: ["practitioner", "availability", scope.owner, scope.revision, profileId],
+    gcTime: 0,
+    queryFn: ({ signal }) =>
+      practitionerApi.listAvailability(profileId, { signal, isSessionCurrent: scope.isCurrent }),
+  });
+  const hours = weeklyHours(query.data ?? []);
   return (
-    <View className="flex-row items-start justify-between gap-sm">
-      <Text className="font-body-sm text-body-sm text-on-surface-variant">{label}</Text>
-      <Text className="flex-1 text-right font-body-md text-body-md text-on-surface">{value}</Text>
-    </View>
+    <Card className="gap-sm">
+      <Text
+        accessibilityRole="header"
+        className="font-headline-md text-headline-md text-on-surface"
+      >
+        Weekly hours
+      </Text>
+      <Text className="font-body-md text-body-md text-on-surface-variant">
+        {query.isPending
+          ? "Loading consulting hours…"
+          : query.error
+            ? "Could not load consulting hours."
+            : (hours.label ?? "No availability set.")}
+      </Text>
+      {!query.error && !query.isPending && hours.timezone ? (
+        <Text className="font-body-sm text-body-sm text-on-surface-variant">{hours.timezone}</Text>
+      ) : null}
+      {!query.error && !query.isPending && hours.closedLabel ? (
+        <Text className="font-body-sm text-body-sm text-on-surface-variant">
+          {hours.closedLabel}
+        </Text>
+      ) : null}
+      {query.error ? (
+        <Button
+          label="Retry consulting hours"
+          variant="outline"
+          onPress={() => void query.refetch()}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
+export function ProfessionalProfileEditor({
+  profile,
+  onSave,
+  isCurrent,
+  refreshing = false,
+  children,
+}: {
+  profile: ProfessionalProfile;
+  onSave: (changes: ProfessionalChanges, signal: AbortSignal) => Promise<ProfessionalProfile>;
+  isCurrent: () => boolean;
+  refreshing?: boolean;
+  children?: ReactNode;
+}) {
+  const [baseline, setBaseline] = useState(profile);
+  const [form, setForm] = useState(() => professionalDefaults(profile));
+  const [errors, setErrors] = useState<ReturnType<typeof professionalErrors>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(false);
+  const [pendingExit, setPendingExit] = useState<NavigationAction | null>(null);
+  const flight = useRef<AbortController | null>(null);
+  const alive = useRef(true);
+  const seenProfile = useRef(profile);
+  const navigation = useNavigation();
+  const scrim = useTokenColor("scrim", 0.4);
+  const dirty = Object.keys(professionalChanges(baseline, form)).length > 0;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      flight.current?.abort();
+    };
+  }, []);
+  useEffect(() => {
+    if (profile !== seenProfile.current) {
+      seenProfile.current = profile;
+      if (!dirty && !saving) {
+        setBaseline(profile);
+        setForm(professionalDefaults(profile));
+        setSaved(false);
+      }
+    }
+  }, [profile, dirty, saving]);
+  usePreventRemove((dirty || saving) && isCurrent(), ({ data }) => {
+    if (!flight.current) setPendingExit(data.action);
+  });
+  const canAct = () => alive.current && isCurrent();
+  const update = <K extends keyof ProfessionalForm>(key: K, value: ProfessionalForm[K]) => {
+    setForm((old) => ({ ...old, [key]: value }));
+    setSaved(false);
+    setError(null);
+  };
+  const save = async () => {
+    if (flight.current || refreshing || !canAct()) return;
+    const validation = professionalErrors(form);
+    setErrors(validation);
+    if (Object.keys(validation).length) {
+      setError("Check the highlighted fields.");
+      return;
+    }
+    const changes = professionalChanges(baseline, form);
+    if (!Object.keys(changes).length) return;
+    const controller = new AbortController();
+    flight.current = controller;
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const result = await onSave(changes, controller.signal);
+      if (!canAct()) return;
+      setBaseline(result);
+      setForm(professionalDefaults(result));
+      setSaved(true);
+    } catch {
+      if (canAct()) setError("Could not save your profile. Your edits are still here; try again.");
+    } finally {
+      flight.current = null;
+      if (canAct()) setSaving(false);
+    }
+  };
+  const leave = () => {
+    if (!saving) {
+      if (router.canGoBack()) router.back();
+      else router.replace("/(app)/onboarding-status" as Href);
+    }
+  };
+  const fields: {
+    key: Exclude<keyof ProfessionalForm, "isListable">;
+    label: string;
+    maxLength: number;
+    multiline?: boolean;
+  }[] = [
+    { key: "firstName", label: "Professional first name", maxLength: 255 },
+    { key: "lastName", label: "Professional last name", maxLength: 255 },
+    { key: "specialty", label: "Clinical specialty", maxLength: 255 },
+    { key: "bio", label: "Clinical bio", maxLength: 10000, multiline: true },
+    { key: "languages", label: "Languages (separate with commas)", maxLength: 2500 },
+  ];
+  const name = `${form.firstName.trim()} ${form.lastName.trim()}`.trim();
+  return (
+    <DetailShell title="Professional profile" onBack={leave} testID="professional.editor">
+      <KeyboardInset>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 32 }}
+        >
+          <Text
+            accessibilityRole="header"
+            className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface"
+          >
+            Manage professional identity
+          </Text>
+          <Text className="font-body-md text-body-md text-on-surface-variant">
+            Keep the details patients see up to date. Your account details and professional profile
+            are saved separately.
+          </Text>
+          <View className="flex-row gap-sm">
+            <Button
+              className="flex-1"
+              label={preview ? "Edit details" : "Preview profile"}
+              variant="outline"
+              onPress={() => setPreview(!preview)}
+              disabled={saving}
+            />
+            <Button
+              className="flex-1"
+              label="Save changes"
+              loading={saving}
+              disabled={!dirty || refreshing || saving}
+              onPress={() => void save()}
+            />
+          </View>
+          {refreshing ? (
+            <Text className="font-body-sm text-body-sm text-on-surface-variant">
+              Checking current profile…
+            </Text>
+          ) : null}
+          {error ? <InfoCallout tone="error">{error}</InfoCallout> : null}
+          {saved ? (
+            <Text accessibilityRole="alert" className="font-body-md text-body-md text-primary">
+              Professional profile saved.
+            </Text>
+          ) : null}
+          {preview ? (
+            <Card className="gap-md">
+              <Text className="font-label-md text-label-md text-on-surface">
+                Preview · {dirty ? "Unsaved changes" : "Saved details"}
+              </Text>
+              <AvatarWithFallback
+                uri={baseline.photoUrl}
+                label={name}
+                initials={`${form.firstName[0] ?? ""}${form.lastName[0] ?? ""}`}
+                size={80}
+              />
+              <Text className="font-headline-md text-headline-md text-on-surface">
+                {baseline.kind === "doctors" ? "Dr. " : ""}
+                {name}
+              </Text>
+              <Text className="font-body-md text-body-md text-on-surface-variant">
+                {form.specialty.trim() || (baseline.kind === "doctors" ? "Doctor" : "Nurse")}
+              </Text>
+              <Text className="font-body-md text-body-md text-on-surface">
+                {form.bio.trim() || "No biography provided."}
+              </Text>
+              <Text className="font-body-sm text-body-sm text-on-surface-variant">
+                Languages: {form.languages.trim() || "Not provided"}
+              </Text>
+              <Text className="font-body-sm text-body-sm text-on-surface-variant">
+                {form.isListable
+                  ? "Visible in Find Care after saving"
+                  : "Hidden from Find Care after saving"}
+              </Text>
+            </Card>
+          ) : (
+            <Card className="gap-md">
+              {fields.map((field) => (
+                <View key={field.key} className="gap-xs">
+                  <Text className="font-label-md text-label-md text-on-surface">{field.label}</Text>
+                  <Input
+                    accessibilityLabel={field.label}
+                    accessibilityHint={errors[field.key]}
+                    value={form[field.key]}
+                    onChangeText={(value) => update(field.key, value)}
+                    hasError={!!errors[field.key]}
+                    maxLength={field.maxLength}
+                    multiline={field.multiline}
+                    editable={!saving}
+                  />
+                  {errors[field.key] ? (
+                    <Text className="font-body-sm text-body-sm text-error">
+                      {errors[field.key]}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+              <View className="flex-row items-center justify-between gap-sm">
+                <Text className="font-label-md text-label-md text-on-surface">
+                  Visible in Find Care
+                </Text>
+                <Switch
+                  accessibilityLabel="Visible in Find Care"
+                  value={form.isListable}
+                  disabled={saving}
+                  onValueChange={(value) => update("isListable", value)}
+                />
+              </View>
+              <Text className="font-body-sm text-body-sm text-on-surface-variant">
+                Visibility changes take effect when saved. Existing appointments are unaffected.
+              </Text>
+            </Card>
+          )}
+          {children}
+          <Button
+            label="Account settings and sign out"
+            variant="outline"
+            disabled={saving}
+            onPress={() => router.push("/(app)/settings" as Href)}
+          />
+          <Button
+            label="Credential application status"
+            variant="outline"
+            disabled={saving}
+            onPress={() => router.push("/(app)/onboarding-status" as Href)}
+          />
+        </ScrollView>
+      </KeyboardInset>
+      <Modal
+        visible={!!pendingExit}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingExit(null)}
+      >
+        <View className="flex-1 justify-center p-md" style={{ backgroundColor: scrim }}>
+          <Card className="gap-md">
+            <Text className="font-headline-md text-headline-md text-on-surface">
+              Discard unsaved changes?
+            </Text>
+            <Text className="font-body-md text-body-md text-on-surface-variant">
+              Your professional profile has not been saved.
+            </Text>
+            <Button label="Keep editing" onPress={() => setPendingExit(null)} />
+            <Button
+              label="Discard changes"
+              variant="outline"
+              onPress={() => {
+                const action = pendingExit;
+                setPendingExit(null);
+                if (action) navigation.dispatch(action);
+              }}
+            />
+          </Card>
+        </View>
+      </Modal>
+    </DetailShell>
   );
 }

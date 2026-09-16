@@ -15,6 +15,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", module: "dashboard" },
+  { label: "Hospital profile", href: "/hospital-profile", module: "hospital-profile" },
   { label: "Patients", href: "/patients", module: "patients" },
   { label: "Appointments", href: "/appointments", module: "appointments" },
   { label: "Queue", href: "/queue", module: "appointments" },
@@ -43,7 +44,7 @@ export function Sidebar() {
           className="text-lg font-bold"
           style={{ color: config.branding.primaryColor || "#1A5276" }}
         >
-          {config.branding.hospitalName || "HMS"}
+          {user?.hospitalName || "HMS"}
         </h2>
         <p className="text-xs text-slate-500">Hospital Management System</p>
       </div>

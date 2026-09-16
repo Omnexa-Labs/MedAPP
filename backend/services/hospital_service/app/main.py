@@ -1,11 +1,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
-from .routers import hospitals, root
+from .routers import activation, directory, hospitals, root
 
 
 @asynccontextmanager
@@ -23,6 +22,8 @@ def create_app() -> FastAPI:
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
     app.include_router(root.router)
     app.include_router(hospitals.router)
+    app.include_router(activation.router)
+    app.include_router(directory.router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

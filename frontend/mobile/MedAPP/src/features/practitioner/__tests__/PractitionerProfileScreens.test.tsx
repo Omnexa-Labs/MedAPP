@@ -1,3 +1,27 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+jest.mock("@/hooks/use-session-scope", () => ({
+  useSessionScope: () => ({ owner: "p1", revision: 1, isCurrent: () => true }),
+}));
+jest.mock("@/features/care/api", () => ({
+  careApi: {
+    getPublicPractitioner: jest.fn(async () => ({
+      id: "doc-7",
+      category: "doctors",
+      name: "Dr. Sarah Chen",
+      title: "Doctor",
+      bio: null,
+      languages: [],
+      specialties: [],
+      isActive: true,
+      isListable: true,
+    })),
+  },
+}));
+let queryClient: QueryClient;
+beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+});
+afterEach(() => queryClient.clear());
 // Guard tests for the two practitioner profile screens, added with their
 // DetailShell migration.
 //
@@ -53,9 +77,11 @@ beforeEach(() => {
 
 const renderScreen = (Screen: () => React.JSX.Element) =>
   render(
-    <SafeAreaProvider initialMetrics={METRICS}>
-      <Screen />
-    </SafeAreaProvider>,
+    <QueryClientProvider client={queryClient}>
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <Screen />
+      </SafeAreaProvider>
+    </QueryClientProvider>,
   );
 
 const ALL_TAB_LABELS = [
@@ -155,10 +181,10 @@ describe("PractitionerTelehealthProfileScreen", () => {
     expect(source("PractitionerTelehealthProfileScreen.tsx")).not.toMatch(/zIndex: 30/);
   });
 
-  it("keeps the Book Appointment CTA reachable for a real provider", () => {
+  it("keeps the Book Appointment CTA reachable for a real provider", async () => {
     mockParams = { providerId: "doc-7", providerName: "Dr. Sarah Chen" };
     renderScreen(PractitionerTelehealthProfileScreen);
-    expect(screen.getByLabelText("Book appointment")).toBeTruthy();
+    expect(await screen.findByLabelText("Book appointment")).toBeTruthy();
   });
 
   it("hides the dock entirely when there is no provider — the shell rule", () => {

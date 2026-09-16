@@ -11,6 +11,8 @@ from ..deps import DbSession, get_current_principal
 from ..schemas.nurse import NurseCreate, NurseList, NurseOut, NurseServiceAreaOut, NurseServiceAreaPayload, NurseUpdate
 from ..services import NurseError, create_nurse_profile, delete_nurse_profile, get_nurse_profile, list_nurse_profiles, replace_service_area, update_nurse_profile
 
+from ..services.self_profile import get_self_profile
+
 router = APIRouter(prefix="/v1/nurses", tags=["Nurse"])
 
 
@@ -46,6 +48,30 @@ async def index(
     except NurseError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     return NurseList(items=[NurseOut.model_validate(profile) for profile in profiles])
+
+
+@router.get("/me", response_model=NurseOut)
+async def read_self(
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    return NurseOut.model_validate(await get_self_profile(db, principal))
+
+
+@router.patch("/me", response_model=NurseOut)
+async def update_self(
+    payload: NurseUpdate,
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    profile = await get_self_profile(db, principal)
+    if not profile.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "professional profile is inactive")
+    try:
+        profile = await update_nurse_profile(db, principal, profile.id, payload)
+    except NurseError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return NurseOut.model_validate(profile)
 
 
 @router.get("/{nurse_id}", response_model=NurseOut)

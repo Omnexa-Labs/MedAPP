@@ -1,89 +1,66 @@
-"""Walk-in POS sales: FIFO batch deduction, no prescription required."""
-from __future__ import annotations
+"""Walk-in sales and stock reversal, serialized with every inventory writer."""
 
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import UTC, datetime
+from uuid import uuid4
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
+from sqlalchemy import select
 
-from ..models.core import Drug, Sale, SaleItem
-from ..schemas.sales import WalkInSaleCreate
-from . import inventory_service
-
-
-async def _next_sale_number(db: AsyncSession) -> str:
-    n = (await db.execute(select(func.count(Sale.id)))).scalar_one()
-    return f"SL-{int(n) + 1:06d}"
+from ..models.core import DrugBatch, Sale, SaleCorrection, SaleItem, SaleRefund
+from . import inventory_service as inventory
+from . import transaction_pricing as pricing
 
 
-async def record_walk_in_sale(
-    body: WalkInSaleCreate,
-    actor_id: UUID | None,
-    db: AsyncSession,
-) -> Sale:
-    if not body.items:
-        raise ValueError("sale must have at least one item")
+async def prepare(body, db):
+    await pricing.check_customer(body.customer_id, db)
+    return await pricing.plan(
+        [(line.drug_id, line.quantity, line.unit_price_cents) for line in body.items],
+        db,
+        discount=body.discount_cents,
+        tax=body.tax_cents,
+        expected=body.expected_total_cents,
+        walk_in=True,
+    )
 
+
+async def record_walk_in_sale(body, actor_id, db):
+    allocations, quote = await prepare(body, db)
     sale = Sale(
-        sale_number=await _next_sale_number(db),
-        prescription_id=None,
+        sale_number="SL-" + uuid4().hex[:24],
         customer_id=body.customer_id,
         cashier_staff_id=actor_id,
         payment_method=body.payment_method,
         payment_ref=body.payment_ref,
-        discount_cents=body.discount_cents,
-        tax_cents=body.tax_cents,
-        currency="GHS",
+        notes=body.notes,
+        subtotal_cents=quote.subtotal_cents,
+        discount_cents=quote.discount_cents,
+        tax_cents=quote.tax_cents,
+        total_cents=quote.total_cents,
+        currency=quote.currency,
         status="completed",
-        completed_at=datetime.now(tz=timezone.utc),
+        completed_at=datetime.now(UTC),
     )
     db.add(sale)
     await db.flush()
-
-    subtotal = 0
-    for line in body.items:
-        drug = (
-            await db.execute(select(Drug).where(Drug.id == line.drug_id))
-        ).scalar_one_or_none()
-        if drug is None:
-            raise ValueError(f"drug {line.drug_id} not found")
-
-        batches = await inventory_service.fifo_batches(line.drug_id, db)
-        available = sum(b.quantity_on_hand for b in batches)
-        if available < line.quantity:
-            raise ValueError(
-                f"insufficient stock for {drug.name}: need {line.quantity}, have {available}"
+    index = 0
+    for allocation in allocations:
+        for batch, take, price in allocation:
+            inventory.change_quantity(batch, -take)
+            db.add(
+                SaleItem(
+                    sale_id=sale.id,
+                    drug_id=batch.drug_id,
+                    drug_batch_id=batch.id,
+                    drug_name_snapshot=quote.items[index].drug_name,
+                    quantity=take,
+                    unit_price_cents=price,
+                    line_total_cents=take * price,
+                )
             )
-
-        remaining = line.quantity
-        for batch in batches:
-            if remaining == 0:
-                break
-            take = min(remaining, batch.quantity_on_hand)
-            batch.quantity_on_hand -= take
-            remaining -= take
-
-            unit_price = (
-                line.unit_price_cents
-                if line.unit_price_cents is not None
-                else batch.selling_price_cents
-            )
-            line_total = take * unit_price
-            subtotal += line_total
-
-            db.add(SaleItem(
-                sale_id=sale.id,
-                drug_id=drug.id,
-                drug_batch_id=batch.id,
-                drug_name_snapshot=drug.name,
-                quantity=take,
-                unit_price_cents=unit_price,
-                line_total_cents=line_total,
-            ))
-            inventory_service.record_movement(
+            index += 1
+            inventory.record_movement(
                 db,
-                drug_id=drug.id,
+                drug_id=batch.drug_id,
                 batch_id=batch.id,
                 delta=-take,
                 reason="sale",
@@ -92,36 +69,40 @@ async def record_walk_in_sale(
                 actor_staff_id=actor_id,
                 note=f"Sale {sale.sale_number}",
             )
-
-    sale.subtotal_cents = subtotal
-    sale.total_cents = subtotal - body.discount_cents + body.tax_cents
     await db.flush()
     return sale
 
 
-async def void_sale(sale_id: UUID, actor_id: UUID | None, db: AsyncSession) -> Sale:
-    sale = (
-        await db.execute(select(Sale).where(Sale.id == sale_id))
-    ).scalar_one_or_none()
+async def void_sale(sale_id, body, actor_id, db):
+    sale = await db.scalar(select(Sale).where(Sale.id == sale_id).with_for_update())
     if sale is None:
-        raise ValueError("sale not found")
-    if sale.status == "voided":
-        raise ValueError("sale already voided")
-
-    items = (
-        await db.execute(select(SaleItem).where(SaleItem.sale_id == sale.id))
-    ).scalars().all()
-
-    # Return stock to the originating batches and record reversing movements.
+        raise HTTPException(404, "Sale not found.")
+    if sale.version != body.version:
+        raise HTTPException(409, "This sale changed. Reload before making another change.")
+    if sale.status != "completed":
+        raise HTTPException(400, "This sale is already voided.")
+    if await db.scalar(
+        select(SaleCorrection.id).where(SaleCorrection.sale_id == sale.id).limit(1)
+    ) or await db.scalar(select(SaleRefund.id).where(SaleRefund.sale_id == sale.id).limit(1)):
+        raise HTTPException(
+            409,
+            "This sale has correction or refund records. Correct the remaining receipt lines instead of voiding it.",
+        )
+    if sale.prescription_id:
+        raise HTTPException(
+            400,
+            "Prescription sales require a prescription correction before stock can be returned.",
+        )
+    items = list(await db.scalars(select(SaleItem).where(SaleItem.sale_id == sale.id)))
+    await inventory.lock_drugs(db, [item.drug_id for item in items])
     for item in items:
-        from ..models.core import DrugBatch  # local to avoid cycle at import time
-
-        batch = (
-            await db.execute(select(DrugBatch).where(DrugBatch.id == item.drug_batch_id))
-        ).scalar_one_or_none()
-        if batch is not None:
-            batch.quantity_on_hand += item.quantity
-        inventory_service.record_movement(
+        batch = await db.get(DrugBatch, item.drug_batch_id, populate_existing=True)
+        if batch is None:
+            raise HTTPException(
+                409, "An original stock batch is missing. Reconcile this sale before voiding it."
+            )
+        inventory.change_quantity(batch, item.quantity)
+        inventory.record_movement(
             db,
             drug_id=item.drug_id,
             batch_id=item.drug_batch_id,
@@ -130,9 +111,10 @@ async def void_sale(sale_id: UUID, actor_id: UUID | None, db: AsyncSession) -> S
             ref_type="sale_void",
             ref_id=sale.id,
             actor_staff_id=actor_id,
-            note=f"Void {sale.sale_number}",
+            note=f"Void {sale.sale_number}: {body.reason}",
         )
-
     sale.status = "voided"
+    sale.void_reason = body.reason
+    sale.version += 1
     await db.flush()
     return sale

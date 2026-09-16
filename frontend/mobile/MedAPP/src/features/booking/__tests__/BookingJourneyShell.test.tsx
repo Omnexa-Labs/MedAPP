@@ -1,3 +1,27 @@
+jest.mock("@/hooks/use-session-scope", () => ({
+  useSessionScope: () => ({ owner: "u1", revision: 1, isCurrent: () => true }),
+}));
+jest.mock("../hooks/use-booking-availability", () => ({
+  useDateStrip: () => [
+    { iso: "2030-05-13", day: "Mon", date: "13", month: "May", unavailable: false },
+  ],
+  useSlots: () => ({
+    slots: [
+      {
+        time: "10:00 AM",
+        endTime: "10:30 AM",
+        period: "Morning",
+        available: true,
+        startsAtIso: "2030-05-13T10:00:00Z",
+        endsAtIso: "2030-05-13T10:30:00Z",
+        timezone: "UTC",
+      },
+    ],
+    isLoading: false,
+    isError: false,
+    retry: jest.fn(),
+  }),
+}));
 // The booking journey's three screens, locked to DetailShell.
 //
 // Written with the migration, because these screens had NO tests and the thing
@@ -50,7 +74,10 @@ const EVERY_TAB = [
   "Profile",
 ];
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  (useLocalSearchParams as jest.Mock).mockReturnValue({ practitionerId: "d1" });
+});
 
 describe("SelectTimeSlotScreen", () => {
   it("wears exactly one detail bar and no tab set", () => {
@@ -94,6 +121,8 @@ describe("ReviewAppointmentScreen", () => {
    * block so the other suites keep rendering bare.
    */
   const REVIEW_PARAMS = {
+    startsAtIso: "2030-05-13T10:00:00Z",
+    endsAtIso: "2030-05-13T10:30:00Z",
     // Required: `BookingCreate.doctor_id` is a non-optional UUID, so a session
     // without a practitioner id renders 756:4813 rather than a Confirm button
     // that could only ever fail. Screen 1 always pushes it.
@@ -151,15 +180,27 @@ describe("ReviewAppointmentScreen", () => {
 
 describe("BookingConfirmedScreen", () => {
   it("is terminal: a CLOSE affordance, never a back arrow", () => {
-    render(<BookingConfirmedScreen />);
-    expect(screen.getByText("Booking Confirmed")).toBeTruthy();
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}
+      >
+        <BookingConfirmedScreen />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText("Appointment")).toBeTruthy();
     expect(screen.queryByLabelText("Go back")).toBeNull();
     expect(screen.getAllByLabelText("Close")).toHaveLength(1);
     for (const tab of EVERY_TAB) expect(screen.queryByLabelText(tab)).toBeNull();
   });
 
   it("closes to Home by REPLACE, so Review cannot be re-confirmed", () => {
-    render(<BookingConfirmedScreen />);
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}
+      >
+        <BookingConfirmedScreen />
+      </QueryClientProvider>,
+    );
     fireEvent.press(screen.getByLabelText("Close"));
     expect(router.replace).toHaveBeenCalledWith("/(app)");
     expect(router.back).not.toHaveBeenCalled();

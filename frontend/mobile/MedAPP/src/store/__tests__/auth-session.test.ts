@@ -9,25 +9,40 @@
 
 const mockRefresh = jest.fn();
 const mockApiSignOut = jest.fn();
+const mockMe = jest.fn();
 jest.mock("@/features/auth/api", () => ({
   authApi: {
     refresh: (...a: unknown[]) => mockRefresh(...a),
     signOut: (...a: unknown[]) => mockApiSignOut(...a),
+    me: () => mockMe(),
   },
   fetchCurrentUser: jest.fn(),
 }));
 
 const mockGetRefreshToken = jest.fn();
+const mockGetAccessToken = jest.fn(async (): Promise<string | null> => null);
 const mockSetAccessToken = jest.fn(async () => {});
 const mockSetRefreshToken = jest.fn(async () => {});
 const mockClearAll = jest.fn(async () => {});
+const mockUnlock = jest.fn();
+const mockEnable = jest.fn();
+const mockDisable = jest.fn();
+const mockOwner = jest.fn();
+const mockLock = jest.fn();
+const mockClearBiometric = jest.fn(async () => {});
 jest.mock("@/lib/storage/secure-storage", () => ({
   secureStorage: {
-    getAccessToken: jest.fn(async () => null),
+    getAccessToken: () => mockGetAccessToken(),
     setAccessToken: (...a: unknown[]) => mockSetAccessToken(...(a as [])),
     getRefreshToken: () => mockGetRefreshToken(),
     setRefreshToken: (...a: unknown[]) => mockSetRefreshToken(...(a as [])),
     clearAll: () => mockClearAll(),
+    clearBiometric: () => mockClearBiometric(),
+    unlockBiometric: () => mockUnlock(),
+    enableBiometric: (...args: unknown[]) => mockEnable(...args),
+    disableBiometric: (...args: unknown[]) => mockDisable(...args),
+    biometricOwner: () => mockOwner(),
+    lockBiometric: () => mockLock(),
   },
 }));
 
@@ -60,6 +75,8 @@ jest.mock("@/lib/device/device-id", () => ({
 
 import { useAuthStore } from "../auth-store";
 import type { User } from "@/types/user";
+import { ApiError } from "@/types/api";
+import { queryClient } from "@/lib/api/query-client";
 
 const user: User = {
   id: "u1",
@@ -70,6 +87,16 @@ const user: User = {
 
 /** Lets the un-awaited revoke call start. */
 const flush = () => new Promise((r) => setTimeout(r, 0));
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
 
 function signedIn() {
   useAuthStore.setState({ token: "access-1", user, isAuthenticated: true, isHydrating: false });
@@ -162,6 +189,33 @@ describe("signOut revokes the refresh token", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(mockClearAll).toHaveBeenCalled();
   });
+
+  it("clears the visible session before a slow credential read completes", async () => {
+    const read = deferred<string | null>();
+    mockGetRefreshToken.mockReturnValueOnce(read.promise);
+    const signingOut = useAuthStore.getState().signOut();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+    });
+    read.resolve(null);
+    await signingOut;
+  });
+
+  it("still signs out locally when deleting stored credentials fails", async () => {
+    mockGetRefreshToken.mockResolvedValue(null);
+    mockClearAll.mockRejectedValueOnce(new Error("keystore unavailable"));
+
+    await expect(useAuthStore.getState().signOut()).resolves.toBeUndefined();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+    });
+  });
 });
 
 describe("session refresher registered with the api client", () => {
@@ -186,7 +240,10 @@ describe("session refresher registered with the api client", () => {
 
     await expect(sessionRefresher()).resolves.toBe(true);
 
-    expect(mockRefresh).toHaveBeenCalledWith("refresh-1");
+    expect(mockRefresh).toHaveBeenCalledWith(
+      "refresh-1",
+      expect.objectContaining({ onTokensRotated: expect.any(Function) }),
+    );
     expect(mockSetAccessToken).toHaveBeenCalledWith("access-2");
     expect(mockSetRefreshToken).toHaveBeenCalledWith("refresh-2");
     expect(useAuthStore.getState().token).toBe("access-2");
@@ -196,7 +253,7 @@ describe("session refresher registered with the api client", () => {
     // This is what bounces the user to sign-in via the (app) route guard,
     // instead of holding them in an app where every request 401s.
     mockGetRefreshToken.mockResolvedValue("refresh-1");
-    mockRefresh.mockRejectedValue(new Error("401"));
+    mockRefresh.mockRejectedValue(new ApiError("unauthorized", 401));
 
     await expect(sessionRefresher()).resolves.toBe(false);
 
@@ -210,5 +267,219 @@ describe("session refresher registered with the api client", () => {
     await expect(sessionRefresher()).resolves.toBe(false);
 
     expect(mockRefresh).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+});
+
+describe("session restoration", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAccessToken.mockResolvedValue("access-1");
+    mockGetRefreshToken.mockResolvedValue("refresh-1");
+    mockClearAll.mockResolvedValue(undefined);
+    mockApiSignOut.mockResolvedValue(undefined);
+    mockMe.mockReset();
+    useAuthStore.setState({ token: null, user: null, isAuthenticated: false, isHydrating: true });
+  });
+
+  it("retains the rotated token when the initial profile request refreshes the session", async () => {
+    mockRefresh.mockResolvedValue({ accessToken: "access-2", refreshToken: "refresh-2", user });
+    mockMe.mockImplementation(async () => {
+      // The real client's 401 handler invokes this registered callback before
+      // retrying /me. Its request/retry behavior is covered by client-401-refresh.
+      expect(await sessionRefresher()).toBe(true);
+      return user;
+    });
+
+    await useAuthStore.getState().hydrate();
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: "access-2",
+      user,
+      isAuthenticated: true,
+      isHydrating: false,
+    });
+    expect(mockSetAccessToken).toHaveBeenCalledWith("access-2");
+    expect(mockSetRefreshToken).toHaveBeenCalledWith("refresh-2");
+  });
+
+  it("does not restore a profile response that arrives after sign-out", async () => {
+    const profile = deferred<User>();
+    mockMe.mockReturnValue(profile.promise);
+    const hydrating = useAuthStore.getState().hydrate();
+    await flush();
+    expect(mockMe).toHaveBeenCalled();
+
+    await useAuthStore.getState().signOut();
+    profile.resolve(user);
+    await hydrating;
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+      isHydrating: false,
+    });
+  });
+
+  it("does not clear a newer session when an old profile request fails", async () => {
+    const profile = deferred<User>();
+    mockMe.mockReturnValue(profile.promise);
+    const hydrating = useAuthStore.getState().hydrate();
+    await flush();
+    expect(mockMe).toHaveBeenCalled();
+    const nextUser = { ...user, id: "u2", email: "next@example.com" };
+
+    await useAuthStore.getState().signIn("next-access", nextUser, "next-refresh");
+    profile.reject(new Error("old profile request failed"));
+    await hydrating;
+
+    expect(useAuthStore.getState()).toMatchObject({
+      token: "next-access",
+      user: nextUser,
+      isAuthenticated: true,
+      isHydrating: false,
+    });
+    expect(mockClearAll).not.toHaveBeenCalled();
+  });
+});
+
+describe("biometric enrollment and session lifecycle", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetRefreshToken.mockResolvedValue("refresh-1");
+    mockSetAccessToken.mockResolvedValue(undefined);
+    mockSetRefreshToken.mockResolvedValue(undefined);
+    mockClearAll.mockResolvedValue(undefined);
+    mockClearBiometric.mockResolvedValue(undefined);
+    mockApiSignOut.mockResolvedValue(undefined);
+    mockOwner.mockResolvedValue(user.id);
+    mockEnable.mockResolvedValue(undefined);
+    mockDisable.mockResolvedValue(undefined);
+    mockUnlock.mockResolvedValue({ ownerId: user.id, refreshToken: "refresh-1" });
+    mockRefresh.mockReset();
+    useAuthStore.setState({
+      token: null,
+      user: null,
+      isAuthenticated: false,
+      isHydrating: false,
+      revision: useAuthStore.getState().revision + 1,
+    });
+    queryClient.clear();
+  });
+
+  it("enables only the signed-in account and supplies a live session guard", async () => {
+    signedIn();
+    await useAuthStore.getState().enableBiometrics();
+    expect(mockEnable).toHaveBeenCalledWith(user.id, expect.any(Function));
+    const check = mockEnable.mock.calls[0][1] as () => boolean;
+    expect(check()).toBe(true);
+    await useAuthStore.getState().signOut();
+    expect(check()).toBe(false);
+  });
+
+  it("requires a successful protected unlock before exchanging or installing credentials", async () => {
+    const unlocking = deferred<{ ownerId: string; refreshToken: string }>();
+    mockUnlock.mockReturnValueOnce(unlocking.promise);
+    mockRefresh.mockResolvedValue({ accessToken: "access-2", refreshToken: "refresh-2", user });
+    const operation = useAuthStore.getState().biometricSignIn();
+    const repeated = useAuthStore.getState().biometricSignIn();
+    await flush();
+    expect(mockRefresh).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    unlocking.resolve({ ownerId: user.id, refreshToken: "refresh-1" });
+    await operation;
+    await repeated;
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).toHaveBeenCalledWith(
+      "refresh-1",
+      expect.objectContaining({ biometric: true }),
+    );
+    expect(useAuthStore.getState().token).toBe("access-2");
+    expect(mockClearBiometric).not.toHaveBeenCalled();
+  });
+
+  it("cancelled or invalidated device authentication never calls the server", async () => {
+    mockUnlock.mockRejectedValueOnce(new Error("Device authentication cancelled"));
+    await expect(useAuthStore.getState().biometricSignIn()).rejects.toThrow();
+    expect(mockRefresh).not.toHaveBeenCalled();
+    expect(mockClearAll).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("persists a rotated credential even when the subsequent profile read is offline", async () => {
+    mockRefresh.mockImplementation(async (_token, options) => {
+      await options.onTokensRotated({ accessToken: "access-2", refreshToken: "refresh-2" });
+      throw new ApiError("offline reading profile", 0);
+    });
+    await expect(useAuthStore.getState().biometricSignIn()).rejects.toMatchObject({ status: 0 });
+    expect(mockSetRefreshToken).toHaveBeenCalledWith("refresh-2");
+    expect(mockClearAll).not.toHaveBeenCalled();
+    expect(mockLock).toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("removes rejected server credentials and requires a fresh password sign-in", async () => {
+    mockRefresh.mockRejectedValue(new ApiError("revoked", 401));
+    await expect(useAuthStore.getState().biometricSignIn()).rejects.toMatchObject({ status: 401 });
+    expect(mockClearAll).toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("a late device prompt cannot overwrite a newer password sign-in", async () => {
+    const unlocking = deferred<{ ownerId: string; refreshToken: string }>();
+    mockUnlock.mockReturnValueOnce(unlocking.promise);
+    const oldAttempt = useAuthStore.getState().biometricSignIn();
+    const oldRejected = expect(oldAttempt).rejects.toThrow("session changed");
+    await flush();
+    const nextUser = { ...user, id: "patient-b" };
+    const newSignIn = useAuthStore.getState().signIn("new-access", nextUser, "new-refresh");
+    unlocking.resolve({ ownerId: user.id, refreshToken: "refresh-1" });
+    await oldRejected;
+    await newSignIn;
+    expect(mockRefresh).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().user?.id).toBe("patient-b");
+    expect(mockClearBiometric).toHaveBeenCalled();
+  });
+
+  it("locking during rotation hides the account immediately and saves the successor before dropping the key", async () => {
+    signedIn();
+    const rotating = deferred<{ accessToken: string; refreshToken: string; user: User }>();
+    let save!: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
+    mockRefresh.mockImplementation((_token, options) => {
+      save = options.onTokensRotated;
+      return rotating.promise;
+    });
+    queryClient.setQueryData(["private-patient-data"], "private");
+    const renewal = sessionRefresher();
+    await flush();
+    const locking = useAuthStore.getState().lock();
+    await flush();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(queryClient.getQueryData(["private-patient-data"])).toBeUndefined();
+    expect(mockLock).not.toHaveBeenCalled();
+    await save({ accessToken: "access-2", refreshToken: "refresh-2" });
+    rotating.resolve({ accessToken: "access-2", refreshToken: "refresh-2", user });
+    await renewal;
+    await locking;
+    expect(mockSetRefreshToken).toHaveBeenCalledWith("refresh-2");
+    expect(mockLock).toHaveBeenCalledTimes(1);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+  });
+
+  it("cannot silently renew after sign-out even if a credential read could still return a value", async () => {
+    await expect(sessionRefresher()).resolves.toBe(false);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("a partial sign-in storage failure clears both visible and persisted credentials", async () => {
+    signedIn();
+    mockSetRefreshToken.mockRejectedValueOnce(new Error("keystore write failed"));
+    await expect(
+      useAuthStore.getState().signIn("new-access", user, "new-refresh"),
+    ).rejects.toThrow();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(mockClearAll).toHaveBeenCalled();
+    expect(mockApiSignOut).toHaveBeenCalledWith("new-refresh");
   });
 });

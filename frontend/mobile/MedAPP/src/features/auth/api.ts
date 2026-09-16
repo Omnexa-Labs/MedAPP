@@ -1,4 +1,4 @@
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
 import type { User } from "@/types/user";
 
 // Auth network calls.
@@ -25,6 +25,8 @@ interface UserOutWire {
   role: string;
   dob: string | null;
   gender: string | null;
+  blood_type?: string | null;
+  primary_goal?: string | null;
   email_verified: boolean;
   phone_verified: boolean;
   kyc_status: string;
@@ -38,6 +40,22 @@ interface TokenPairWire {
   expires_in: number;
 }
 
+export class TwoFactorRequired extends Error {
+  constructor(
+    public readonly challengeToken: string,
+    public readonly expiresIn: number,
+  ) {
+    super("Enter your authenticator or recovery code.");
+    this.name = "TwoFactorRequired";
+  }
+}
+
+interface LoginChallengeWire {
+  mfa_required: true;
+  challenge_token: string;
+  expires_in: number;
+}
+
 interface SignupRequestWire {
   email: string;
   password: string;
@@ -46,6 +64,11 @@ interface SignupRequestWire {
   phone?: string;
   role?: string;
   verification_token?: string;
+  provider_ticket?: string;
+  dob?: string;
+  gender?: string;
+  blood_type?: string;
+  primary_goal?: string;
 }
 
 // Signup-OTP wire shapes (separate from the passwordless-login OTP).
@@ -72,9 +95,25 @@ interface LoginResponse {
   user: User;
 }
 
+export class SignupSignInError extends Error {
+  constructor() {
+    super("Your account was created and your details were saved. Sign in to continue.");
+    this.name = "SignupSignInError";
+  }
+}
+
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  bloodType?: string | null;
+  primaryGoal?: string | null;
 }
 
 export interface SignUpPayload {
@@ -83,25 +122,21 @@ export interface SignUpPayload {
   displayName: string;
 }
 
-// Composed payload from the 3-step sign-up flow. Step 2 / Step 3 fields are
-// captured for future use (the user-service signup doesn't accept them yet);
-// they'll be persisted via PATCH /me + a preferences endpoint once those land.
+// Personal details are saved atomically with the account. Security enrollment
+// and care-team consent require separate flows; signup cannot activate them.
 export interface SignUpFullPayload {
+  providerTicket?: string;
   // Step 1 — single Full Name field (see schema.ts). Replaced
   // firstName/middleName/lastName; middleName is no longer collected anywhere
   // in the app (flagged). Split into first/last in signUpFull below.
   fullName: string;
   email: string;
   password: string;
-  // Step 2 — recorded client-side until /me PATCH is wired.
+  // Step 2 — persisted by the signup endpoint and restored through /me.
   dateOfBirth: string;
   bloodType?: string;
   gender: string;
   primaryGoal: string;
-  // Step 3 — preferences (client-only until a prefs endpoint lands).
-  enableBiometric: boolean;
-  enableTwoFactor: boolean;
-  shareAnonymousData: boolean;
   // Verified contact from the OTP step between Step 1 and Step 2. The
   // backend marks the matching contact (email or phone) as verified at
   // creation time. Phone (when channel=sms) is persisted on the user;
@@ -138,6 +173,13 @@ function adaptUser(u: UserOutWire): User {
     id: u.id,
     email: u.email,
     displayName,
+    accountRole: u.role,
+    firstName: u.first_name,
+    lastName: u.last_name,
+    dateOfBirth: u.dob ?? null,
+    gender: u.gender ?? null,
+    bloodType: u.blood_type ?? null,
+    primaryGoal: u.primary_goal ?? null,
     // The wire User type has no avatarUrl yet; leave undefined.
     avatarUrl: undefined,
     // Backend role -> mobile Partner: only "user" maps cleanly today. Doctor /
@@ -153,10 +195,64 @@ function adaptUser(u: UserOutWire): User {
 // ---- API surface ---------------------------------------------------------
 
 export const authApi = {
-  async login(payload: LoginPayload): Promise<LoginResponse> {
-    const tokens = await client.post<TokenPairWire>("/v1/auth/login", payload, {
-      withAuth: false,
+  async providerSession(tokens: {
+    access_token: string;
+    refresh_token: string;
+  }): Promise<LoginResponse> {
+    try {
+      const user = await client.get<UserOutWire>("/v1/me", {
+        withAuth: false,
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      return {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        user: adaptUser(user),
+      };
+    } catch (error) {
+      void authApi.signOut(tokens.refresh_token).catch(() => {});
+      throw error;
+    }
+  },
+  async updateProfile(payload: UpdateProfilePayload): Promise<User> {
+    const user = await client.patch<UserOutWire>("/v1/me", {
+      first_name: payload.firstName,
+      last_name: payload.lastName,
+      dob: payload.dateOfBirth,
+      gender: payload.gender,
+      blood_type: payload.bloodType,
+      primary_goal: payload.primaryGoal,
     });
+    return adaptUser(user);
+  },
+
+  async requestPasswordReset(email: string): Promise<{ resendAfterSeconds: number }> {
+    const response = await client.post<{ status: string; resend_after_seconds?: number }>(
+      "/v1/auth/password/forgot",
+      { email },
+      { withAuth: false },
+    );
+    return { resendAfterSeconds: response.resend_after_seconds ?? 30 };
+  },
+
+  async resetPassword(payload: { token: string; newPassword: string }): Promise<void> {
+    await client.post(
+      "/v1/auth/password/reset",
+      { token: payload.token, new_password: payload.newPassword },
+      { withAuth: false },
+    );
+  },
+
+  async login(payload: LoginPayload): Promise<LoginResponse> {
+    const tokens = await client.post<TokenPairWire | LoginChallengeWire>(
+      "/v1/auth/login",
+      payload,
+      {
+        withAuth: false,
+      },
+    );
+    if ("mfa_required" in tokens)
+      throw new TwoFactorRequired(tokens.challenge_token, tokens.expires_in);
     // Backend login returns tokens only; fetch the user separately. Set the
     // token explicitly for this one /me call so we don't depend on the auth
     // store having updated yet.
@@ -169,6 +265,29 @@ export const authApi = {
       refreshToken: tokens.refresh_token,
       user: adaptUser(user),
     };
+  },
+
+  async completeTwoFactor(challengeToken: string, code: string): Promise<LoginResponse> {
+    const tokens = await client.post<TokenPairWire>(
+      "/v1/auth/two-factor/verify",
+      { challenge_token: challengeToken, code },
+      { withAuth: false },
+    );
+    try {
+      const user = await client.get<UserOutWire>("/v1/me", {
+        withAuth: false,
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      return {
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+        user: adaptUser(user),
+      };
+    } catch (error) {
+      // The proof is consumed. Close this orphan session and ask for a new password login.
+      void authApi.signOut(tokens.refresh_token).catch(() => {});
+      throw error;
+    }
   },
 
   // Legacy single-step signup (kept for callers that still want it).
@@ -188,9 +307,6 @@ export const authApi = {
   },
 
   async signUpFull(payload: SignUpFullPayload): Promise<LoginResponse> {
-    // Backend signup takes first/last/phone/role/verification_token. Step 2
-    // and Step 3 data are deferred — they belong on PATCH /me + a preferences
-    // endpoint that doesn't exist yet. Dropping them here is intentional.
     // FLAGGED, needs a product/backend decision — do not treat as settled.
     // The UI collapsed first/middle/last into one Full Name field (the Figma
     // frame draws one input), but SignupRequestWire still requires both
@@ -208,6 +324,10 @@ export const authApi = {
       first_name: firstName,
       last_name: lastName,
       role: "user",
+      dob: payload.dateOfBirth,
+      gender: payload.gender,
+      blood_type: payload.bloodType,
+      primary_goal: payload.primaryGoal,
     };
     // If the user verified a phone via OTP, persist it on the account so
     // the verified flag is meaningful.
@@ -217,40 +337,48 @@ export const authApi = {
     if (payload.verification?.token) {
       body.verification_token = payload.verification.token;
     }
+    if (payload.providerTicket) body.provider_ticket = payload.providerTicket;
     await client.post<UserOutWire>("/v1/auth/signup", body, { withAuth: false });
-    return authApi.login({ email: payload.email, password: payload.password });
+    try {
+      return await authApi.login({ email: payload.email, password: payload.password });
+    } catch {
+      // Creation already committed. Retrying signup would report a duplicate
+      // account even though the original personal details were saved correctly.
+      throw new SignupSignInError();
+    }
   },
 
   // Begin signup-time contact verification. Channel is "sms" or "email";
   // recipient is the E.164 phone or the email address. The backend
   // refuses (409) if the contact already belongs to a user — the caller
   // should map that to "looks like you already have an account".
-  async signupOtpStart(payload: SignupOtpStartPayload): Promise<{ expiresIn: number }> {
+  async signupOtpStart(payload: SignupOtpStartPayload): Promise<{
+    expiresIn: number;
+    resendAfterSeconds: number;
+  }> {
     const wire: SignupOtpStartWire = { channel: payload.channel };
     if (payload.channel === "sms") wire.phone = payload.recipient;
     else wire.email = payload.recipient;
-    const r = await client.post<{ sent: boolean; expires_in: number }>(
-      "/v1/auth/otp/signup-start",
-      wire,
-      { withAuth: false },
-    );
-    return { expiresIn: r.expires_in };
+    const r = await client.post<{
+      sent: boolean;
+      expires_in: number;
+      resend_after_seconds?: number;
+    }>("/v1/auth/otp/signup-start", wire, { withAuth: false });
+    return { expiresIn: r.expires_in, resendAfterSeconds: r.resend_after_seconds ?? 30 };
   },
 
   async signupOtpVerify(payload: SignupOtpVerifyPayload): Promise<SignupOtpVerifyResult> {
     const wire: SignupOtpVerifyWire = { channel: payload.channel, code: payload.code };
     if (payload.channel === "sms") wire.phone = payload.recipient;
     else wire.email = payload.recipient;
-    const r = await client.post<SignupOtpVerifyResponseWire>(
-      "/v1/auth/otp/signup-verify",
-      wire,
-      { withAuth: false },
-    );
+    const r = await client.post<SignupOtpVerifyResponseWire>("/v1/auth/otp/signup-verify", wire, {
+      withAuth: false,
+    });
     return { verificationToken: r.verification_token, expiresIn: r.expires_in };
   },
 
-  async me(): Promise<User> {
-    const u = await client.get<UserOutWire>("/v1/me");
+  async me(options?: RequestOptions): Promise<User> {
+    const u = await client.get<UserOutWire>("/v1/me", options);
     return adaptUser(u);
   },
 
@@ -264,12 +392,24 @@ export const authApi = {
   // the server emits a `user.biometric_login` audit + domain event.
   // The X-Device-Id header is attached by the api client automatically;
   // the backend uses it to bind this refresh chain to this install.
-  async refresh(refreshToken: string, options?: { biometric?: boolean }): Promise<LoginResponse> {
+  async refresh(
+    refreshToken: string,
+    options?: {
+      biometric?: boolean;
+      onTokensRotated?: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
+    },
+  ): Promise<LoginResponse> {
     const tokens = await client.post<TokenPairWire>(
       "/v1/auth/refresh",
       { refresh_token: refreshToken, biometric: options?.biometric ?? false },
       { withAuth: false },
     );
+    // Persist the new credential before /me: a failed profile request must not
+    // leave the caller retrying the already-consumed refresh token.
+    await options?.onTokensRotated?.({
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    });
     const user = await client.get<UserOutWire>("/v1/me", {
       withAuth: false,
       headers: { Authorization: `Bearer ${tokens.access_token}` },
@@ -289,6 +429,32 @@ export const authApi = {
       { refresh_token: refreshToken },
       { withAuth: false },
     );
+  },
+
+  /**
+   * Change the signed-in user's password.
+   *
+   * A REAL endpoint: `user_service` mounts `password.router` at `/auth/password`,
+   * so `POST /auth/password/change` exists, requires `CurrentUser`, and answers
+   * 204. The gateway maps `/v1/auth` -> user_service and strips the `v1/` prefix
+   * for that service alone (see api_gateway `_rewrite_path`), which is why the
+   * public path carries `/v1` and the router's does not.
+   *
+   * `withAuth` is deliberately LEFT AT ITS DEFAULT of true — unlike login,
+   * signup, logout and refresh, which pass `withAuth: false` because they carry
+   * their own credential. This one is an authenticated action on the current
+   * session and the server reads the user from the bearer token.
+   *
+   * Snake_case on the wire to match `ChangePasswordRequest`. A wrong current
+   * password is a 400 with `{"detail": ...}`, which `parseError` surfaces as the
+   * ApiError message — so callers should show `error.message` rather than
+   * inventing copy.
+   */
+  async changePassword(input: { currentPassword: string; newPassword: string }): Promise<void> {
+    await client.post<void>("/v1/auth/password/change", {
+      current_password: input.currentPassword,
+      new_password: input.newPassword,
+    });
   },
 };
 

@@ -10,24 +10,24 @@ These tests pin the middleware-layer contract independently of which
 routes happen to depend on ``get_hms_principal`` today — the defense
 must hold even if a future route forgets the principal dep.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import jwt as pyjwt
 import pytest
+from app import deps as hms_deps
+from app.config import settings
+from app.middleware import TenantContextMiddleware
+from app.tenant import tenant_context_var
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from app.config import settings
-from app import deps as hms_deps
-from app.middleware import TenantContextMiddleware
-from app.tenant import tenant_context_var
-
 
 def _sign(sub: str, hospital_id: str) -> str:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     payload = {
         "sub": sub,
         "role": "user",
@@ -35,7 +35,16 @@ def _sign(sub: str, hospital_id: str) -> str:
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
     }
-    return pyjwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    secret = settings.jwt_secret
+    if not settings.dev_mode:
+        payload.update(
+            role="hms_staff",
+            typ="access",
+            aud=settings.workspace_session_audience,
+            iss=settings.workspace_session_issuer,
+        )
+        secret = settings.workspace_session_secret.get_secret_value()
+    return pyjwt.encode(payload, secret, algorithm="HS256")
 
 
 def _probe_app() -> FastAPI:
@@ -69,6 +78,7 @@ async def test_unverified_user_does_not_bind_tenant_context(
 ) -> None:
     """Token with hospital_id=B for a user who has NO active staff role
     must leave the tenant context unset."""
+
     async def _no_role(_user_id: str, _tenant_id: str) -> str | None:
         return None
 
@@ -146,13 +156,19 @@ async def test_missing_subject_does_not_bind_tenant(
 ) -> None:
     """A token without ``sub`` cannot be verified — middleware must leave
     the context unset rather than fall back to trusting hospital_id."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     payload = {
         "hospital_id": str(uuid4()),
+        "role": "hms_staff",
+        "typ": "access",
+        "aud": settings.workspace_session_audience,
+        "iss": settings.workspace_session_issuer,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=5)).timestamp()),
     }
-    token = pyjwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    token = pyjwt.encode(
+        payload, settings.workspace_session_secret.get_secret_value(), algorithm="HS256"
+    )
 
     async def _explode(_user_id: str, _tenant_id: str) -> str | None:
         raise AssertionError("verification must not run without a subject")
@@ -161,8 +177,6 @@ async def test_missing_subject_does_not_bind_tenant(
 
     transport = ASGITransport(app=_probe_app())
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        resp = await ac.get(
-            "/v1/probe", headers={"Authorization": f"Bearer {token}"}
-        )
+        resp = await ac.get("/v1/probe", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["tenant"] is None

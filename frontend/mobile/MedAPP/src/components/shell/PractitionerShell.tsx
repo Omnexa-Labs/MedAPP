@@ -23,6 +23,7 @@ import type { Href } from "expo-router";
 import { useResolvedScheme } from "@/lib/theme";
 import { PractitionerAppBar } from "./PractitionerAppBar";
 import { PractitionerBottomNav, type PractitionerTab } from "./PractitionerBottomNav";
+import { WebColumn } from "./WebColumn";
 
 interface Props extends Pick<ViewProps, "testID"> {
   /** Which tab renders as selected. */
@@ -63,15 +64,18 @@ export function PractitionerShell({
           inset as padding so its own `surface` fill runs under the gesture bar
           instead of leaving a strip of canvas. */}
       <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
-        <PractitionerAppBar
-          hideBack={hideBack}
-          backFallbackHref={backFallbackHref}
-          onBackPress={onBackPress}
-          unreadCount={unreadCount}
-          onNotificationsPress={onNotificationsPress}
-        />
-        <View className="flex-1">{children}</View>
-        <PractitionerBottomNav active={activeTab} onTabPress={onTabPress} />
+        {/* Web only; renders nothing on native. See WebColumn's header. */}
+        <WebColumn>
+          <PractitionerAppBar
+            hideBack={hideBack}
+            backFallbackHref={backFallbackHref}
+            onBackPress={onBackPress}
+            unreadCount={unreadCount}
+            onNotificationsPress={onNotificationsPress}
+          />
+          <View className="flex-1">{children}</View>
+          <PractitionerBottomNav active={activeTab} onTabPress={onTabPress} />
+        </WebColumn>
       </SafeAreaView>
     </View>
   );

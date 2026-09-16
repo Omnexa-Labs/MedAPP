@@ -8,13 +8,13 @@ on confirming before irreversible actions (create / cancel).
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 from agents.shared import (
     AgentRequest,
     AgentResponse,
     BaseAgent,
     LLMChatTurn,
+    load_prompt,
     make_memory_service_from_env,
     make_provider,
 )
@@ -22,9 +22,7 @@ from agents.shared import (
 from .config import settings
 from .tools import TOOLS, make_executor
 
-_SYSTEM_PROMPT = (
-    Path(__file__).resolve().parents[3] / "prompts" / "booking.md"
-).read_text(encoding="utf-8")
+_SYSTEM_PROMPT = load_prompt("booking.md")
 
 
 class BookingAgent(BaseAgent):

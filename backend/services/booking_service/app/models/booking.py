@@ -23,11 +23,8 @@ class Booking(Base, TimestampMixin):
     # authorises on, and the comparison is local: no network call decides
     # access. See services/doctor_directory.py for the rejected alternatives.
     #
-    # Nullable because resolution is best-effort on the write path (a patient
-    # must not lose a confirmed slot to a doctor_service outage) and because
-    # rows predating this column cannot be filled by a migration that has no
-    # access to doctor_service's database. **NULL MEANS DENY, NOT ALLOW.**
-    # Repair NULLs with scripts/backfill_booking_doctor_user_id.py.
+    # Nullable for historical unresolved rows. New bookings require resolution;
+    # historical NULLs deny clinician access until explicitly backfilled.
     doctor_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
@@ -51,6 +48,7 @@ class Booking(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rescheduled_from_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, unique=True)
 
     @property
     def booking_id(self):

@@ -43,6 +43,7 @@ import { router, type Href } from "expo-router";
 import { useResolvedScheme } from "@/lib/theme";
 import { BottomNav, type PatientTab } from "@/features/home/components/BottomNav";
 import { PatientAppBar } from "./PatientAppBar";
+import { WebColumn } from "./WebColumn";
 
 // ---------------------------------------------------------------------------
 // THE TAB MAP — one copy, here, and nowhere else
@@ -237,6 +238,9 @@ export function PatientShell({
       {/* No "bottom" edge: BottomNav is absolutely positioned and already carries
           its own bottom padding, so claiming the inset here would double it. */}
       <SafeAreaView className="flex-1" edges={["top", "left", "right"]}>
+        {/* Web only; renders nothing on native. Wraps the BAR and the NAV as well
+            as the content, so all three share one edge — see WebColumn's header. */}
+        <WebColumn>
         {/* Every bar prop is forwarded. PractitionerShell shipped for a while
             with `onTabPress` declared and never passed down, which made the
             nav's documented escape hatch unreachable — the same class of bug
@@ -256,6 +260,7 @@ export function PatientShell({
         />
         <View className="flex-1">{children}</View>
         {showBottomNav ? <BottomNav active={activeTab} onTabPress={handleTabPress} /> : null}
+        </WebColumn>
       </SafeAreaView>
     </View>
   );

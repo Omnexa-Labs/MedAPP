@@ -4,13 +4,24 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
 from .middleware import TenantContextMiddleware
-from .routers import appointments, billing, dashboard, patients, pharmacy, staff, tenants
-from .routers import dev_auth
+from .routers import (
+    activation,
+    appointments,
+    billing,
+    dashboard,
+    dev_auth,
+    hospital_directory,
+    patients,
+    pharmacy,
+    staff,
+    staff_access,
+    tenants,
+    workspace_sessions,
+)
 from .tenant import tenant_db_manager
 
 logger = logging.getLogger(__name__)
@@ -27,7 +38,9 @@ async def lifespan(app: FastAPI):
 
 async def _init_dev_db():
     from shared.db import Base
+
     import app.models  # noqa: F401
+
     from .deps import _DevDB
 
     _DevDB.get_factory()
@@ -62,9 +75,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-    instrument_app(
-        app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint
-    )
+    instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
     if settings.dev_mode:
         app.add_middleware(
             CORSMiddleware,
@@ -75,8 +86,12 @@ def create_app() -> FastAPI:
         )
     app.add_middleware(TenantContextMiddleware)
     app.include_router(tenants.router)
+    app.include_router(activation.router)
+    app.include_router(workspace_sessions.router)
     app.include_router(patients.router)
     app.include_router(staff.router)
+    app.include_router(staff_access.router)
+    app.include_router(hospital_directory.router)
     app.include_router(appointments.router)
     app.include_router(pharmacy.router)
     app.include_router(billing.router)

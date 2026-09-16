@@ -13,15 +13,3 @@ export function makeQueryClient() {
     },
   });
 }
-
-let browserQueryClient: QueryClient | undefined;
-
-export function getQueryClient() {
-  if (typeof window === "undefined") {
-    return makeQueryClient();
-  }
-  if (!browserQueryClient) {
-    browserQueryClient = makeQueryClient();
-  }
-  return browserQueryClient;
-}

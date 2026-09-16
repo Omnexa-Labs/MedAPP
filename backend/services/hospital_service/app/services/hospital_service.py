@@ -3,11 +3,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from shared.audit import audited_collection_read
 from shared.auth import Principal
+from sqlalchemy import cast, func, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import AccessAudit, HospitalProfile, HospitalReview, HospitalStaff, StaffRole
 from ..schemas.hospital import HospitalCreate, HospitalStaffCreate
@@ -25,13 +25,19 @@ def _principal_uuid(principal: Principal) -> UUID:
 
 
 def _require_admin(principal: Principal) -> None:
-    if principal.role not in {"hospital_admin", "platform_admin"}:
+    if principal.role not in {"hospital_admin", "admin", "platform_admin"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin access required")
 
 
-def _require_staff_writer(principal: Principal) -> None:
-    if principal.role not in {"hospital_admin", "platform_admin"}:
+def _require_staff_writer(principal: Principal, hospital: HospitalProfile) -> None:
+    if not _may_manage_hospital(principal, hospital):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin access required")
+
+
+def _may_manage_hospital(principal: Principal, hospital: HospitalProfile) -> bool:
+    return principal.role in {"admin", "platform_admin"} or (
+        hospital.owner_user_id == _principal_uuid(principal) and hospital.is_active
+    )
 
 
 def _normalize_text(value: str | None) -> str | None:
@@ -41,9 +47,13 @@ def _normalize_text(value: str | None) -> str | None:
     return trimmed or None
 
 
-async def create_hospital(db: AsyncSession, principal: Principal, payload: HospitalCreate) -> HospitalProfile:
+async def create_hospital(
+    db: AsyncSession, principal: Principal, payload: HospitalCreate
+) -> HospitalProfile:
     _require_admin(principal)
     hospital = HospitalProfile(
+        owner_user_id=_principal_uuid(principal),
+        is_listable=True,
         name=payload.name.strip(),
         slug=payload.slug.strip(),
         description=_normalize_text(payload.description),
@@ -74,7 +84,9 @@ async def list_hospitals(
     city: str | None = None,
     country: str | None = None,
 ) -> list[HospitalProfile]:
-    stmt = select(HospitalProfile).where(HospitalProfile.is_active.is_(True))
+    stmt = select(HospitalProfile).where(
+        HospitalProfile.is_active.is_(True), HospitalProfile.is_listable.is_(True)
+    )
     if specialty:
         stmt = stmt.where(HospitalProfile.specialty.ilike(f"%{specialty.strip()}%"))
     if city:
@@ -82,7 +94,20 @@ async def list_hospitals(
     if country:
         stmt = stmt.where(HospitalProfile.country.ilike(f"%{country.strip()}%"))
     if insurance:
-        stmt = stmt.where(HospitalProfile.insurance_accepted.contains([insurance.strip()]))
+        insurers = (
+            (
+                func.jsonb_array_elements_text(cast(HospitalProfile.insurance_accepted, JSONB))
+                if db.bind.dialect.name == "postgresql"
+                else func.json_each(HospitalProfile.insurance_accepted)
+            )
+            .table_valued("value")
+            .alias("accepted_insurers")
+        )
+        stmt = stmt.where(
+            select(insurers.c.value)
+            .where(func.lower(insurers.c.value) == insurance.strip().lower())
+            .exists()
+        )
     # Free-text search added for the Find-Care wiring (plan
     # merry-seeking-gem). Case-insensitive substring across the
     # fields a patient is most likely to type.
@@ -104,16 +129,18 @@ async def list_hospitals(
 
 async def get_hospital(db: AsyncSession, hospital_id: UUID) -> HospitalProfile:
     hospital = await db.get(HospitalProfile, hospital_id)
-    if hospital is None:
+    if hospital is None or not hospital.is_active or not hospital.is_listable:
         raise HospitalError("hospital not found")
     return hospital
 
 
-async def add_staff_member(db: AsyncSession, principal: Principal, hospital_id: UUID, payload: HospitalStaffCreate) -> HospitalStaff:
-    _require_staff_writer(principal)
+async def add_staff_member(
+    db: AsyncSession, principal: Principal, hospital_id: UUID, payload: HospitalStaffCreate
+) -> HospitalStaff:
     hospital = await db.get(HospitalProfile, hospital_id)
     if hospital is None:
         raise HospitalError("hospital not found")
+    _require_staff_writer(principal, hospital)
     staff = HospitalStaff(
         hospital_id=hospital_id,
         user_id=payload.user_id,
@@ -127,23 +154,27 @@ async def add_staff_member(db: AsyncSession, principal: Principal, hospital_id: 
     return staff
 
 
-def may_see_staff_user_ids(principal: Principal) -> bool:
+async def may_see_staff_user_ids(db: AsyncSession, principal: Principal, hospital_id: UUID) -> bool:
     """Whether this caller gets `user_id` on roster rows.
 
-    Same role set as `_require_staff_writer`: whoever may edit the roster
-    already knows who is on it, so returning the ids they wrote back to them
-    discloses nothing new. Everyone else gets the roster without them.
+    Only this hospital's active owner or a platform administrator can manage
+    its roster and see account IDs. Other authenticated readers get a narrower
+    projection for publicly listed hospitals.
     """
-    return principal.role in {"hospital_admin", "platform_admin"}
+    hospital = await db.get(HospitalProfile, hospital_id)
+    return hospital is not None and _may_manage_hospital(principal, hospital)
 
 
-async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) -> list[HospitalStaff]:
+async def list_staff(
+    db: AsyncSession, principal: Principal, hospital_id: UUID
+) -> list[HospitalStaff]:
     """Active staff of one hospital, for an AUTHENTICATED caller.
 
     THE ACCESS RULE, AND WHY IT IS NOT PUBLIC
     -----------------------------------------
-    Any authenticated principal may read a hospital's roster; anonymous callers
-    may not. That is stricter than the sibling reads on this router
+    Any authenticated principal may read an active, publicly listed hospital's
+    roster; private rosters require the owner or a platform administrator.
+    Anonymous callers may not read rosters. That is stricter than sibling reads
     (`GET /v1/hospitals`, `/{id}`, `/{id}/reviews` are all public) and the
     difference is deliberate. Those return facts about an institution. This
     returns a list of people and where each of them works, which is personal
@@ -169,9 +200,8 @@ async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) 
         `may_see_staff_user_ids`.
 
     Raises `HospitalError` for an unknown hospital, so the router can answer 404
-    instead of an empty roster — `list_reviews` returns `[]` for a nonexistent
-    hospital, which cannot distinguish "no staff published" from "wrong id", and
-    that ambiguity is what put an EmptyState on the screen in the first place.
+    instead of an empty roster. Public review reads also require a visible,
+    existing hospital.
 
     AUDITED — this is the access log the docstring above promised and could not
     yet point at. Requiring a token made every read attributable; this makes it
@@ -201,6 +231,10 @@ async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) 
             # Outside the audit trail by design: `HospitalError` is not a
             # denial, and a roster that does not exist was not disclosed.
             raise HospitalError("hospital not found")
+        if (not hospital.is_active or not hospital.is_listable) and not _may_manage_hospital(
+            principal, hospital
+        ):
+            raise HTTPException(404, "hospital not found")
 
         stmt = (
             select(HospitalStaff)
@@ -213,18 +247,23 @@ async def list_staff(db: AsyncSession, principal: Principal, hospital_id: UUID) 
         result = await db.scalars(stmt)
         staff = list(result.all())
         audit.record_count = len(staff)
-        # `admin_override` is left False even for a `hospital_admin`, and that is
-        # a considered choice. Nobody bypasses a rule here — every authenticated
-        # role may read this roster. Admins do get the staff `user_id`s
-        # (`may_see_staff_user_ids`), i.e. a WIDER projection, which is a
-        # different fact from an override. Setting the flag for it would make
-        # `WHERE admin_override IS TRUE` stop meaning "someone bypassed
-        # authorization", which is the one query the column exists for.
-        # Recording projection width needs its own column; flagged, not faked.
+        # Platform access to a private roster uses the administrative override.
+        # Projection width on public rosters alone is not an override.
+        audit.admin_override = (
+            principal.role in {"admin", "platform_admin"}
+            and (not hospital.is_active or not hospital.is_listable)
+            and hospital.owner_user_id != _principal_uuid(principal)
+        )
     return staff
 
 
 async def list_reviews(db: AsyncSession, hospital_id: UUID) -> list[HospitalReview]:
-    stmt = select(HospitalReview).where(HospitalReview.hospital_id == hospital_id).where(HospitalReview.is_public.is_(True)).order_by(HospitalReview.created_at.desc())
+    await get_hospital(db, hospital_id)
+    stmt = (
+        select(HospitalReview)
+        .where(HospitalReview.hospital_id == hospital_id)
+        .where(HospitalReview.is_public.is_(True))
+        .order_by(HospitalReview.created_at.desc())
+    )
     result = await db.scalars(stmt)
     return list(result.all())

@@ -24,5 +24,8 @@ class RefreshToken(Base, TimestampMixin):
     # with rows that pre-date this column (rolling deploy: old mobile builds
     # still work; new builds get the binding).
     device_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # Stable across refresh rotation. Legacy rows join a family on first refresh.
+    session_id: Mapped[UUID | None] = mapped_column(nullable=True, index=True)
+    session_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_refresh_tokens_user_active", "user_id", "revoked_at"),)

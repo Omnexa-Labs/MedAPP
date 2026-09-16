@@ -82,6 +82,11 @@ async def test_update_patient(client):
     assert resp.json()["city"] == "Kumasi"
     assert resp.json()["first_name"] == "Kwame"
 
+    saved = await client.get(f"/v1/patients/{patient_id}")
+    assert saved.status_code == 200
+    assert saved.json()["city"] == "Kumasi"
+    assert saved.json()["updated_at"] == resp.json()["updated_at"]
+
 
 @pytest.mark.asyncio
 async def test_create_visit(client):

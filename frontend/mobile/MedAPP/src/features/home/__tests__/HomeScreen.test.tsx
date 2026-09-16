@@ -16,7 +16,7 @@
 // patient's own blood pressure, attributed to an AI, on a screen that has never
 // issued a vitals request. That string cannot come back by accident.
 
-import { fireEvent, screen, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { TEST_METRICS } from "@/test/safe-area";
@@ -55,8 +55,16 @@ jest.mock("react-native-reanimated", () => {
 // suite's `use-current-user` mock. A signed-in user with no display name is the
 // screen's own fallback path ("Good morning, there") and changes nothing the
 // tests below look at.
+let mockAccount = {
+  user: { id: "patient-a", displayName: "Ama Mensah" },
+  revision: 1,
+  isAuthenticated: true,
+};
 jest.mock("@/store/auth-store", () => ({
-  useAuthStore: (selector: (state: { user: null }) => unknown) => selector({ user: null }),
+  useAuthStore: Object.assign(
+    (selector: (state: typeof mockAccount) => unknown) => selector(mockAccount),
+    { getState: () => mockAccount },
+  ),
 }));
 
 // Mocked at the FEATURE boundary, not at `client`, for the reason the
@@ -78,8 +86,12 @@ jest.mock("@/features/wearables/api", () => ({
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockNavigate = jest.fn();
+let mockFocus: (() => void) | undefined;
 
 jest.mock("expo-router", () => ({
+  useFocusEffect: (callback: () => void) => {
+    mockFocus = callback;
+  },
   router: {
     push: (...args: unknown[]) => mockPush(...args),
     replace: (...args: unknown[]) => mockReplace(...args),
@@ -137,6 +149,11 @@ function renderScreen() {
 }
 
 beforeEach(() => {
+  mockAccount = {
+    user: { id: "patient-a", displayName: "Ama Mensah" },
+    revision: 1,
+    isAuthenticated: true,
+  };
   mockPush.mockClear();
   mockReplace.mockClear();
   mockNavigate.mockClear();
@@ -174,7 +191,7 @@ describe("HomeScreen — Quick Services", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/appointments");
   });
 
-  it("does NOT announce the four destination-less tiles as buttons", () => {
+  it("connects existing patient destinations while the pharmacy directory remains pending", () => {
     // The defect, stated directly. These four had `accessibilityRole="button"`,
     // an accessibilityLabel and `active:scale-95` with no handler, so TalkBack
     // said "Pharmacy, button" and the tile depressed under the finger for a tap
@@ -182,9 +199,14 @@ describe("HomeScreen — Quick Services", () => {
     // is a `<Text>` — they are simply no longer controls.
     renderScreen();
 
-    for (const label of ["Pharmacy", "Labs", "Vitals", "Records"]) {
-      expect(screen.getByText(label)).toBeTruthy();
-      expect(screen.queryByRole("button", { name: label })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pharmacy" })).toBeNull();
+    for (const [label, target] of [
+      ["Labs", "lab-results"],
+      ["Vitals", "vitals-timeline"],
+      ["Records", "medical-records"],
+    ]) {
+      fireEvent.press(screen.getByRole("button", { name: label }));
+      expect(mockPush).toHaveBeenCalledWith(`/(app)/${target}`);
     }
   });
 
@@ -289,13 +311,13 @@ describe("HomeScreen — nothing fabricated survives", () => {
     expect(screen.getByText(/not a diagnosis/i)).toBeTruthy();
   });
 
-  it("renders no wellness figures when the patient has no readings", () => {
+  it("explains empty wellness without inventing figures", async () => {
     // The literals were "7h 20m" and "6,240 / 8,000". With no samples the whole
     // section is absent — NOT zeroed, because a zero step count claims the
     // patient did not move (docs/api/wearable_sync_service.md).
     renderScreen();
 
-    expect(screen.queryByText("Daily Wellness")).toBeNull();
+    expect(await screen.findByText("No wellness readings today")).toBeTruthy();
     expect(screen.queryByText("7h 20m")).toBeNull();
     expect(screen.queryByText(/6,240/)).toBeNull();
   });
@@ -308,8 +330,22 @@ describe("HomeScreen — nothing fabricated survives", () => {
     };
     getSummary.mockResolvedValue({
       recentSamples: [
-        { id: "s1", deviceId: "dev-1", kind: "sleep_minutes", value: "440", unit: "min", recordedAtIso: at(7) },
-        { id: "s2", deviceId: "dev-1", kind: "steps", value: "1940", unit: "steps", recordedAtIso: at(18) },
+        {
+          id: "s1",
+          deviceId: "dev-1",
+          kind: "sleep_minutes",
+          value: "440",
+          unit: "min",
+          recordedAtIso: at(7),
+        },
+        {
+          id: "s2",
+          deviceId: "dev-1",
+          kind: "steps",
+          value: "1940",
+          unit: "steps",
+          recordedAtIso: at(18),
+        },
       ],
     });
     renderScreen();
@@ -322,13 +358,13 @@ describe("HomeScreen — nothing fabricated survives", () => {
     expect(screen.queryByText(/8,000/)).toBeNull();
   });
 
-  it("shows no appointment card at all when there is no upcoming booking", async () => {
+  it("offers booking from an empty schedule without an invented appointment", async () => {
     renderScreen();
     await waitFor(() => expect(listAppointments).toHaveBeenCalled());
 
     // No invented clinician, and no "Tomorrow, 10:30 AM" that stays "Tomorrow"
     // forever. An absent section is the honest resting state.
-    expect(screen.queryByText("Upcoming Appointments")).toBeNull();
+    expect(await screen.findByText("No upcoming appointments")).toBeTruthy();
     expect(screen.queryByText(/Dr\. Sarah Chen/)).toBeNull();
     expect(screen.queryByText("Tomorrow, 10:30 AM")).toBeNull();
   });
@@ -394,5 +430,60 @@ describe("HomeScreen — nothing fabricated survives", () => {
 
     fireEvent.press(screen.getByLabelText("View All Upcoming Appointments"));
     expect(mockPush).toHaveBeenCalledWith("/(app)/appointments");
+  });
+});
+
+describe("HomeScreen — loading, retry and account boundaries", () => {
+  it("keeps explicit loading regions until each service responds", () => {
+    listAppointments.mockImplementation(() => new Promise(() => {}));
+    getSummary.mockImplementation(() => new Promise(() => {}));
+    renderScreen();
+    expect(screen.getByTestId("home-appointments-loading")).toBeTruthy();
+    expect(screen.getByTestId("home-wellness-loading")).toBeTruthy();
+    expect(screen.queryByText("No upcoming appointments")).toBeNull();
+  });
+  it("retries appointments independently while wellness remains available", async () => {
+    listAppointments
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue({ upcoming: [VIDEO_APPOINTMENT], past: [] });
+    renderScreen();
+    fireEvent.press(await screen.findByLabelText("Retry home appointments"));
+    expect(await screen.findByText("Dr. Adjoa Boateng")).toBeTruthy();
+    expect(getSummary).toHaveBeenCalledTimes(1);
+  });
+  it("wellness failure cannot masquerade as an empty day", async () => {
+    getSummary.mockRejectedValue(new Error("offline"));
+    renderScreen();
+    expect(await screen.findByText("Wellness couldn't load")).toBeTruthy();
+    expect(screen.queryByText("No wellness readings today")).toBeNull();
+  });
+  it("returning to Home refetches both sources", async () => {
+    renderScreen();
+    await screen.findByText("No upcoming appointments");
+    await act(async () => mockFocus?.());
+    await waitFor(() => expect(listAppointments).toHaveBeenCalledTimes(2));
+    expect(getSummary).toHaveBeenCalledTimes(2);
+  });
+  it("an account change removes the previous account's appointment and invalidates its retry guard", async () => {
+    listAppointments.mockResolvedValue({ upcoming: [VIDEO_APPOINTMENT], past: [] });
+    const view = renderScreen();
+    await screen.findByText("Dr. Adjoa Boateng");
+    const guard = listAppointments.mock.calls[0][0].isSessionCurrent;
+    mockAccount = {
+      user: { id: "patient-b", displayName: "Other Patient" },
+      revision: 2,
+      isAuthenticated: true,
+    };
+    listAppointments.mockImplementation(() => new Promise(() => {}));
+    view.rerender(
+      <SafeAreaProvider initialMetrics={TEST_METRICS}>
+        <QueryClientProvider client={activeClient!}>
+          <HomeScreen />
+        </QueryClientProvider>
+      </SafeAreaProvider>,
+    );
+    expect(guard()).toBe(false);
+    expect(screen.queryByText("Dr. Adjoa Boateng")).toBeNull();
+    expect(screen.getByText("Hello, Other")).toBeTruthy();
   });
 });

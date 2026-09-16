@@ -1,86 +1,171 @@
 "use client";
-
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/stores/auth.store";
-
+import { SessionError, useAuthStore } from "@/lib/stores/auth.store";
 export default function LoginPage() {
   const router = useRouter();
-  const login = useAuthStore((s) => s.login);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const { isAuthenticated, isHydrating, error: sessionError } = useAuthStore();
+  const [email, setEmail] = useState(""),
+    [password, setPassword] = useState(""),
+    [code, setCode] = useState("");
+  const [challenge, setChallenge] = useState<{
+    scope: string;
+    expiresAt: number;
+  } | null>(null);
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (isAuthenticated) router.replace("/workspaces");
+  }, [isAuthenticated, router]);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
     setError("");
-    setLoading(true);
+    setBusy(true);
     try {
-      await login(email, password);
-      router.replace("/dashboard");
-    } catch {
-      setError("Invalid credentials. Please try again.");
+      if (challenge) {
+        if (challenge.expiresAt <= Date.now())
+          throw new SessionError("Verification expired. Start sign-in again.");
+        await useAuthStore.getState().verify(code, challenge.scope);
+      } else {
+        const result = await useAuthStore.getState().login(email, password);
+        setPassword("");
+        if (result) {
+          setChallenge({
+            scope: result.scope,
+            expiresAt: Date.now() + result.expires_in * 1000,
+          });
+          return;
+        }
+      }
+      router.replace("/workspaces");
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Sign-in could not be completed.",
+      );
+      if (failure instanceof SessionError && failure.code === "session_changed")
+        await useAuthStore.getState().hydrate();
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
+  }
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
-      <div className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Hospital Management System</h1>
-          <p className="mt-2 text-sm text-slate-500">Sign in with your MedApp credentials</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-              placeholder="you@hospital.com"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-xs text-slate-400">
-          Powered by MedApp
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <section
+        className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm"
+        aria-labelledby="signin-title"
+      >
+        <p className="text-sm font-semibold text-slate-600">
+          MedApp · Hospital portal
         </p>
-      </div>
-    </div>
+        <h1
+          id="signin-title"
+          className="mt-3 text-2xl font-bold text-slate-900"
+        >
+          {challenge ? "Verify your sign-in" : "Sign in to your hospital"}
+        </h1>
+        <p className="mt-2 text-sm text-slate-600">
+          {challenge
+            ? "Enter your authenticator code or one of your recovery codes."
+            : "Use your MedApp account, then choose a hospital where you are a staff member."}
+        </p>
+        {isHydrating ? (
+          <p role="status" className="mt-6">
+            Checking your session…
+          </p>
+        ) : isAuthenticated ? (
+          <Link href="/workspaces" className="mt-6 block underline">
+            Continue to your workspaces
+          </Link>
+        ) : (
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            {(error || sessionError) && (
+              <p
+                role="alert"
+                className="rounded-md bg-red-50 p-3 text-sm text-red-700"
+              >
+                {error || sessionError}
+              </p>
+            )}
+            {challenge ? (
+              <div>
+                <label htmlFor="code" className="text-sm font-medium">
+                  Authenticator or recovery code
+                </label>
+                <input
+                  id="code"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={busy}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="email" className="text-sm font-medium">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="username"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={busy}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={busy}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+                  />
+                </div>
+              </>
+            )}
+            <button
+              disabled={busy}
+              className="w-full rounded-md bg-slate-900 px-4 py-2.5 font-medium text-white disabled:opacity-50"
+            >
+              {busy
+                ? "Please wait…"
+                : challenge
+                  ? "Verify and continue"
+                  : "Sign in"}
+            </button>
+            {challenge && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setChallenge(null);
+                  setCode("");
+                  setError("");
+                }}
+                className="w-full py-2 text-sm underline"
+              >
+                Start sign-in again
+              </button>
+            )}
+          </form>
+        )}
+      </section>
+    </main>
   );
 }

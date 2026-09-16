@@ -1,4 +1,5 @@
 const MODULE_ROLES: Record<string, string[]> = {
+  "hospital-profile": ["hospital_admin"],
   patients: ["hospital_admin", "receptionist", "doctor", "nurse"],
   staff: ["hospital_admin", "department_head"],
   appointments: ["hospital_admin", "receptionist", "doctor", "nurse"],

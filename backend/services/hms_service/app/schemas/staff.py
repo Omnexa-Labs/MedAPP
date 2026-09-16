@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DepartmentCreate(BaseModel):
@@ -52,6 +52,7 @@ class StaffCreate(BaseModel):
 
 
 class StaffUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
     employee_id: str | None = Field(default=None, max_length=32)
     first_name: str | None = Field(default=None, max_length=128)
     last_name: str | None = Field(default=None, max_length=128)
@@ -61,6 +62,13 @@ class StaffUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=32)
     email: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
+
+    @field_validator("first_name", "last_name")
+    @classmethod
+    def name_required(cls, value):
+        if not value:
+            raise ValueError("Staff names cannot be blank.")
+        return value
 
 
 class StaffOut(BaseModel):
@@ -83,6 +91,7 @@ class StaffOut(BaseModel):
 
 class StaffList(BaseModel):
     items: list[StaffOut] = Field(default_factory=list)
+    has_more: bool = False
 
 
 class ScheduleSlotCreate(BaseModel):

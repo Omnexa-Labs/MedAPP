@@ -45,7 +45,7 @@
 
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { AppearanceSelector, AvatarWithFallback, Icon } from "@/components/ui";
 import { ACCOUNT_MENU_PROFILE_HREF, AccountMenu, DetailShell } from "@/components/shell";
 import { useTokenColor } from "@/lib/tokens";
@@ -64,9 +64,7 @@ const GLYPH = 20;
  * reduces to.
  */
 function SectionLabel({ children }: { children: string }) {
-  return (
-    <Text className="font-label-md text-label-md text-on-surface-variant">{children}</Text>
-  );
+  return <Text className="font-label-md text-label-md text-on-surface-variant">{children}</Text>;
 }
 
 export function SettingsScreen() {
@@ -150,6 +148,58 @@ export function SettingsScreen() {
           <SectionLabel>Appearance</SectionLabel>
           <AppearanceSelector />
         </View>
+
+        {/* Security & privacy — the first of the rows the header calls out as
+            absent, now that it has a screen behind it. It is a real destination
+            with a real control (change password hits
+            `POST /v1/auth/password/change`), which is the bar the header set:
+            "a row for any of them would be a designed promise the product cannot
+            keep". The rest of that list — Notifications, Language, About — is
+            still absent for exactly the same reason. */}
+        <View className="gap-sm">
+          <SectionLabel>Privacy</SectionLabel>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Security and privacy"
+            onPress={() => router.push("/(app)/security-privacy" as Href)}
+            className="flex-row items-center justify-between rounded-card border border-outline-variant bg-card-surface px-md active:opacity-70"
+            style={{ minHeight: ROW_MIN_HEIGHT }}
+            testID="settings-security-privacy"
+          >
+            <Text className="font-label-md text-label-md text-on-surface">
+              Security &amp; privacy
+            </Text>
+            <Icon chrome="chevron-right" size={22} />
+          </Pressable>
+        </View>
+
+        {user ? (
+          <View className="gap-sm">
+            <SectionLabel>Professional work</SectionLabel>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Pharmacy workspaces"
+              onPress={() => router.push("/(app)/pharmacy-workspaces" as Href)}
+              className="flex-row items-center justify-between rounded-card border border-outline-variant bg-card-surface px-md active:opacity-70"
+              style={{ minHeight: ROW_MIN_HEIGHT }}
+            >
+              <Text className="font-label-md text-label-md text-on-surface">Pharmacy workspaces</Text>
+              <Icon chrome="chevron-right" size={GLYPH} color={onSurfaceVariant} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Hospital workspaces"
+              onPress={() => router.push("/(app)/hospital-workspaces" as Href)}
+              className="flex-row items-center justify-between rounded-card border border-outline-variant bg-card-surface px-md active:opacity-70"
+              style={{ minHeight: ROW_MIN_HEIGHT }}
+            >
+              <Text className="font-label-md text-label-md text-on-surface">
+                Hospital workspaces
+              </Text>
+              <Icon chrome="chevron-right" size={GLYPH} color={onSurfaceVariant} />
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Session. A centred `error`-toned row on its own card, not a filled
             red slab: the filled destructive treatment belongs to the CONFIRM

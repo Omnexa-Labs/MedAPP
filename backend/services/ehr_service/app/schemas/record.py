@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class PatientOut(BaseModel):
@@ -37,6 +38,7 @@ class VitalOut(BaseModel):
 
 class VitalTimelineOut(BaseModel):
     items: list[VitalOut] = Field(default_factory=list)
+    next_cursor: str | None = None
 
 
 class PatientSummaryOut(BaseModel):
@@ -46,8 +48,10 @@ class PatientSummaryOut(BaseModel):
 
 
 class ConsentCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     doctor_user_id: UUID
-    scope: str = Field(default="records", max_length=64)
+    scope: Literal["records", "records_and_vitals"] = "records"
+    expires_in_days: Literal[7, 30, 90] = 30
     reason: str = Field(default="patient consent", max_length=255)
 
 
@@ -62,6 +66,37 @@ class ConsentOut(BaseModel):
     granted_at: datetime
     revoked_at: datetime | None = None
     revoked_by_user_id: UUID | None = None
+    expires_at: datetime | None = None
+    clinician_display_name: str | None = None
+    clinician_role: str | None = None
+    reason: str | None = None
+
+    @computed_field
+    @property
+    def status(self) -> Literal["active", "revoked", "expired"]:
+        expiry = self.expires_at
+        if expiry and not expiry.tzinfo:
+            expiry = expiry.replace(tzinfo=UTC)
+        revoked = self.revoked_at
+        if revoked and not revoked.tzinfo:
+            revoked = revoked.replace(tzinfo=UTC)
+        # Expired rows are closed at their expiry when a fresh grant is created.
+        if expiry and expiry <= datetime.now(UTC) and (not revoked or revoked >= expiry):
+            return "expired"
+        return "revoked" if revoked else "active"
+
+
+class ConsentPage(BaseModel):
+    items: list[ConsentOut]
+    limit: int
+    offset: int
+    next_offset: int | None
+
+
+class ClinicianIdentity(BaseModel):
+    user_id: UUID
+    display_name: str = Field(min_length=1, max_length=511)
+    role: Literal["doctor", "nurse"]
 
 
 class PatientBundleOut(BaseModel):

@@ -39,7 +39,7 @@ async def test_book_appointment(client):
     })
     assert resp.status_code == 201
     data = resp.json()
-    assert data["status"] == "scheduled"
+    assert data["status"] == "booked"
     assert data["appointment_type"] == "scheduled"
     assert data["reason"] == "Annual checkup"
 

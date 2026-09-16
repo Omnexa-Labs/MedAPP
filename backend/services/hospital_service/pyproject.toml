@@ -22,6 +22,10 @@ test = [
   "aiosqlite>=0.20",
 ]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
 [tool.setuptools]
 include-package-data = true
 

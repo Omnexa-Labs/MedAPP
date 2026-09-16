@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PharmacyBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str = Field(min_length=1, max_length=255)
     slug: str = Field(min_length=1, max_length=128)
     description: str | None = None
-    license_number: str | None = Field(default=None, max_length=128)
+    license_number: str | None = Field(default=None, max_length=255)
     license_categories: list[str] = Field(default_factory=list)
     address_line1: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=128)
@@ -25,8 +26,6 @@ class PharmacyBase(BaseModel):
     # accept any string dict; schema is not enforced beyond that today.
     operating_hours: dict[str, str] | None = None
     photo_url: str | None = Field(default=None, max_length=1024)
-    pms_base_url: str | None = Field(default=None, max_length=512)
-    pms_partner_secret_id: str | None = Field(default=None, max_length=128)
     is_listable: bool = False
 
 
@@ -35,10 +34,11 @@ class PharmacyCreate(PharmacyBase):
 
 
 class PharmacyUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str | None = Field(default=None, min_length=1, max_length=255)
     slug: str | None = Field(default=None, min_length=1, max_length=128)
     description: str | None = None
-    license_number: str | None = Field(default=None, max_length=128)
+    license_number: str | None = Field(default=None, max_length=255)
     license_categories: list[str] | None = None
     address_line1: str | None = Field(default=None, max_length=255)
     city: str | None = Field(default=None, max_length=128)
@@ -51,8 +51,6 @@ class PharmacyUpdate(BaseModel):
     insurance_accepted: list[str] | None = None
     operating_hours: dict[str, str] | None = None
     photo_url: str | None = Field(default=None, max_length=1024)
-    pms_base_url: str | None = Field(default=None, max_length=512)
-    pms_partner_secret_id: str | None = Field(default=None, max_length=128)
     is_listable: bool | None = None
 
 
@@ -60,8 +58,20 @@ class PharmacyOut(PharmacyBase):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     pharmacy_id: UUID
-    user_id: UUID
     is_active: bool
+    services_offered: list[str] = Field(default_factory=list)
+    head_pharmacist_name: str | None = None
+    head_pharmacist_bio: str | None = None
+
+    @field_validator("photo_url")
+    @classmethod
+    def public_photo_url(cls, value):
+        from ..config import settings
+        from ..photo_paths import PHOTO_PATH
+
+        if value and PHOTO_PATH.fullmatch(value):
+            return settings.public_api_origin + value
+        return value
 
 
 class PharmacyList(BaseModel):

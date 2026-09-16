@@ -22,6 +22,7 @@ def issue_access_token(
     ttl_minutes: int = 15,
     audience: str = DEFAULT_AUDIENCE,
     issuer: str = DEFAULT_ISSUER,
+    session_id: str | None = None,
 ) -> str:
     now = datetime.now(tz=timezone.utc)
     payload: dict[str, Any] = {
@@ -33,6 +34,8 @@ def issue_access_token(
         "exp": int((now + timedelta(minutes=ttl_minutes)).timestamp()),
         "typ": "access",
     }
+    if session_id is not None:
+        payload["sid"] = session_id
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .. import events
@@ -12,6 +13,8 @@ from ..schemas import (
     UserOut,
 )
 from ..services import auth_service
+from ..schemas.two_factor import LoginChallenge
+from ..services.two_factor_service import FactorError
 
 router = APIRouter()
 
@@ -25,9 +28,12 @@ async def signup(
     db: AsyncSession = DbSession,
     ip: str | None = ClientIp,
     ua: str | None = UserAgent,
+    device_id: str | None = DeviceId,
 ) -> UserOut:
     try:
-        user = await auth_service.signup(db, payload, ip=ip, user_agent=ua)
+        user = await auth_service.signup(db, payload, ip=ip, user_agent=ua, device_id=device_id)
+    except FactorError as exc:
+        raise HTTPException(exc.status, str(exc)) from exc
     except auth_service.AuthError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     # Commit before publishing so the event stream never outruns the database.
@@ -42,18 +48,23 @@ async def signup(
 
 
 # Login verifies credentials and returns a new access/refresh pair.
-@router.post("/login", response_model=TokenPair)
+@router.post("/login", response_model=TokenPair | LoginChallenge)
 async def login(
     payload: LoginRequest,
+    response: Response,
     db: AsyncSession = DbSession,
     ip: str | None = ClientIp,
     ua: str | None = UserAgent,
     device_id: str | None = DeviceId,
-) -> TokenPair:
+) -> TokenPair | LoginChallenge | JSONResponse:
+    response.headers["Cache-Control"] = "no-store"
     try:
         _user, tokens = await auth_service.login(
             db, payload, ip=ip, user_agent=ua, device_id=device_id
         )
+    except FactorError as exc:
+        return JSONResponse(status_code=exc.status, content={"detail": str(exc)},
+                            headers={"Cache-Control": "no-store"})
     except auth_service.AuthError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     return tokens

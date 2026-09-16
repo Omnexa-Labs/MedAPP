@@ -59,6 +59,8 @@ import { tokenColor } from "@/lib/tokens";
 import { Icon, type ChromeIconName } from "./icons/Icon";
 
 export type InputProps = React.ComponentProps<typeof TextInput> & {
+  /** React 19 ref prop, forwarded to TextInput so forms can focus invalid fields. */
+  ref?: React.Ref<TextInput>;
   /** Leading UI-chrome glyph (mail, lock, person …). Optional. */
   icon?: ChromeIconName;
   /**

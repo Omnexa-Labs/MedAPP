@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -83,6 +84,10 @@ async def compute_slots(
     rules = await list_availability_rules(db, doctor_id)
     if from_date > to_date:
         raise AvailabilityError("from_date must be on or before to_date")
+    if (to_date - from_date).days > 30:
+        raise AvailabilityError("request at most 31 calendar days")
+    if not 5 <= slot_minutes <= 240:
+        raise AvailabilityError("slot_minutes must be between 5 and 240")
 
     slots: list[SlotOut] = []
     current = from_date
@@ -92,8 +97,23 @@ async def compute_slots(
         for rule in rules:
             if rule.day_of_week != weekday:
                 continue
-            starts_at = datetime.combine(current, rule.start_time)
-            ends_at = datetime.combine(current, rule.end_time)
+            try:
+                zone = ZoneInfo(rule.timezone)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise AvailabilityError("availability has an invalid timezone") from exc
+            # Walk elapsed instants, retaining both repeated clocks at fall-back
+            # and skipping nonexistent clocks at spring-forward. Boundaries
+            # inside a DST gap are not offered until the clinician fixes them.
+            def boundary(clock, fold):
+                local = datetime.combine(current, clock).replace(tzinfo=zone, fold=fold)
+                instant = local.astimezone(timezone.utc)
+                if instant.astimezone(zone).replace(tzinfo=None) != local.replace(tzinfo=None):
+                    return None
+                return instant
+            starts_at = boundary(rule.start_time, 0)
+            ends_at = boundary(rule.end_time, 1)
+            if starts_at is None or ends_at is None:
+                continue
             cursor = starts_at
             while cursor + step <= ends_at:
                 slots.append(
@@ -106,4 +126,5 @@ async def compute_slots(
                 )
                 cursor += step
         current += timedelta(days=1)
-    return slots
+    unique = {(slot.starts_at, slot.ends_at): slot for slot in slots}
+    return sorted(unique.values(), key=lambda slot: slot.starts_at)

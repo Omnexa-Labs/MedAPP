@@ -61,7 +61,10 @@ jest.mock("expo-calendar", () => ({
 import { AccessibilityInfo, BackHandler, Linking, Share } from "react-native";
 import { router } from "expo-router";
 import * as Calendar from "expo-calendar";
-import { BookingConfirmedScreen } from "../BookingConfirmedScreen";
+import { BookingConfirmationDetails, type ConfirmationParams } from "../BookingConfirmationDetails";
+const BookingConfirmedScreen = () => (
+  <BookingConfirmationDetails params={mockParams as ConfirmationParams} isCurrent={() => true} />
+);
 
 /**
  * A confirmed in-person booking, EXACTLY as Review forwards it after a real
@@ -115,7 +118,7 @@ let backPress: (() => boolean | null | undefined) | null = null;
 let removeBackHandler: jest.Mock;
 
 function source(): string {
-  return readFileSync(join(__dirname, "..", "BookingConfirmedScreen.tsx"), "utf8");
+  return readFileSync(join(__dirname, "..", "BookingConfirmationDetails.tsx"), "utf8");
 }
 
 /** Strips comments, so a hex mentioned in the "these are deleted" note is not a hit. */
@@ -231,10 +234,9 @@ describe("booking reference", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Share appointment"));
-    });
+    fireEvent.press(screen.getByLabelText("Share appointment"));
 
+    await waitFor(() => expect(share).toHaveBeenCalled());
     const [{ message }] = share.mock.calls[0] as [{ message: string }];
     expect(message).toContain("Dr. Amina Sterling");
     expect(message).toContain("Tuesday, 13 May 2025");
@@ -257,10 +259,9 @@ describe("booking reference", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Share appointment"));
-    });
+    fireEvent.press(screen.getByLabelText("Share appointment"));
 
+    await waitFor(() => expect(share).toHaveBeenCalled());
     const [{ message }] = share.mock.calls[0] as [{ message: string }];
     expect(message).not.toMatch(/medapp:|exp:|https?:\/\//);
   });
@@ -268,7 +269,7 @@ describe("booking reference", () => {
   it("never puts a source file near a link builder", () => {
     // The source guard, same shape as the reference one above: a rendering
     // assertion passes just as happily against a link nobody pressed.
-    const src = readFileSync(join(__dirname, "..", "BookingConfirmedScreen.tsx"), "utf8");
+    const src = readFileSync(join(__dirname, "..", "BookingConfirmationDetails.tsx"), "utf8");
     expect(src).not.toMatch(/shareLinkLine|shareLinkFor|Linking\.createURL/);
   });
 });
@@ -285,7 +286,9 @@ describe("consultation mode", () => {
     for (const item of VIDEO_CHECKLIST) expect(screen.queryByText(item)).toBeNull();
     expect(screen.getByText("In person")).toBeTruthy();
     expect(
-      screen.getByText("Your in-person appointment is confirmed. We've saved it to My Appointments."),
+      screen.getByText(
+        "Your in-person appointment is confirmed. We've saved it to My Appointments.",
+      ),
     ).toBeTruthy();
   });
 
@@ -324,12 +327,10 @@ describe("Add to Calendar", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Add to Calendar"));
-    });
+    fireEvent.press(screen.getByLabelText("Add to Calendar"));
 
     expect(Calendar.requestCalendarPermissionsAsync).toHaveBeenCalled();
-    expect(Calendar.createEventAsync).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(Calendar.createEventAsync).toHaveBeenCalledTimes(1));
     const [calendarId, event] = (Calendar.createEventAsync as jest.Mock).mock.calls[0];
     expect(typeof calendarId).toBe("string");
     expect(event.title).toContain("Dr. Amina Sterling");
@@ -356,10 +357,9 @@ describe("Add to Calendar", () => {
     mockParams = { ...VIDEO, joinUrl: "https://meet.medapp.dev/abc" };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Add to Calendar"));
-    });
+    fireEvent.press(screen.getByLabelText("Add to Calendar"));
 
+    await waitFor(() => expect(Calendar.createEventAsync).toHaveBeenCalled());
     const [, event] = (Calendar.createEventAsync as jest.Mock).mock.calls[0];
     expect(event.location).toBeUndefined();
     // There is no join link to carry, so the event carries no note promising
@@ -378,9 +378,7 @@ describe("Add to Calendar", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Add to Calendar"));
-    });
+    fireEvent.press(screen.getByLabelText("Add to Calendar"));
 
     await waitFor(() => expect(screen.getByText(DENIED_COPY)).toBeTruthy());
     expect(Calendar.createEventAsync).not.toHaveBeenCalled();
@@ -400,9 +398,7 @@ describe("Add to Calendar", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Add to Calendar"));
-    });
+    fireEvent.press(screen.getByLabelText("Add to Calendar"));
 
     await waitFor(() =>
       expect(screen.getByText(/We couldn't add this to your calendar/)).toBeTruthy(),
@@ -444,9 +440,7 @@ describe("Add to Calendar", () => {
     mockParams = { ...IN_PERSON };
     render(<BookingConfirmedScreen />);
 
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText("Add to Calendar"));
-    });
+    fireEvent.press(screen.getByLabelText("Add to Calendar"));
 
     await waitFor(() =>
       expect(screen.getByText(/We couldn't add this to your calendar/)).toBeTruthy(),
@@ -469,7 +463,8 @@ describe("no invented booking", () => {
     expect(tree).not.toMatch(/Video Call/);
     expect(screen.queryByText("Date & Time")).toBeNull();
     expect(screen.queryByText("Consultation Type")).toBeNull();
-    // The headline still stands — the user did confirm something.
+    // Presentation receives a validated booking from the route loader.
+    // saved-confirmation.test.tsx verifies that an ID-less route cannot reach it.
     expect(screen.getByText("Appointment Confirmed")).toBeTruthy();
   });
 
@@ -519,4 +514,39 @@ describe("frame fidelity", () => {
     // opt out explicitly rather than inherit an elevation no frame draws.
     expect(src).toMatch(/shadow=\{false\}/);
   });
+});
+
+it("does not write to the calendar if the account changes during its permission prompt", async () => {
+  let finish!: (value: unknown) => void;
+  let current = true;
+  (Calendar.requestCalendarPermissionsAsync as jest.Mock).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  render(
+    <BookingConfirmationDetails
+      params={IN_PERSON as ConfirmationParams}
+      isCurrent={() => current}
+    />,
+  );
+  fireEvent.press(screen.getByLabelText("Add to Calendar"));
+  current = false;
+  await act(async () => finish({ granted: true }));
+  expect(Calendar.createEventAsync).not.toHaveBeenCalled();
+});
+it("does not write to the calendar after leaving or replacing the booking", async () => {
+  let finish!: (value: unknown) => void;
+  (Calendar.requestCalendarPermissionsAsync as jest.Mock).mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  const view = render(
+    <BookingConfirmationDetails params={IN_PERSON as ConfirmationParams} isCurrent={() => true} />,
+  );
+  fireEvent.press(screen.getByLabelText("Add to Calendar"));
+  view.unmount();
+  await act(async () => finish({ granted: true }));
+  expect(Calendar.createEventAsync).not.toHaveBeenCalled();
 });

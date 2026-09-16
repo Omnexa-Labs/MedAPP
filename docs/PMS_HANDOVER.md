@@ -1,5 +1,35 @@
 # Pharmacy Management System — Handover Guide
 
+**MedApp activation update, 2026-09-16:** use the
+[pharmacy activation contract](api/pharmacy_service.md) for approved MedApp
+pharmacies. It requires a fresh PMS database, a permanent operator assignment,
+separate credentials and `PMS_DEV_MODE=false`. The owner uses a verified MedApp
+identity; do not seed shared demonstration accounts into that workspace. The
+portal now supports MedApp password/MFA sign-in and server-held sessions. Use the
+[portal setup guide](../frontend/pms_web/README.md) for the required private Redis,
+gateway/PMS origins and exact deployment key. MedApp workspace selection and
+handoff/return are implemented; configure the per-deployment handoff credential
+and return allowlists before use. The owner profile editor, explicit publication/
+withdrawal, history and managed photo uploads are implemented; apply directory
+migration 20260915_0004 and set PHARMACY_PUBLIC_API_ORIGIN to the patient gateway.
+Dashboard, catalog editing and batch receipt/adjustment/history are implemented.
+Apply PMS migrations through `0006_sale_corrections` with the updated portal/API and
+follow the [inventory contract](api/pms_service.md) for versioned edits, request
+keys and stock concurrency. Purchasing now supports draft edits, partial deliveries,
+multiple batches, cancellation of unreceived stock and administrator reconciliation
+of recorded earlier batches. POS and dispensing now review batch prices and retain
+atomic request receipts; cancellation/void actions require saved revisions and
+record reasons. Payment details are recorded without charging or refunding an
+instrument. Receipt corrections now preserve original receipts and distinguish
+never-collected units from customer returns. Only never-collected units restore
+stock and reduce verified prescription quantities. External refunds can be recorded
+against credits, with separate history and corrected-entry evidence. Older dispense
+links require administrator review. See the [correction contract](api/pms_service.md#receipt-corrections-and-completed-refund-records).
+Missing legacy evidence, durable MedApp synchronization, actual payment-provider
+refunds, full operational and rendered/device acceptance remain pending.
+The standalone instructions below do not activate MedApp ownership. Existing PMS
+sessions must sign in again for the new token issuer/audience and pharmacy scope.
+
 This guide is for an IT person setting up the **Pharmacy Management System
 (PMS)** for a single pharmacy. The PMS is a self-contained template: it runs
 fully standalone (POS, inventory, batches, suppliers, purchase orders,
@@ -16,7 +46,7 @@ platform.
 
 - Docker & Docker Compose (recommended), or:
   - Python 3.12 + [uv](https://docs.astral.sh/uv/)
-  - Node 20+
+  - Node 24
   - Postgres 16
 
 ---
@@ -74,11 +104,13 @@ In a second terminal:
 ```bash
 cd frontend/pms_web
 npm install
-cp .env.example .env.local       # NEXT_PUBLIC_PMS_API_URL=http://localhost:8030
+cp .env.example .env.local       # configure PMS_WEB_* server-only values
 npm run dev
 ```
 
-Open http://localhost:3002.
+Open http://127.0.0.1:3002. Redis is required for portal sessions. Approved owners
+choose MedApp account; standalone staff choose Local staff account. The native
+handoff and profile/publication workflow are not covered by these instructions.
 
 ---
 
@@ -88,10 +120,15 @@ Open http://localhost:3002.
 2. **Staff** → add the pharmacist(s) and cashier(s) with their own logins.
 3. **Suppliers** → add the wholesalers you buy from.
 4. **Inventory** → add the drugs you stock (or accept the seeded sample list and edit).
-5. **Purchase orders** → create your first PO and mark it Received — this
-   creates batches and seeds opening stock.
-6. **POS** → ring up a test sale to verify the flow.
-7. **Reports** → confirm the dashboard reflects the test sale.
+5. **Purchase orders** → save an order, mark it ordered after placing it with the
+   supplier, then record actual deliveries and their batch details. Use direct
+   batch receipt for opening stock that has no purchase-order record.
+6. In a test environment, **POS** → add a non-prescription medicine, review batch
+   prices, record payment details and open the saved receipt. Test a partial
+   prescription dispense and check its remaining quantities and linked sale.
+7. **Reports** → confirm the dashboard reflects recorded transactions. A lost
+   response should be retried using **Retry same request** in the same open form.
+   Do not recreate an uncertain sale without checking the ledger.
 
 ---
 

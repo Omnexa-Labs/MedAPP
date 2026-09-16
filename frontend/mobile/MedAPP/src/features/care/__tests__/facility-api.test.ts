@@ -18,7 +18,13 @@
 
 const mockGet = jest.fn();
 jest.mock("@/lib/api/client", () => ({
-  client: { get: (...a: unknown[]) => mockGet(...a), post: jest.fn(), put: jest.fn(), patch: jest.fn(), delete: jest.fn() },
+  client: {
+    get: (...a: unknown[]) => mockGet(...a),
+    post: jest.fn(),
+    put: jest.fn(),
+    patch: jest.fn(),
+    delete: jest.fn(),
+  },
   registerAuthTokenProvider: jest.fn(),
   registerDeviceIdProvider: jest.fn(),
 }));
@@ -191,6 +197,18 @@ describe("listHospitalStaff", () => {
 });
 
 describe("getPharmacy", () => {
+  it("preserves the pharmacy's published services and head pharmacist details", async () => {
+    mockGet.mockResolvedValue({
+      ...PHARMACY_WIRE,
+      services_offered: ["Vaccinations"],
+      head_pharmacist_name: "Ama Mensah",
+      head_pharmacist_bio: "Community pharmacist.",
+    });
+    const pharmacy = await careApi.getPharmacy("pharm-1");
+    expect(pharmacy.servicesOffered).toEqual(["Vaccinations"]);
+    expect(pharmacy.headPharmacistName).toBe("Ama Mensah");
+    expect(pharmacy.headPharmacistBio).toBe("Community pharmacist.");
+  });
   it("calls the detail route, which is not filtered by only_listable", async () => {
     mockGet.mockResolvedValue(PHARMACY_WIRE);
     await careApi.getPharmacy("pharm-1");
@@ -349,7 +367,7 @@ describe("adaptDoctor / getDoctor — nothing invented, nothing dropped", () => 
     mockGet.mockResolvedValue(DOCTOR_WIRE);
     const d = await careApi.getDoctor("doc-7");
 
-    expect(mockGet).toHaveBeenCalledWith("/v1/doctors/doc-7");
+    expect(mockGet).toHaveBeenCalledWith("/v1/doctors/doc-7", undefined);
     expect(d.avatarUri).toBe("");
     expect(d.consultationFeeCents).toBe(12000);
   });

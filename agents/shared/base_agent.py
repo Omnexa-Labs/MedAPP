@@ -183,8 +183,8 @@ def _load_memory_summary_prompt() -> str | None:
     global _MEMORY_SUMMARY_PROMPT
     if _MEMORY_SUMMARY_PROMPT is not None:
         return _MEMORY_SUMMARY_PROMPT
-    from pathlib import Path
-    p = Path(__file__).resolve().parents[1] / "prompts" / "_memory_summary.md"
+    from .prompts import prompt_path
+    p = prompt_path("_memory_summary.md")
     try:
         _MEMORY_SUMMARY_PROMPT = p.read_text(encoding="utf-8")
     except OSError:

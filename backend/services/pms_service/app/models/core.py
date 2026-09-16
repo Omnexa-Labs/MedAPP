@@ -4,11 +4,13 @@ Kept together because every entity here belongs to the same single-pharmacy
 deployment and they cross-reference often (drug -> batch -> sale_item).
 Importing this module registers tables on shared.db.Base.metadata.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime
 from uuid import UUID
 
+from shared.db import Base, TimestampMixin
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -21,13 +23,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 # Use JSONB on Postgres, plain JSON on SQLite (for tests).
 JsonType = JSON().with_variant(JSONB(), "postgresql")
-from sqlalchemy.orm import Mapped, mapped_column
-
-from shared.db import Base, TimestampMixin
-
 
 # -- profile + identity ------------------------------------------------------
 
@@ -39,12 +38,12 @@ class PharmacyProfile(Base, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
-    license_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    license_no: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address: Mapped[str | None] = mapped_column(String(512), nullable=True)
     city: Mapped[str | None] = mapped_column(String(128), nullable=True)
     region: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    country: Mapped[str] = mapped_column(String(2), nullable=False, default="GH")
-    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    country: Mapped[str] = mapped_column(String(128), nullable=False, default="GH")
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="GHS")
     medapp_partner_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -57,7 +56,7 @@ class Staff(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
 
 
@@ -79,20 +78,25 @@ class Supplier(Base, TimestampMixin):
 class PurchaseOrder(Base, TimestampMixin):
     __tablename__ = "purchase_orders"
 
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    receiving_reconciled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    supplier_name_snapshot: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     po_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True)
     supplier_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("suppliers.id"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="draft", index=True
-    )  # draft|sent|received|cancelled
+        String(24), nullable=False, default="draft", index=True
+    )  # draft|sent|partially_received|received|cancelled
     expected_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     total_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="GHS")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by_staff_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), nullable=True
-    )
+    created_by_staff_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
 
 
 class PurchaseOrderItem(Base, TimestampMixin):
@@ -103,6 +107,10 @@ class PurchaseOrderItem(Base, TimestampMixin):
     )
     drug_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    quantity_received: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    drug_name_snapshot: Mapped[str | None] = mapped_column(String(384), nullable=True)
     unit_cost_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
@@ -111,6 +119,8 @@ class PurchaseOrderItem(Base, TimestampMixin):
 
 class Drug(Base, TimestampMixin):
     __tablename__ = "drugs"
+
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
 
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     brand_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -130,6 +140,8 @@ class Drug(Base, TimestampMixin):
 class DrugBatch(Base, TimestampMixin):
     __tablename__ = "drug_batches"
 
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+
     drug_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("drugs.id"), nullable=False, index=True
     )
@@ -139,6 +151,10 @@ class DrugBatch(Base, TimestampMixin):
     purchase_order_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("purchase_orders.id"), nullable=True
     )
+    purchase_order_item_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("purchase_order_items.id"), nullable=True, index=True
+    )
+    delivery_reference: Mapped[str | None] = mapped_column(String(64), nullable=True)
     batch_number: Mapped[str] = mapped_column(String(64), nullable=False)
     quantity_received: Mapped[int] = mapped_column(Integer, nullable=False)
     quantity_on_hand: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -183,6 +199,9 @@ class Customer(Base, TimestampMixin):
 class Prescription(Base, TimestampMixin):
     __tablename__ = "prescriptions"
 
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    cancellation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     rx_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True)
     source: Mapped[str] = mapped_column(
         String(16), nullable=False, default="walk_in", index=True
@@ -218,6 +237,10 @@ class PrescriptionItem(Base, TimestampMixin):
 class Sale(Base, TimestampMixin):
     __tablename__ = "sales"
 
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    void_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     sale_number: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True)
     prescription_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("prescriptions.id"), nullable=True, index=True
@@ -247,6 +270,9 @@ class SaleItem(Base, TimestampMixin):
     sale_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("sales.id"), nullable=False, index=True
     )
+    prescription_item_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("prescription_items.id"), nullable=True, index=True
+    )
     drug_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     drug_batch_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
     drug_name_snapshot: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -255,14 +281,66 @@ class SaleItem(Base, TimestampMixin):
     line_total_cents: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class SaleCorrection(Base, TimestampMixin):
+    __tablename__ = "sale_corrections"
+
+    sale_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("sales.id"), index=True)
+    number: Mapped[str] = mapped_column(String(32), unique=True)
+    kind: Mapped[str] = mapped_column(String(24))  # not_collected | customer_return
+    reason: Mapped[str] = mapped_column(String(255))
+    credit_cents: Mapped[int] = mapped_column(Integer)
+    actor_staff_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True))
+
+
+class SaleCorrectionItem(Base, TimestampMixin):
+    __tablename__ = "sale_correction_items"
+
+    correction_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("sale_corrections.id"), index=True
+    )
+    sale_item_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("sale_items.id"), index=True
+    )
+    quantity: Mapped[int] = mapped_column(Integer)
+    credit_cents: Mapped[int] = mapped_column(Integer)
+
+
+class SaleRefund(Base, TimestampMixin):
+    __tablename__ = "sale_refunds"
+
+    sale_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("sales.id"), index=True)
+    number: Mapped[str] = mapped_column(String(32), unique=True)
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    payment_method: Mapped[str] = mapped_column(String(16))
+    payment_ref: Mapped[str] = mapped_column(String(128))
+    reason: Mapped[str] = mapped_column(String(255))
+    actor_staff_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(16), default="recorded", server_default="recorded")
+    void_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    voided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    voided_by: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+
+
 # -- audit -------------------------------------------------------------------
 
 
 class AuditLog(Base, TimestampMixin):
     __tablename__ = "audit_log"
 
-    actor_staff_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True)
+    actor_staff_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True, index=True
+    )
     action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     entity_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     payload_json: Mapped[dict | None] = mapped_column(JsonType, nullable=True)
+
+
+class InventoryRequest(Base, TimestampMixin):
+    """Committed results let a caller safely retry the same stock operation."""
+
+    __tablename__ = "inventory_requests"
+    actor_staff_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    operation: Mapped[str] = mapped_column(String(100), nullable=False)
+    request: Mapped[dict] = mapped_column(JsonType, nullable=False)
+    result: Mapped[dict | None] = mapped_column(JsonType, nullable=True)

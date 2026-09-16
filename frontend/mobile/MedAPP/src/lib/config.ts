@@ -12,13 +12,15 @@ export interface AppConfig {
   appEnv: AppEnv;
   apiBaseUrl: string;
   partnerOnboardingUrl: string;
+  hospitalPortalUrl: string;
 }
 
 function readExtra(): AppConfig {
   const extra = (Constants.expoConfig?.extra ?? {}) as Partial<AppConfig>;
   const appEnv = extra.appEnv;
   let apiBaseUrl = extra.apiBaseUrl;
-  const partnerOnboardingUrl = extra.partnerOnboardingUrl;
+  let partnerOnboardingUrl = extra.partnerOnboardingUrl;
+  let hospitalPortalUrl = extra.hospitalPortalUrl || "";
 
   if (!appEnv || !apiBaseUrl || !partnerOnboardingUrl) {
     throw new Error(
@@ -36,8 +38,11 @@ function readExtra(): AppConfig {
   if (Platform.OS === "web" && apiBaseUrl.includes("10.0.2.2")) {
     apiBaseUrl = apiBaseUrl.replace("10.0.2.2", "localhost");
   }
+  if (Platform.OS === "web")
+    partnerOnboardingUrl = partnerOnboardingUrl.replace("10.0.2.2", "localhost");
+  if (Platform.OS === "web") hospitalPortalUrl = hospitalPortalUrl.replace("10.0.2.2", "localhost");
 
-  return { appEnv, apiBaseUrl, partnerOnboardingUrl };
+  return { appEnv, apiBaseUrl, partnerOnboardingUrl, hospitalPortalUrl };
 }
 
 export const config: AppConfig = readExtra();

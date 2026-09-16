@@ -1,24 +1,28 @@
 from __future__ import annotations
 
-from uuid import UUID
 from datetime import datetime
+from typing import Literal
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .inventory_validation import Units
+from .transactions import PaymentInput, TransactionInput, Version
 
 
-class PrescriptionItemIn(BaseModel):
+class PrescriptionItemIn(TransactionInput):
     drug_id: UUID
-    quantity_prescribed: int
-    dosage_instructions: str | None = None
+    quantity_prescribed: Units
+    dosage_instructions: str | None = Field(None, max_length=512)
 
 
-class PrescriptionCreate(BaseModel):
+class PrescriptionCreate(TransactionInput):
     customer_id: UUID | None = None
-    prescriber_name: str | None = None
-    prescriber_license: str | None = None
-    source: str = "walk_in"  # walk_in|internal — medapp comes via /integrations
-    notes: str | None = None
-    items: list[PrescriptionItemIn]
+    prescriber_name: str | None = Field(None, max_length=255)
+    prescriber_license: str | None = Field(None, max_length=64)
+    source: Literal["walk_in", "internal"] = "walk_in"
+    notes: str | None = Field(None, max_length=2000)
+    items: list[PrescriptionItemIn] = Field(min_length=1, max_length=100)
 
 
 class PrescriptionItemOut(BaseModel):
@@ -38,6 +42,8 @@ class PrescriptionOut(BaseModel):
 
     id: UUID
     rx_number: str
+    version: int
+    cancellation_reason: str | None
     source: str
     external_ref: str | None
     customer_id: UUID | None
@@ -51,18 +57,26 @@ class PrescriptionOut(BaseModel):
 
 class PrescriptionList(BaseModel):
     items: list[PrescriptionOut]
+    total: int
+    limit: int
+    offset: int
 
 
-class DispenseItemIn(BaseModel):
+class DispenseItemIn(TransactionInput):
     prescription_item_id: UUID
-    quantity: int
+    quantity: Units
 
 
-class DispenseRequest(BaseModel):
-    items: list[DispenseItemIn]
-    payment_method: str = "cash"
-    payment_ref: str | None = None
-    notes: str | None = None
+class DispenseRequest(PaymentInput):
+    version: Version
+    items: list[DispenseItemIn] = Field(min_length=1, max_length=100)
+
+    @field_validator("items")
+    @classmethod
+    def unique_items(cls, items):
+        if len({item.prescription_item_id for item in items}) != len(items):
+            raise ValueError("include each prescription item only once")
+        return items
 
 
 class DispenseResultLine(BaseModel):
@@ -74,7 +88,9 @@ class DispenseResultLine(BaseModel):
 class DispenseResult(BaseModel):
     prescription_id: UUID
     rx_status: str
+    rx_version: int
     sale_id: UUID
+    sale_number: str
     sale_total_cents: int
     currency: str
     lines: list[DispenseResultLine]

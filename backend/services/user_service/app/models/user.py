@@ -22,6 +22,9 @@ class User(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(32), index=True, default="user")
     dob: Mapped[date | None] = mapped_column(Date, nullable=True)
     gender: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Self-reported signup/profile data, not a clinically verified blood group.
+    blood_type: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    primary_goal: Mapped[str | None] = mapped_column(String(16), nullable=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     kyc_status: Mapped[str] = mapped_column(String(32), default="not_required", index=True)

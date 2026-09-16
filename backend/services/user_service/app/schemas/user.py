@@ -8,9 +8,11 @@ from pydantic import (
     EmailStr,
     Field,
     StringConstraints,
+    field_validator,
 )
 
 from .medical import MedicalHistory
+from .profile_details import ProfileDetails
 
 
 # Audit finding B-12: per-item bound on allergy strings. The ORM
@@ -34,6 +36,8 @@ class UserOut(BaseModel):
     role: str
     dob: date | None = None
     gender: str | None = None
+    blood_type: str | None = None
+    primary_goal: str | None = None
     email_verified: bool
     phone_verified: bool
     kyc_status: str
@@ -73,7 +77,7 @@ class UserOut(BaseModel):
     }
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(ProfileDetails):
     # Audit finding C-9: this schema IS the field allowlist for PATCH /me.
     # Pydantic v2 defaults to silently dropping unknown fields; we set
     # `extra="forbid"` so an attempt to PATCH a privileged field (`role`,
@@ -87,16 +91,29 @@ class UserUpdate(BaseModel):
     # the platform never accepts PHI shapes it can't account for.
     first_name: str | None = Field(
         default=None,
+        max_length=255,
         validation_alias=AliasChoices("first_name", "firstname", "firstName"),
     )
     last_name: str | None = Field(
         default=None,
+        max_length=255,
         validation_alias=AliasChoices("last_name", "lastname", "surname", "lastName"),
     )
-    dob: date | None = None
-    gender: str | None = None
     allergies: list[_AllergyEntry] | None = Field(default=None, max_length=50)
     medical_history: MedicalHistory | None = None
+
+    @field_validator("first_name", "last_name", mode="before")
+    @classmethod
+    def validate_profile_name(cls, value, info):
+        # Omitted names are untouched. Explicit null would violate the existing
+        # NOT NULL columns; an empty last name supports a person with one name.
+        if value is None:
+            raise ValueError("Name cannot be null")
+        if isinstance(value, str):
+            value = value.strip()
+            if info.field_name == "first_name" and not value:
+                raise ValueError("First name is required")
+        return value
 
     model_config = {
         "extra": "forbid",

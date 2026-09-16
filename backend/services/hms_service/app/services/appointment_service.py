@@ -62,6 +62,7 @@ async def update_appointment(appt_id: UUID, body: AppointmentUpdate, db: AsyncSe
     for key, value in update_data.items():
         setattr(appt, key, value)
     await db.flush()
+    await db.refresh(appt, attribute_names=["updated_at"])
     return appt
 
 

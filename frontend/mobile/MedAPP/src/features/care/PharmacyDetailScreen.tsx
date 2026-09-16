@@ -124,7 +124,12 @@ export function formatDayHours(raw: string | undefined): string {
   if (!v) return "Not listed";
   if (/^closed$/i.test(v)) return "Closed";
   const range = v.match(/^(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})$/);
-  return range ? `${range[1]} – ${range[2]}` : v;
+  if (!range) return v;
+  const minutes = (time: string) => {
+    const [h, m] = time.split(":").map(Number);
+    return h * 60 + m;
+  };
+  return `${range[1]} – ${range[2]}${minutes(range[2]) < minutes(range[1]) ? " (next day)" : ""}`;
 }
 
 /** Case-insensitive view of the raw hours map, built once per record. */
@@ -299,7 +304,11 @@ export function PharmacyDetailScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* -- Storefront ---------------------------------------------------- */}
-        <Storefront name={pharmacy.name} photoUrl={pharmacy.photoUrl} />
+        <Storefront
+          key={pharmacy.photoUrl || pharmacy.pharmacyId}
+          name={pharmacy.name}
+          photoUrl={pharmacy.photoUrl}
+        />
 
         {/* -- Identity ------------------------------------------------------ */}
         <Card className="gap-4">
@@ -340,6 +349,33 @@ export function PharmacyDetailScreen() {
           </View>
         ) : null}
 
+        {pharmacy.servicesOffered?.length ? (
+          <View className="gap-3" testID="pharmacy-services">
+            <SectionHeader title="Services available" />
+            <Card className="gap-3">
+              {pharmacy.servicesOffered.map((service) => (
+                <Text key={service} className="font-body-md text-body-md text-on-surface">
+                  {service}
+                </Text>
+              ))}
+            </Card>
+          </View>
+        ) : null}
+        {pharmacy.headPharmacistName ? (
+          <View className="gap-3" testID="pharmacy-head-pharmacist">
+            <SectionHeader title="Head pharmacist" />
+            <Card className="gap-2">
+              <Text className="font-headline-md text-headline-md text-on-surface">
+                {pharmacy.headPharmacistName}
+              </Text>
+              {pharmacy.headPharmacistBio ? (
+                <Text className="font-body-md text-body-md text-on-surface-variant">
+                  {pharmacy.headPharmacistBio}
+                </Text>
+              ) : null}
+            </Card>
+          </View>
+        ) : null}
         {/* -- Opening hours -------------------------------------------------
             All seven days, always, when the map exists at all — a table with
             gaps in it is how a reader concludes the pharmacy is shut on the
@@ -429,15 +465,20 @@ export function PharmacyDetailScreen() {
         </View>
 
         {/* -- Pharmacists here ---------------------------------------------- */}
-        <View className="gap-3" testID="pharmacy-pharmacists">
-          <SectionHeader title="Pharmacists here" />
-          <Pharmacists
-            pharmacyName={pharmacy.name}
-            isPending={pharmacistsQuery.isPending}
-            isError={pharmacistsQuery.isError}
-            entries={pharmacists}
-          />
-        </View>
+        {(!pharmacy.headPharmacistName ||
+          pharmacists.length > 0 ||
+          pharmacistsQuery.isPending ||
+          pharmacistsQuery.isError) && (
+          <View className="gap-3" testID="pharmacy-pharmacists">
+            <SectionHeader title="Pharmacists here" />
+            <Pharmacists
+              pharmacyName={pharmacy.name}
+              isPending={pharmacistsQuery.isPending}
+              isError={pharmacistsQuery.isError}
+              entries={pharmacists}
+            />
+          </View>
+        )}
       </ScrollView>
 
       {showDock ? (
@@ -731,7 +772,5 @@ function LoadingBody() {
 
 /** See HospitalDetailScreen — height off the `label-sm` ramp, not a literal. */
 function ValueBar({ width }: { width: `${number}%` }) {
-  return (
-    <View className="rounded bg-surface-container-low" style={{ width, height: 12 * 1.3 }} />
-  );
+  return <View className="rounded bg-surface-container-low" style={{ width, height: 12 * 1.3 }} />;
 }

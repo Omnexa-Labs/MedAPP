@@ -10,7 +10,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.ext.compiler import compiles
 
-
 TEST_ROOT = Path(__file__).resolve().parent
 SERVICE_ROOT = TEST_ROOT.parent
 BACKEND_ROOT = SERVICE_ROOT.parent.parent
@@ -19,7 +18,10 @@ SHARED_ROOT = BACKEND_ROOT / "shared"
 
 def _is_other_service_path(value: str) -> bool:
     normalized = value.replace("\\", "/").lower()
-    return "/backend/services/" in normalized and "/backend/services/onboarding_service" not in normalized
+    return (
+        "/backend/services/" in normalized
+        and "/backend/services/onboarding_service" not in normalized
+    )
 
 
 sys.path = [entry for entry in sys.path if not _is_other_service_path(entry)]
@@ -31,19 +33,22 @@ for path in (SERVICE_ROOT, SHARED_ROOT):
 
 
 @compiles(UUID, "sqlite")
-def _compile_uuid_sqlite(element, compiler, **kw):  # noqa: ARG001
+def _compile_uuid_sqlite(element, compiler, **kw):
     return "CHAR(36)"
 
 
 from app.deps import get_current_principal, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
+from app.storage import get_storage  # noqa: E402
 from shared.auth import Principal  # noqa: E402
 
 
 @pytest_asyncio.fixture
 async def engine():
-    eng = create_async_engine("sqlite+aiosqlite:///:memory:", connect_args={"check_same_thread": False})
+    eng = create_async_engine(
+        "sqlite+aiosqlite:///:memory:", connect_args={"check_same_thread": False}
+    )
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng
@@ -75,7 +80,7 @@ def principal_platform_admin() -> Principal:
     return Principal(subject="44444444-4444-4444-4444-444444444444", role="platform_admin")
 
 
-async def _make_client(application, sessionmaker, principal):
+async def _make_client(application, sessionmaker, principal, document_store):
     async def _db_override():
         async with sessionmaker() as session:
             try:
@@ -90,6 +95,7 @@ async def _make_client(application, sessionmaker, principal):
 
     application.dependency_overrides[get_db] = _db_override
     application.dependency_overrides[get_current_principal] = _principal_override
+    application.dependency_overrides[get_storage] = lambda: document_store
     transport = ASGITransport(app=application)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -97,30 +103,78 @@ async def _make_client(application, sessionmaker, principal):
 
 
 @pytest_asyncio.fixture
-async def hospital_client(sessionmaker, principal_hospital_admin):
+async def hospital_client(sessionmaker, principal_hospital_admin, document_store):
     application = create_app()
-    async for client in _make_client(application, sessionmaker, principal_hospital_admin):
+    async for client in _make_client(
+        application, sessionmaker, principal_hospital_admin, document_store
+    ):
         yield client
 
 
 @pytest_asyncio.fixture
-async def doctor_client(sessionmaker, principal_doctor):
+async def doctor_client(sessionmaker, principal_doctor, document_store):
     application = create_app()
-    async for client in _make_client(application, sessionmaker, principal_doctor):
+    async for client in _make_client(application, sessionmaker, principal_doctor, document_store):
         yield client
 
 
 @pytest_asyncio.fixture
-async def pharmacist_client(sessionmaker, principal_pharmacist):
+async def pharmacist_client(sessionmaker, principal_pharmacist, document_store):
     application = create_app()
-    async for client in _make_client(application, sessionmaker, principal_pharmacist):
+    async for client in _make_client(
+        application, sessionmaker, principal_pharmacist, document_store
+    ):
         yield client
 
 
 @pytest_asyncio.fixture
-async def admin_client(sessionmaker, principal_platform_admin):
+async def admin_client(sessionmaker, principal_platform_admin, document_store):
     application = create_app()
-    async for client in _make_client(application, sessionmaker, principal_platform_admin):
+    async for client in _make_client(
+        application, sessionmaker, principal_platform_admin, document_store
+    ):
+        yield client
+
+
+class MemoryDocumentStorage:
+    """Explicit test double; production has no memory or filesystem fallback."""
+
+    def __init__(self):
+        self.objects = {}
+        self.writes = []
+        self.reads = []
+        self.fail_write = False
+        self.fail_read = False
+
+    async def write(self, key, data, content_type):
+        self.writes.append((key, data, content_type))
+        if self.fail_write:
+            raise RuntimeError("storage offline")
+        assert key not in self.objects
+        self.objects[key] = data
+        return "1"
+
+    async def read(self, key, generation, maximum):
+        self.reads.append((key, generation))
+        if self.fail_read:
+            raise RuntimeError("storage offline")
+        assert generation == "1"
+        return self.objects[key][: maximum + 1]
+
+
+@pytest.fixture
+def document_store():
+    return MemoryDocumentStorage()
+
+
+@pytest.fixture
+def principal_patient():
+    return Principal(subject="55555555-5555-5555-5555-555555555555", role="patient")
+
+
+@pytest_asyncio.fixture
+async def patient_client(sessionmaker, principal_patient, document_store):
+    async for client in _make_client(create_app(), sessionmaker, principal_patient, document_store):
         yield client
 
 
@@ -133,16 +187,20 @@ def hospital_team_payload():
         "display_name": "Nile Heart Hospital",
         "specialty": "cardiology",
         "license_number": "HOSP-2026-UG-001",
+        "registration_number": "REG-001",
         "country": "UG",
         "city": "Kampala",
         "address_line1": "12 Riverside Avenue",
         "email": "onboarding@hospital.example.com",
         "phone": "+256700000000",
-        "documents": [
-            {"kind": "registration_certificate", "url": "https://files.example.com/hospital-reg.pdf", "label": "Registration"},
-        ],
         "team_members": [
-            {"full_name": "Dr. Mary Achieng", "role": "medical_director", "title": "Medical Director", "specialty": "cardiology", "is_primary": True},
+            {
+                "full_name": "Dr. Mary Achieng",
+                "role": "medical_director",
+                "title": "Medical Director",
+                "specialty": "cardiology",
+                "is_primary": True,
+            }
         ],
     }
 
@@ -151,13 +209,17 @@ def hospital_team_payload():
 def practitioner_payload():
     return {
         "partner_type": "practitioner",
+        "practitioner_role": "doctor",
+        "professional_first_name": "Peter",
+        "professional_last_name": "Okello",
         "legal_name": "Dr. Peter Okello",
         "display_name": "Dr. Peter Okello",
         "specialty": "general practice",
         "license_number": "DOC-UG-7788",
         "country": "UG",
         "city": "Kampala",
-        "documents": [],
+        "email": "peter@example.com",
+        "phone": "+256700000001",
     }
 
 
@@ -168,9 +230,10 @@ def pharmacy_payload():
         "legal_name": "City Care Pharmacy Ltd",
         "display_name": "City Care Pharmacy",
         "registration_number": "PHARM-00321",
+        "license_number": "PHARM-LIC-321",
         "country": "UG",
         "city": "Kampala",
-        "documents": [
-            {"kind": "pharmacy_license", "url": "https://files.example.com/pharmacy-licence.pdf"},
-        ],
+        "address_line1": "13 Riverside Avenue",
+        "email": "pharmacy@example.com",
+        "phone": "+256700000002",
     }

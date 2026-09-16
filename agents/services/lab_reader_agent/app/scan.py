@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 from agents.shared import (
     ImagePart,
     LLMChatTurn,
     LLMProvider,
+    prompt_path,
 )
 
 from .parser import ScanResult, parse
@@ -27,9 +27,7 @@ from .parser import ScanResult, parse
 logger = logging.getLogger(__name__)
 
 
-_EXTRACTION_PROMPT_PATH = (
-    Path(__file__).resolve().parents[3] / "prompts" / "_lab_reader_extraction.md"
-)
+_EXTRACTION_PROMPT_PATH = prompt_path("_lab_reader_extraction.md")
 
 
 def _load_extraction_prompt() -> str:

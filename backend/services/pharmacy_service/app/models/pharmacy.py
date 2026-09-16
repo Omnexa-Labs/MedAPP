@@ -2,9 +2,8 @@
 
 This service is the patient-facing read directory for pharmacies, NOT the
 operational system. The operational counterpart per-pharmacy is
-`pms_service` (single-tenant). The link between the two is the optional
-`pms_base_url` column — when present, this service can call upstream
-pms_service for stock visibility on demand.
+`pms_service` (single-tenant). Confirmed PharmacyDeployment assignments
+select operator-owned settings for upstream stock visibility.
 
 License categories and operating hours are stored as JSON / ARRAY so
 they're cheap to evolve without an Alembic migration each time the
@@ -15,21 +14,33 @@ denormalize then.
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, Float, JSON, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY, UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column
-
 from shared.db import Base, TimestampMixin
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class PharmacyProfile(Base, TimestampMixin):
     __tablename__ = "pharmacy_profiles"
 
+    directory_draft: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    directory_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    directory_published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    services_offered: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    head_pharmacist_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    head_pharmacist_bio: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
     # Owner / operator's user_id in user_service. Not a DB FK because
     # cross-service Postgres; we treat it as a soft reference.
-    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), unique=True, index=True, nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True), unique=True, index=True, nullable=False
+    )
 
     # Display + URL identity
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -37,7 +48,7 @@ class PharmacyProfile(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Licensure
-    license_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    license_number: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # license_categories on Postgres becomes a text[] column. On SQLite
     # (tests) ARRAY isn't supported natively; the test conftest installs
     # a JSON fallback dialect compile hook (mirrors doctor_service).
@@ -64,13 +75,9 @@ class PharmacyProfile(Base, TimestampMixin):
 
     photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
 
-    # Stock-visibility integration with pms_service. Both nullable —
-    # pharmacies without a pms deployment just don't get the stock badge.
+    # Legacy integration metadata retained for explicit migration only.
+    # Neither field is writable/public or used for outbound request routing.
     pms_base_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    # NOT the secret itself — an opaque reference (a key name in a
-    # secret store, an env var name, etc.). For the dev stack we resolve
-    # via settings.medapp_partner_secret regardless of this value, but
-    # the column shape is ready for per-pharmacy secrets in production.
     pms_partner_secret_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     # Listing controls

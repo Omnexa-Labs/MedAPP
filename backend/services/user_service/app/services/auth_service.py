@@ -7,19 +7,19 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from sqlalchemy import and_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from shared.auth.jwt import decode_token, issue_access_token
+from sqlalchemy import and_, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..models import AuditLog, PasswordResetToken, RefreshToken, User
 from ..schemas import LoginRequest, SignupRequest, TokenPair
+from ..schemas.two_factor import LoginChallenge
 
 _hasher = PasswordHasher()
 
@@ -42,7 +42,7 @@ def _new_opaque_token(nbytes: int = 32) -> str:
 
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
@@ -50,7 +50,7 @@ def _as_utc(dt: datetime | None) -> datetime | None:
     round-trip. Treat naive datetimes from the DB as UTC."""
     if dt is None:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 async def _audit(
@@ -85,6 +85,7 @@ async def signup(
     *,
     ip: str | None = None,
     user_agent: str | None = None,
+    device_id: str | None = None,
 ) -> User:
     # Enforce uniqueness at the service layer so the router only handles HTTP mapping.
     existing = await db.scalar(select(User).where(User.email == payload.email))
@@ -120,6 +121,12 @@ async def signup(
             phone_verified = True
             verified_channel = "sms"
 
+    provider_proof = None
+    if payload.provider_ticket:
+        from . import provider_auth
+        provider_proof = await provider_auth.signup_proof(
+            db, payload.provider_ticket, str(payload.email), email_verified, device_id)
+
     # Generic app users do not require KYC. Provider/admin roles do.
     kyc_status = "not_required" if payload.role == "user" else "pending"
     user = User(
@@ -132,9 +139,15 @@ async def signup(
         kyc_status=kyc_status,
         email_verified=email_verified,
         phone_verified=phone_verified,
+        dob=payload.dob,
+        gender=payload.gender,
+        blood_type=payload.blood_type,
+        primary_goal=payload.primary_goal,
     )
     db.add(user)
     await db.flush()
+    if provider_proof:
+        await provider_auth.attach(db, user, provider_proof)
     audit_meta: dict = {"role": payload.role}
     if verified_channel:
         audit_meta["verified_channel"] = verified_channel
@@ -160,10 +173,11 @@ async def login(
     ip: str | None = None,
     user_agent: str | None = None,
     device_id: str | None = None,
-) -> tuple[User, TokenPair]:
+) -> tuple[User, TokenPair | LoginChallenge]:
     # Use the same path for credential verification and audit logging so the
     # observable security trail stays consistent.
-    user = await db.scalar(select(User).where(User.email == payload.email))
+    user = await db.scalar(select(User).where(User.email == payload.email).with_for_update()
+                           .execution_options(populate_existing=True))
     if not user or not user.is_active:
         _hasher.hash("dummy")  # keep timing similar on a missing-user path
         raise AuthError("invalid credentials")
@@ -179,6 +193,12 @@ async def login(
             user_agent=user_agent,
         )
         raise AuthError("invalid credentials") from exc
+
+    from . import two_factor_service
+
+    factor = await two_factor_service.state(db, user)
+    if factor and factor.enabled:
+        return user, await two_factor_service.begin_login(db, user, factor, device_id)
 
     tokens = await issue_tokens_for_user(
         db, user, ip=ip, user_agent=user_agent, device_id=device_id
@@ -202,6 +222,7 @@ async def issue_tokens_for_user(
     ip: str | None = None,
     user_agent: str | None = None,
     device_id: str | None = None,
+    second_factor_verified: bool = False,
 ) -> TokenPair:
     """Issue an access + refresh pair for a user (used by login and by
     OTP-verified phone signup/login).
@@ -210,14 +231,28 @@ async def issue_tokens_for_user(
     (`X-Device-Id` header). Persisting it lets the refresh path enforce
     that the same install must present the same id — see `refresh()`.
     """
+    from . import two_factor_service
+
+    # Keep phone OTP and any future token-issuing callers from bypassing enrollment.
+    # Lock before checking, so enrollment cannot race an alternate login.
+    await db.flush()
+    user = await _lock_session_owner(db, user.id)
+    if not user or not user.is_active:
+        raise AuthError("user inactive")
+    factor = await two_factor_service.state(db, user)
+    if factor and factor.enabled and not second_factor_verified:
+        raise AuthError("Use your password and authenticator or recovery code to sign in.")
     # Access tokens are short-lived and signed; refresh tokens are opaque and
     # stored hashed so the server can revoke them without keeping secrets in DB.
+    session_id = uuid4()
+    started_at = _now()
     access = issue_access_token(
         subject=str(user.id),
         role=user.role,
         secret=settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
         ttl_minutes=settings.jwt_access_ttl_minutes,
+        session_id=str(session_id),
     )
     raw_refresh = _new_opaque_token()
     db.add(
@@ -228,6 +263,8 @@ async def issue_tokens_for_user(
             user_agent=user_agent,
             ip_address=ip,
             device_id=device_id,
+            session_id=session_id,
+            session_started_at=started_at,
         )
     )
     await db.flush()
@@ -272,7 +309,15 @@ async def refresh(
     record = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
     if not record:
         raise AuthError("invalid refresh token")
+    # Serialize rotation and session revocation for this account. Reload after
+    # acquiring the lock so a concurrent rotation cannot mint a second successor.
+    user = await _lock_session_owner(db, record.user_id)
+    await db.refresh(record)
     if record.revoked_at is not None:
+        # A deliberate sign-out is not evidence of stolen-token reuse. A client
+        # presenting it must not sign out the account's other devices as a side effect.
+        if not record.replaced_by or record.replaced_by.startswith("revoked:"):
+            raise AuthError("refresh token revoked")
         # Reused after revocation — likely token theft. Revoke the whole chain
         # and commit the revocation BEFORE raising, since the request transaction
         # is rolled back on exception.
@@ -311,7 +356,6 @@ async def refresh(
         await db.commit()
         raise AuthError("refresh token bound to a different device")
 
-    user = await db.get(User, record.user_id)
     if not user or not user.is_active:
         raise AuthError("user inactive")
 
@@ -319,6 +363,10 @@ async def refresh(
     new_hash = _hash_token(new_raw)
     record.revoked_at = _now()
     record.replaced_by = new_hash
+    session_id = record.session_id or record.id
+    started_at = record.session_started_at or record.created_at
+    record.session_id = session_id
+    record.session_started_at = started_at
     # New row carries the device_id from the current request — for legacy
     # rows (record.device_id is None) the next rotation onwards starts
     # enforcing.
@@ -330,6 +378,8 @@ async def refresh(
             user_agent=user_agent,
             ip_address=ip,
             device_id=device_id if device_id is not None else record.device_id,
+            session_id=session_id,
+            session_started_at=started_at,
         )
     )
 
@@ -339,6 +389,7 @@ async def refresh(
         secret=settings.jwt_secret,
         algorithm=settings.jwt_algorithm,
         ttl_minutes=settings.jwt_access_ttl_minutes,
+        session_id=str(session_id),
     )
 
     # In-band audit row. The biometric domain event is published AFTER
@@ -385,27 +436,59 @@ async def logout(db: AsyncSession, raw_token: str, *, actor_id: UUID | None = No
     # Logout is idempotent because client retries should not turn into failures.
     token_hash = _hash_token(raw_token)
     record = await db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
-    if not record or record.revoked_at is not None:
+    if not record:
         return  # idempotent
-    record.revoked_at = _now()
-    record.replaced_by = "revoked:logout"
-    await _audit(
-        db,
-        actor_id=actor_id or record.user_id,
-        action="logout",
-        target_user_id=record.user_id,
-    )
+    await _lock_session_owner(db, record.user_id)
+    await db.refresh(record)
+    # A local logout can race the client's automatic refresh. Revoke the family,
+    # including a newly rotated token, instead of returning early for the old one.
+    await revoke_session(db, record.user_id, record.session_id or record.id, reason="logout")
+
+
+async def _lock_session_owner(db: AsyncSession, user_id: UUID) -> User | None:
+    return await db.scalar(select(User).where(User.id == user_id).with_for_update()
+                           .execution_options(populate_existing=True))
+
+
+async def revoke_session(db: AsyncSession, user_id: UUID, session_id: UUID, *, reason: str = "session") -> bool:
+    await _lock_session_owner(db, user_id)
+    scope = and_(RefreshToken.user_id == user_id,
+                 or_(RefreshToken.session_id == session_id,
+                     and_(RefreshToken.session_id.is_(None), RefreshToken.id == session_id)))
+    exists = await db.scalar(select(RefreshToken.id).where(scope).limit(1))
+    if exists is None:
+        return False
+    # Mark ancestors too: a delayed retry from an intentionally signed-out family
+    # must not trigger the stolen-token handler and eject unrelated sessions.
+    await db.execute(update(RefreshToken).where(scope).values(
+        revoked_at=_now(), replaced_by=f"revoked:{reason}"))
+    await _audit(db, actor_id=user_id, action="logout" if reason == "logout" else "session.revoked", target_user_id=user_id,
+                 meta={"session_id": str(session_id), "reason": reason})
+    return True
 
 
 # ---------- password reset ----------
 
 
 async def request_password_reset(db: AsyncSession, email: str) -> tuple[User, str] | None:
-    """Returns (user, raw_token) or None. Router still responds 200 either way
-    so an attacker can't enumerate registered emails."""
+    """Return a token to deliver, or None for unknown/inactive/throttled accounts.
+
+    The router responds 202 in each case without revealing account existence.
+    """
     # We intentionally avoid signaling whether the email exists.
     user = await db.scalar(select(User).where(User.email == email))
     if not user or not user.is_active:
+        return None
+    recent_token = await db.scalar(
+        select(PasswordResetToken.id)
+        .where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.created_at
+            > _now() - timedelta(seconds=settings.password_reset_resend_cooldown_seconds),
+        )
+        .limit(1)
+    )
+    if recent_token:
         return None
     raw = _new_opaque_token()
     db.add(
@@ -423,7 +506,9 @@ async def reset_password(db: AsyncSession, raw_token: str, new_password: str) ->
     # Password reset tokens are single-use and time-limited.
     token_hash = _hash_token(raw_token)
     record = await db.scalar(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash)
+        .with_for_update()
     )
     if (
         not record
@@ -431,15 +516,13 @@ async def reset_password(db: AsyncSession, raw_token: str, new_password: str) ->
         or (_as_utc(record.expires_at) or _now()) <= _now()
     ):
         raise AuthError("invalid or expired reset token")
-    user = await db.get(User, record.user_id)
-    if not user:
+    user = await _lock_session_owner(db, record.user_id)
+    if not user or not user.is_active:
         raise AuthError("invalid reset token")
     user.password_hash = _hasher.hash(new_password)
     record.consumed_at = _now()
     await _revoke_all_for_user(db, user.id, reason="password_reset")
-    await _audit(
-        db, actor_id=user.id, action="password.reset_completed", target_user_id=user.id
-    )
+    await _audit(db, actor_id=user.id, action="password.reset_completed", target_user_id=user.id)
     return user
 
 
@@ -447,6 +530,9 @@ async def change_password(
     db: AsyncSession, user: User, current_password: str, new_password: str
 ) -> None:
     # Changing a password invalidates outstanding refresh tokens so old sessions die.
+    user = await _lock_session_owner(db, user.id)
+    if not user or not user.is_active:
+        raise AuthError("user inactive")
     try:
         _hasher.verify(user.password_hash, current_password)
     except VerifyMismatchError as exc:
@@ -469,13 +555,13 @@ def decode_access_token(token: str) -> dict:
 
 __all__ = [
     "AuthError",
-    "signup",
-    "login",
-    "refresh",
-    "logout",
-    "issue_tokens_for_user",
-    "request_password_reset",
-    "reset_password",
     "change_password",
     "decode_access_token",
+    "issue_tokens_for_user",
+    "login",
+    "logout",
+    "refresh",
+    "request_password_reset",
+    "reset_password",
+    "signup",
 ]

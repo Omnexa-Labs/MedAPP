@@ -123,7 +123,7 @@ async def read_staff(
     except HospitalError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
 
-    expose_user_ids = may_see_staff_user_ids(principal)
+    expose_user_ids = await may_see_staff_user_ids(db, principal, hospital_id)
     return HospitalStaffRoster(
         items=[
             HospitalStaffRosterEntry.model_validate(
@@ -149,7 +149,10 @@ async def read_staff(
 
 @router.get("/{hospital_id}/reviews", response_model=list[HospitalReviewOut])
 async def read_reviews(hospital_id: UUID, db: AsyncSession = DbSession):
-    reviews = await list_reviews(db, hospital_id)
+    try:
+        reviews = await list_reviews(db, hospital_id)
+    except HospitalError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     return [
         HospitalReviewOut.model_validate(
             {

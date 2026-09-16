@@ -1,42 +1,14 @@
-// Partner onboarding API — onboarding_service, `/v1/onboarding`.
-//
-// ---------------------------------------------------------------------------
-// READ-ONLY ON PURPOSE: THE APPLICATION ITSELF IS A WEB FLOW
-// ---------------------------------------------------------------------------
-// `src/store/welcome-store.ts` already records the split — "This is NOT partner
-// onboarding — that lives on the web" — and `lib/partner/open-onboarding.ts`
-// hands off to it. The mobile app's job is to show an applicant WHERE THEY ARE,
-// which is what `/(app)/onboarding-status` is for.
-//
-// So `POST /applications`, `/documents`, `/team-members`, `/submit` and
-// `/review` are deliberately NOT wrapped. Document upload and legal-entity
-// details belong in the flow that owns them; a half-copy on mobile would be a
-// second place for a partner application to diverge, and `/review` is an
-// ADMIN action that must never be reachable from a patient build.
-//
-// ---------------------------------------------------------------------------
-// THIS SERVICE HAD NO CONTAINER UNTIL 2026-08-07
-// ---------------------------------------------------------------------------
-// It exists on disk and the gateway routes `/v1/onboarding` to it, but it was
-// the only one of the twenty services with no docker-compose entry — so every
-// call failed at DNS inside the compose network. Added, migrated, and both
-// read routes verified at 200.
-
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
 
 export const ONBOARDING_PATH = "/v1/onboarding";
 
 /** Free text on the wire despite the server-side StrEnum. Do not switch exhaustively. */
 export type ApplicationStatus =
-  | "draft"
-  | "submitted"
-  | "under_review"
-  | "approved"
-  | "rejected"
-  | string;
+  "draft" | "submitted" | "under_review" | "approved" | "rejected" | string;
 
 interface ApplicationWire {
   application_id: string;
+  submitted_by_user_id: string;
   partner_type: string;
   onboarding_mode: string | null;
   legal_name: string;
@@ -67,6 +39,7 @@ interface SummaryWire {
 
 export interface PartnerApplication {
   id: string;
+  ownerId: string;
   partnerType: string;
   onboardingMode: string | null;
   legalName: string;
@@ -98,6 +71,7 @@ export interface OnboardingSummary {
 
 const toApplication = (w: ApplicationWire): PartnerApplication => ({
   id: w.application_id,
+  ownerId: w.submitted_by_user_id,
   partnerType: w.partner_type,
   onboardingMode: w.onboarding_mode ?? null,
   legalName: w.legal_name,
@@ -112,9 +86,9 @@ const toApplication = (w: ApplicationWire): PartnerApplication => ({
 });
 
 export const partnerApi = {
-  /** `GET /v1/onboarding/applications` — `{ items }`. Verified live. */
-  async listApplications(): Promise<PartnerApplication[]> {
-    const w = await client.get<ApplicationListWire>(`${ONBOARDING_PATH}/applications`);
+  /** Applications visible to the caller; admins can also see other owners. */
+  async listApplications(options?: RequestOptions): Promise<PartnerApplication[]> {
+    const w = await client.get<ApplicationListWire>(`${ONBOARDING_PATH}/applications`, options);
     return (w.items ?? []).map(toApplication);
   },
 

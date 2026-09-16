@@ -1,56 +1,75 @@
-# Welcome to your Expo app 👋
+# MedApp mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Patient and specialist application built with Expo SDK 55, React Native, Expo Router,
+NativeWind, TanStack Query, and Zustand. Routes live in `src/app`; features live in `src/features`.
 
-## Get started
+See the [completion guide](../../../docs/COMPLETION_GUIDE.md) and
+[screen inventory](../../../docs/SCREEN_INVENTORY.md) for implementation and acceptance status.
 
-1. Install dependencies
+For Google and Apple sign-in, follow the [provider setup guide](../../../docs/PROVIDER_SIGN_IN_SETUP.md).
+It lists the required accounts, public client IDs, backend settings, native builds and live checks.
+Providers stay unavailable until configured; email authentication remains available.
 
-   ```bash
-   npm install
-   ```
+## Install
 
-2. Start the app
+Run commands from this directory. Use a Node version supported by
+[Expo SDK 55](https://docs.expo.dev/versions/v55.0.0/); Node 24 is used locally.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```powershell
+npm.cmd ci --include=dev
+npx.cmd expo install --check
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Expo CLI is included in the dependencies. The lockfile contains React Native, platform packages
+and test tools. Run install scripts normally; `--ignore-scripts` is not the complete setup.
 
-### Other setup steps
+Keep `react-test-renderer` pinned to the exact React version. React Native Testing Library v13
+requires that match; leaving its broad peer range unpinned can select an incompatible renderer
+during a fresh install.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+When Expo reports incompatible versions, use `npx.cmd expo install --fix` and review
+`package.json` and `package-lock.json` together. Keep upgrades within the chosen SDK until
+a deliberate SDK migration is planned.
 
-## Learn more
+## Run
 
-To learn more about developing your project with Expo, look at the following resources:
+Start the API gateway and services required by the flow under test. The normal local gateway
+is port 8000. For a browser session:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```powershell
+$env:API_BASE_URL = 'http://localhost:8000'
+npm.cmd run web -- --port 8082 --localhost
+```
 
-## Join the community
+For the native development server, use `npm.cmd start`. `npm.cmd run android` requires Java,
+Android SDK tooling and a device or emulator. An iOS build requires macOS and Xcode. For a
+physical device, set `API_BASE_URL` to a host it can reach; the Android emulator default is
+`http://10.0.2.2:8000`.
 
-Join our community of developers creating universal apps.
+`app.config.ts` reads the API URL when Expo starts; restart Expo after changing it. The gateway's
+CORS allow-list must include the exact browser origin, for example `http://localhost:8082`.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Password recovery also requires the user service's SMTP configuration. See the
+[user-service contract](../../../docs/api/user_service.md). The temporary recovery QA harness
+uses a local test inbox and isolated database; it does not validate deployed email delivery
+or other service-backed journeys.
+
+## Check
+
+```powershell
+npx.cmd expo install --check
+npx.cmd expo-doctor
+npx.cmd tsc --noEmit --incremental false
+npm.cmd test -- --runInBand
+```
+
+The completion baseline records results, environment limits, and test-runner timing/shutdown
+issues. Unit tests and a successful bundle do not replace browser or native-device checks.
+
+## Windows / OneDrive
+
+Dependency operations in a OneDrive-synced checkout can be slow. Recovery QA also uses a
+disposable source mirror at `%LOCALAPPDATA%\MedApp\recovery-runtime\mobile`. Copy current source
+and both package files into the mirror before testing, and run `npm.cmd ci` when its lockfile
+changes. The repository remains the source of truth; results apply only to the copied source
+and dependency versions actually tested.

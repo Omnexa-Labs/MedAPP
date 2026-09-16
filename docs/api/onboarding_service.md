@@ -29,16 +29,19 @@ diff is one command and would have caught this at any point.
 | POST | `/applications/{id}/documents` · `/team-members` · `/submit` | — | not wrapped |
 | POST | `/applications/{id}/review` | — | **admin, not wrapped** |
 
-## Why the client is read-only
+## Mobile/web boundary
 
-`src/store/welcome-store.ts` already records the split — *"This is NOT partner onboarding — that
-lives on the web"* — and `lib/partner/open-onboarding.ts` hands off to it. The mobile app's job is
-to show an applicant **where they are**, which is what `/(app)/onboarding-status` exists for.
+The established product boundary keeps credential uploads, legal-entity details,
+team setup and submission in a web onboarding flow. The earlier documentation
+named `lib/partner/open-onboarding.ts` as implemented, but that file is absent.
+The configured `partnerOnboardingUrl` exists; a working launcher, authenticated
+handoff, callback refresh and the web application flow still need implementation.
+`admin_web` currently contains a scaffold, not a completed onboarding/review portal.
 
-Create, documents, team-members and submit are therefore not wrapped: document upload and
-legal-entity details belong to the flow that owns them, and a half-copy on mobile would be a second
-place for a partner application to diverge. **`/review` is an admin action** and must never be
-reachable from a patient build.
+The mobile client reads applications and summaries. Review is an administrator
+operation. Approval changes the application's status only: the current service
+does not provision a doctor/nurse profile, update the user role or create a tenant.
+Do not infer active professional access from an approved application.
 
 ## Gaps and hazards
 
@@ -50,9 +53,20 @@ reachable from a patient build.
 - **`display_name` is nullable**; `legal_name` is not. Fall back to the legal name.
 - **No pagination** on applications.
 
-## Wiring status
+## Wiring status — 2026-09-14
 
-| Screen | State |
-| --- | --- |
-| Client (`features/partner/api.ts`) | Written; applications and summary verified live at 200. |
-| `/(app)/onboarding-status` | **Not wired.** The route exists and was already flagged in its own header as reachable by nothing — it has no entry point in the app, so wiring it to live data would light up a screen no one can navigate to. Giving it an entry point is a product decision. |
+Patient Profile → Professional applications and access opens the mobile status
+screen. It fetches application records with account/session scope, shows only the
+current owner's rows (admin list responses may include others), and handles
+loading, empty, draft, submitted, under-review, approved, rejected, unknown-status
+and retry states. Rejection feedback appears only on rejected applications. It no
+longer fabricates submission or a review deadline when no application exists.
+
+The user-service role is preserved separately as `User.accountRole`. Activated
+doctor/nurse roles expose professional editor entry; the editor and doctor
+workspace then check the authenticated self-profile endpoint. API permissions
+remain enforced by each service. No application status elevates client/server
+permissions. Full web application/credential handling, approval provisioning,
+revocation/session refresh, partner-kind selection and reference acceptance remain
+open B03 work. Current software evidence is in the completion baseline; historical
+200 checks in the route table do not constitute new live-gateway acceptance.

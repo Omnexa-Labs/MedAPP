@@ -29,6 +29,7 @@ from .memory import (
     make_memory_service_from_env,
 )
 from .phi import redact
+from .prompts import PROMPTS_DIR, load_prompt, prompt_path
 from .triage import TriageResult, classify as triage_classify
 from .qdrant_client import (
     AsyncQdrantWrapper,
@@ -71,6 +72,7 @@ __all__ = [
     "make_notification_dispatcher_from_env",
     "QdrantClientLike",
     "QdrantHit",
+    "PROMPTS_DIR",
     "QdrantPoint",
     "RECOMMENDATION_COLLECTION",
     "Recommendation",
@@ -79,8 +81,10 @@ __all__ = [
     "TriageResult",
     "triage_classify",
     "make_app",
+    "load_prompt",
     "make_embedder",
     "make_memory_service_from_env",
     "make_provider",
+    "prompt_path",
     "redact",
 ]

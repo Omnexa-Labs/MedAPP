@@ -94,6 +94,7 @@ async def update_patient(patient_id: UUID, body: PatientUpdate, db: AsyncSession
     for key, value in update_data.items():
         setattr(patient, key, value)
     await db.flush()
+    await db.refresh(patient, attribute_names=["updated_at"])
     return patient
 
 
@@ -138,4 +139,5 @@ async def update_visit(visit_id: UUID, body: VisitUpdate, db: AsyncSession) -> V
     for key, value in update_data.items():
         setattr(visit, key, value)
     await db.flush()
+    await db.refresh(visit, attribute_names=["updated_at"])
     return visit

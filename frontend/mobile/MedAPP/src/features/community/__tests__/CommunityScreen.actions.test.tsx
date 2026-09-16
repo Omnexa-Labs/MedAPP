@@ -29,7 +29,7 @@
 // RNTL's own matcher prints the element compactly, so a failed poll costs
 // milliseconds and the retry happens. Same expectation, honest cost.
 
-import { screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
@@ -88,26 +88,26 @@ const wire = (over: Record<string, unknown> = {}) => {
   const merged: Record<string, unknown> = { author_user_id: "u-other", ...over };
   const anonymous = Boolean(merged.is_anonymous);
   return {
-  owned_by_me: merged.author_user_id === VIEWER,
-  post_id: "p-1",
-  kind: "blog",
-  author_role: "doctor",
-  author_name: "Dr. Kwabena Osei",
-  title: "Managing blood pressure",
-  body: "Take your reading at the same time each morning.",
-  excerpt: null,
-  tags: [],
-  is_anonymous: false,
-  moderation_status: "approved",
-  published_at: "2026-08-07T09:00:00Z",
-  created_at: "2026-08-07T09:00:00Z",
-  updated_at: "2026-08-07T09:00:00Z",
-  like_count: 3,
-  comment_count: 2,
-  liked_by_me: false,
-  bookmarked_by_me: false,
-  ...merged,
-  author_user_id: anonymous ? null : merged.author_user_id,
+    owned_by_me: merged.author_user_id === VIEWER,
+    post_id: "p-1",
+    kind: "blog",
+    author_role: "doctor",
+    author_name: "Dr. Kwabena Osei",
+    title: "Managing blood pressure",
+    body: "Take your reading at the same time each morning.",
+    excerpt: null,
+    tags: [],
+    is_anonymous: false,
+    moderation_status: "approved",
+    published_at: "2026-08-07T09:00:00Z",
+    created_at: "2026-08-07T09:00:00Z",
+    updated_at: "2026-08-07T09:00:00Z",
+    like_count: 3,
+    comment_count: 2,
+    liked_by_me: false,
+    bookmarked_by_me: false,
+    ...merged,
+    author_user_id: anonymous ? null : merged.author_user_id,
   };
 };
 
@@ -129,10 +129,19 @@ function feedReturns(items: Record<string, unknown>[], nextOffset: number | null
   });
 }
 
+const queryClients: QueryClient[] = [];
+
+afterEach(() => {
+  cleanup();
+  for (const client of queryClients) client.clear();
+  queryClients.length = 0;
+});
+
 function render(ui: ReactElement) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  queryClients.push(qc);
   return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
@@ -267,9 +276,7 @@ describe("The 3-dot overflow menu", () => {
     // The invariant that actually matters. `author_user_id` is on the wire for
     // an anonymous post, so ownership is answerable — but the id must never be
     // rendered, or the post is deanonymised by its own delete affordance.
-    feedReturns([
-      wire({ author_user_id: "u-me", is_anonymous: true, author_name: null }),
-    ]);
+    feedReturns([wire({ author_user_id: "u-me", is_anonymous: true, author_name: null })]);
     render(<CommunityScreen />);
     await waitFor(() => expect(screen.getByText("Anonymous")).toBeTruthy());
     fireEvent.press(screen.getByLabelText("More options"));

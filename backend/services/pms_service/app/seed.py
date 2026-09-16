@@ -6,6 +6,7 @@ Usable two ways:
 
 The seed is idempotent: it short-circuits if a pharmacy profile already exists.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +41,16 @@ DRUGS_DATA = [
     ("Ibuprofen", "Brufen", "analgesic", "tablet", "400mg", "tablet", 180, 120),
     ("Omeprazole", "Losec", "antacid", "capsule", "20mg", "capsule", 80, 350),
     ("Ciprofloxacin", "Cipro", "antibiotic", "tablet", "500mg", "tablet", 60, 400),
-    ("Artemether/Lumefantrine", "Coartem", "antimalarial", "tablet", "20/120mg", "tablet", 50, 1200),
+    (
+        "Artemether/Lumefantrine",
+        "Coartem",
+        "antimalarial",
+        "tablet",
+        "20/120mg",
+        "tablet",
+        50,
+        1200,
+    ),
     ("ORS", "Oralyte", "supplement", "sachet", "20.5g", "sachet", 100, 80),
     ("Cetirizine", "Zyrtec", "antihistamine", "tablet", "10mg", "tablet", 80, 90),
     ("Loratadine", "Claritin", "antihistamine", "tablet", "10mg", "tablet", 80, 110),
@@ -126,7 +136,8 @@ async def seed(db: AsyncSession) -> dict:
             reorder_level=reorder,
             default_selling_price_cents=price,
             currency=settings.pharmacy_currency,
-            requires_prescription=cat in ("antibiotic", "antimalarial", "antidiabetic", "antihypertensive"),
+            requires_prescription=cat
+            in ("antibiotic", "antimalarial", "antidiabetic", "antihypertensive"),
             is_active=True,
         )
         db.add(d)
@@ -138,7 +149,7 @@ async def seed(db: AsyncSession) -> dict:
         batch = DrugBatch(
             drug_id=d.id,
             supplier_id=supplier.id,
-            batch_number=f"SEED-{i+1:03d}",
+            batch_number=f"SEED-{i + 1:03d}",
             quantity_received=starting + 100,
             quantity_on_hand=starting,
             unit_cost_cents=max(d.default_selling_price_cents * 60 // 100, 1),

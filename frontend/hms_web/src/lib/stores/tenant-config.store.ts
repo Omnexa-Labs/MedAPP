@@ -68,9 +68,6 @@ export const useTenantConfigStore = create<TenantConfigState>((set) => ({
       : DEFAULT_CONFIG.features;
 
     const config: TenantConfig = { branding, locale, modules, features };
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hms_tenant_config", JSON.stringify(config));
-    }
     set({ config, isLoaded: true });
   },
 

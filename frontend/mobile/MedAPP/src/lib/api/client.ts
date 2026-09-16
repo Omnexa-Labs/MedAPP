@@ -60,7 +60,7 @@ export function registerSessionRefresher(refresher: SessionRefresher): void {
 // that the second 401 awaits the first refresh instead of starting another.
 let refreshInFlight: Promise<boolean> | null = null;
 
-function refreshSession(): Promise<boolean> {
+export function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   const refresher = sessionRefresher;
   // Nothing registered (tests, or a request before the store loaded). Report
@@ -91,6 +91,8 @@ export interface RequestOptions {
   // Set to false for auth endpoints (login, signup) where attaching a stale
   // token would be wrong.
   withAuth?: boolean;
+  // Sensitive account actions can cancel a retry after the active identity changes.
+  isSessionCurrent?: () => boolean;
 }
 
 function buildHeaders(opts: RequestOptions, hasBody: boolean): Headers {
@@ -146,7 +148,14 @@ async function parseError(response: Response): Promise<ApiError> {
   return new ApiError(message, response.status, code, details);
 }
 
-async function send<T>(method: string, path: string, body: unknown, opts: RequestOptions): Promise<T> {
+async function send<T>(
+  method: string,
+  path: string,
+  body: unknown,
+  opts: RequestOptions,
+): Promise<T> {
+  if (opts.isSessionCurrent && !opts.isSessionCurrent())
+    throw new ApiError("Your sign-in changed. Open this screen again.", 409);
   const url = path.startsWith("http") ? path : `${config.apiBaseUrl}${path}`;
   const hasBody = body !== undefined && body !== null && method !== "GET";
   const headers = buildHeaders(opts, hasBody);
@@ -181,7 +190,12 @@ async function send<T>(method: string, path: string, body: unknown, opts: Reques
   return (await response.json()) as T;
 }
 
-async function request<T>(method: string, path: string, body: unknown, opts: RequestOptions): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body: unknown,
+  opts: RequestOptions,
+): Promise<T> {
   try {
     return await send<T>(method, path, body, opts);
   } catch (error) {
@@ -196,6 +210,7 @@ async function request<T>(method: string, path: string, body: unknown, opts: Req
     // The caller walked away (screen unmounted, query cancelled). Renewing the
     // session on its behalf and retrying would be work nobody is waiting for.
     if (opts.signal?.aborted) throw error;
+    if (opts.isSessionCurrent && !opts.isSessionCurrent()) throw error;
 
     const refreshed = await refreshSession();
     // Refresh failed. The refresher has already signed the user out, so the

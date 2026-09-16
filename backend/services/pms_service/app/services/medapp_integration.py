@@ -1,6 +1,7 @@
 """MedApp integration: HMAC verification, inbound prescription ingest,
 outbound dispense confirmation (best-effort, no-op when URL unset).
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,7 +25,7 @@ def verify_signature(body: bytes, signature_header: str | None) -> bool:
 
     Header format: `sha256=<hex>`. Constant-time comparison.
     """
-    if not signature_header:
+    if not signature_header or len(settings.medapp_webhook_secret) < 32:
         return False
     secret = settings.medapp_webhook_secret.encode("utf-8")
     expected = hmac.new(secret, body, hashlib.sha256).hexdigest()
@@ -46,10 +47,10 @@ def verify_partner_signature(
     Header format: raw hex digest (no `sha256=` prefix), in
     `X-MedApp-Signature`. Constant-time comparison.
     """
-    if not signature_header:
+    if not signature_header or len(settings.medapp_webhook_secret) < 32:
         return False
     secret = settings.medapp_webhook_secret.encode("utf-8")
-    msg = f"{method.upper()}\n{path_with_query}\n".encode("utf-8") + body
+    msg = f"{method.upper()}\n{path_with_query}\n".encode() + body
     expected = hmac.new(secret, msg, hashlib.sha256).hexdigest()
     provided = signature_header.strip()
     return hmac.compare_digest(expected, provided)
@@ -82,9 +83,7 @@ async def _upsert_customer(
 ) -> Customer | None:
     if medapp_user_id:
         existing = (
-            await db.execute(
-                select(Customer).where(Customer.medapp_user_id == medapp_user_id)
-            )
+            await db.execute(select(Customer).where(Customer.medapp_user_id == medapp_user_id))
         ).scalar_one_or_none()
         if existing:
             return existing
@@ -161,13 +160,15 @@ async def ingest_prescription(payload, db: AsyncSession) -> dict:
         if drug is None:
             unresolved.append(item.drug_name)
             continue
-        db.add(PrescriptionItem(
-            prescription_id=rx.id,
-            drug_id=drug.id,
-            drug_name_snapshot=drug.name,
-            quantity_prescribed=item.quantity_prescribed,
-            dosage_instructions=item.dosage_instructions,
-        ))
+        db.add(
+            PrescriptionItem(
+                prescription_id=rx.id,
+                drug_id=drug.id,
+                drug_name_snapshot=drug.name,
+                quantity_prescribed=item.quantity_prescribed,
+                dosage_instructions=item.dosage_instructions,
+            )
+        )
         accepted += 1
 
     await db.flush()

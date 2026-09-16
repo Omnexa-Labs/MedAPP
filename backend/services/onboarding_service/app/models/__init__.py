@@ -1,5 +1,20 @@
 from shared.db import Base
 
-from .partner import PartnerApplication, PartnerApplicationStatus, OnboardingMode, PartnerType
+from .activation import ApplicationActivation
+from .partner import (
+    ApplicationEvent,
+    OnboardingMode,
+    PartnerApplication,
+    PartnerApplicationStatus,
+    PartnerType,
+)
 
-__all__ = ["Base", "PartnerApplication", "PartnerApplicationStatus", "OnboardingMode", "PartnerType"]
+__all__ = [
+    "ApplicationActivation",
+    "ApplicationEvent",
+    "Base",
+    "OnboardingMode",
+    "PartnerApplication",
+    "PartnerApplicationStatus",
+    "PartnerType",
+]

@@ -3,19 +3,21 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Header, HTTPException, status
+from shared.auth import Principal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from shared.auth.jwt import decode_token
-
 from .config import settings
 from .db import MgmtSessionLocal
+from .session_tokens import platform_claims, workspace_claims
 from .tenant import tenant_context_var, tenant_db_manager
 
 log = logging.getLogger(__name__)
+
 
 class _DevDB:
     engine = None
@@ -91,9 +93,7 @@ async def get_hms_principal(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
     token = authorization.split(" ", 1)[1]
     try:
-        claims = decode_token(
-            token, secret=settings.jwt_secret, algorithm=settings.jwt_algorithm
-        )
+        claims = workspace_claims(token)
     except Exception as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from exc
 
@@ -110,7 +110,9 @@ async def get_hms_principal(
         hms_role = str(claims["hms_role"])
         log.warning(
             "hms_principal.dev_mode_role_from_claim sub=%s hospital_id=%s role=%s",
-            claims.get("sub"), hospital_id, hms_role,
+            claims.get("sub"),
+            hospital_id,
+            hms_role,
         )
     else:
         hms_role = await _resolve_hms_role(str(claims["sub"]), str(hospital_id))
@@ -123,13 +125,19 @@ async def get_hms_principal(
 
 
 async def _resolve_hms_role(user_id: str, tenant_id: str) -> str | None:
-    from .models.mgmt import HmsStaffRole
+    from .models.mgmt import HmsStaffRole, TenantRegistry
 
     async with MgmtSessionLocal() as session:
-        stmt = select(HmsStaffRole.hms_role).where(
-            HmsStaffRole.tenant_id == UUID(tenant_id),
-            HmsStaffRole.user_id == UUID(user_id),
-            HmsStaffRole.is_active.is_(True),
+        stmt = (
+            select(HmsStaffRole.hms_role)
+            .join(TenantRegistry, TenantRegistry.id == HmsStaffRole.tenant_id)
+            .where(
+                HmsStaffRole.tenant_id == UUID(tenant_id),
+                HmsStaffRole.user_id == UUID(user_id),
+                HmsStaffRole.is_active.is_(True),
+                TenantRegistry.is_active.is_(True),
+                TenantRegistry.provisioned_at.is_not(None),
+            )
         )
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -156,7 +164,7 @@ async def verify_staff_membership(user_id: str, tenant_id: str) -> bool:
 
 def require_hms_roles(*allowed_roles: str):
     async def _checker(
-        principal: HmsPrincipal = Depends(get_hms_principal),
+        principal: Annotated[HmsPrincipal, Depends(get_hms_principal)],
     ) -> HmsPrincipal:
         if principal.hms_role not in allowed_roles:
             raise HTTPException(
@@ -171,3 +179,11 @@ def require_hms_roles(*allowed_roles: str):
 MgmtSession = Depends(get_mgmt_db)
 TenantSession = Depends(get_tenant_db)
 CurrentHmsPrincipal = Depends(get_hms_principal)
+
+
+async def get_management_principal(
+    authorization: str | None = Header(default=None),
+) -> Principal:
+    """Management uses the platform access token; membership supplies tenant rights."""
+    claims = platform_claims(authorization)
+    return Principal(subject=str(UUID(claims["sub"])), role=claims["role"])

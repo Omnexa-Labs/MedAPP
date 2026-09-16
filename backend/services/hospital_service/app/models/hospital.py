@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from shared.db import Base, TimestampMixin
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
-
-from shared.db import Base, TimestampMixin
 
 
 class StaffRole(StrEnum):
@@ -19,6 +19,18 @@ class StaffRole(StrEnum):
 
 class HospitalProfile(Base, TimestampMixin):
     __tablename__ = "hospital_profiles"
+
+    owner_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), nullable=True, index=True
+    )
+    is_listable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    directory_draft: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    directory_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    directory_published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     slug: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
@@ -34,7 +46,9 @@ class HospitalProfile(Base, TimestampMixin):
     contact_phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     accreditation: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    accreditation_status: Mapped[str] = mapped_column(String(64), nullable=False, default="pending", index=True)
+    accreditation_status: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="pending", index=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
 
     @property
@@ -45,9 +59,16 @@ class HospitalProfile(Base, TimestampMixin):
 class HospitalStaff(Base, TimestampMixin):
     __tablename__ = "hospital_staff"
 
-    hospital_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("hospital_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    hospital_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("hospital_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
-    role: Mapped[str] = mapped_column(String(32), nullable=False, default=StaffRole.OTHER, index=True)
+    role: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=StaffRole.OTHER, index=True
+    )
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     department: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
@@ -56,10 +77,17 @@ class HospitalStaff(Base, TimestampMixin):
 class HospitalReview(Base, TimestampMixin):
     __tablename__ = "hospital_reviews"
 
-    hospital_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("hospital_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    hospital_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("hospital_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     reviewer_user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     rating: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
-    moderation_status: Mapped[str] = mapped_column(String(32), nullable=False, default="approved", index=True)
+    moderation_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="approved", index=True
+    )

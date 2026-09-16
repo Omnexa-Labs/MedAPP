@@ -1,12 +1,27 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
 from shared.observability import configure_logging, instrument_app
 
 from . import events
 from .config import settings
-from .routers import admin, auth, kyc, otp, password, profiles, users
+from .routers import (
+    activation,
+    admin,
+    admin_sso,
+    auth,
+    hospital_handoff,
+    kyc,
+    otp,
+    partner_handoff,
+    password,
+    pharmacy_handoff,
+    profiles,
+    provider_auth,
+    sessions,
+    two_factor,
+    users,
+)
 
 
 @asynccontextmanager
@@ -33,12 +48,22 @@ def create_app() -> FastAPI:
     app.include_router(otp.router, prefix="/auth/otp", tags=["auth"])
     app.include_router(password.router, prefix="/auth/password", tags=["auth"])
     app.include_router(profiles.router, prefix="/me", tags=["profile"])
+    app.include_router(sessions.router, prefix="/me/sessions", tags=["sessions"])
+    app.include_router(two_factor.router, prefix="/me/two-factor", tags=["two-factor"])
+    app.include_router(two_factor.login_router, prefix="/auth/two-factor", tags=["auth"])
+    app.include_router(provider_auth.router, prefix="/auth/providers", tags=["auth"])
+    app.include_router(admin_sso.router, prefix="/auth/admin-sso", tags=["auth"])
+    app.include_router(partner_handoff.router, prefix="/auth/partner-handoffs", tags=["auth"])
+    app.include_router(hospital_handoff.router, prefix="/auth/hospital-handoffs", tags=["auth"])
+    app.include_router(pharmacy_handoff.router, prefix="/auth/pharmacy-handoffs", tags=["auth"])
+    app.include_router(provider_auth.account_router, prefix="/me/providers", tags=["profile"])
     app.include_router(kyc.router, prefix="/me/kyc", tags=["kyc"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     # Service-to-service identity lookup. NOT in api_gateway ROUTES on purpose -
     # see the module docstring: a public look-up-any-user-by-id is a patient
     # enumeration surface.
     app.include_router(users.router, prefix="/users", tags=["users"])
+    app.include_router(activation.router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

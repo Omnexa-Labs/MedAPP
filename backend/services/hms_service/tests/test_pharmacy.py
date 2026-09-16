@@ -82,6 +82,7 @@ async def test_add_batch(client):
         "selling_price_cents": 300,
         "currency": "GHS",
         "supplier": "PharmaCo",
+        "received_at": "2026-05-20",
         "expiry_date": "2027-12-31",
     })
     assert resp.status_code == 201

@@ -1,6 +1,10 @@
+import smtplib
+
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..deps import DbSession, EmailDep, SmsDep
 from ..schemas import (
     OtpStartRequest,
@@ -13,6 +17,7 @@ from ..schemas import (
 )
 from ..services import EmailNotifier, SmsNotifier, otp_service
 from ..services.auth_service import AuthError
+from ..services.notifiers import EmailDeliveryError
 
 router = APIRouter()
 
@@ -36,17 +41,25 @@ async def start(
         )
     except AuthError as exc:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
-    return OtpStartResponse(sent=True, expires_in=ttl)
+    return OtpStartResponse(
+        sent=True, expires_in=ttl, resend_after_seconds=settings.otp_resend_cooldown_seconds
+    )
 
 
 @router.post("/verify", response_model=TokenPair)
-async def verify(payload: OtpVerifyRequest, db: AsyncSession = DbSession) -> TokenPair:
+async def verify(
+    payload: OtpVerifyRequest, db: AsyncSession = DbSession
+) -> TokenPair | JSONResponse:
     try:
         _user, tokens = await otp_service.verify_otp_and_login(
             db, phone=payload.phone, code=payload.code
         )
     except AuthError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        # Return expected rejections so get_db commits the failed attempt.
+        # Raising HTTPException would roll back the attempt counter.
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)}
+        )
     return tokens
 
 
@@ -82,13 +95,21 @@ async def signup_start(
         if "already in use" in msg:
             raise HTTPException(status.HTTP_409_CONFLICT, msg) from exc
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, msg) from exc
-    return OtpStartResponse(sent=True, expires_in=ttl)
+    except (EmailDeliveryError, OSError, smtplib.SMTPException) as exc:
+        # Roll back the undelivered code so delivery can be retried immediately.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Email verification is temporarily unavailable. Please try again later.",
+        ) from exc
+    return OtpStartResponse(
+        sent=True, expires_in=ttl, resend_after_seconds=settings.otp_resend_cooldown_seconds
+    )
 
 
 @router.post("/signup-verify", response_model=SignupOtpVerifyResponse)
 async def signup_verify(
     payload: SignupOtpVerifyRequest, db: AsyncSession = DbSession
-) -> SignupOtpVerifyResponse:
+) -> SignupOtpVerifyResponse | JSONResponse:
     try:
         token = await otp_service.verify_signup_otp(
             db,
@@ -97,7 +118,10 @@ async def signup_verify(
             code=payload.code,
         )
     except AuthError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+        # Preserve failed attempts while retaining rollback for unexpected errors.
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST, content={"detail": str(exc)}
+        )
     return SignupOtpVerifyResponse(
         verification_token=token,
         expires_in=otp_service.SIGNUP_VERIFY_TOKEN_TTL_MINUTES * 60,

@@ -47,7 +47,7 @@ async def test_successful_vital_write_publishes_event(
 
     await patient_client.post(
         f"/v1/patients/{principal_patient.subject}/consents",
-        json={"doctor_user_id": principal_doctor.subject, "scope": "records", "reason": "ok"},
+        json={"doctor_user_id": principal_doctor.subject, "scope": "records_and_vitals", "reason": "ok"},
     )
 
     # Doctor-led vital recording.

@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,15 @@ class Settings(BaseSettings):
     # Audit finding #2: no default secret. Set HMS_JWT_SECRET in env.
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
+    jwt_audience: str = "medapp.platform"
+    jwt_issuer: str = "medapp"
+    onboarding_activation_secret: SecretStr = SecretStr("")
+    workspace_session_secret: SecretStr = SecretStr("")
+    workspace_session_audience: str = "medapp.hms"
+    workspace_session_issuer: str = "medapp.hms"
+    user_service_url: str = "http://user_service:8001"
+    hospital_service_url: str = "http://hospital_service:8004"
+    hospital_directory_secret: SecretStr = SecretStr("")
     amqp_url: str = "amqp://medapp:medapp@rabbitmq:5672/"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"

@@ -36,6 +36,7 @@ function codeOnly(): string {
 const mockBack = jest.fn();
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+let mockUser: import("@/types/user").User | null = null;
 
 jest.mock("expo-router", () => ({
   router: {
@@ -47,7 +48,7 @@ jest.mock("expo-router", () => ({
 }));
 
 jest.mock("@/hooks/use-current-user", () => ({
-  useCurrentUser: () => null,
+  useCurrentUser: () => mockUser,
 }));
 
 import { PatientProfileOverviewScreen } from "../PatientProfileOverviewScreen";
@@ -57,6 +58,7 @@ describe("PatientProfileOverviewScreen navigation", () => {
     mockBack.mockClear();
     mockPush.mockClear();
     mockReplace.mockClear();
+    mockUser = null;
   });
 
   it("wears detail chrome: no tab bar, no logo, one back button", () => {
@@ -100,6 +102,19 @@ describe("PatientProfileOverviewScreen navigation", () => {
     expect(mockPush).toHaveBeenCalledWith("/(app)/find-care");
     expect(mockPush).not.toHaveBeenCalledWith("/(app)/select-time-slot");
   });
+
+  it("opens the patient editor from the signed-in profile", () => {
+    mockUser = {
+      id: "patient",
+      email: "patient@example.com",
+      displayName: "Ama Kofi",
+      createdAt: "",
+    };
+    render(<PatientProfileOverviewScreen />);
+    fireEvent.press(screen.getByRole("button", { name: "Edit profile" }));
+    expect(mockPush).toHaveBeenCalledWith("/(app)/edit-patient-profile");
+    mockUser = null;
+  });
 });
 
 describe("PatientProfileOverviewScreen presents no fictional patient", () => {
@@ -134,9 +149,10 @@ describe("PatientProfileOverviewScreen presents no fictional patient", () => {
     expect(screen.queryByText("Verified")).toBeNull();
   });
 
-  it("says what it does not hold, instead of filling it in", () => {
+  it("marks missing personal details without inventing values", () => {
     render(<PatientProfileOverviewScreen />);
-    expect(screen.getByText(/doesn't hold your date of birth, blood type/i)).toBeTruthy();
+    expect(screen.getByTestId("profile.personal-details")).toBeTruthy();
+    expect(screen.getAllByText("Not provided")).toHaveLength(4);
     expect(screen.getByText("No emergency contact is saved.")).toBeTruthy();
   });
 

@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 from agents.shared import (
     AgentRequest,
@@ -33,6 +32,7 @@ from agents.shared import (
     EventSubscriber,
     LLMChatTurn,
     NotificationDispatcher,
+    load_prompt,
     make_memory_service_from_env,
     make_notification_dispatcher_from_env,
     make_provider,
@@ -43,9 +43,7 @@ from .tools import TOOLS, fetch_vitals, make_executor
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    Path(__file__).resolve().parents[3] / "prompts" / "vitals_watcher.md"
-).read_text(encoding="utf-8")
+_SYSTEM_PROMPT = load_prompt("vitals_watcher.md")
 
 
 class VitalsWatcherAgent(BaseAgent):

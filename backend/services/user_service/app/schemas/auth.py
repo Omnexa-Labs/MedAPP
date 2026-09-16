@@ -1,7 +1,9 @@
 from pydantic import AliasChoices, BaseModel, EmailStr, Field, field_validator
 
+from .profile_details import ProfileDetails
 
-class SignupRequest(BaseModel):
+
+class SignupRequest(ProfileDetails):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(
@@ -21,6 +23,7 @@ class SignupRequest(BaseModel):
     # verified. When absent, the user is created unverified — the legacy
     # path, kept for back-compat during the mobile rollout.
     verification_token: str | None = Field(default=None, max_length=2048)
+    provider_ticket: str | None = Field(default=None, min_length=32, max_length=128)
 
     model_config = {
         "populate_by_name": True,
@@ -29,8 +32,8 @@ class SignupRequest(BaseModel):
                 {
                     "email": "user@medapp.com",
                     "password": "password123",
-                    "firstname": "Amina",
-                    "surname": "Mensah",
+                    "first_name": "Amina",
+                    "last_name": "Mensah",
                     "phone": "+233241234567",
                     "role": "user",
                 }

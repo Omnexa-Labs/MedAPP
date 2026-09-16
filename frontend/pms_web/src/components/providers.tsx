@@ -1,23 +1,44 @@
 "use client";
-
 import { QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { useEffect } from "react";
-import { getQueryClient } from "@/lib/query-client";
+import { useEffect, useState } from "react";
+import { makeQueryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/lib/stores/auth.store";
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  const queryClient = getQueryClient();
-  const hydrate = useAuthStore((s) => s.hydrate);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} />
-    </QueryClientProvider>
+function ScopedQueries({ children }: { children: React.ReactNode }) {
+  const [client] = useState(makeQueryClient);
+  useEffect(
+    () => () => {
+      void client.cancelQueries();
+      client.clear();
+    },
+    [client],
   );
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+export function Providers({ children }: { children: React.ReactNode }) {
+  const scope = useAuthStore((s) => s.scope);
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== "hidden")
+        void useAuthStore.getState().hydrate();
+    };
+    refresh();
+    const interval = setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const channel =
+      typeof BroadcastChannel !== "undefined"
+        ? new BroadcastChannel("medapp-pms-session")
+        : null;
+    if (channel)
+      channel.onmessage = () => {
+        void useAuthStore.getState().invalidate();
+      };
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      channel?.close();
+    };
+  }, []);
+  return <ScopedQueries key={scope || "anonymous"}>{children}</ScopedQueries>;
 }

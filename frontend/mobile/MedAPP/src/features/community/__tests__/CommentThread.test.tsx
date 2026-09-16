@@ -20,7 +20,7 @@
 // SEAM: `@/lib/api/client`, so the real mapper, the real paths and the real
 // per-viewer keys are exercised.
 
-import { screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { renderWithSafeArea as renderRaw } from "@/test/safe-area";
@@ -144,15 +144,24 @@ function serverHas({
 const repliesPath = (commentId: string, offset = 0) =>
   `/v1/social/comments/${commentId}/replies?limit=20&offset=${offset}`;
 
+const queryClients: QueryClient[] = [];
+
+afterEach(() => {
+  cleanup();
+  for (const client of queryClients) client.clear();
+  queryClients.length = 0;
+  jest.useRealTimers();
+});
+
 function render(ui: ReactElement) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  queryClients.push(qc);
   return renderRaw(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
-const replyReads = () =>
-  mockGet.mock.calls.filter(([p]) => String(p).includes("/replies")).length;
+const replyReads = () => mockGet.mock.calls.filter(([p]) => String(p).includes("/replies")).length;
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -177,7 +186,9 @@ describe("the expander", () => {
     fireEvent.press(screen.getByLabelText("View 2 replies"));
     await waitFor(() => expect(mockGet).toHaveBeenCalledWith(repliesPath("c-1")));
     await waitFor(() =>
-      expect(screen.getByText("Morning readings before food are the ones we compare.")).toBeTruthy(),
+      expect(
+        screen.getByText("Morning readings before food are the ones we compare."),
+      ).toBeTruthy(),
     );
     // And a way back out, drawn OUTSIDE the rail because it closes the thread
     // rather than paging it.
@@ -275,6 +286,9 @@ describe("writing a reply", () => {
   });
 
   it("shows a visible error and keeps the draft when the send fails", async () => {
+    // Keep the three-second toast visible while assertions run, regardless of
+    // how long rendering takes on a cold or busy machine.
+    jest.useFakeTimers();
     serverHas({ comments: [commentWire()] });
     render(<PostDetailScreen />);
     await waitFor(() => expect(screen.getByLabelText("Reply to Ama Mensah")).toBeTruthy());
@@ -288,6 +302,7 @@ describe("writing a reply", () => {
     // Reply mode SURVIVES the failure. Dropping back to top-level would silently
     // re-aim a retry at the post instead of at the person being answered.
     expect(screen.getByText("Replying to")).toBeTruthy();
+    expect(screen.getByLabelText("Comment input").props.value).toBe("A reply");
   });
 });
 
@@ -424,7 +439,9 @@ describe("acting on a reply", () => {
     await waitFor(() => expect(screen.getByLabelText("View 1 reply")).toBeTruthy());
     fireEvent.press(screen.getByLabelText("View 1 reply"));
     await waitFor(() =>
-      expect(screen.getByText("Morning readings before food are the ones we compare.")).toBeTruthy(),
+      expect(
+        screen.getByText("Morning readings before food are the ones we compare."),
+      ).toBeTruthy(),
     );
 
     // Two rows, both the reader's, so both offer delete — index 1 is the reply.
@@ -503,7 +520,9 @@ describe("the async branches of one thread", () => {
     });
     fireEvent.press(screen.getByLabelText("Retry loading replies"));
     await waitFor(() =>
-      expect(screen.getByText("Morning readings before food are the ones we compare.")).toBeTruthy(),
+      expect(
+        screen.getByText("Morning readings before food are the ones we compare."),
+      ).toBeTruthy(),
     );
   });
 

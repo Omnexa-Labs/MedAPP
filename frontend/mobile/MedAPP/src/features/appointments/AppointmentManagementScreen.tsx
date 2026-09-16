@@ -87,7 +87,8 @@
 
 import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
+import { useSessionScope } from "@/hooks/use-session-scope";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   appointmentsApi,
@@ -131,7 +132,8 @@ interface PastAppointment {
   doctorName: string;
   specialty: string;
   facility: string;
-  completedLabel: string; // "Completed on Monday, Sep 12 • 09:00 AM"
+  status: "past" | "cancelled";
+  scheduledLabel: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,8 +171,14 @@ function doctorName(a: Appointment): string {
  * not initial as "D".
  */
 function initialsOf(name: string): string {
-  const words = name.replace(/^Dr\.?\s+/i, "").split(/\s+/).filter(Boolean);
-  return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  const words = name
+    .replace(/^Dr\.?\s+/i, "")
+    .split(/\s+/)
+    .filter(Boolean);
+  return words
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function toUpcoming(a: Appointment): UpcomingAppointment {
@@ -203,8 +211,8 @@ function toPast(a: Appointment): PastAppointment {
     doctorName: doctorName(a),
     specialty: a.doctor?.specialty ?? "",
     facility: "",
-    completedLabel:
-      a.status === "cancelled" ? `Cancelled — was ${when}` : `Completed on ${when}`,
+    status: a.status === "cancelled" ? "cancelled" : "past",
+    scheduledLabel: a.status === "cancelled" ? `Cancelled — was ${when}` : `Scheduled for ${when}`,
   };
 }
 
@@ -267,14 +275,22 @@ const STATUS_STYLES: Record<
 // ---------------------------------------------------------------------------
 
 export function AppointmentManagementScreen() {
+  const scope = useSessionScope();
+  return <Appointments key={`${scope.owner}:${scope.revision}`} scope={scope} />;
+}
+
+function Appointments({ scope }: { scope: ReturnType<typeof useSessionScope> }) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
 
   // `GET /v1/bookings`, scoped to the bearer token. This screen rendered two
   // hardcoded arrays until now, so a booking made in the app was invisible the
   // moment the user landed here.
   const { data, isPending, isError, error, refetch, isRefetching } = useQuery({
-    queryKey: ["appointments"],
-    queryFn: () => appointmentsApi.listAppointments(),
+    queryKey: ["appointments", scope.owner, scope.revision],
+    gcTime: 0,
+    enabled: !!scope.owner,
+    queryFn: ({ signal }) =>
+      appointmentsApi.listAppointments({ signal, isSessionCurrent: scope.isCurrent }),
   });
 
   const upcoming = (data?.upcoming ?? []).map(toUpcoming);
@@ -317,7 +333,7 @@ export function AppointmentManagementScreen() {
         {/* Subtitle only — the screen name now lives in the app bar (see the
             header note). Repeating it here at 28px would announce
             "Appointments, heading. Appointments." */}
-        <Text className="font-body-md text-on-surface-variant mb-md">
+        <Text className="mb-md font-body-md text-on-surface-variant">
           Manage your clinical sessions and history.
         </Text>
 
@@ -393,11 +409,7 @@ export function AppointmentManagementScreen() {
             active={tab === "upcoming"}
             onPress={() => setTab("upcoming")}
           />
-          <TabButton
-            label="Past"
-            active={tab === "past"}
-            onPress={() => setTab("past")}
-          />
+          <TabButton label="Past" active={tab === "past"} onPress={() => setTab("past")} />
         </View>
 
         {/* List.
@@ -417,7 +429,7 @@ export function AppointmentManagementScreen() {
             <View
               accessibilityRole="progressbar"
               accessibilityLabel="Loading your appointments"
-              className="items-center gap-sm py-2xl"
+              className="py-2xl items-center gap-sm"
             >
               <ActivityIndicator color={spinner} />
               <Text className="text-on-surface-variant" style={{ fontSize: 14 }}>
@@ -599,11 +611,8 @@ function ModalityBadge({ mode }: { mode: AppointmentMode }) {
 // Upcoming card
 // ---------------------------------------------------------------------------
 
-function UpcomingCard({
-  appointment,
-}: {
-  appointment: UpcomingAppointment;
-}) {
+function UpcomingCard({ appointment }: { appointment: UpcomingAppointment }) {
+  const scope = useSessionScope();
   const statusStyle = STATUS_STYLES[appointment.status];
   const queryClient = useQueryClient();
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
@@ -631,9 +640,15 @@ function UpcomingCard({
   //     fixed — it would leave the patient believing they had cancelled twice
   //     over. The error keeps the dialog open with the server's own message.
   const cancelMutation = useMutation({
-    mutationFn: () => appointmentsApi.cancelAppointment(appointment.id),
+    gcTime: 0,
+    mutationFn: () =>
+      appointmentsApi.cancelAppointment(appointment.id, undefined, {
+        isSessionCurrent: scope.isCurrent,
+      }),
     onSuccess: () => {
+      if (!scope.isCurrent()) return;
       setConfirmCancelOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["slots"] });
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
     },
   });
@@ -689,7 +704,7 @@ function UpcomingCard({
             </Text>
             {appointment.specialty ? (
               <Text
-                className="text-primary mt-xs"
+                className="mt-xs text-primary"
                 // 14px title case, per the frame. It was 10px uppercase with
                 // letterspacing — an eyebrow treatment, which made a clinician's
                 // specialty shout ("GENERAL PRACTICE") where the design reads it
@@ -719,7 +734,6 @@ function UpcomingCard({
             ) : null}
           </View>
         </View>
-
       </View>
 
       {/* Status row.
@@ -756,20 +770,15 @@ function UpcomingCard({
       </View>
 
       {/* Date/Time strip */}
-      <View
-        className="mb-md flex-row items-center gap-sm rounded-lg bg-surface-container-low p-sm"
-      >
+      <View className="mb-md flex-row items-center gap-sm rounded-lg bg-surface-container-low p-sm">
         {/* Decorative — the date is the content of the row. */}
         <Icon chrome="calendar-today" size={20} color={accent} />
         <View className="flex-1">
-          <Text
-            className="text-on-surface"
-            style={{ fontSize: 14, fontWeight: "600" }}
-          >
+          <Text className="text-on-surface" style={{ fontSize: 14, fontWeight: "600" }}>
             {appointment.dateLabel}
           </Text>
           <Text
-            className="text-on-surface-variant mt-xs"
+            className="mt-xs text-on-surface-variant"
             style={{
               fontSize: 12,
               fontWeight: "700",
@@ -870,7 +879,7 @@ function UpcomingCard({
               <Text className="text-on-surface" style={{ fontSize: 14, fontWeight: "600" }}>
                 Video link pending
               </Text>
-              <Text className="text-on-surface-variant mt-xs" style={{ fontSize: 12 }}>
+              <Text className="mt-xs text-on-surface-variant" style={{ fontSize: 12 }}>
                 We&rsquo;ll add the join button here as soon as the room is ready.
               </Text>
             </View>
@@ -878,6 +887,20 @@ function UpcomingCard({
         )
       ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`View details for appointment with ${appointment.doctorName}`}
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/booking-confirmed",
+            params: { bookingId: appointment.id },
+          } as Href)
+        }
+        className="mb-sm items-center justify-center"
+        style={{ minHeight: 44 }}
+      >
+        <Text className="font-label-md text-primary">View details</Text>
+      </Pressable>
       {/* Action buttons */}
       <View className="flex-row gap-sm">
         <Pressable
@@ -906,6 +929,8 @@ function UpcomingCard({
                 // cancels this id after its POST succeeds — book first, then
                 // cancel; the order and its failure modes are argued there.
                 rescheduleOfId: appointment.id,
+                mode: appointment.mode,
+                reason: appointment.consultationType,
               },
             })
           }
@@ -924,9 +949,7 @@ function UpcomingCard({
               neutral label inside an `outline-variant` border: it is the
               secondary of the two actions, and painting it brand-teal made it
               compete with Cancel's error red for the eye. */}
-          <Text style={{ color: neutralLabel, fontSize: 14, fontWeight: "600" }}>
-            Reschedule
-          </Text>
+          <Text style={{ color: neutralLabel, fontSize: 14, fontWeight: "600" }}>Reschedule</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -943,9 +966,7 @@ function UpcomingCard({
           })}
           onPress={() => setConfirmCancelOpen(true)}
         >
-          <Text style={{ color: danger, fontSize: 14, fontWeight: "600" }}>
-            Cancel
-          </Text>
+          <Text style={{ color: danger, fontSize: 14, fontWeight: "600" }}>Cancel</Text>
         </Pressable>
       </View>
 
@@ -976,7 +997,7 @@ function UpcomingCard({
             >
               Cancel this appointment?
             </Text>
-            <Text className="text-on-surface-variant mt-sm" style={{ fontSize: 14 }}>
+            <Text className="mt-sm text-on-surface-variant" style={{ fontSize: 14 }}>
               {`Your ${appointment.dateLabel} appointment with ${appointment.doctorName} will be cancelled. You'll need to book again to see them.`}
             </Text>
 
@@ -991,11 +1012,11 @@ function UpcomingCard({
                 <Text className="text-error" style={{ fontSize: 13, fontWeight: "600" }}>
                   We couldn&rsquo;t cancel this appointment
                 </Text>
-                <Text className="text-on-surface-variant mt-xs" style={{ fontSize: 13 }}>
+                <Text className="mt-xs text-on-surface-variant" style={{ fontSize: 13 }}>
                   {cancelMutation.error instanceof Error && cancelMutation.error.message
                     ? cancelMutation.error.message
                     : "Check your connection and try again."}
-                  {" It is still booked."}
+                  {" Refresh your appointments to verify its status before trying again."}
                 </Text>
               </View>
             ) : null}
@@ -1085,7 +1106,7 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
               {appointment.doctorName}
             </Text>
             <Text
-              className="text-outline mt-xs"
+              className="mt-xs text-outline"
               style={{
                 // 12, BRAND's floor. It was 10 — an uppercase, letterspaced
                 // eyebrow set below the minimum legible size, on a clinician's
@@ -1103,21 +1124,14 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
             <View className="mt-xs flex-row items-center gap-xs">
               {/* Decorative — the facility name is right beside it. */}
               <Icon chrome="location-on" size={14} color={mutedGlyph} />
-              <Text
-                className="text-on-surface-variant"
-                style={{ fontSize: 12 }}
-                numberOfLines={1}
-              >
+              <Text className="text-on-surface-variant" style={{ fontSize: 12 }} numberOfLines={1}>
                 {appointment.facility}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* "Completed" is the NEUTRAL status tone — a finished appointment
-            carries no accent — which is `Badge`'s neutral pair: a surface step
-            up from the card, labelled `on-surface-variant`. Same two tokens
-            the literals happened to equal in light, chosen for the role. */}
+        {/* Scheduled and cancelled history use the neutral status treatment. */}
         <View
           className="bg-surface-container-highest"
           style={{
@@ -1132,26 +1146,26 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
             // card. It was 11 — under BRAND's floor, on a status label.
             style={{ fontSize: 12, fontWeight: "700" }}
           >
-            Completed
+            {appointment.status === "cancelled" ? "Cancelled" : "Past"}
           </Text>
         </View>
       </View>
 
       {/* 12, not 11: this line is the WHEN of a past appointment, which is the
           single fact a patient scans this card for. */}
-      <Text
-        className="text-on-surface-variant"
-        style={{ fontSize: 12, marginBottom: 12 }}
-      >
-        {appointment.completedLabel}
+      <Text className="text-on-surface-variant" style={{ fontSize: 12, marginBottom: 12 }}>
+        {appointment.scheduledLabel}
       </Text>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`View summary for appointment with ${appointment.doctorName}`}
-        onPress={() => {
-          // TODO: route to consultation summary screen once ready.
-        }}
+        accessibilityLabel={`View details for appointment with ${appointment.doctorName}`}
+        onPress={() =>
+          router.push({
+            pathname: "/(app)/booking-confirmed",
+            params: { bookingId: appointment.id },
+          } as Href)
+        }
         className="bg-surface-container-highest"
         style={({ pressed }) => ({
           width: "100%",
@@ -1167,7 +1181,7 @@ function PastCard({ appointment }: { appointment: PastAppointment }) {
             on-surface — the label of a tonal surface, not a filled accent. It
             flips to #DEE4E1 on the dark plate. */}
         <Text className="text-on-surface" style={{ fontSize: 14, fontWeight: "600" }}>
-          View Summary
+          View details
         </Text>
       </Pressable>
     </View>

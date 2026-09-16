@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from shared.audit import audited_collection_read, audited_read
 from shared.auth import Principal
@@ -26,6 +27,7 @@ from ..schemas.booking import (
 )
 from .doctor_directory import resolve_doctor_user_id
 from .telemedicine import provision_room
+from .availability import ensure_offered
 
 log = logging.getLogger(__name__)
 
@@ -114,12 +116,14 @@ async def create_booking(
     payload: BookingCreate,
     *,
     authorization: str | None = None,
+    rescheduled_from_id: UUID | None = None,
+    patient_id: UUID | None = None,
 ) -> Booking:
-    user_id = _principal_uuid(principal)
-    if payload.starts_at >= payload.ends_at:
-        raise BookingError("starts_at must be before ends_at")
+    user_id = patient_id or _principal_uuid(principal)
     _ensure_timezone_aware(payload.starts_at, "starts_at")
     _ensure_timezone_aware(payload.ends_at, "ends_at")
+    if payload.starts_at >= payload.ends_at:
+        raise BookingError("starts_at must be before ends_at")
     if payload.starts_at <= datetime.now(tz=timezone.utc):
         raise BookingError("booking must start in the future")
 
@@ -130,22 +134,14 @@ async def create_booking(
         Booking.ends_at > payload.starts_at,
     )
     if await db.scalar(conflict_stmt):
-        raise BookingError("doctor is already booked for that time window")
+        raise HTTPException(409, "doctor is already booked for that time window")
 
-    # Resolve the clinician's user_service id ONCE, here on the write path, so
-    # every later practitioner read is a local comparison (see
-    # doctor_directory.py for why this is not done at read time). A None result
-    # is stored as NULL and NULL denies — the doctor loses this row from their
-    # schedule, which the backfill script repairs. It does NOT fail the
-    # booking: the patient's slot is the thing that must survive.
+    await ensure_offered(payload.doctor_id, payload.starts_at, payload.ends_at,
+                         authorization=authorization)
+
     doctor_user_id = await resolve_doctor_user_id(payload.doctor_id, authorization=authorization)
     if doctor_user_id is None:
-        # No patient identifier in this line — doctor_id is a public directory
-        # id, and that is all the operator needs to run the backfill.
-        log.warning(
-            "booking_doctor_link_unresolved",
-            extra={"doctor_id": str(payload.doctor_id)},
-        )
+        raise HTTPException(503, "Could not confirm the clinician. Try again.")
 
     booking = Booking(
         user_id=user_id,
@@ -157,9 +153,16 @@ async def create_booking(
         mode=payload.mode.value,
         reason=_normalize_text(payload.reason),
         notes=_normalize_text(payload.notes),
+        rescheduled_from_id=rescheduled_from_id,
     )
     db.add(booking)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # Only the named exclusion constraint is a slot contention error.
+        if "ex_booking_doctor_window" in str(exc.orig):
+            raise HTTPException(409, "That slot was just taken. Choose another time.") from exc
+        raise
 
     # Video provisioning happens AFTER the flush (the booking needs its id to
     # be the room's `booking_id`) and is deliberately not part of the booking's
@@ -426,6 +429,7 @@ async def get_booking(
     booking_id: UUID,
     *,
     require_write: bool = False,
+    lock: bool = False,
 ) -> Booking:
     """Fetch one booking, enforcing read or write access.
 
@@ -442,7 +446,8 @@ async def get_booking(
     patient to attribute the attempt to, so it writes no row (see
     `shared.audit.recorder.audited_read`).
     """
-    booking = await db.get(Booking, booking_id)
+    booking = (await db.scalar(select(Booking).where(Booking.id == booking_id).with_for_update())
+               if lock else await db.get(Booking, booking_id))
     if not booking:
         raise BookingError("booking not found")
     resource = "booking_write" if require_write else "booking"
@@ -464,7 +469,7 @@ async def cancel_booking(
     booking_id: UUID,
     payload: BookingCancel,
 ) -> Booking:
-    booking = await get_booking(db, principal, booking_id, require_write=True)
+    booking = await get_booking(db, principal, booking_id, require_write=True, lock=True)
     if booking.status == BookingStatus.CANCELLED.value:
         raise BookingError("booking is already cancelled")
     booking.status = BookingStatus.CANCELLED.value
@@ -473,3 +478,39 @@ async def cancel_booking(
     await db.flush()
     await db.refresh(booking)
     return booking
+
+
+async def reschedule_booking(db: AsyncSession, principal: Principal, booking_id: UUID,
+                             payload: BookingCreate, *, authorization: str | None) -> Booking:
+    _ensure_timezone_aware(payload.starts_at, "starts_at")
+    _ensure_timezone_aware(payload.ends_at, "ends_at")
+    try:
+        original = await get_booking(db, principal, booking_id, require_write=True, lock=True)
+    except BookingError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    # A retry of the same request returns the same replacement, including after
+    # a lost success response. A different request must start from that visit.
+    replacement = await db.scalar(select(Booking).where(Booking.rescheduled_from_id == booking_id))
+    if replacement:
+        if (replacement.status == "booked" and replacement.doctor_id == payload.doctor_id
+            and _as_utc(replacement.starts_at) == _as_utc(payload.starts_at)
+            and _as_utc(replacement.ends_at) == _as_utc(payload.ends_at)
+            and replacement.mode == payload.mode.value
+            and replacement.reason == _normalize_text(payload.reason)
+            and replacement.notes == _normalize_text(payload.notes)):
+            return replacement
+        raise HTTPException(409, "This appointment was already rescheduled. Check your appointments.")
+    if original.status != "booked" or _as_utc(original.starts_at) <= datetime.now(timezone.utc):
+        raise HTTPException(409, "Only upcoming booked appointments can be rescheduled.")
+    if original.doctor_id != payload.doctor_id:
+        raise BookingError("rescheduling must keep the same clinician")
+    original.status = "cancelled"
+    original.cancelled_at = datetime.now(timezone.utc)
+    original.cancellation_reason = "Rescheduled by the patient"
+    await db.flush()
+    # The request transaction rolls back this cancellation if any validation,
+    # reservation or subsequent database write fails.
+    replacement = await create_booking(db, principal, payload, authorization=authorization,
+                                       rescheduled_from_id=booking_id, patient_id=original.user_id)
+    await db.flush()
+    return replacement

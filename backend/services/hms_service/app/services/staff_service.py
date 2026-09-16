@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.department import Department, DepartmentMembership
@@ -40,13 +41,16 @@ async def get_department(dept_id: UUID, db: AsyncSession) -> Department | None:
     return result.scalar_one_or_none()
 
 
-async def update_department(dept_id: UUID, body: DepartmentUpdate, db: AsyncSession) -> Department | None:
+async def update_department(
+    dept_id: UUID, body: DepartmentUpdate, db: AsyncSession
+) -> Department | None:
     dept = await get_department(dept_id, db)
     if dept is None:
         return None
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(dept, key, value)
     await db.flush()
+    await db.refresh(dept, attribute_names=["updated_at"])
     return dept
 
 
@@ -83,13 +87,17 @@ async def list_staff(
     search: str | None = None,
     department_id: UUID | None = None,
     specialty: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[StaffMember]:
     query = select(StaffMember).where(StaffMember.is_active.is_(True))
 
     if search:
         like = f"%{search}%"
         query = query.where(
-            StaffMember.first_name.ilike(like) | StaffMember.last_name.ilike(like)
+            StaffMember.first_name.ilike(like)
+            | StaffMember.last_name.ilike(like)
+            | StaffMember.employee_id.ilike(like)
         )
 
     if specialty:
@@ -100,7 +108,12 @@ async def list_staff(
             DepartmentMembership, DepartmentMembership.staff_id == StaffMember.id
         ).where(DepartmentMembership.department_id == department_id)
 
-    result = await db.execute(query.order_by(StaffMember.last_name))
+    result = await db.execute(
+        query.distinct()
+        .order_by(StaffMember.last_name, StaffMember.id)
+        .offset(offset)
+        .limit(limit + 1)
+    )
     return list(result.scalars().all())
 
 
@@ -113,9 +126,16 @@ async def update_staff(staff_id: UUID, body: StaffUpdate, db: AsyncSession) -> S
     staff = await get_staff(staff_id, db)
     if staff is None:
         return None
+    if body.employee_id and await db.scalar(
+        select(StaffMember.id).where(
+            StaffMember.employee_id == body.employee_id, StaffMember.id != staff_id
+        )
+    ):
+        raise HTTPException(409, "This employee ID already belongs to another staff member.")
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(staff, key, value)
     await db.flush()
+    await db.refresh(staff, attribute_names=["updated_at"])
     return staff
 
 

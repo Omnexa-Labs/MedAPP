@@ -4,7 +4,7 @@ import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "MedApp PMS — Pharmacy Management",
-  description: "Pharmacy Management System template powered by MedApp",
+  description: "Pharmacy inventory, dispensing and staff operations with MedApp",
 };
 
 export default function RootLayout({

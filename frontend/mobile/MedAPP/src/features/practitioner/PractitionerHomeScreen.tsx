@@ -65,7 +65,7 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API
 // here. Only expo-router is used.
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -81,6 +81,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useSessionScope } from "@/hooks/use-session-scope";
 import { useTokenColor } from "@/lib/tokens";
 import { practitionerApi, type ScheduleEntry } from "./api";
 import {
@@ -103,35 +104,53 @@ const CHEVRON = 22;
 
 export function PractitionerHomeScreen() {
   const user = useCurrentUser();
+  const scope = useSessionScope();
   const onSurfaceVariant = useTokenColor("on-surface-variant");
 
   // ONE clock read for the whole render, captured here rather than inside the
   // three helpers that need it. Two `new Date()` calls a millisecond apart can
   // straddle midnight, and "Good evening ... Thursday 6 August" above a list
   // filtered to Wednesday is a bug nobody would reproduce on demand.
-  const now = useMemo(() => new Date(), []);
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // `GET /v1/bookings/schedule`. No identifier — authorization is the caller's
   // own token, which is what removes the IDOR an authorising `?doctor_id=`
   // would have created.
   const scheduleQuery = useQuery({
-    queryKey: ["practitioner", "schedule"],
-    queryFn: () => practitionerApi.listSchedule(),
+    queryKey: ["practitioner", "schedule", scope.owner, scope.revision],
+    enabled: !!scope.owner && user?.accountRole === "doctor",
+    gcTime: 0,
+    queryFn: ({ signal }) =>
+      practitionerApi.listSchedule({ signal, isSessionCurrent: scope.isCurrent }),
   });
 
-  // The clinician's own doctor profile, for the specialty in the context line
-  // and for the availability card. `enabled` on the user id because
-  // `findMyProfile` scans the directory for it and cannot run without one —
-  // see the header of api.ts for why there is no `GET /v1/doctors/me`.
+  // Direct lookup keeps the account ID distinct from the clinician profile ID.
   const profileQuery = useQuery({
-    queryKey: ["practitioner", "profile", user?.id],
-    queryFn: () => practitionerApi.findMyProfile(user!.id),
-    enabled: Boolean(user?.id),
+    queryKey: ["practitioner", "profile", scope.owner, scope.revision],
+    queryFn: ({ signal }) =>
+      practitionerApi.findMyProfile(scope.owner!, { signal, isSessionCurrent: scope.isCurrent }),
+    enabled: !!scope.owner && user?.accountRole === "doctor",
+    gcTime: 0,
   });
 
   const availabilityQuery = useQuery({
-    queryKey: ["practitioner", "availability", profileQuery.data?.doctorId],
-    queryFn: () => practitionerApi.listAvailability(profileQuery.data!.doctorId),
+    queryKey: [
+      "practitioner",
+      "availability",
+      scope.owner,
+      scope.revision,
+      profileQuery.data?.doctorId,
+    ],
+    gcTime: 0,
+    queryFn: ({ signal }) =>
+      practitionerApi.listAvailability(profileQuery.data!.doctorId, {
+        signal,
+        isSessionCurrent: scope.isCurrent,
+      }),
     enabled: Boolean(profileQuery.data?.doctorId),
   });
 
@@ -201,8 +220,8 @@ export function PractitionerHomeScreen() {
               Schedule unavailable
             </Text>
             <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
-              Your schedule could not be loaded. This does not mean your day is clear — check
-              your connection and try again.
+              Your schedule could not be loaded. This does not mean your day is clear — check your
+              connection and try again.
             </Text>
             <Button
               label="Try again"
@@ -303,7 +322,10 @@ function ConsultationCard({ entry }: { entry: ScheduleEntry }) {
           icon={entry.mode === "video" ? "videocam" : "place"}
           tone="neutral"
         />
-        <Badge label={cancelled ? "Cancelled" : "Confirmed"} tone={cancelled ? "error" : "success"} />
+        <Badge
+          label={cancelled ? "Cancelled" : "Confirmed"}
+          tone={cancelled ? "error" : "success"}
+        />
       </View>
 
       <Text

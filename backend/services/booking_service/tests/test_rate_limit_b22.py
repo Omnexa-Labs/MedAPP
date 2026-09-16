@@ -132,7 +132,7 @@ async def test_rate_limit_failed_creates_still_count(
     a = await client.post("/v1/bookings", json=payload)
     assert a.status_code == 201
     b = await client.post("/v1/bookings", json=payload)  # conflict
-    assert b.status_code == 400
+    assert b.status_code == 409
     # Third call still 429 — the failed second one consumed a slot.
     c = await client.post("/v1/bookings", json=_payload(booking_window))
     assert c.status_code == 429

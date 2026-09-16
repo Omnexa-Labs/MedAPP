@@ -3,11 +3,10 @@ from __future__ import annotations
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, JSON, String, Text, UniqueConstraint
+from shared.db import Base, TimestampMixin
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
-
-from shared.db import Base, TimestampMixin
 
 
 class HmsRoleEnum(StrEnum):
@@ -28,9 +27,7 @@ class TenantRegistry(Base, TimestampMixin):
     slug: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     database_url: Mapped[str] = mapped_column(String(512), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
-    provisioned_at: Mapped[DateTime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    provisioned_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     config_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -45,12 +42,9 @@ class HmsStaffRole(Base, TimestampMixin):
         UniqueConstraint("tenant_id", "user_id", name="uq_hms_staff_roles_tenant_user"),
     )
 
-    tenant_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), nullable=False, index=True
-    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False, index=True)
     hms_role: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
-    department_id: Mapped[UUID | None] = mapped_column(
-        PGUUID(as_uuid=True), nullable=True
-    )
+    department_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")

@@ -23,6 +23,15 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
+  /** Server account role; application approval is tracked separately. */
+  accountRole?: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  /** Self-reported during signup/profile editing, not a verified clinical result. */
+  bloodType?: string | null;
+  primaryGoal?: string | null;
   avatarUrl?: string;
   partner?: Partner;
   createdAt: string;

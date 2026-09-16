@@ -6,8 +6,10 @@ from sqlalchemy import engine_from_config, pool
 from shared.db import Base
 
 import app.models  # noqa: F401 — register tables on Base.metadata
+from app.config import settings
 
 config = context.config
+config.set_main_option("sqlalchemy.url", settings.database_url_sync.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

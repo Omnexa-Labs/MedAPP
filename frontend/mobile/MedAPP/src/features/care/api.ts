@@ -31,12 +31,14 @@
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // Expo-specific code here. None today.
 
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
 import type {
+  DirectoryCategory,
   DirectoryEntry,
   FacilityEntry,
   PersonEntry,
 } from "@/features/care/types";
+import { ApiError } from "@/types/api";
 
 // ---- Wire shapes ---------------------------------------------------------
 
@@ -86,7 +88,7 @@ interface HospitalWire {
 }
 
 interface PharmacyWire {
-  id: string;
+  pharmacy_id: string;
   user_id: string;
   name: string;
   slug: string;
@@ -167,6 +169,9 @@ interface HospitalStaffRosterWire {
 }
 
 interface PharmacyDetailWire {
+  services_offered?: string[];
+  head_pharmacist_name?: string | null;
+  head_pharmacist_bio?: string | null;
   pharmacy_id: string;
   user_id: string;
   name: string;
@@ -207,10 +212,21 @@ interface PharmacyStockWire {
   source: string;
 }
 
-interface DoctorListWire { items: DoctorWire[] }
-interface NurseListWire { items: NurseWire[] }
-interface HospitalListWire { items: HospitalWire[] }
-interface PaginatedWire<T> { items: T[]; total: number; limit: number; offset: number }
+interface DoctorListWire {
+  items: DoctorWire[];
+}
+interface NurseListWire {
+  items: NurseWire[];
+}
+interface HospitalListWire {
+  items: HospitalWire[];
+}
+interface PaginatedWire<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
 
 // ---- Helpers -------------------------------------------------------------
 
@@ -266,6 +282,8 @@ function adaptDoctor(d: DoctorWire): PersonEntry {
     // seeing what it costs. It travels to the review screen, which is where the
     // commit happens. MINOR UNITS — nothing on this path may render it raw.
     consultationFeeCents: d.consultation_fee_cents,
+    specialties: d.specialty ? [d.specialty] : [],
+    languages: d.languages,
     badges,
   };
 }
@@ -283,6 +301,9 @@ function adaptNurse(n: NurseWire): PersonEntry {
     kind: "person",
     category: "nurses",
     id: n.nurse_id,
+    specialties: n.specialty ? [n.specialty] : [],
+    languages: n.languages,
+    homeVisitFeeCents: n.home_visit_fee_cents,
     name: `${n.first_name} ${n.last_name}`.trim(),
     title: n.specialty ? `${titleCase(n.specialty)} Nurse` : "Nurse",
     avatarUri: n.photo_url ?? "",
@@ -331,12 +352,10 @@ function adaptHospital(h: HospitalWire): FacilityEntry {
 
 function adaptPharmacy(p: PharmacyWire): FacilityEntry {
   const badges: FacilityEntry["badges"] = [];
-  // operating_hours is a {day: "08:00-22:00"} map. We don't compute
-  // "open now" here — too easy to get wrong without the user's TZ.
-  // Surface the first hours string as a hint instead.
-  const hoursValues = p.operating_hours ? Object.values(p.operating_hours) : [];
-  if (hoursValues.length > 0) {
-    pushBadge(badges, { label: `Open ${hoursValues[0]}`, tone: "open" });
+  // Hours have no timezone or normalized schedule contract. The detail page
+  // displays the recorded days without claiming that the pharmacy is open now.
+  if (p.operating_hours && Object.keys(p.operating_hours).length > 0) {
+    pushBadge(badges, { label: "Hours listed", tone: "tertiary" });
   }
   if (p.insurance_accepted.length > 0) {
     pushBadge(badges, {
@@ -347,7 +366,7 @@ function adaptPharmacy(p: PharmacyWire): FacilityEntry {
   return {
     kind: "facility",
     category: "pharmacies",
-    id: p.id,
+    id: p.pharmacy_id,
     name: p.name,
     subtitle: p.city ?? p.address_line1 ?? "",
     icon: "local-pharmacy",
@@ -369,10 +388,10 @@ function adaptPharmacist(p: PharmacistWire): PersonEntry {
     kind: "person",
     category: "pharmacists",
     id: p.pharmacist_id,
+    specialties: p.specialties,
+    languages: p.languages,
     name: `${p.first_name} ${p.last_name}`.trim(),
-    title: p.specialties.length > 0
-      ? `${titleCase(p.specialties[0])} Pharmacist`
-      : "Pharmacist",
+    title: p.specialties.length > 0 ? `${titleCase(p.specialties[0])} Pharmacist` : "Pharmacist",
     avatarUri: p.photo_url ?? "",
     badges,
   };
@@ -453,6 +472,9 @@ function adaptHospitalStaff(w: HospitalStaffRosterWire): HospitalStaffRoster {
 
 function adaptPharmacyDetail(p: PharmacyDetailWire): PharmacyDetail {
   return {
+    servicesOffered: p.services_offered ?? [],
+    headPharmacistName: p.head_pharmacist_name ?? null,
+    headPharmacistBio: p.head_pharmacist_bio ?? null,
     pharmacyId: p.pharmacy_id,
     name: p.name,
     description: p.description,
@@ -509,22 +531,50 @@ export interface ListParams {
   offset?: number;
 }
 
+export interface DirectoryPage {
+  entries: DirectoryEntry[];
+  total: number;
+  nextOffset: number | null;
+}
+
+export type PractitionerKind = "doctors" | "nurses" | "pharmacists";
+export interface PublicPractitioner extends PersonEntry {
+  category: PractitionerKind;
+  bio: string | null;
+  specialties: string[];
+  languages: string[];
+  isActive: boolean;
+  isListable: boolean;
+}
+
+function directoryPage<T>(
+  wire: PaginatedWire<T>,
+  adapt: (item: T) => DirectoryEntry,
+): DirectoryPage {
+  const next = wire.offset + wire.items.length;
+  return {
+    entries: wire.items.map(adapt),
+    total: wire.total,
+    nextOffset: wire.items.length > 0 && next < wire.total ? next : null,
+  };
+}
+
 export const careApi = {
-  async listDoctors(p: ListParams = {}): Promise<DirectoryEntry[]> {
+  async listDoctors(p: ListParams = {}, options?: RequestOptions): Promise<DirectoryEntry[]> {
     const qs = toQuery({ q: p.q, specialty: p.specialty });
-    const wire = await client.get<DoctorListWire>(`/v1/doctors${qs}`);
+    const wire = await client.get<DoctorListWire>(`/v1/doctors${qs}`, options);
     return wire.items.map(adaptDoctor);
   },
 
-  async listNurses(p: ListParams = {}): Promise<DirectoryEntry[]> {
+  async listNurses(p: ListParams = {}, options?: RequestOptions): Promise<DirectoryEntry[]> {
     const qs = toQuery({ q: p.q, specialty: p.specialty });
-    const wire = await client.get<NurseListWire>(`/v1/nurses${qs}`);
+    const wire = await client.get<NurseListWire>(`/v1/nurses${qs}`, options);
     return wire.items.map(adaptNurse);
   },
 
-  async listHospitals(p: ListParams = {}): Promise<DirectoryEntry[]> {
-    const qs = toQuery({ q: p.q, city: p.city });
-    const wire = await client.get<HospitalListWire>(`/v1/hospitals${qs}`);
+  async listHospitals(p: ListParams = {}, options?: RequestOptions): Promise<DirectoryEntry[]> {
+    const qs = toQuery({ q: p.q, city: p.city, specialty: p.specialty });
+    const wire = await client.get<HospitalListWire>(`/v1/hospitals${qs}`, options);
     return wire.items.map(adaptHospital);
   },
 
@@ -545,6 +595,85 @@ export const careApi = {
     return wire.items.map(adaptPharmacist);
   },
 
+  async listDirectoryPage(
+    category: DirectoryCategory,
+    p: ListParams = {},
+    options?: RequestOptions,
+  ): Promise<DirectoryPage> {
+    if (category === "pharmacies") {
+      const qs = toQuery({ q: p.q, city: p.city, limit: p.limit ?? 50, offset: p.offset ?? 0 });
+      return directoryPage(
+        await client.get<PaginatedWire<PharmacyWire>>(`/v1/pharmacies${qs}`, options),
+        adaptPharmacy,
+      );
+    }
+    if (category === "pharmacists") {
+      const qs = toQuery({
+        q: p.q,
+        pharmacy_id: p.pharmacyId,
+        limit: p.limit ?? 50,
+        offset: p.offset ?? 0,
+      });
+      return directoryPage(
+        await client.get<PaginatedWire<PharmacistWire>>(`/v1/pharmacists${qs}`, options),
+        adaptPharmacist,
+      );
+    }
+    // These three services currently return their complete filtered list.
+    const entries = await (category === "doctors"
+      ? careApi.listDoctors(p, options)
+      : category === "nurses"
+        ? careApi.listNurses(p, options)
+        : careApi.listHospitals(p, options));
+    return { entries, total: entries.length, nextOffset: null };
+  },
+
+  async getPublicPractitioner(
+    kind: PractitionerKind,
+    id: string,
+    options?: RequestOptions,
+  ): Promise<PublicPractitioner> {
+    const path = `/v1/${kind}/${encodeURIComponent(id)}`;
+    let profile: PublicPractitioner;
+    if (kind === "doctors") {
+      const d = await client.get<DoctorWire>(path, options);
+      profile = {
+        ...adaptDoctor(d),
+        category: kind,
+        bio: d.bio,
+        specialties: d.specialty ? [d.specialty] : [],
+        languages: d.languages,
+        isActive: d.is_active,
+        isListable: d.is_listable,
+      };
+    } else if (kind === "nurses") {
+      const n = await client.get<NurseWire>(path, options);
+      profile = {
+        ...adaptNurse(n),
+        category: kind,
+        bio: n.bio,
+        specialties: n.specialty ? [n.specialty] : [],
+        languages: n.languages,
+        isActive: n.is_active,
+        isListable: n.is_listable,
+      };
+    } else {
+      const p = await client.get<PharmacistWire>(path, options);
+      profile = {
+        ...adaptPharmacist(p),
+        category: kind,
+        bio: p.bio,
+        specialties: p.specialties,
+        languages: p.languages,
+        isActive: p.is_active,
+        isListable: p.is_listable,
+      };
+    }
+    if (profile.id !== id)
+      throw new ApiError("The provider response did not match this profile.", 502);
+    return profile;
+  },
+
   /**
    * One doctor by id — `GET /v1/doctors/{doctor_id}` -> `DoctorProfileOut`.
    *
@@ -554,8 +683,8 @@ export const careApi = {
    * an existing booking with. Anything hydrating a stored `doctor_id` — the
    * appointments list, a booking receipt — must come through here.
    */
-  async getDoctor(doctorId: string): Promise<DoctorSummary> {
-    const d = await client.get<DoctorWire>(`/v1/doctors/${doctorId}`);
+  async getDoctor(doctorId: string, options?: RequestOptions): Promise<DoctorSummary> {
+    const d = await client.get<DoctorWire>(`/v1/doctors/${doctorId}`, options);
     return {
       doctorId: d.doctor_id,
       // The wire has no title; "Dr." is the app's own presentation, applied in
@@ -592,9 +721,7 @@ export const careApi = {
    * own docstring), so an empty list here proves nothing about the hospital.
    */
   async listHospitalReviews(hospitalId: string): Promise<HospitalReview[]> {
-    const wire = await client.get<HospitalReviewWire[]>(
-      `/v1/hospitals/${hospitalId}/reviews`,
-    );
+    const wire = await client.get<HospitalReviewWire[]>(`/v1/hospitals/${hospitalId}/reviews`);
     return wire.map(adaptHospitalReview);
   },
 
@@ -613,9 +740,7 @@ export const careApi = {
    * service (not merely at the gateway), and 404s on an unknown hospital.
    */
   async listHospitalStaff(hospitalId: string): Promise<HospitalStaffRoster> {
-    const wire = await client.get<HospitalStaffRosterWire>(
-      `/v1/hospitals/${hospitalId}/staff`,
-    );
+    const wire = await client.get<HospitalStaffRosterWire>(`/v1/hospitals/${hospitalId}/staff`);
     return adaptHospitalStaff(wire);
   },
 
@@ -649,9 +774,7 @@ export const careApi = {
    */
   async checkStock(pharmacyId: string, drugName: string): Promise<StockCheck> {
     const qs = toQuery({ drug_name: drugName });
-    const s = await client.get<PharmacyStockWire>(
-      `/v1/pharmacies/${pharmacyId}/stock${qs}`,
-    );
+    const s = await client.get<PharmacyStockWire>(`/v1/pharmacies/${pharmacyId}/stock${qs}`);
     return adaptStock(s);
   },
 };
@@ -748,6 +871,9 @@ export interface HospitalStaffRoster {
  * and no screen has any business showing.
  */
 export interface PharmacyDetail {
+  servicesOffered?: string[];
+  headPharmacistName?: string | null;
+  headPharmacistBio?: string | null;
   pharmacyId: string;
   name: string;
   description: string | null;

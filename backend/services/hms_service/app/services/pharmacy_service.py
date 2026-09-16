@@ -58,6 +58,7 @@ async def update_drug(drug_id: UUID, body: DrugUpdate, db: AsyncSession) -> Drug
     for key, value in body.model_dump(exclude_unset=True).items():
         setattr(drug, key, value)
     await db.flush()
+    await db.refresh(drug, attribute_names=["updated_at"])
     return drug
 
 

@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,9 @@ class Settings(BaseSettings):
     # an empty or known-weak value.
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
+    hms_workspace_session_secret: SecretStr = SecretStr("")
+    hms_workspace_session_audience: str = "medapp.hms"
+    hms_workspace_session_issuer: str = "medapp.hms"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
 
@@ -88,6 +92,7 @@ ROUTES: dict[str, str] = {
     "/v1/admin": settings.analytics_service_url,
     "/v1/onboarding": settings.onboarding_service_url,
     "/v1/pharmacies": settings.pharmacy_service_url,
+    "/v1/pharmacy-workspaces": settings.pharmacy_service_url,
     "/v1/pharmacists": settings.pharmacist_service_url,
     # MESSAGING. Absent until 2026-08-06, which meant every /v1/threads call the
     # mobile app made returned the gateway's {"error":"unknown route"} 404 — the

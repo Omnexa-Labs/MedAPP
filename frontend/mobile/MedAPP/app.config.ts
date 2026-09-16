@@ -33,14 +33,25 @@ function defaultApiBaseUrl(env: AppEnv): string {
 }
 
 function defaultPartnerOnboardingUrl(env: AppEnv): string {
-  if (env === "prod") return "https://partners.medapp.dev/onboarding";
-  if (env === "preview") return "https://preview-partners.medapp.dev/onboarding";
-  return "http://localhost:3000/onboarding";
+  if (env === "prod") return "https://partners.medapp.dev";
+  if (env === "preview") return "https://preview-partners.medapp.dev";
+  return process.platform === "darwin" ? "http://localhost:3003" : "http://10.0.2.2:3003";
 }
 
 const API_BASE_URL = process.env.API_BASE_URL ?? defaultApiBaseUrl(APP_ENV);
 const PARTNER_ONBOARDING_URL =
   process.env.PARTNER_ONBOARDING_URL ?? defaultPartnerOnboardingUrl(APP_ENV);
+const HMS_WEB_URL =
+  process.env.HMS_WEB_URL ??
+  (APP_ENV === "dev"
+    ? process.platform === "darwin"
+      ? "http://localhost:3001"
+      : "http://10.0.2.2:3001"
+    : "");
+const GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID ?? "";
+const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID ?? "";
+const APPLE_SIGN_IN_ENABLED = process.env.APPLE_SIGN_IN_ENABLED === "true";
+const GOOGLE_READY = !!(GOOGLE_WEB_CLIENT_ID && GOOGLE_IOS_CLIENT_ID);
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -53,6 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
   ios: {
     bundleIdentifier: BUNDLE_BY_ENV[APP_ENV],
+    usesAppleSignIn: APPLE_SIGN_IN_ENABLED,
     icon: "./assets/expo.icon",
   },
   android: {
@@ -97,6 +109,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
+    ...(APPLE_SIGN_IN_ENABLED ? ["expo-apple-authentication"] : []),
+    ...(GOOGLE_READY
+      ? [
+          [
+            "react-native-nitro-google-signin",
+            {
+              iosUrlScheme: GOOGLE_IOS_CLIENT_ID.split(".").reverse().join("."),
+            },
+          ] as [string, Record<string, string>],
+        ]
+      : []),
     [
       "expo-splash-screen",
       {
@@ -108,7 +131,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     "expo-font",
-    "expo-secure-store",
+    [
+      "expo-secure-store",
+      { faceIDPermission: "Allow MedApp to use Face ID to protect your sign-in on this device." },
+    ],
     // Voice input in the AI assistant / chat composer. The permission STRING is
     // the point of registering the plugin: iOS refuses to prompt for the mic
     // without NSMicrophoneUsageDescription, and a health app asking for a
@@ -123,6 +149,38 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
     // Sharing and saving records (prescriptions, medication lists, reports).
     "expo-sharing",
+    // Prescription label capture in the "Add medication" flow (SDK 55
+    // `CameraView`). The permission STRING is the reason this is registered as a
+    // plugin rather than left to the package default: iOS will not prompt without
+    // NSCameraUsageDescription, and the default copy ("Allow MedApp to access
+    // your camera") states no purpose — on a health app that is the prompt users
+    // decline.
+    //
+    // Both optional native features are turned OFF deliberately:
+    //
+    //   recordAudioAndroid  The flow captures STILLS only. Left at its `true`
+    //                       default this adds RECORD_AUDIO to the Android
+    //                       manifest, so the app would request the microphone
+    //                       twice for two unrelated reasons — and app.config's
+    //                       expo-audio note already sets the standard here: "a
+    //                       health app asking for a microphone with no stated
+    //                       reason is the kind of prompt users decline."
+    //   barcodeScannerEnabled  Nothing calls `onBarcodeScanned`. A prescription
+    //                       label is read as text, not as a barcode, so this
+    //                       would ship a native scanning module no code uses.
+    //
+    // NOT TESTABLE IN EXPO GO — this is a native module, and Expo Go bundles its
+    // own set. Verifying the viewfinder needs a development build, the same
+    // caveat already recorded for softwareKeyboardLayoutMode above.
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "MedApp uses the camera only when you choose to photograph a prescription label, so the details can be filled in for you.",
+        recordAudioAndroid: false,
+        barcodeScannerEnabled: false,
+      },
+    ],
     // Biometric sign-in. iOS requires NSFaceIDUsageDescription before
     // FaceID can be prompted; the config plugin sets it so the string
     // lives in version control rather than in raw Info.plist. Android
@@ -152,8 +210,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     reactCompiler: true,
   },
   extra: {
+    googleWebClientId: GOOGLE_WEB_CLIENT_ID,
+    googleIosClientId: GOOGLE_IOS_CLIENT_ID,
+    appleSignInEnabled: APPLE_SIGN_IN_ENABLED,
     appEnv: APP_ENV,
     apiBaseUrl: API_BASE_URL,
     partnerOnboardingUrl: PARTNER_ONBOARDING_URL,
+    hospitalPortalUrl: HMS_WEB_URL,
   },
 });

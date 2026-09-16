@@ -28,6 +28,8 @@ for path in (SERVICE_ROOT, SHARED_ROOT):
 from app.deps import get_current_principal, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
+from app.schemas.record import ClinicianIdentity
+from app.services.clinician_identity import get_clinician_lookup
 
 
 @compiles(PGUUID, "sqlite")
@@ -61,12 +63,28 @@ def principal_doctor():
 
 
 @pytest.fixture()
+def principal_nurse():
+    return type("Principal", (), {"subject": str(uuid4()), "role": "nurse"})()
+
+
+@pytest.fixture()
+def recipient_lookup(principal_doctor, principal_nurse):
+    async def lookup(user_id):
+        from fastapi import HTTPException
+        for person in (principal_doctor, principal_nurse):
+            if str(user_id) == person.subject:
+                return ClinicianIdentity(user_id=user_id, display_name=f"Test {person.role}", role=person.role)
+        raise HTTPException(400, "this clinician is no longer available")
+    return lookup
+
+
+@pytest.fixture()
 def principal_admin():
     return type("Principal", (), {"subject": str(uuid4()), "role": "admin"})()
 
 
 @pytest_asyncio.fixture
-async def patient_client(sessionmaker: async_sessionmaker, principal_patient) -> AsyncIterator[AsyncClient]:
+async def patient_client(sessionmaker: async_sessionmaker, principal_patient, recipient_lookup) -> AsyncIterator[AsyncClient]:
     app: FastAPI = create_app()
 
     async def _db_override():
@@ -83,6 +101,7 @@ async def patient_client(sessionmaker: async_sessionmaker, principal_patient) ->
 
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_current_principal] = _principal_override
+    app.dependency_overrides[get_clinician_lookup] = lambda: recipient_lookup
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -116,7 +135,7 @@ async def doctor_client(sessionmaker: async_sessionmaker, principal_doctor) -> A
 
 
 @pytest_asyncio.fixture
-async def admin_client(sessionmaker: async_sessionmaker, principal_admin) -> AsyncIterator[AsyncClient]:
+async def admin_client(sessionmaker: async_sessionmaker, principal_admin, recipient_lookup) -> AsyncIterator[AsyncClient]:
     app: FastAPI = create_app()
 
     async def _db_override():
@@ -130,6 +149,8 @@ async def admin_client(sessionmaker: async_sessionmaker, principal_admin) -> Asy
 
     async def _principal_override():
         return principal_admin
+
+    app.dependency_overrides[get_clinician_lookup] = lambda: recipient_lookup
 
     app.dependency_overrides[get_db] = _db_override
     app.dependency_overrides[get_current_principal] = _principal_override

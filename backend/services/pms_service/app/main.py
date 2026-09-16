@@ -2,17 +2,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
 from .routers import (
+    activation,
     auth,
     batches,
     customers,
     dev_auth,
     drugs,
     integrations,
+    medapp_sessions,
     prescriptions,
     purchase_orders,
     reports,
@@ -34,6 +35,7 @@ async def _init_dev_db() -> None:
     from shared.db import Base
 
     import app.models  # noqa: F401 — register all model classes on Base.metadata
+
     from .db import engine
 
     async with engine.begin() as conn:
@@ -46,9 +48,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-    instrument_app(
-        app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint
-    )
+    instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
 
     origins = [o.strip() for o in settings.cors_allow_origins.split(",") if o.strip()]
     app.add_middleware(
@@ -60,6 +60,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth.router)
+    app.include_router(activation.router)
+    app.include_router(medapp_sessions.router)
     app.include_router(staff.router)
     app.include_router(suppliers.router)
     app.include_router(drugs.router)
@@ -67,6 +69,9 @@ def create_app() -> FastAPI:
     app.include_router(purchase_orders.router)
     app.include_router(prescriptions.router)
     app.include_router(sales.router)
+    from .routers import sale_corrections
+
+    app.include_router(sale_corrections.router)
     app.include_router(customers.router)
     app.include_router(reports.router)
     app.include_router(integrations.router)

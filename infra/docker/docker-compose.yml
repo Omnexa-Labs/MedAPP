@@ -40,17 +40,20 @@ x-svc-env: &svc-env
   WEARABLE_SYNC_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   PHARMACY_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
   PHARMACIST_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
-  # Shared HMAC secret used by:
-  #   - pharmacy_service to SIGN outbound stock-availability calls
-  #     (PHARMACY_MEDAPP_PARTNER_SECRET)
-  #   - pms_service to VERIFY those calls
-  #     (PMS_MEDAPP_WEBHOOK_SECRET, same trust anchor for the partner
-  #     path and the prescription webhook in dev)
-  # Both env vars MUST resolve to the same string or the contract
-  # breaks. Override with PMS_MEDAPP_WEBHOOK_SECRET in .env for real
-  # deployments; the per-pharmacy `pms_partner_secret_id` lookup is
-  # the production path.
-  PHARMACY_MEDAPP_PARTNER_SECRET: "medapp_dev_partner_secret_change_me"
+  # AGENTS. Each agent reads its secret under its own pydantic `env_prefix`
+  # (CONCIERGE_, MEDICAL_CHAT_, ...), NOT the bare JWT_SECRET above — so before
+  # these existed every agent booted with `jwt_secret: str = ""` and logged
+  # "auth.unconfigured ... /chat will reject all requests", which it then did for
+  # every caller. The agent containers were up and healthy while every AI feature
+  # in the app returned 401.
+  #
+  # booking_agent is absent on purpose: its env_prefix is BOOKING_, so it already
+  # reads BOOKING_JWT_SECRET above — the same value booking_service uses.
+  CONCIERGE_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  MEDICAL_CHAT_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  SMART_RECOMMEND_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  LAB_READER_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+  VITALS_WATCHER_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
 
 services:
   postgres:
@@ -97,7 +100,26 @@ services:
     ports: ["6333:6333", "6334:6334"]
     volumes: [qdrantdata:/qdrant/storage]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/readyz || exit 1"]
+      # `wget` is NOT in qdrant/qdrant — nor curl, nc, or python3 — so the
+      # previous wget probe failed with "wget: not found" on every interval and
+      # the container sat `unhealthy` for its whole life while /readyz answered
+      # 200 the entire time. Nothing declares `depends_on: qdrant`, so this
+      # never blocked a service; it just made `docker ps` lie.
+      #
+      # `bash` IS present, so talk HTTP over bash's /dev/tcp and match the
+      # status line. This keeps the real readiness semantics of /readyz ("all
+      # shards are ready") rather than degrading to a bare port-open check,
+      # and adds no dependency on the image's (nonexistent) tooling.
+      #
+      # `$$line` is doubled deliberately: compose interpolates `$VAR` in every
+      # value, so a single `$line` is substituted with the empty string before
+      # bash ever sees it, leaving `[[  == *"200 OK"* ]]`. `$$` escapes to a
+      # literal `$`.
+      test:
+        - "CMD"
+        - "bash"
+        - "-c"
+        - 'exec 3<>/dev/tcp/127.0.0.1/6333; printf "GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3; read -r line <&3; [[ $$line == *"200 OK"* ]]'
       interval: 10s
       timeout: 5s
       retries: 10
@@ -140,7 +162,9 @@ services:
         SERVICE: api_gateway
         SERVICE_PORT: 8000
     depends_on: [user_service]
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      GW_HMS_WORKSPACE_SESSION_SECRET: ${HMS_WORKSPACE_SESSION_SECRET:-}
     ports: ["8000:8000"]
 
   user_service:
@@ -151,7 +175,32 @@ services:
         SERVICE: user_service
         SERVICE_PORT: 8001
     depends_on: { postgres: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      USER_SMTP_HOST: ${USER_SMTP_HOST:-}
+      USER_MFA_ENCRYPTION_KEY: ${USER_MFA_ENCRYPTION_KEY:-}
+      USER_GOOGLE_CLIENT_IDS: ${USER_GOOGLE_CLIENT_IDS:-}
+      USER_APPLE_CLIENT_IDS: ${USER_APPLE_CLIENT_IDS:-}
+      USER_ADMIN_GOOGLE_CLIENT_ID: ${USER_ADMIN_GOOGLE_CLIENT_ID:-}
+      USER_ADMIN_WORKSPACE_DOMAINS: ${USER_ADMIN_WORKSPACE_DOMAINS:-}
+      USER_PARTNER_HANDOFF_SECRET: ${USER_PARTNER_HANDOFF_SECRET:-}
+      USER_ONBOARDING_ACTIVATION_SECRET: ${USER_ONBOARDING_ACTIVATION_SECRET:-}
+      USER_PARTNER_WEB_ORIGIN: ${USER_PARTNER_WEB_ORIGIN:-}
+      USER_PARTNER_RETURN_URIS: ${USER_PARTNER_RETURN_URIS:-medapp://onboarding-status}
+      USER_HMS_HANDOFF_SECRET: ${USER_HMS_HANDOFF_SECRET:-}
+      USER_HMS_WEB_ORIGIN: ${USER_HMS_WEB_ORIGIN:-}
+      USER_HMS_RETURN_URIS: ${USER_HMS_RETURN_URIS:-medapp://hospital-workspaces}
+      USER_PMS_HANDOFF_DEPLOYMENTS: '${USER_PMS_HANDOFF_DEPLOYMENTS:-{}}'
+      USER_PMS_RETURN_URIS: ${USER_PMS_RETURN_URIS:-medapp://pharmacy-workspaces}
+      USER_PHARMACY_SERVICE_URL: ${USER_PHARMACY_SERVICE_URL:-http://pharmacy_service:8015}
+      USER_SMTP_PORT: ${USER_SMTP_PORT:-587}
+      USER_SMTP_FROM_EMAIL: ${USER_SMTP_FROM_EMAIL:-}
+      USER_SMTP_USERNAME: ${USER_SMTP_USERNAME:-}
+      USER_SMTP_PASSWORD: ${USER_SMTP_PASSWORD:-}
+      USER_SMTP_SECURITY: ${USER_SMTP_SECURITY:-starttls}
+      USER_SMTP_TIMEOUT_SECONDS: ${USER_SMTP_TIMEOUT_SECONDS:-10}
+      USER_PASSWORD_RESET_TTL_MINUTES: ${USER_PASSWORD_RESET_TTL_MINUTES:-30}
+      USER_PASSWORD_RESET_RESEND_COOLDOWN_SECONDS: ${USER_PASSWORD_RESET_RESEND_COOLDOWN_SECONDS:-30}
     ports: ["8001:8001"]
 
   doctor_service:
@@ -166,7 +215,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      DOCTOR_ONBOARDING_ACTIVATION_SECRET: ${DOCTOR_ONBOARDING_ACTIVATION_SECRET:-}
     ports: ["8002:8002"]
 
   nurse_service:
@@ -177,7 +228,9 @@ services:
         SERVICE: nurse_service
         SERVICE_PORT: 8003
     depends_on: [postgres]
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      NURSE_ONBOARDING_ACTIVATION_SECRET: ${NURSE_ONBOARDING_ACTIVATION_SECRET:-}
     ports: ["8003:8003"]
 
   hospital_service:
@@ -188,7 +241,10 @@ services:
         SERVICE: hospital_service
         SERVICE_PORT: 8004
     depends_on: [postgres]
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      HOSPITAL_ONBOARDING_ACTIVATION_SECRET: ${HOSPITAL_ONBOARDING_ACTIVATION_SECRET:-}
+      HOSPITAL_HMS_DIRECTORY_SECRET: ${HMS_HOSPITAL_DIRECTORY_SECRET:-}
     ports: ["8004:8004"]
 
   booking_service:
@@ -312,7 +368,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      ONBOARDING_GCS_BUCKET: ${ONBOARDING_GCS_BUCKET:-}
+      ONBOARDING_ACTIVATION_ENABLED: ${ONBOARDING_ACTIVATION_ENABLED:-false}
+      ONBOARDING_ACTIVATION_USER_SECRET: ${USER_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_ACTIVATION_DOCTOR_SECRET: ${DOCTOR_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_ACTIVATION_NURSE_SECRET: ${NURSE_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_ACTIVATION_HOSPITAL_SECRET: ${HOSPITAL_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_ACTIVATION_HMS_SECRET: ${HMS_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_ACTIVATION_PHARMACY_SECRET: ${PHARMACY_ONBOARDING_ACTIVATION_SECRET:-}
+      ONBOARDING_DOCUMENT_MAX_BYTES: ${ONBOARDING_DOCUMENT_MAX_BYTES:-10485760}
+      ONBOARDING_DOCUMENT_LIMIT: ${ONBOARDING_DOCUMENT_LIMIT:-20}
     ports: ["8022:8013"]
 
   lab_service:
@@ -342,7 +409,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    environment: *svc-env
+    environment:
+      <<: *svc-env
+      EHR_USER_SERVICE_URL: ${EHR_USER_SERVICE_URL:-http://user_service:8001}
     ports: ["8010:8010"]
 
   wearable_sync_service:
@@ -399,7 +468,13 @@ services:
       HMS_MGMT_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_hms_mgmt
       HMS_TENANT_DATABASE_URL_TEMPLATE: postgresql+asyncpg://medapp:medapp@postgres/hms_{tenant_slug}
       HMS_ADMIN_DATABASE_URL_SYNC: postgresql://medapp:medapp@postgres/medapp
-      HMS_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # Match this development stack's MedApp identity signing key.
+      HMS_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+      HMS_ONBOARDING_ACTIVATION_SECRET: ${HMS_ONBOARDING_ACTIVATION_SECRET:-}
+      HMS_WORKSPACE_SESSION_SECRET: ${HMS_WORKSPACE_SESSION_SECRET:-}
+      HMS_HOSPITAL_DIRECTORY_SECRET: ${HMS_HOSPITAL_DIRECTORY_SECRET:-}
+      HMS_HOSPITAL_SERVICE_URL: http://hospital_service:8004
+      HMS_DEV_MODE: "false"
       HMS_AMQP_URL: amqp://medapp:medapp@rabbitmq/
     ports: ["8020:8020"]
 
@@ -414,11 +489,14 @@ services:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       PMS_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pms
-      PMS_JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      # The webhook secret doubles as the partner-token secret used by
-      # pharmacy_service for stock-availability calls. Keep this in
-      # lockstep with PHARMACY_MEDAPP_PARTNER_SECRET above.
-      PMS_MEDAPP_WEBHOOK_SECRET: ${PMS_MEDAPP_WEBHOOK_SECRET:-medapp_dev_partner_secret_change_me}
+      PMS_DATABASE_URL_SYNC: postgresql+psycopg://medapp:medapp@postgres/medapp_pms
+      PMS_JWT_SECRET: ${PMS_JWT_SECRET:-}
+      PMS_MEDAPP_JWT_SECRET: "medapp_dev_secret_jwt_key_32_chars_long"
+      PMS_USER_SERVICE_URL: http://user_service:8001
+      PMS_MEDAPP_DEPLOYMENT_KEY: ${PMS_MEDAPP_DEPLOYMENT_KEY:-}
+      PMS_ONBOARDING_ACTIVATION_SECRET: ${PMS_ONBOARDING_ACTIVATION_SECRET:-}
+      # Match this deployment's stock_secret in PHARMACY_PMS_DEPLOYMENTS.
+      PMS_MEDAPP_WEBHOOK_SECRET: ${PMS_MEDAPP_WEBHOOK_SECRET:-}
       PMS_MEDAPP_DISPENSE_WEBHOOK_URL: ${PMS_MEDAPP_DISPENSE_WEBHOOK_URL:-}
     ports: ["8030:8030"]
 
@@ -433,6 +511,9 @@ services:
     environment:
       <<: *svc-env
       PHARMACY_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pharmacies
+      PHARMACY_ONBOARDING_ACTIVATION_SECRET: ${PHARMACY_ONBOARDING_ACTIVATION_SECRET:-}
+      PHARMACY_PMS_DEPLOYMENTS: ${PHARMACY_PMS_DEPLOYMENTS:-{}}
+      PHARMACY_PUBLIC_API_ORIGIN: ${PHARMACY_PUBLIC_API_ORIGIN:-http://localhost:8000}
     ports: ["8015:8015"]
 
   pharmacist_service:
@@ -452,58 +533,71 @@ services:
     build:
       context: ../../frontend/pms_web
       dockerfile: Dockerfile
-    depends_on: [pms_service]
+    depends_on: [pms_service, api_gateway, redis]
     environment:
-      NEXT_PUBLIC_PMS_API_URL: ${PMS_PUBLIC_API_URL:-http://localhost:8030}
+      PMS_WEB_ORIGIN: ${PMS_WEB_ORIGIN:-http://127.0.0.1:3002}
+      PMS_WEB_API_URL: http://pms_service:8030
+      PMS_WEB_MEDAPP_API_URL: http://api_gateway:8000
+      PMS_WEB_REDIS_URL: redis://redis:6379
+      PMS_WEB_DEPLOYMENT_KEY: ${PMS_MEDAPP_DEPLOYMENT_KEY:-}
+      PMS_WEB_HANDOFF_SECRET: ${PMS_WEB_HANDOFF_SECRET:-}
+      PMS_WEB_RETURN_URIS: ${PMS_WEB_RETURN_URIS:-medapp://pharmacy-workspaces}
     ports: ["3002:3000"]
 
   # ── Agents (Claude-powered) ────────────────────────────────────────────────
+  #
+  # Every agent merges *svc-env for the same reason the backend services do: it
+  # carries the shared JWT secrets, without which `/chat` rejects every request.
+  # These blocks used to set only ANTHROPIC_API_KEY + the OTEL endpoint, which is
+  # why the agents authenticated nobody. The OTEL endpoint is already in the
+  # anchor at the same value; ANTHROPIC_API_KEY stays explicit because it is
+  # agent-only and comes from the host environment.
   concierge_agent:
     build: { <<: *py-build, dockerfile: agents/services/concierge_agent/Dockerfile }
     depends_on: [api_gateway]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9001:9001"]
 
   smart_recommend_agent:
     build: { <<: *py-build, dockerfile: agents/services/smart_recommend_agent/Dockerfile }
     depends_on: [ehr_service]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9002:9002"]
 
   medical_chat_agent:
     build: { <<: *py-build, dockerfile: agents/services/medical_chat_agent/Dockerfile }
     depends_on: [ehr_service]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9003:9003"]
 
   lab_reader_agent:
     build: { <<: *py-build, dockerfile: agents/services/lab_reader_agent/Dockerfile }
     depends_on: [ehr_service, lab_service]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9004:9004"]
 
   vitals_watcher_agent:
     build: { <<: *py-build, dockerfile: agents/services/vitals_watcher_agent/Dockerfile }
     depends_on: [ehr_service, notification_service]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9005:9005"]
 
   booking_agent:
     build: { <<: *py-build, dockerfile: agents/services/booking_agent/Dockerfile }
     depends_on: [booking_service, payment_service]
     environment:
+      <<: *svc-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     ports: ["9006:9006"]
 
 volumes:

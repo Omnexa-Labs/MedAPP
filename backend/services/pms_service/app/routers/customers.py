@@ -53,9 +53,7 @@ async def get_customer(
     db: AsyncSession = DbSession,
     _=Depends(require_roles(*ALL)),
 ):
-    c = (
-        await db.execute(select(Customer).where(Customer.id == customer_id))
-    ).scalar_one_or_none()
+    c = (await db.execute(select(Customer).where(Customer.id == customer_id))).scalar_one_or_none()
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
     return CustomerOut.model_validate(c)
@@ -68,9 +66,7 @@ async def update_customer(
     db: AsyncSession = DbSession,
     _=Depends(require_roles(*EDIT)),
 ):
-    c = (
-        await db.execute(select(Customer).where(Customer.id == customer_id))
-    ).scalar_one_or_none()
+    c = (await db.execute(select(Customer).where(Customer.id == customer_id))).scalar_one_or_none()
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "customer not found")
     for field, value in body.model_dump(exclude_unset=True).items():

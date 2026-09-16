@@ -7,13 +7,83 @@ consumes the JWT and marks the matching contact verified.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
 
-from app.models import User
+from app.config import settings
+from app.models import OtpCode, User
+from app.services.notifiers import EmailDeliveryError
 
 pytestmark = pytest.mark.asyncio
+
+
+async def test_email_start_returns_distinct_expiry_and_resend_delays(client, monkeypatch):
+    monkeypatch.setattr(settings, "otp_ttl_seconds", 120)
+    monkeypatch.setattr(settings, "otp_resend_cooldown_seconds", 17)
+    response = await _start(client, channel="email", recipient="timers@example.com")
+    assert response.status_code == 200
+    assert response.json() == {"sent": True, "expires_in": 120, "resend_after_seconds": 17}
+    repeated = await _start(client, channel="email", recipient="timers@example.com")
+    assert repeated.status_code == 429
+
+
+async def test_expired_email_code_cannot_verify(client, notifier, session_factory):
+    recipient = "expired@example.com"
+    assert (await _start(client, channel="email", recipient=recipient)).status_code == 200
+    code = _extract_code(notifier.emails[-1]["body"])
+    async with session_factory() as session:
+        record = await session.scalar(select(OtpCode).where(OtpCode.recipient == recipient))
+        record.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        await session.commit()
+    assert (await _verify(client, channel="email", recipient=recipient, code=code)).status_code == 400
+
+
+async def test_wrong_email_codes_consume_the_attempt_budget(client, notifier, session_factory):
+    recipient = "attempts@example.com"
+    assert (await _start(client, channel="email", recipient=recipient)).status_code == 200
+    code = _extract_code(notifier.emails[-1]["body"])
+    wrong = "000000" if code != "000000" else "111111"
+    for attempt in range(1, settings.otp_max_attempts + 1):
+        response = await _verify(client, channel="email", recipient=recipient, code=wrong)
+        assert response.status_code == 400
+        async with session_factory() as session:
+            record = await session.scalar(select(OtpCode).where(OtpCode.recipient == recipient))
+            assert record.attempts == attempt
+    response = await _verify(client, channel="email", recipient=recipient, code=code)
+    assert response.status_code == 400
+    assert "verification_token" not in response.json()
+
+
+async def test_consuming_a_new_code_does_not_reactivate_an_older_code(client, notifier, session_factory):
+    recipient = "resend@example.com"
+    assert (await _start(client, channel="email", recipient=recipient)).status_code == 200
+    old_code = _extract_code(notifier.emails[-1]["body"])
+    async with session_factory() as session:
+        previous = await session.scalar(select(OtpCode).where(OtpCode.recipient == recipient))
+        previous.created_at = datetime.now(timezone.utc) - timedelta(seconds=settings.otp_resend_cooldown_seconds + 1)
+        await session.commit()
+    assert (await _start(client, channel="email", recipient=recipient)).status_code == 200
+    current_code = _extract_code(notifier.emails[-1]["body"])
+    assert (await _verify(client, channel="email", recipient=recipient, code=current_code)).status_code == 200
+    assert (await _verify(client, channel="email", recipient=recipient, code=old_code)).status_code == 400
+
+
+@pytest.mark.parametrize("delivery_error", [OSError, EmailDeliveryError])
+async def test_delivery_failure_returns_unavailable_and_allows_retry(
+    client, notifier, monkeypatch, delivery_error
+):
+    async def fail_delivery(**kwargs):
+        raise delivery_error("SMTP connection failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(notifier, "send_email", fail_delivery)
+        response = await _start(client, channel="email", recipient="retry@example.com")
+        assert response.status_code == 503
+    response = await _start(client, channel="email", recipient="retry@example.com")
+    assert response.status_code == 200
+    assert len(notifier.emails) == 1
 
 
 def _extract_code(body: str) -> str:

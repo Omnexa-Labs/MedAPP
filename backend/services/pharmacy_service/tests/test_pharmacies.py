@@ -266,9 +266,7 @@ async def test_stock_returns_404_when_no_pms(client) -> None:
     assert resp.status_code == status.HTTP_404_NOT_FOUND
 
 
-async def test_stock_degrades_gracefully_on_network_error(client) -> None:
-    # Point at an unroutable URL → check_drug_at_pharmacy should return
-    # `available=False, source="unknown"` rather than 5xx.
+async def test_owner_cannot_choose_an_upstream_url(client) -> None:
     create = await client.post(
         "/v1/pharmacies",
         json={
@@ -278,12 +276,4 @@ async def test_stock_degrades_gracefully_on_network_error(client) -> None:
             "pms_base_url": "http://127.0.0.1:1",
         },
     )
-    pharmacy_id = create.json()["pharmacy_id"]
-    resp = await client.get(
-        f"/v1/pharmacies/{pharmacy_id}/stock",
-        params={"drug_name": "Paracetamol"},
-    )
-    assert resp.status_code == status.HTTP_200_OK
-    body = resp.json()
-    assert body["available"] is False
-    assert body["source"] == "unknown"
+    assert create.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY

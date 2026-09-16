@@ -43,12 +43,10 @@
 //   2. BLOOD TYPE "O+" was rendered beside the user's real name. A blood type
 //      has transfusion consequences and this one was picked by a designer.
 //
-// There is no profile/demographics endpoint anywhere in the product —
-// `user_service` `/v1/me` carries id, email, display name and avatar, and
-// `ehr_service` has no demographics on `PatientOut` either (docs/api/*.md). So
-// these cannot be made real, and the rule is that a fabrication is deleted
-// rather than dressed up. What remains is exactly what the app actually knows
-// about the person signed in, plus a plain statement of what it does not hold.
+// Personal details are now saved by signup and restored from /v1/me (2026-09-13).
+// The profile shows only those saved values; absent fields say "Not provided".
+// Blood type is explicitly self-reported. Weight, address, primary care provider
+// and emergency-contact examples remain absent until supported by real data.
 //
 // Removed with them, because they were controls attached to the fiction:
 //   * "Share Records" and "Edit Profile", both `onPress={() => {}}` — there is
@@ -58,6 +56,8 @@
 //   * the dual-line Health Trends chart and its "15% more active" claim, which
 //     were normalised constants with no unit and no source.
 // All recorded in docs/api/README.md's gap register.
+// Edit profile now opens the authenticated patient editor (2026-09-13), which
+// loads and saves the account's real name parts and optional personal details.
 //
 // Read https://docs.expo.dev/versions/v55.0.0/ before adding any
 // expo-* APIs here. None beyond expo-router; expo-status-bar moved into the
@@ -66,10 +66,11 @@
 import { ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import { AvatarWithFallback, Button, Card, InfoCallout } from "@/components/ui";
+import { AvatarWithFallback, Button, Card } from "@/components/ui";
 import { DetailShell } from "@/components/shell";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useTokenColor } from "@/lib/tokens";
+import { PersonalDetailsCard } from "./PersonalDetailsCard";
 
 type IconName = React.ComponentProps<typeof MaterialIcons>["name"];
 
@@ -116,7 +117,7 @@ export function PatientProfileOverviewScreen() {
           </Text>
         </View>
 
-        {/* Account card — the two fields the product actually stores.
+        {/* Account identity and the entry point to edit saved profile details.
             The photo is the user's own or their initials or a silhouette;
             AvatarWithFallback walks that ladder itself. */}
         <Card className="mt-md items-center gap-md">
@@ -131,34 +132,25 @@ export function PatientProfileOverviewScreen() {
             <Text className="font-headline-md text-on-surface" style={{ fontSize: 20 }}>
               {displayName ?? "Your profile"}
             </Text>
-            {/* No "Verified" badge. Nothing in `user_service` reports an email
-                verification state, so the badge was a trust claim the backend
-                never made. */}
+            {/* Verification status is not displayed by this account card. */}
             {email ? (
               <Text className="font-body-md text-body-md text-on-surface-variant">{email}</Text>
             ) : null}
           </View>
+          {user ? (
+            <Button
+              label="Edit profile"
+              variant="outline"
+              size="docked"
+              pill={false}
+              shadow={false}
+              leadingIcon="edit"
+              onPress={() => router.push("/(app)/edit-patient-profile" as Href)}
+            />
+          ) : null}
         </Card>
 
-        {/* What is NOT here, said plainly.
-            This is the whole of the "gate it behind an unmissable treatment"
-            option, chosen over rendering greyed sample values: a demographics
-            row with a placeholder in it is still a demographics row, and the
-            one field that matters most (blood type) is exactly the one a reader
-            would trust a placeholder for. */}
-        <Card className="mt-md gap-md">
-          <View className="flex-row items-center gap-sm">
-            <MaterialIcons name="badge" size={20} color={onSurface} />
-            <Text className="flex-1 font-headline-md text-on-surface" style={{ fontSize: 20 }}>
-              Health record
-            </Text>
-          </View>
-          <InfoCallout>
-            MedApp doesn&apos;t hold your date of birth, blood type, weight, address or phone
-            number yet. Your care team keeps those in their own records — ask them if you need to
-            check or correct anything.
-          </InfoCallout>
-        </Card>
+        <PersonalDetailsCard user={user} />
 
         {/* Primary Care — an honest absence plus the one route that works. */}
         <Card className="mt-md gap-md">
@@ -169,10 +161,7 @@ export function PatientProfileOverviewScreen() {
             </Text>
           </View>
 
-          <EmptyRow
-            icon="person-off"
-            text="No primary care provider is linked to your account."
-          />
+          <EmptyRow icon="person-off" text="No primary care provider is linked to your account." />
 
           {/* Was `push("/(app)/select-time-slot")` with NO params. SelectTimeSlot
               resolves its grid from `params.practitionerId`, so that CTA reliably
@@ -212,6 +201,19 @@ export function PatientProfileOverviewScreen() {
               number you would want used in your phone&apos;s own emergency contacts.
             </Text>
           </View>
+        </Card>
+        <Card className="mt-md gap-sm">
+          <Text className="font-headline-md text-headline-md text-on-surface">
+            Professional workspace
+          </Text>
+          <Text className="font-body-md text-body-md text-on-surface-variant">
+            View your application status and access your activated professional profile.
+          </Text>
+          <Button
+            label="Professional applications and access"
+            variant="outline"
+            onPress={() => router.push("/(app)/onboarding-status" as Href)}
+          />
         </Card>
       </ScrollView>
     </DetailShell>

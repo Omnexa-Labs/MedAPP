@@ -12,7 +12,7 @@
 // behaviour the design cannot express: RHF + zod (`SignUpStep3Schema`), the
 // `onBack` / `onSubmit` / `onSkip` hand-off to the route (which composes the
 // full sign-up payload and fires the mutation), the submit-error surface, and
-// the bound `lastAuditDate`.
+// the account-created/sign-in continuation.
 //
 // Frame structure (values read from get_design_context / get_variable_defs /
 // get_metadata, not eyeballed):
@@ -63,15 +63,10 @@
 // `surface-container-lowest` thumb, dash glyph in `on-surface-variant`.
 //
 // FLAGGED deviations / gaps (also listed in the task report):
-//   1. SEMANTIC CONFLICT on the third toggle. The frame labels it "Share Data
-//      with Care Team — Let your providers view your health records.", but the
-//      field it is bound to is `shareAnonymousData`, which the schema and
-//      `authApi.signUpFull` define as anonymised sharing with RESEARCHERS.
-//      Those are different consents with different legal weight. The frame's
-//      copy is used (Figma wins on copy) and the field name is left alone
-//      (renaming it is an API-contract change), but ONE of the two has to move:
-//      either the frame means provider access and needs a new field, or the
-//      copy needs to say "researchers". Needs a product/legal decision.
+//   1. Signup enrollment/consent is unavailable. All options stay disabled/off.
+//      The care-team field now has its own name; signup never requests research
+//      sharing or grants record access. Unsupported compliance/audit claims were
+//      removed from the setup card.
 //   2. The frame has no submit-error state and no error slot. The route can
 //      surface a 409 / network failure, so `errorMessage` renders on
 //      `error-container` above the divider. Needs a designed error state.
@@ -131,10 +126,11 @@ const SWITCH = { width: 52, height: 32, thumb: 24, inset: 4 } as const;
 
 interface Props {
   isSubmitting?: boolean;
+  accountCreated?: boolean;
+  onSignIn?: () => void;
+  onRestartProvider?: () => void;
   /** Submit failure from the route. FLAGGED (2) — no error state in the frame. */
   errorMessage?: string | null;
-  /** Bound variable, not hardcoded copy — the frame draws "Last audit: Jun 2026". */
-  lastAuditDate?: string;
   onBack?: () => void;
   onSubmit?: (values: SignUpStep3Values) => void;
   onSkip?: () => void;
@@ -145,8 +141,7 @@ interface Props {
  * from the frame. Every glyph is a real Health Icons registry entry, so nothing
  * had to be added to src/components/ui/icons/registry.ts.
  *
- * FLAGGED (1): `shareAnonymousData` carries the frame's care-team copy while the
- * schema/API define it as anonymised research sharing.
+ * The options remain visible for reference, disabled until actual setup exists.
  */
 const TOGGLES: {
   name: keyof SignUpStep3Values;
@@ -159,29 +154,33 @@ const TOGGLES: {
     name: "enableBiometric",
     icon: "fingerprint",
     title: "Biometric Login",
-    description: "Use Face ID or fingerprint to sign in securely.",
+    description: "Set up biometric sign-in in Security & privacy after creating your account.",
     testID: "signup.step3.biometric",
   },
   {
     name: "enableTwoFactor",
     icon: "secure-communication",
     title: "Two-Factor Authentication",
-    description: "Add a verification code step when signing in.",
+    description:
+      "Set up an authenticator in Security & privacy after creating your account. This option stays off here.",
     testID: "signup.step3.two-factor",
   },
   {
-    name: "shareAnonymousData",
+    name: "shareWithCareTeam",
     icon: "health-worker",
     title: "Share Data with Care Team",
-    description: "Let your providers view your health records.",
+    description:
+      "After signup, choose a clinician in Security & Privacy → Care-team sharing. Signup does not share your records.",
     testID: "signup.step3.data-sharing",
   },
 ];
 
 export function SignUpStep3Screen({
   isSubmitting,
+  accountCreated = false,
+  onSignIn,
+  onRestartProvider,
   errorMessage,
-  lastAuditDate = "Jun 2026",
   onBack,
   onSubmit,
   onSkip,
@@ -191,15 +190,14 @@ export function SignUpStep3Screen({
   // take a colour string), so they're resolved by token name for the mode.
   const primary = useTokenColor("primary");
   const onSurfaceVariant = useTokenColor("on-surface-variant");
-  const success = useTokenColor("success");
 
   const { control, handleSubmit } = useForm<SignUpStep3Values>({
     resolver: zodResolver(SignUpStep3Schema),
-    // The frame draws Biometric and Share Data On and 2FA Off.
+    // A design's checked state is not enrollment or consent.
     defaultValues: {
-      enableBiometric: true,
+      enableBiometric: false,
       enableTwoFactor: false,
-      shareAnonymousData: true,
+      shareWithCareTeam: false,
     },
     mode: "onSubmit",
   });
@@ -249,7 +247,7 @@ export function SignUpStep3Screen({
                 Secure your account
               </Text>
               <Text className="w-full text-center font-body-md text-body-md text-on-surface-variant">
-                Add an extra layer of protection to keep your health records private and safe.
+                Review the setup options below, then save your account details.
               </Text>
             </View>
 
@@ -268,6 +266,7 @@ export function SignUpStep3Screen({
                       description={toggle.description}
                       value={field.value}
                       onValueChange={field.onChange}
+                      disabled
                     />
                   )}
                 />
@@ -282,22 +281,13 @@ export function SignUpStep3Screen({
               <View className="w-full flex-row items-center gap-2">
                 <Icon name="secure" size={20} color={onSurfaceVariant} />
                 <Text className="font-label-md text-label-md text-on-surface">
-                  HIPAA-Compliant Security
+                  Your account setup
                 </Text>
               </View>
               <Text className="w-full font-label-sm text-label-sm text-on-surface-variant">
-                Your health data is encrypted end-to-end and stored in accordance with HIPAA
-                security standards.
+                Complete Setup saves your personal details. Security enrollment and care-team
+                sharing require separate setup. Skip for now leaves these options off.
               </Text>
-              {/* Audit Chip (338:859) — hug width, radius/full, 12/8 inset.
-                  FLAGGED (6): label takes `on-success-container`, not the
-                  frame's `on-surface`, so it stays legible in dark mode. */}
-              <View className="flex-row items-center gap-2 self-start rounded-full bg-success-container px-3 py-2">
-                <Icon name="calendar" size={20} color={success} />
-                <Text className="font-label-sm text-label-sm text-on-success-container">
-                  Last audit: {lastAuditDate}
-                </Text>
-              </View>
             </Card>
 
             {/* Submit error — FLAGGED (2): not in the frame. */}
@@ -325,17 +315,25 @@ export function SignUpStep3Screen({
                 size="cta"
                 pill={false}
                 shadow={false}
-                label="Complete Setup"
-                accessibilityLabel="Complete setup"
+                label={accountCreated ? "Sign in to continue" : "Complete Setup"}
+                accessibilityLabel={accountCreated ? "Sign in to continue" : "Complete setup"}
                 trailingIcon="arrow-forward"
                 loading={isSubmitting}
-                disabled={isSubmitting}
-                onPress={submit}
+                disabled={isSubmitting || (accountCreated && !onSignIn)}
+                onPress={accountCreated ? onSignIn : submit}
               />
 
               {/* Skip for now (338:878) — a 44px text action.
                   FLAGGED (3): only rendered when the route wires it. */}
-              {onSkip ? (
+              {onRestartProvider && errorMessage && !accountCreated ? (
+                <Button
+                  label="Restart provider sign-in"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onPress={onRestartProvider}
+                />
+              ) : null}
+              {onSkip && !accountCreated ? (
                 <Pressable
                   testID="signup.step3.skip"
                   onPress={onSkip}
@@ -408,6 +406,7 @@ function ToggleCard({
   description,
   value,
   onValueChange,
+  disabled = false,
 }: {
   testID: string;
   icon: HealthIconName;
@@ -415,6 +414,7 @@ function ToggleCard({
   description: string;
   value: boolean;
   onValueChange: (next: boolean) => void;
+  disabled?: boolean;
 }) {
   // The glyph sits on the `primary-tint` chip and the on-state hairline is the
   // same accent, so both resolve one token for the current mode — never a hex.
@@ -424,8 +424,9 @@ function ToggleCard({
     <Pressable
       testID={testID}
       onPress={() => onValueChange(!value)}
+      disabled={disabled}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+      accessibilityState={{ checked: value, disabled }}
       accessibilityLabel={title}
       accessibilityHint={description}
       className="w-full active:scale-[0.99]"

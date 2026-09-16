@@ -14,7 +14,7 @@ router = APIRouter()
 # in this set is refused by `setattr`. If a new safe field is added to
 # `UserUpdate`, it must also be added here.
 _PATCHABLE_PROFILE_FIELDS: frozenset[str] = frozenset(
-    {"first_name", "last_name", "dob", "gender", "allergies", "medical_history"}
+    {"first_name", "last_name", "dob", "gender", "blood_type", "primary_goal", "allergies", "medical_history"}
 )
 
 

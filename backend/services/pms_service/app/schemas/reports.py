@@ -10,11 +10,15 @@ class PaymentMethodBreakdown(BaseModel):
 
 
 class SalesSummary(BaseModel):
+    currency: str = "GHS"
     start_date: str
     end_date: str
     sale_count: int
     gross_total_cents: int
     discount_cents: int
+    credit_total_cents: int = 0
+    refund_total_cents: int = 0
+    net_sales_cents: int = 0
     by_payment_method: list[PaymentMethodBreakdown]
 
 
@@ -22,6 +26,9 @@ class DailySalesPoint(BaseModel):
     day: str
     sale_count: int
     total_cents: int
+    credit_cents: int = 0
+    refund_cents: int = 0
+    net_sales_cents: int = 0
 
 
 class DailySalesSeries(BaseModel):

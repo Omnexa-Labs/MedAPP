@@ -1,4 +1,6 @@
 import pytest
+from app.models import User
+from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
 
@@ -8,18 +10,20 @@ pytestmark = pytest.mark.asyncio
 # `User.role`, via `review_submission`. These tests exercise that path, so the
 # account they start from is exactly what a real applicant has - a `user` asking
 # to become something else.
-async def _signup_login(client, email="doc@b.com", role="user"):
-    await client.post(
+async def _signup_login(client, email="doc@b.com"):
+    signup = await client.post(
         "/auth/signup",
         json={
             "email": email,
             "password": "password123",
             "first_name": "T",
             "last_name": "U",
-            "role": role,
+            "role": "user",
         },
     )
+    assert signup.status_code == 201, signup.text
     r = await client.post("/auth/login", json={"email": email, "password": "password123"})
+    assert r.status_code == 200, r.text
     return r.json()["access_token"]
 
 
@@ -69,8 +73,8 @@ async def test_non_admin_cannot_list_pending_kyc(client):
     assert r.status_code == 403
 
 
-async def test_user_cannot_review_own_kyc_submission(client):
-    token = await _signup_login(client, email="adminlike@b.com", role="hospital_admin")
+async def test_user_cannot_review_own_kyc_submission(client, db):
+    token = await _signup_login(client, email="adminlike@b.com")
     submit = await client.post(
         "/me/kyc",
         headers={"authorization": f"Bearer {token}"},
@@ -81,9 +85,20 @@ async def test_user_cannot_review_own_kyc_submission(client):
     )
     assert submit.status_code == 201, submit.text
 
+    # Provision the reviewer in the fixture. Public signup must never grant this role.
+    user = await db.scalar(select(User).where(User.email == "adminlike@b.com"))
+    user.role = "hospital_admin"
+    await db.commit()
+    login = await client.post(
+        "/auth/login", json={"email": "adminlike@b.com", "password": "password123"}
+    )
+    assert login.status_code == 200, login.text
+    token = login.json()["access_token"]
+
     review = await client.post(
         f"/admin/kyc/{submit.json()['id']}/review",
         headers={"authorization": f"Bearer {token}"},
         json={"approve": True},
     )
     assert review.status_code == 400
+    assert review.json()["detail"] == "cannot review own submission"

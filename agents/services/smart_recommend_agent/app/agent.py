@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -35,6 +34,7 @@ from agents.shared import (
     BaseAgent,
     LLMChatTurn,
     NotificationDispatcher,
+    load_prompt,
     make_memory_service_from_env,
     make_notification_dispatcher_from_env,
     make_provider,
@@ -55,9 +55,7 @@ from .tools import (
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (
-    Path(__file__).resolve().parents[3] / "prompts" / "smart_recommend.md"
-).read_text(encoding="utf-8")
+_SYSTEM_PROMPT = load_prompt("smart_recommend.md")
 
 
 class AnalyzeRequest(BaseModel):

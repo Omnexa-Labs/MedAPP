@@ -25,6 +25,7 @@ class OtpStartRequest(BaseModel):
 class OtpStartResponse(BaseModel):
     sent: bool
     expires_in: int  # seconds
+    resend_after_seconds: int
 
 
 class OtpVerifyRequest(BaseModel):

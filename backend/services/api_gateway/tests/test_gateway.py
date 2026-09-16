@@ -1,17 +1,29 @@
 from __future__ import annotations
 
+from secrets import token_hex
 from uuid import uuid4
 
 import httpx
-import jwt
-from fastapi.testclient import TestClient
-
+import pytest
 from app.config import settings
-from app.main import create_app, _resolve_upstream
+from app.main import _resolve_upstream, create_app
+from fastapi.testclient import TestClient
+from shared.auth.jwt import issue_access_token
+
+
+@pytest.fixture(autouse=True)
+def signing_configuration(monkeypatch):
+    # Tests supply a real signing configuration; runtime configuration stays required.
+    monkeypatch.setattr(settings, "jwt_secret", token_hex(32))
 
 
 def _token(role: str = "patient") -> str:
-    return jwt.encode({"sub": str(uuid4()), "role": role}, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return issue_access_token(
+        subject=str(uuid4()),
+        role=role,
+        secret=settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
 
 
 def test_gateway_routes_v1_prefixes_to_longest_match() -> None:
@@ -29,6 +41,26 @@ def test_healthz() -> None:
         assert resp.status_code == 200
 
 
+def test_only_exact_public_photo_get_is_forwarded_without_token():
+    pharmacy_id, photo_id = uuid4(), uuid4()
+    path = f"/v1/pharmacies/{pharmacy_id}/photos/{photo_id}"
+    captured = []
+    def handler(request):
+        captured.append(request)
+        return httpx.Response(404, headers={"Cache-Control": "private, no-store"})
+    with TestClient(create_app()) as client:
+        client.app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        response = client.get(path)
+        assert response.status_code == 404
+        assert response.headers["cache-control"] == "private, no-store"
+        assert len(captured) == 1
+        for method, value in [("POST", path), ("DELETE", path), ("GET", path + "/extra"),
+                              ("GET", f"/v1/pharmacies/{pharmacy_id}"),
+                              ("GET", f"/v1/pharmacy-workspaces/{pharmacy_id}/profile/photos/{photo_id}")]:
+            assert client.request(method, value).status_code == 401
+        assert len(captured) == 1
+
+
 def test_gateway_injects_request_id_and_strips_internal_headers() -> None:
     captured: dict[str, object] = {}
 
@@ -39,10 +71,16 @@ def test_gateway_injects_request_id_and_strips_internal_headers() -> None:
 
     app = create_app()
     with TestClient(app) as client:
-        client.app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://upstream")
+        client.app.state.http = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), base_url="http://upstream"
+        )
         resp = client.get(
             "/v1/doctors",
-            headers={"Authorization": f"Bearer {_token()}", "X-Internal-Test": "secret", "X-Request-Id": "req-123"},
+            headers={
+                "Authorization": f"Bearer {_token()}",
+                "X-Internal-Test": "secret",
+                "X-Request-Id": "req-123",
+            },
         )
         assert resp.status_code == 200, resp.text
         assert resp.headers["X-Request-Id"] == "req-123"
@@ -56,7 +94,9 @@ def test_gateway_injects_request_id_and_strips_internal_headers() -> None:
 def test_gateway_requires_admin_token_for_admin_routes() -> None:
     app = create_app()
     with TestClient(app) as client:
-        resp = client.get("/v1/admin/metrics/funnel", headers={"Authorization": f"Bearer {_token('doctor')}"})
+        resp = client.get(
+            "/v1/admin/metrics/funnel", headers={"Authorization": f"Bearer {_token('doctor')}"}
+        )
         assert resp.status_code == 403
 
 
@@ -69,10 +109,14 @@ def test_auth_routes_allow_missing_token() -> None:
 
     app = create_app()
     with TestClient(app) as client:
-        client.app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://upstream")
-        resp = client.post("/v1/auth/login", json={"email": "patient@example.com", "password": "secret"})
+        client.app.state.http = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), base_url="http://upstream"
+        )
+        resp = client.post(
+            "/v1/auth/login", json={"email": "patient@example.com", "password": "secret"}
+        )
         assert resp.status_code == 200, resp.text
-        assert captured["url"].endswith("/v1/auth/login")
+        assert captured["url"].endswith("/auth/login")
 
 
 def test_auth_routes_are_rate_limited() -> None:
@@ -81,10 +125,16 @@ def test_auth_routes_are_rate_limited() -> None:
 
     app = create_app()
     with TestClient(app) as client:
-        client.app.state.http = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://upstream")
+        client.app.state.http = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), base_url="http://upstream"
+        )
         for _ in range(10):
-            resp = client.post("/v1/auth/login", json={"email": "patient@example.com", "password": "secret"})
+            resp = client.post(
+                "/v1/auth/login", json={"email": "patient@example.com", "password": "secret"}
+            )
             assert resp.status_code == 200, resp.text
 
-        resp = client.post("/v1/auth/login", json={"email": "patient@example.com", "password": "secret"})
+        resp = client.post(
+            "/v1/auth/login", json={"email": "patient@example.com", "password": "secret"}
+        )
         assert resp.status_code == 429

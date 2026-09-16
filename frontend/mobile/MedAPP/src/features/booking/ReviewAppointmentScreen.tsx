@@ -1,137 +1,5 @@
-// Review Appointment — the last screen before anything is booked.
-//
-// Figma page 144:107: 756:4213 (light), 756:4988 (dark), 756:4442 (submitting),
-// 756:4586 (confirm-failed), 756:4765 (discard), 756:4813 (no-data).
-//
-// Entry: SelectTimeSlotScreen → "Book Now" (pushes practitioner + date/time/
-// mode/type/reason). Exit: Confirm → BookingConfirmedScreen (replace), Edit →
-// back to a REHYDRATED slot picker, discard → router.dismissAll().
-//
-// ---------------------------------------------------------------------------
-// WHAT THIS PASS CHANGED, AND WHY (build spec §3, required items 1/3/5/6)
-// ---------------------------------------------------------------------------
-//
-// `FALLBACK` IS GONE. The file used to invent a whole appointment — a named
-// cardiologist, a real Rochester street address, a 45-minute duration and a
-// Google-CDN map tile — whenever a param was missing. On a medical booking
-// screen that is the most dangerous line in the file: a user who deep-links or
-// comes back to a dropped session was shown a plausible booking that nobody had
-// made, at an address they could have driven to. It is also what made the
-// no-data frame (756:4813) unreachable. Missing required params now render that
-// frame instead: an expired session, stated as one.
-//
-// The same rule applies per row, not just per screen. Duration, the clinic name
-// and its address are rendered ONLY when the params carry them. A provenance
-// badge over a hardcoded string is a lie with a certificate attached — and that
-// is why the Duration row's "From provider" badge is now GONE too: the value
-// reaching it is derived from `SEED_SLOTS`, so the badge had moved one module
-// away from the hardcoding rather than stopped certifying it.
-//
-// THE CHECKOUT IS DELETED. This screen advertised a "$10 processing fee" and a
-// "Secure encrypted checkout" over a flow with no payment step, no amount, no
-// card and no `payment_service` call — against a backend with no payment
-// provider at all. Both are gone; what replaces them is the consultation fee the
-// wire has carried all along and the adapter used to drop. See POLICY and
-// `feeLabel`.
-//
-// CANCEL IS DELETED. `Edit` and `Cancel` were both `router.back()` — the same
-// function under two labels, one of which promised to abandon the booking and
-// did not. Abandon is now the app-bar back and Android's hardware back, both
-// routed through a discard dialog (756:4765) that ends in `router.dismissAll()`.
-// The hardware-back handler returns `true`: without it Android pops the screen
-// out from behind the dialog it just opened.
-//
-// THE MAP IS DELETED, AND WITH IT THE ONE SURVIVING SHADOW. The old file kept a
-// 30-line defence of the map pin's `0 2px 6px` floating shadow. The frames draw
-// no map — the location is a `KeyValueRow` with a real "Directions" action — so
-// the pin, `FLOATING_SHADOW`, `pinShadow` and the argument for them are all
-// moot. `Linking.openURL` with a platform-native maps URL and an https fallback
-// replaces a "Get Directions" chip that was decoration: it was never pressable.
-//
-// CONFIRM IS ASYNC. It was a synchronous `router.replace` — the screen could not
-// fail, so three designed frames (submitting, confirm-failed, and the reference
-// on screen 3) had nothing behind them. It is a mutation now, and the failure
-// copy is deliberate: a user who is told nothing after a failed booking books
-// twice, and a user who is not told "nothing has been charged" phones support.
-//
-// THE ENDPOINT WAS WRONG, AND THE SCREEN SHOULD NEVER HAVE HELD IT. The confirm
-// call posted to `/v1/appointments`, which the gateway does not route and no
-// service behind it defines — so every real Confirm 404'd and the confirmation
-// screen was unreachable. The call now lives in `./api.ts` against the real
-// `POST /v1/bookings`, and this file imports a typed function instead of a URL.
-//
-// With it went the two fields that were invented alongside the endpoint:
-// `booking_reference` and `join_url` exist nowhere in the backend, so nothing is
-// forwarded for them and the confirmation screen's reference/join rows simply do
-// not render — which is exactly what its `params.bookingReference ? ...` guard
-// was already written to do. What the server DOES return, the real start and end
-// instants, is forwarded, and that is what powers the calendar handoff.
-//
-// ---------------------------------------------------------------------------
-// THE PARAMS CONTRACT WITH SCREEN 1 — read this before adding a param
-// ---------------------------------------------------------------------------
-// This screen renders NOTHING it was not given (see `FALLBACK IS GONE` above),
-// so every optional row here is dead in production until `SelectTimeSlotScreen`
-// pushes the param behind it. The full contract, and who honours it today:
-//
-//   REQUIRED (absent -> 756:4813, the expired frame)
-//     practitionerId        forwarded    doctor_id on the wire; a UUID
-//     practitionerName      forwarded
-//     date                  forwarded    "YYYY-MM-DD", never a display string
-//     time                  forwarded    wall clock, "10:00 AM"
-//     type                  forwarded    consultation TYPE
-//     mode                  forwarded    "in-person" | "video" — the other axis
-//
-//   OPTIONAL, and each one gates a row
-//     practitionerSpecialty forwarded
-//     practitionerAvatar    forwarded
-//     reason                forwarded
-//     rating + reviewCount  NOT YET      the rating line (756:4213)
-//     tags                  NOT YET      the badge row (756:4213)
-//     endTime               NOT YET      "10:00 AM – 10:45 AM" instead of a start
-//     timezone              NOT YET      the zone badge beside Time
-//     duration              NOT YET      the Duration row (the badge is gone)
-//     locationName/Address  NOT YET      the whole Location card and Directions
-//     feeCents              forwarded    the Consultation fee row — MINOR UNITS
-//     rescheduleOfId        forwarded    present only on a reschedule; see confirm
-//
-// The six NOT YETs are the live gap: their branches are exercised by
-// ReviewAppointmentScreen.test.tsx, but no user reaches them, because screen 1's
-// params-out is only the nine above. `renders exactly what screen 1 sends today`
-// in that suite pins that honestly rather than letting a green run imply the
-// rows are live. Logged in docs/PIPELINE.md §5.
-//
-// IDENTITY — the rating is answered ONCE, by the params, or not at all.
-// Screen 1 currently seeds a private `SEED_RATING = { 4.9, 1200 }` and this
-// screen showed no rating at all, so the same clinician had two ratings and one
-// of them was invented; 756:4213 draws a third ("4.8 (326 reviews)"). A number
-// beside a doctor's name is a claim about a real person, so this screen will not
-// mint one and will not default one: it renders the rating IT WAS HANDED, and
-// nothing when it was handed none. Both screens reading the same two params is
-// what makes them incapable of disagreeing — once screen 1 forwards the value it
-// is displaying, the two are the same value by construction. A malformed or
-// out-of-range value is treated as ABSENT, never clamped into a plausible one.
-//
-// APPEARANCE. Screen gutter 16 (was 24 — BRAND §Spacing always said 16), section
-// headings on the `headline-md` ramp OUTSIDE their cards (was an 11px uppercase
-// caption inside, under BRAND's 12sp floor), no blue anywhere (the file carried
-// `#0058be`, `#d5e3fc`, `rgba(33,112,228,0.12)` and `rgba(0,88,190,0.05)`, none
-// of which is a token or appears in a frame), and no hex literals at all — every
-// one of them froze light mode and broke 756:4988.
-//
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
-// This file uses none: `Linking`, `Modal` and `BackHandler` are react-native.
-
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  BackHandler,
-  Linking,
-  Modal,
-  Platform,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { BackHandler, Linking, Modal, Platform, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { DetailShell } from "@/components/shell";
@@ -146,40 +14,15 @@ import {
   PractitionerSummaryRow,
   SectionHeader,
 } from "@/components/ui";
-import { bookingApi } from "@/features/booking/api";
+import { bookingApi, validInstant, type CreateBookingPayload } from "@/features/booking/api";
 import { consultationFee } from "@/features/practitioner/format";
 import { useTokenColor, useTokenShadow } from "@/lib/tokens";
+import { useSessionScope } from "@/hooks/use-session-scope";
 
-/** Non-empty strings only; `null`, `""` and absent all collapse to `undefined`. */
 function text(value: string | null | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
 }
-
-/**
- * `"45 Minutes"` / `"1 hr 15 min"` -> 75. The duration param is a DISPLAY string
- * from the provider; the wire wants an `ends_at`. Anything unparseable returns
- * undefined rather than a number, so `api.ts` falls through to its own
- * documented default instead of booking a window derived from a misread label.
- */
-function parseDurationMinutes(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const hours = /(\d+)\s*(?:h|hr|hour)/i.exec(value);
-  const minutes = /(\d+)\s*(?:m|min|minute)/i.exec(value);
-  if (!hours && !minutes) return undefined;
-  const total = (hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0);
-  return total > 0 ? total : undefined;
-}
-
-/**
- * `"4.8"` + `"326"` -> `{ value: 4.8, count: 326 }`, or undefined.
- *
- * BOTH halves are required: `PractitionerSummaryRow` draws "4.8 (326 reviews)"
- * as one line, and a value with no count renders "(NaN reviews)" beside a real
- * doctor's name. Out of range is treated as absent rather than clamped — a 7.2
- * that becomes a 5.0 is a fabricated rating with a rounding error's alibi. The
- * count must be a whole non-negative number; "326.5 reviews" is not a thing.
- */
 function parseRating(
   value: string | undefined,
   count: string | undefined,
@@ -191,39 +34,22 @@ function parseRating(
   if (!Number.isInteger(parsedCount) || parsedCount < 0) return undefined;
   return { value: parsedValue, count: parsedCount };
 }
-
-/**
- * `"Cardiology,Top Rated"` -> `["Cardiology", "Top Rated"]`. Route params are
- * strings, so a list has to travel as one; comma is the separator because no tag
- * in any frame contains one. Blanks and duplicates are dropped (a duplicate is a
- * serialisation artefact, and `PractitionerSummaryRow` keys on the tag), and an
- * empty result is `undefined` so the row takes its `Show tags = false` variant
- * rather than rendering an empty badge strip.
- */
 function parseTags(value: string | undefined): string[] | undefined {
   if (!value) return undefined;
-  const tags = [...new Set(value.split(",").map((t) => t.trim()).filter(Boolean))];
+  const tags = [
+    ...new Set(
+      value
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  ];
   return tags.length > 0 ? tags : undefined;
 }
-
-// ---------------------------------------------------------------------------
-// Params
-// ---------------------------------------------------------------------------
-
 export type ConsultationMode = "in-person" | "video";
-
-/**
- * Consultation MODE is a separate axis from consultation TYPE — a "Follow-up
- * Visit" can be either. The two were collapsed before, which is why the screen
- * could not decide whether to show an address or a join link, and why the
- * confirmation screen's checklist told video patients to arrive ten minutes
- * early. Anything that is not one of the two designed values is treated as
- * absent rather than guessed at.
- */
 function readMode(value: string | undefined): ConsultationMode | undefined {
   return value === "in-person" || value === "video" ? value : undefined;
 }
-
 const WEEKDAYS = [
   "Sunday",
   "Monday",
@@ -247,19 +73,6 @@ const MONTHS = [
   "November",
   "December",
 ] as const;
-
-/**
- * "2025-05-13" → "Tuesday, 13 May 2025" (756:4213).
- *
- * Formatting lives at the LEAF: screen 1 sends an ISO date, because it also has
- * to round-trip that value back into its own date strip when the user taps Edit,
- * and `"Tue, May 13"` is not a key. Anything that is not an ISO date is passed
- * through untouched rather than reformatted into something it is not — an
- * unparseable date must never become a different date.
- *
- * Built from local Y/M/D parts, not `new Date(iso)`, which parses a bare date as
- * UTC and lands on the previous day west of Greenwich.
- */
 function formatLongDate(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return value;
@@ -268,56 +81,13 @@ function formatLongDate(value: string): string {
   if (Number.isNaN(date.getTime())) return value;
   return `${WEEKDAYS[date.getDay()]}, ${Number(day)} ${MONTHS[Number(month) - 1]} ${year}`;
 }
-
-/** Route params drop `undefined` rather than serialising the string "undefined". */
-function defined(params: Record<string, string | undefined>): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(params).filter((entry): entry is [string, string] => entry[1] !== undefined),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Copy
-// ---------------------------------------------------------------------------
-
-/**
- * THE "$10 PROCESSING FEE" IS DELETED, and the sentence it lived in is the only
- * part that survives.
- *
- * It read "After that, a $10 processing fee may apply." Three things were wrong
- * with it and any one of them is enough: there is no payment step anywhere in
- * this flow, `payment_service` has no provider integrated at all (docs/api §
- * "Payments do not take money"), and `$` is not this product's currency — the
- * seeded roster bills in Ghana. A financial term stated to a patient is a term
- * of the contract they are about to enter, and it has to come from the backend
- * that will enforce it, not from a string constant in a screen. Logged in
- * docs/api/README.md's gap register: the cancellation window has no source
- * either, but a free-cancellation promise errs toward the patient, which a fee
- * does not.
- */
-const POLICY = "Free cancellation until 24 hours before the appointment.";
-
-/**
- * `12000` -> "GHS 120.00" — reused from the practitioner surface, NOT reimplemented.
- *
- * That helper carries the flag this row inherits and must not lose: **the
- * currency is assumed, not read**. `DoctorProfileOut` has `consultation_fee_cents`
- * and no currency column anywhere in doctor_service, so "GHS" is a design
- * constant taken from the frame and the Accra/Kumasi roster. Two treatments of
- * one unsourced currency would be worse than one, so this screen takes the
- * existing one rather than minting a second. The real fix is a `currency` column;
- * it is in docs/api/README.md's gap register.
- */
+const POLICY = "Contact the clinic about fees and cancellation terms.";
 function feeLabel(value: string | undefined): string | null {
   if (value === undefined) return null;
   const cents = Number(value.trim());
-  // A non-integer or negative amount is treated as ABSENT, never rounded into a
-  // plausible price — the same rule `parseRating` applies to a score.
   if (!Number.isInteger(cents) || cents < 0) return null;
   return consultationFee(cents);
 }
-
-/** 756:4586. The "nothing has been charged" clause is load-bearing, not padding. */
 function failureCopy(status: number | undefined, time: string, practitioner: string) {
   if (status === 409) {
     return {
@@ -327,42 +97,33 @@ function failureCopy(status: number | undefined, time: string, practitioner: str
   }
   return {
     title: "We couldn't confirm this booking",
-    body: "Nothing has been booked and nothing has been charged. Check your connection and try again, or pick another time.",
+    body: "We could not verify the result. Check My Appointments before retrying to avoid booking twice.",
   };
 }
-
-/**
- * A dialog IS one of docs/BRAND.md's sanctioned floating roles ("a bottom sheet,
- * a menu, a dialog, a toast"), and it is the ONLY elevation in this flow. The
- * `0 2px 6px` at 8% step, tinted with the `shadow` token — never grey, never the
- * 24px-blur card signature BRAND removed.
- */
 const DIALOG_SHADOW = { y: 2, blur: 6, opacity: 0.08 } as const;
-
-/** 756:4813 / 756:4586 — the error plate diameters. */
 const ERROR_PLATE_LARGE = 56;
 const ERROR_PLATE_SMALL = 40;
-/** Clears the `Buttons=Pair` bar (115) plus its footnote and a little air. */
 const DOCKED_CLEARANCE = 168;
-
-// ---------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------
-
 export function ReviewAppointmentScreen() {
+  const scope = useSessionScope();
+  return <Review key={`${scope.owner}:${scope.revision}`} scope={scope} />;
+}
+
+function Review({ scope }: { scope: ReturnType<typeof useSessionScope> }) {
+  const submitting = useRef(false);
   const params = useLocalSearchParams<{
     practitionerId?: string;
     practitionerName?: string;
     practitionerSpecialty?: string;
     practitionerAvatar?: string;
-    /** Two halves of one claim — see `parseRating`. */
     rating?: string;
     reviewCount?: string;
-    /** Comma-separated, e.g. `"Cardiology,Top Rated"` — see `parseTags`. */
     tags?: string;
     date?: string;
     time?: string;
     endTime?: string;
+    startsAtIso?: string;
+    endsAtIso?: string;
     timezone?: string;
     mode?: string;
     type?: string;
@@ -370,12 +131,9 @@ export function ReviewAppointmentScreen() {
     duration?: string;
     locationName?: string;
     locationAddress?: string;
-    /** `consultation_fee_cents`, verbatim. MINOR UNITS — see `feeLabel`. */
     feeCents?: string;
-    /** The booking this one replaces — see `confirm`. */
     rescheduleOfId?: string;
   }>();
-
   const practitionerName = text(params.practitionerName);
   const practitionerSpecialty = text(params.practitionerSpecialty);
   const date = text(params.date);
@@ -392,123 +150,35 @@ export function ReviewAppointmentScreen() {
   const tags = parseTags(text(params.tags));
   const fee = feeLabel(text(params.feeCents));
   const rescheduleOfId = text(params.rescheduleOfId);
-
   const [discardOpen, setDiscardOpen] = useState(false);
   const queryClient = useQueryClient();
-
   const confirmMutation = useMutation({
-    mutationFn: bookingApi.createBooking,
-    // ---------------------------------------------------------------------
-    // RESCHEDULE IS BOOK-THEN-CANCEL, IN THAT ORDER, AND THE ORDER IS THE
-    // WHOLE DECISION.
-    // ---------------------------------------------------------------------
-    // `booking_service` has EIGHT routes and none of them is a reschedule
-    // (docs/api/README.md: "Booking has no reschedule endpoint — cancel-and-
-    // rebook is non-atomic"). So a reschedule is two calls and one of them can
-    // fail between the two. The two orders fail differently, and they are not
-    // close:
-    //
-    //   cancel first   the cancel succeeds, the new POST 409s on a slot taken
-    //                  while the patient was reviewing, and they now have NO
-    //                  appointment. They came here to move one. That loss is
-    //                  silent, immediate and, for a slot in demand,
-    //                  unrecoverable.
-    //   book first     the POST succeeds, the cancel fails, and the patient has
-    //                  TWO appointments. Visible on the very next screen, in a
-    //                  list with a working Cancel button on every row, and
-    //                  costing a clinician one held slot rather than a patient
-    //                  their care.
-    //
-    // So: book, then cancel. A failed create leaves the original untouched and
-    // falls into this screen's existing confirm-failed branch, which is exactly
-    // right — nothing has changed and "pick another time" is the true advice. A
-    // failed cancel is carried to the confirmation screen as a fact and stated
-    // there, never swallowed: an unsurfaced duplicate is a patient who turns up
-    // twice and a clinician who blocks a slot for nobody.
-    //
-    // This is NOT presented as atomic anywhere, because it is not.
+    gcTime: 0,
+    mutationFn: (payload: CreateBookingPayload) =>
+      rescheduleOfId
+        ? bookingApi.rescheduleBooking(rescheduleOfId, payload, {
+            isSessionCurrent: scope.isCurrent,
+          })
+        : bookingApi.createBooking(payload, { isSessionCurrent: scope.isCurrent }),
+    onSettled: () => {
+      submitting.current = false;
+    },
     onSuccess: async (booking) => {
-      let rescheduleCancelFailed: string | undefined;
-      if (rescheduleOfId) {
-        try {
-          await bookingApi.cancelBooking(rescheduleOfId, "Rescheduled by the patient");
-        } catch {
-          rescheduleCancelFailed = "1";
-        }
-      }
-      // The appointments list is now wrong in cache — a new row, and (usually)
-      // one fewer. Invalidated rather than refetched here: the screen that owns
-      // that query is the one being navigated to.
+      if (!scope.isCurrent()) return;
+      void queryClient.invalidateQueries({ queryKey: ["slots"] });
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
       router.replace({
-        // Route added in an earlier iteration — typedRoutes regenerates on dev
-        // server start.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         pathname: "/(app)/booking-confirmed" as any,
-        params: defined({
-          practitionerName,
-          practitionerSpecialty,
-          practitionerAvatar: text(params.practitionerAvatar),
-          // `rating` and `tags` are deliberately NOT forwarded: 780:5363 gives
-          // screen 3 the `Show rating = false` / `Show tags = false` variant and
-          // 756:5180 draws neither. Forwarding them would put a rating on a
-          // frame that has no place to draw it.
-          date,
-          time,
-          endTime,
-          timezone,
-          type,
-          // THE SERVER'S mode, not the route param this screen was handed.
-          // They agree today — `confirm` posts the param — but they are not the
-          // same fact: one is what the user tapped, the other is what the clinic
-          // will see, and the confirmation screen says "your in-person
-          // appointment is confirmed" about the row that now exists. If the
-          // service ever coerces or defaults a mode, the confirmation must
-          // follow the row rather than repeat the request.
-          mode: booking.mode,
-          // `room_id` is deliberately NOT forwarded, even though the response
-          // now carries it. The confirmation screen has no join affordance —
-          // 550:1826 puts that on the appointment card, which reads the room off
-          // `GET /v1/bookings` itself — and a param no screen consumes is
-          // exactly the sort of spare handle that later gets rendered into a
-          // fabricated link. It stays where it is read.
-          locationName,
-          locationAddress,
-          // Server-owned. `BookingOut` echoes the two instants it stored, and
-          // those — not the local strings this screen displayed — are what the
-          // calendar event is written from.
-          //
-          // `bookingReference` and `joinUrl` are NOT here. The backend has no
-          // such fields (see ./api.ts), so nothing is forwarded and the
-          // confirmation screen's `params.bookingReference ? ...` /
-          // `params.joinUrl ? ...` guards keep those rows unrendered. Deriving
-          // a "reference" from `booking_id` would put a number on a medical
-          // confirmation that no clinic can look up. Logged in PIPELINE §5.
-          startsAtIso: booking.startsAtIso,
-          endsAtIso: booking.endsAtIso,
-          // Only ever set when a reschedule's second call failed. See above.
-          rescheduleCancelFailed,
-        }),
+        params: { bookingId: booking.bookingId },
       });
     },
   });
-
   const isPending = confirmMutation.isPending;
-
-  /**
-   * Abandon. A no-op while the mutation is in flight: `dismissAll()` mid-request
-   * orphans a booking the server may well be creating, and the user would have
-   * no screen left on which to be told about it.
-   */
   const requestDiscard = useCallback(() => {
     if (isPending) return;
     setDiscardOpen(true);
   }, [isPending]);
-
-  // Android hardware back MIRRORS the app-bar back — the whole point of the
-  // dialog is that the booking cannot be abandoned by accident, and a hardware
-  // gesture that bypasses it is the accident. `return true` consumes the event;
-  // without it Android pops this screen out from behind the dialog.
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       requestDiscard();
@@ -516,51 +186,41 @@ export function ReviewAppointmentScreen() {
     });
     return () => subscription.remove();
   }, [requestDiscard]);
-
   const goEdit = useCallback(() => {
-    // Straight back to a REHYDRATED SelectTimeSlotScreen — it seeds its state
-    // from the params it pushed. That pairing is the point of both changes:
-    // without rehydration "Edit" wipes four choices the user already made.
     router.back();
   }, []);
-
   const keepEditing = useCallback(() => setDiscardOpen(false), []);
-
   const discardBooking = useCallback(() => {
     setDiscardOpen(false);
     router.dismissAll();
   }, []);
-
   const confirm = useCallback(() => {
     const doctorId = text(params.practitionerId);
-    if (!doctorId || !date || !time) return;
-    // `mode` IS SENT NOW — `BookingCreate.mode` exists (migration
-    // 20260803_0002), so the In person / Video choice the user made on screen 1
-    // is persisted rather than displayed here and thrown away at the boundary.
-    // `readMode` has already narrowed it to the designed union or `undefined`,
-    // and `undefined` is passed through as an omission so the SERVER's default
-    // applies — this screen refuses to render at all without a mode (see the
-    // required-params guard below), so in practice it is always one of the two.
-    //
-    // `type` is still not sent: no column for it. See ./api.ts and §5.
+    if (
+      !doctorId ||
+      !validInstant(params.startsAtIso) ||
+      !validInstant(params.endsAtIso) ||
+      submitting.current ||
+      !scope.isCurrent()
+    )
+      return;
+    submitting.current = true;
     confirmMutation.mutate({
       doctorId,
-      date,
-      time,
-      endTime,
-      durationMinutes: parseDurationMinutes(duration),
+      startsAtIso: params.startsAtIso!,
+      endsAtIso: params.endsAtIso!,
       reason,
       mode,
     });
-  }, [confirmMutation, date, time, endTime, duration, params.practitionerId, reason, mode]);
-
-  /**
-   * The maps handoff, for real. Native scheme first so the phone's own maps app
-   * takes it, https as the fallback for a device that has none — and the whole
-   * thing guarded, because `openURL` REJECTS when no handler claims the URL and
-   * an unhandled rejection here would take down the screen the user is trying
-   * to book on.
-   */
+  }, [
+    confirmMutation,
+    params.practitionerId,
+    params.startsAtIso,
+    params.endsAtIso,
+    reason,
+    mode,
+    scope,
+  ]);
   const openDirections = useCallback(async () => {
     if (!locationAddress) return;
     const query = encodeURIComponent(
@@ -578,33 +238,25 @@ export function ReviewAppointmentScreen() {
     } catch {
       try {
         await Linking.openURL(webUrl);
-      } catch {
-        // Both handoffs refused. The address is on screen as text, which is the
-        // fallback that always works; a toast here would be noise.
-      }
+      } catch {}
     }
   }, [locationAddress, locationName]);
-
   const failure = useMemo(() => {
     const status = (confirmMutation.error as { status?: number } | null)?.status;
     return failureCopy(status, time ?? "this slot", practitionerName ?? "another patient");
   }, [confirmMutation.error, time, practitionerName]);
-
   const errorPlate = useTokenColor("on-error-container");
   const dialogShadow = useTokenShadow("shadow", DIALOG_SHADOW);
-
-  // -------------------------------------------------------------------------
-  // 756:4813 — the session we cannot reconstruct
-  // -------------------------------------------------------------------------
-  // A WHOLE-SCREEN replacement, not a banner: there is no appointment to review,
-  // so reviewing one is not an option the screen can offer. Hooks above run
-  // first, unconditionally.
-  //
-  // `practitionerId` joins the guard this pass. `BookingCreate.doctor_id` is a
-  // required UUID, so a session that lost the id cannot produce a booking at
-  // all — offering a Confirm button that can only ever fail is the same defect
-  // as the fabricated appointment this frame was introduced to replace.
-  if (!text(params.practitionerId) || !practitionerName || !date || !time || !type || !mode) {
+  if (
+    !text(params.practitionerId) ||
+    !practitionerName ||
+    !date ||
+    !time ||
+    !type ||
+    !mode ||
+    !validInstant(params.startsAtIso) ||
+    !validInstant(params.endsAtIso)
+  ) {
     return (
       <DetailShell title="Review Appointment">
         <ScrollView
@@ -645,20 +297,10 @@ export function ReviewAppointmentScreen() {
       </DetailShell>
     );
   }
-
   const showTimezoneBadge = !!timezone;
   const timeValue = endTime ? `${time} – ${endTime}` : time;
-
   return (
-    <DetailShell
-      title="Review Appointment"
-      onBack={requestDiscard}
-      // The app-bar action slot is EMPTY in 756:4213. It used to carry a
-      // notifications bell that did nothing on a checkout screen.
-      // The docked bar claims the bottom inset itself (its own SafeAreaView), so
-      // the shell must not claim it too or the padding doubles.
-      claimsBottomInset={false}
-    >
+    <DetailShell title="Review Appointment" onBack={requestDiscard} claimsBottomInset={false}>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -667,21 +309,6 @@ export function ReviewAppointmentScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* -- Practitioner (756:4221) -------------------------------------
-            756:4213 draws a rating and two tags ("Cardiology", "Top Rated"),
-            and this screen now HAS slots for both — `rating`+`reviewCount` and
-            a comma-separated `tags`, added to the contract at the top of this
-            file so screen 1 and screen 2 answer the rating question from the
-            same two params instead of one inventing a number and the other
-            showing none.
-
-            Still FLAGGED, and it is a data gap now rather than a component one:
-            screen 1 does not yet forward them (it holds a private SEED_RATING),
-            and nothing behind it produces them — /v1/practitioners does not
-            exist. Until it does these two lines are absent, which is exactly
-            780:5363's `Show rating = false` / `Show tags = false`. What is NOT
-            done here is defaulting them: an invented "Top Rated" on a real
-            clinician is the same class of harm as the deleted FALLBACK. */}
         <PractitionerSummaryRow
           surface="card"
           verified
@@ -691,8 +318,6 @@ export function ReviewAppointmentScreen() {
           rating={rating}
           tags={tags}
         />
-
-        {/* -- Time & Schedule (756:4282) ---------------------------------- */}
         <View className="mt-6">
           <SectionHeader title="Time & Schedule" />
           <Card className="gap-4">
@@ -702,8 +327,6 @@ export function ReviewAppointmentScreen() {
             </View>
             <View className="flex-row items-start gap-4">
               <IconTile icon="schedule" />
-              {/* The timezone badge is a CLAIM about where and when this is —
-                  rendered only when the params carry one. */}
               {showTimezoneBadge ? (
                 <KeyValueRow
                   label="Time"
@@ -716,8 +339,6 @@ export function ReviewAppointmentScreen() {
             </View>
           </Card>
         </View>
-
-        {/* -- Service Details (756:4356) ---------------------------------- */}
         <View className="mt-6">
           <SectionHeader title="Service Details" />
           <Card className="gap-4">
@@ -725,30 +346,12 @@ export function ReviewAppointmentScreen() {
               <IconTile icon="stethoscope" />
               <KeyValueRow label="Consultation type" value={type} />
             </View>
-            {/* THE "From provider" BADGE IS GONE (and the row is not).
-                It is a PROVENANCE claim, and the value it certifies is derived
-                from `SEED_SLOTS` — a bundle constant, not a provider. Screen 1
-                computes the duration off the seed grid's own start and end, so
-                the badge said "the clinician told us this" about eleven times
-                typed into a file. That is precisely the defect this file's
-                header records fixing when the badge sat over a hardcoded "45
-                Minutes"; it survived because the hardcoding moved one module
-                away. The duration is still shown — it is a real consequence of
-                the slot the user picked — it just no longer wears a certificate
-                nothing issued. The badge returns when /v1/slots does. */}
             {duration ? (
               <View className="flex-row items-start gap-4">
                 <IconTile icon="schedule" />
                 <KeyValueRow label="Duration" value={duration} />
               </View>
             ) : null}
-            {/* THE PRICE, BEFORE THE COMMIT. `consultation_fee_cents` has been
-                on the wire the whole time and `adaptDoctor` dropped it on the
-                floor, so a patient confirmed a medical appointment without ever
-                being shown what it costs. CENTS — `feeLabel` divides by 100;
-                a raw render is 100x the price, which docs/api/README.md already
-                lists as a known trap on this exact column. The currency is
-                assumed, not sourced — see `feeLabel`. */}
             {fee ? (
               <View className="flex-row items-start gap-4">
                 <IconTile icon="payments" />
@@ -763,12 +366,7 @@ export function ReviewAppointmentScreen() {
             ) : null}
           </Card>
         </View>
-
-        {/* -- Location / Consultation — branches on MODE ------------------ */}
         {mode === "video" ? (
-          // FLAGGED: screen 2 has no video frame. Derived from 757:4828, the one
-          // frame that draws the video treatment. Deliberately NO join link:
-          // nothing is booked yet, so no `joinUrl` exists to show.
           <View className="mt-6">
             <SectionHeader title="Consultation" />
             <Card>
@@ -790,34 +388,23 @@ export function ReviewAppointmentScreen() {
                 <KeyValueRow
                   label={locationName ?? "Clinic address"}
                   value={locationAddress}
-                  // Suppressed mid-flight (756:4442): the screen is committing,
-                  // and a maps handoff backgrounds the app under the request.
-                  action={
-                    isPending ? undefined : { label: "Directions", onPress: openDirections }
-                  }
+                  action={isPending ? undefined : { label: "Directions", onPress: openDirections }}
                 />
               </View>
             </Card>
           </View>
         ) : null}
-
-        {/* -- Reschedule, stated in the order it actually happens ---------- */}
         {rescheduleOfId ? (
           <View className="mt-6">
             <InfoCallout tone="info">
-              Confirming books this new time first, then cancels your original appointment. If the
-              cancellation doesn&rsquo;t go through we&rsquo;ll tell you, so you can cancel it from
-              My Appointments.
+              Confirming replaces your original appointment. If this slot cannot be booked, your
+              original appointment stays booked.
             </InfoCallout>
           </View>
         ) : null}
-
-        {/* -- Cancellation policy (756:4361) ------------------------------ */}
         <View className="mt-6">
           <InfoCallout>{POLICY}</InfoCallout>
         </View>
-
-        {/* -- 756:4586 confirm-failed ------------------------------------- */}
         {confirmMutation.isError ? (
           <View className="mt-6 items-center" accessibilityLiveRegion="polite">
             <View
@@ -832,7 +419,12 @@ export function ReviewAppointmentScreen() {
             <Text className="mt-2 text-center font-label-sm text-label-sm text-on-surface-variant">
               {failure.body}
             </Text>
-            <View className="mt-4 w-full">
+            <View className="mt-4 w-full gap-3">
+              <Button
+                label="Check My Appointments"
+                variant="outline"
+                onPress={() => router.replace("/(app)/appointments")}
+              />
               <Button
                 label="Choose another time"
                 variant="outline"
@@ -845,8 +437,6 @@ export function ReviewAppointmentScreen() {
           </View>
         ) : null}
       </ScrollView>
-
-      {/* -- Docked commit bar (781:2291 Pair + 781:2287 footnote) --------- */}
       <DockedActionBar
         secondary={{ label: "Edit", onPress: goEdit, disabled: isPending }}
         primary={{
@@ -855,30 +445,11 @@ export function ReviewAppointmentScreen() {
             : confirmMutation.isError
               ? "Try again"
               : "Confirm Booking",
-          // `loading` already carries `disabled` and `accessibilityState.busy`.
           loading: isPending,
           onPress: confirm,
         }}
-        // NO FOOTNOTE. It read "Secure encrypted checkout" under a padlock, and
-        // there is no checkout: no payment step, no amount collected, no card,
-        // no `payment_service` call in this flow — and nothing to integrate with
-        // if there were, since that service has no provider and settles nothing
-        // (docs/api/README.md § "Payments do not take money"). A padlock and the
-        // word "encrypted" over a screen that takes no money is a security claim
-        // made about a transaction that does not happen, which is worse than
-        // decoration: it is the reassurance a patient checks for before
-        // committing. The consultation fee above says what this costs; the clinic
-        // collects it, not this app.
       />
-
-      {/* -- 756:4765 discard -------------------------------------------- */}
-      <Modal
-        visible={discardOpen}
-        transparent
-        animationType="fade"
-        // Hardware back inside the dialog dismisses the DIALOG, not the screen.
-        onRequestClose={keepEditing}
-      >
+      <Modal visible={discardOpen} transparent animationType="fade" onRequestClose={keepEditing}>
         <View className="flex-1 items-center justify-center bg-scrim/40 px-4">
           <View
             accessibilityViewIsModal
@@ -892,8 +463,8 @@ export function ReviewAppointmentScreen() {
               Discard this booking?
             </Text>
             <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
-              Your date, time, consultation type and reason will be lost. Nothing has been booked
-              and nothing has been charged.
+              Your current selections will be lost. If you already tried to confirm, check My
+              Appointments for the result.
             </Text>
             <View className="mt-6 gap-3">
               <Button

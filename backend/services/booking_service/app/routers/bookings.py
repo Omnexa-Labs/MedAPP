@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from uuid import UUID
+from datetime import date
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal, get_current_principal
@@ -31,6 +32,38 @@ from ..services import (
 )
 
 router = APIRouter(prefix="/v1/bookings", tags=["Booking"])
+
+
+@router.get("/slots")
+async def available(
+    doctor_id: UUID, from_date: date, to_date: date, response: Response,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = DbSession,
+    authorization: str | None = Header(default=None),
+):
+    from ..services.availability import available_slots
+    response.headers["Cache-Control"] = "no-store"
+    return {"items": await available_slots(db, doctor_id, from_date, to_date,
+                                          authorization=authorization)}
+
+
+@router.post("/{booking_id}/reschedule", response_model=BookingOut)
+async def reschedule(
+    booking_id: UUID, payload: BookingCreate,
+    principal: Principal = Depends(get_current_principal),
+    db: AsyncSession = DbSession,
+    limiter: BookingRateLimiter = RateLimiterDep,
+    authorization: str | None = Header(default=None),
+) -> BookingOut:
+    from ..services.booking_service import reschedule_booking
+    if principal.role != "admin":
+        await limiter.check(principal.subject)
+    try:
+        booking = await reschedule_booking(db, principal, booking_id, payload,
+                                            authorization=authorization)
+    except BookingError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return BookingOut.model_validate(booking)
 
 
 @router.post("", response_model=BookingOut, status_code=status.HTTP_201_CREATED)

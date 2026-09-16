@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { authApi, type SignUpFullPayload } from "@/features/auth/api";
+import { authApi, SignupSignInError, type SignUpFullPayload } from "@/features/auth/api";
 import { useAuthStore } from "@/store/auth-store";
 
 // useMutation wrapping the multi-step sign-up endpoint.
@@ -8,9 +8,17 @@ import { useAuthStore } from "@/store/auth-store";
 export function useSignUp() {
   const signIn = useAuthStore((s) => s.signIn);
   return useMutation({
-    mutationFn: (payload: SignUpFullPayload) => authApi.signUpFull(payload),
-    onSuccess: async ({ accessToken, refreshToken, user }) => {
-      await signIn(accessToken, user, refreshToken);
+    mutationFn: async (payload: SignUpFullPayload) => {
+      const revision = useAuthStore.getState().revision;
+      return { ...(await authApi.signUpFull(payload)), revision };
+    },
+    onSuccess: async ({ accessToken, refreshToken, user, revision }) => {
+      try {
+        if (useAuthStore.getState().revision !== revision) throw new SignupSignInError();
+        await signIn(accessToken, user, refreshToken);
+      } catch {
+        throw new SignupSignInError();
+      }
     },
   });
 }

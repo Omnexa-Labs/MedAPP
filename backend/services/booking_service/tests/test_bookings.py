@@ -45,7 +45,7 @@ async def test_booking_conflict_is_rejected(client, booking_window) -> None:
             "ends_at": (end + timedelta(minutes=15)).isoformat(),
         },
     )
-    assert second.status_code == status.HTTP_400_BAD_REQUEST
+    assert second.status_code == status.HTTP_409_CONFLICT
     assert "already booked" in second.json()["detail"]
 
 

@@ -1,16 +1,18 @@
 """Outbound transport abstractions for OTP / password-reset / verification emails.
 
-These are intentionally thin Protocols. The real implementations (Twilio
-Verify, SendGrid) plug in later; until then, `LogSmsNotifier` and
-`LogEmailNotifier` write to the structured log so dev/test flows work end-
-to-end without provider keys. Test code can swap in `InMemoryNotifier` to
-assert on what would have been sent.
+Email uses configurable SMTP; tests can swap in `InMemoryNotifier`.
+The legacy log transports remain available for explicitly selected development
+uses. Password recovery does not use a log transport.
 """
 
 from __future__ import annotations
 
+import asyncio
+import smtplib
+import ssl
 from dataclasses import dataclass, field
-from typing import Protocol
+from email.message import EmailMessage
+from typing import Literal, Protocol
 
 from shared.observability import get_logger
 
@@ -23,6 +25,47 @@ class SmsNotifier(Protocol):
 
 class EmailNotifier(Protocol):
     async def send(self, *, email: str, subject: str, body: str) -> None: ...
+
+
+class EmailDeliveryError(RuntimeError):
+    """A transport failure without recipient, credentials, or message content."""
+
+
+@dataclass
+class SmtpEmailNotifier:
+    host: str
+    port: int
+    sender: str
+    username: str | None = None
+    password: str | None = field(default=None, repr=False)
+    security: Literal["starttls", "ssl", "none"] = "starttls"
+    timeout: float = 10
+
+    async def send(self, *, email: str, subject: str, body: str) -> None:
+        # smtplib is blocking; keep socket operations off the ASGI event loop.
+        try:
+            await asyncio.to_thread(self._send, email, subject, body)
+        except (OSError, smtplib.SMTPException) as exc:
+            raise EmailDeliveryError("email delivery failed") from exc
+
+    def _send(self, email: str, subject: str, body: str) -> None:
+        message = EmailMessage()
+        message["From"] = self.sender
+        message["To"] = email
+        message["Subject"] = subject
+        message.set_content(body)
+        context = ssl.create_default_context()
+        connection = (
+            smtplib.SMTP_SSL(self.host, self.port, timeout=self.timeout, context=context)
+            if self.security == "ssl"
+            else smtplib.SMTP(self.host, self.port, timeout=self.timeout)
+        )
+        with connection as smtp:
+            if self.security == "starttls":
+                smtp.starttls(context=context)
+            if self.username:
+                smtp.login(self.username, self.password or "")
+            smtp.send_message(message)
 
 
 class LogSmsNotifier:

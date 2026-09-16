@@ -20,9 +20,16 @@ export interface CustomerCreate {
 }
 
 export const customersRepo = {
-  list: async (q?: string): Promise<Customer[]> => {
-    const { data } = await apiClient.get("/v1/customers", { params: q ? { q } : undefined });
+  list: async (q?: string, signal?: AbortSignal): Promise<Customer[]> => {
+    const { data } = await apiClient.get("/v1/customers", {
+      params: q ? { q } : undefined,
+      signal,
+    });
     return data.items;
+  },
+  get: async (id: string, signal?: AbortSignal): Promise<Customer> => {
+    const { data } = await apiClient.get(`/v1/customers/${id}`, { signal });
+    return data;
   },
   create: async (body: CustomerCreate): Promise<Customer> => {
     const { data } = await apiClient.post("/v1/customers", body);

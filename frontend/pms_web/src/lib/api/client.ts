@@ -1,33 +1,43 @@
-import axios from "axios";
-
+import axios, { CanceledError } from "axios";
+import { useAuthStore } from "@/lib/stores/auth.store";
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_PMS_API_URL || "http://localhost:8030",
-  timeout: 15000,
+  timeout: 25000,
   headers: { "Content-Type": "application/json" },
 });
-
 apiClient.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("pms_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
+  const { scope, identity } = useAuthStore.getState();
+  if (!scope || !identity) throw new CanceledError("Sign in to your pharmacy.");
+  if (!config.url?.startsWith("/v1/"))
+    throw new Error("Unknown pharmacy API route.");
+  config.url = "/api/pms/" + config.url.slice("/v1/".length);
+  config.baseURL = "";
+  config.headers.delete("Authorization");
+  config.headers.set("X-Session-Scope", scope);
   return config;
 });
-
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (
+      response.config.headers.get("X-Session-Scope") !==
+      useAuthStore.getState().scope
+    )
+      throw new CanceledError("Pharmacy session changed.");
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("pms_token");
-      localStorage.removeItem("pms_user");
-      if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login";
-      }
+    const sent = error.config?.headers?.get?.("X-Session-Scope");
+    if (sent && sent !== useAuthStore.getState().scope)
+      return Promise.reject(new CanceledError("Pharmacy session changed."));
+    if (sent) {
+      if (
+        error.response?.status === 401 ||
+        error.response?.data?.code === "session_changed"
+      )
+        void useAuthStore.getState().invalidate();
+      else if (error.response?.status === 403)
+        void useAuthStore.getState().hydrate();
     }
     return Promise.reject(error);
-  }
+  },
 );
-
 export default apiClient;

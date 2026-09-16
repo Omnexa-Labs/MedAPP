@@ -1,3 +1,6 @@
+jest.mock("@/hooks/use-session-scope", () => ({
+  useSessionScope: () => ({ owner: "u1", revision: 1, isCurrent: () => true }),
+}));
 // AppointmentManagementScreen, locked to DetailShell.
 //
 // This screen is the one the PO explicitly ruled OUT of the patient tab set
@@ -78,7 +81,7 @@ const COMPLETED = {
   doctor: doctor("Dr. Aris Thorne", "Physiotherapist"),
   startsAtIso: PAST,
   endsAtIso: PAST,
-  status: "completed" as const,
+  status: "past" as const,
 };
 
 /**
@@ -118,10 +121,9 @@ jest.setTimeout(30_000);
 
 const renderLoaded = async () => {
   const out = renderScreen();
-  await waitFor(
-    () => expect(screen.queryByLabelText("Loading your appointments")).toBeNull(),
-    { timeout: 15_000 },
-  );
+  await waitFor(() => expect(screen.queryByLabelText("Loading your appointments")).toBeNull(), {
+    timeout: 15_000,
+  });
   return out;
 };
 
@@ -208,6 +210,8 @@ describe("Reschedule", () => {
         practitionerAvatar: expect.any(String),
         // And which booking this replaces — see the reschedule note below.
         rescheduleOfId: "b1",
+        mode: "in-person",
+        reason: "",
       },
     });
   });
@@ -285,7 +289,11 @@ describe("Cancel", () => {
     fireEvent.press(screen.getByLabelText("Yes, cancel appointment"));
 
     await waitFor(() => expect(cancelAppointment).toHaveBeenCalledTimes(1));
-    expect(cancelAppointment).toHaveBeenCalledWith(UPCOMING.id);
+    expect(cancelAppointment).toHaveBeenCalledWith(
+      UPCOMING.id,
+      undefined,
+      expect.objectContaining({ isSessionCurrent: expect.any(Function) }),
+    );
   });
 
   it("backs out without calling anything", async () => {
@@ -320,7 +328,7 @@ describe("Cancel", () => {
     // offline phone from a server fault.
     expect(screen.getByText(/Network request failed/)).toBeTruthy();
     // And the standing truth, stated: the appointment is still booked.
-    expect(screen.getByText(/It is still booked\./)).toBeTruthy();
+    expect(screen.getByText(/Refresh your appointments to verify its status/)).toBeTruthy();
   });
 
   it("keeps the dialog open on failure so the patient can retry", async () => {
@@ -382,7 +390,11 @@ describe("reads GET /v1/bookings", () => {
 
   it("shows a spinner before the list arrives", () => {
     let settle: (v: unknown) => void = () => {};
-    listAppointments.mockReturnValue(new Promise((r) => { settle = r; }));
+    listAppointments.mockReturnValue(
+      new Promise((r) => {
+        settle = r;
+      }),
+    );
     renderScreen();
     expect(screen.getByLabelText("Loading your appointments")).toBeTruthy();
     settle({ upcoming: [], past: [] });
@@ -425,7 +437,8 @@ describe("reads GET /v1/bookings", () => {
 
     // "Completed" on an appointment nobody attended is a false claim on a
     // medical record, which is why the label branches on status.
-    expect(screen.getByText(/^Cancelled/)).toBeTruthy();
+    expect(screen.getByText("Cancelled")).toBeTruthy();
+    expect(screen.getByText(/^Cancelled — was /)).toBeTruthy();
     expect(screen.queryByText(/^Completed on /)).toBeNull();
   });
 
@@ -465,9 +478,7 @@ describe("consultation modality", () => {
 
     expect(screen.getByText("Video call")).toBeTruthy();
     expect(screen.queryByText("In person")).toBeNull();
-    expect(
-      screen.getByLabelText("Join video call with Dr. Julian Sterling"),
-    ).toBeTruthy();
+    expect(screen.getByLabelText("Join video call with Dr. Julian Sterling")).toBeTruthy();
     expect(screen.queryByText("Video link pending")).toBeNull();
   });
 
@@ -503,9 +514,7 @@ describe("consultation modality", () => {
     // No control at all, disabled or otherwise. A greyed "Join video call" tells
     // the patient they are doing something wrong; the room is simply not ready.
     expect(screen.queryByText("Join video call")).toBeNull();
-    expect(
-      screen.queryByLabelText("Join video call with Dr. Julian Sterling"),
-    ).toBeNull();
+    expect(screen.queryByLabelText("Join video call with Dr. Julian Sterling")).toBeNull();
   });
 
   it("survives a mode it does not recognise instead of blanking the list", async () => {
@@ -519,5 +528,36 @@ describe("consultation modality", () => {
     expect(screen.getByText("Dr. Julian Sterling")).toBeTruthy();
     expect(screen.getByText("In person")).toBeTruthy();
     expect(screen.queryByText("Join video call")).toBeNull();
+  });
+});
+
+// Reopening an appointment reads its saved row by ID.
+it("opens saved details for an upcoming appointment", async () => {
+  listAppointments.mockResolvedValue({ upcoming: [UPCOMING], past: [] });
+  renderScreen();
+  fireEvent.press(
+    await screen.findByLabelText(`View details for appointment with ${UPCOMING.doctor!.name}`),
+  );
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: "/(app)/booking-confirmed",
+    params: { bookingId: UPCOMING.id },
+  });
+});
+it("labels cancelled history correctly and opens the persisted booking", async () => {
+  listAppointments.mockResolvedValue({
+    upcoming: [],
+    past: [{ ...COMPLETED, status: "cancelled" }],
+  });
+  renderScreen();
+  fireEvent.press(screen.getByLabelText("Past"));
+  const details = await screen.findByLabelText(
+    `View details for appointment with ${COMPLETED.doctor!.name}`,
+  );
+  expect(screen.getByText("Cancelled")).toBeTruthy();
+  expect(screen.queryByText("Completed")).toBeNull();
+  fireEvent.press(details);
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: "/(app)/booking-confirmed",
+    params: { bookingId: COMPLETED.id },
   });
 });

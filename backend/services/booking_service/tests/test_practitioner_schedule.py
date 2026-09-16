@@ -137,49 +137,35 @@ async def test_doctor_id_query_param_cannot_widen_the_patient_view(
 
 
 async def test_null_doctor_user_id_row_is_invisible(
-    client_as, principal, doctor_principal, doctor_profile_id, booking_window
+    client_as, principal, doctor_principal, doctor_profile_id, booking_window, session_factory
 ):
-    """Fail closed: an unresolved clinician link denies, it does not allow.
-
-    `linked_doctor` is deliberately not requested, so the stub doctor_service
-    404s and the row is written with `doctor_user_id = NULL`. The booking must
-    still be created — the patient's slot survives a doctor_service outage — but
-    it must not appear in anyone's schedule until the backfill repairs it.
-    """
-    async with client_as(principal) as patient:
-        created = await _book(patient, booking_window, doctor_profile_id)
-
+    """Historical unresolved rows remain denied, even though new writes fail closed."""
+    from app.models import Booking
+    from uuid import UUID
+    async with session_factory() as db:
+        row = Booking(user_id=UUID(principal.subject), doctor_id=UUID(doctor_profile_id),
+                      starts_at=booking_window[0], ends_at=booking_window[1], status="booked", mode="in_person")
+        db.add(row)
+        await db.commit()
+        booking_id = str(row.id)
     async with client_as(doctor_principal) as doctor:
         resp = await doctor.get("/v1/bookings/schedule", headers=AUTH)
         assert resp.json()["items"] == []
-        # Not even the detail read, which authorises on the same column.
-        detail = await doctor.get(f"/v1/bookings/{created['booking_id']}", headers=AUTH)
+        detail = await doctor.get(f"/v1/bookings/{booking_id}", headers=AUTH)
         assert detail.status_code == status.HTTP_403_FORBIDDEN
 
 
-async def test_doctor_service_outage_does_not_fail_the_booking(
-    monkeypatch, client_as, principal, doctor_principal, doctor_profile_id, booking_window
+async def test_doctor_service_outage_preserves_no_unlinked_booking(
+    monkeypatch, client_as, principal, doctor_profile_id, booking_window
 ):
-    """A network failure resolving the clinician must not cost the patient the slot."""
-
-    def handler(request: httpx.Request) -> httpx.Response:
+    def handler(request):
         raise httpx.ConnectError("doctor_service unreachable", request=request)
-
-    monkeypatch.setattr(
-        doctor_directory,
-        "_build_client",
-        lambda: httpx.AsyncClient(
-            base_url="http://doctor_service:8002",
-            transport=httpx.MockTransport(handler),
-        ),
-    )
-
+    monkeypatch.setattr(doctor_directory, "_build_client", lambda: httpx.AsyncClient(
+        base_url="http://doctor_service:8002", transport=httpx.MockTransport(handler)))
     async with client_as(principal) as patient:
-        await _book(patient, booking_window, doctor_profile_id)
-
-    async with client_as(doctor_principal) as doctor:
-        resp = await doctor.get("/v1/bookings/schedule", headers=AUTH)
-        assert resp.json()["items"] == []
+        result = await patient.post("/v1/bookings", json=_payload(booking_window, doctor_profile_id), headers=AUTH)
+        assert result.status_code == 503
+        assert (await patient.get("/v1/bookings", headers=AUTH)).json()["items"] == []
 
 
 async def test_resolution_calls_doctor_service_correctly(

@@ -131,12 +131,14 @@ async def verify_otp(
         .where(
             OtpCode.recipient == recipient,
             OtpCode.purpose == purpose,
-            OtpCode.consumed_at.is_(None),
         )
         .order_by(desc(OtpCode.created_at))
         .limit(1)
+        .with_for_update()
     )
-    if not record:
+    # Only the newest code can be used, even after it has been consumed.
+    # Lock it so concurrent verification requests share one attempt budget.
+    if not record or record.consumed_at is not None:
         raise AuthError("no active code")
     if (_as_utc(record.expires_at) or _now()) <= _now():
         raise AuthError("code expired")

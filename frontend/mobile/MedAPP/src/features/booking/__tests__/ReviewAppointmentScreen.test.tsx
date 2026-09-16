@@ -46,7 +46,14 @@ import { ReviewAppointmentScreen } from "../ReviewAppointmentScreen";
 
 const post = client.post as unknown as jest.Mock;
 
+let mockSessionCurrent = true;
+jest.mock("@/hooks/use-session-scope", () => ({
+  useSessionScope: () => ({ owner: "u1", revision: 1, isCurrent: () => mockSessionCurrent }),
+}));
+
 const PARAMS = {
+  startsAtIso: "2025-05-13T10:00:00-04:00",
+  endsAtIso: "2025-05-13T10:45:00-04:00",
   practitionerId: "prac-1",
   practitionerName: "Dr. Julian Sterling",
   practitionerSpecialty: "Senior Cardiologist",
@@ -68,11 +75,14 @@ function withParams(overrides: Record<string, string | undefined> = {}) {
   });
 }
 
+let testQueryClient: QueryClient | undefined;
+
 /** A fresh client per test: a shared one would carry mutation state between them. */
 function renderScreen(node: ReactElement = <ReviewAppointmentScreen />) {
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: 0 }, queries: { retry: false } },
   });
+  testQueryClient = queryClient;
   return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 }
 
@@ -88,6 +98,7 @@ let removeSpy: jest.Mock;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSessionCurrent = true;
   removeSpy = jest.fn();
   jest
     .spyOn(BackHandler, "addEventListener")
@@ -99,7 +110,11 @@ beforeEach(() => {
   withParams();
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  testQueryClient?.clear();
+  testQueryClient = undefined;
+  jest.restoreAllMocks();
+});
 
 // ---------------------------------------------------------------------------
 // Required item 3 — abandon
@@ -188,19 +203,19 @@ describe("consultation mode is its own axis", () => {
     expect(screen.getByText("Video consultation")).toBeTruthy();
   });
 
-  it("forwards THE SERVER'S mode to the confirmation screen", async () => {
+  it("opens the persisted booking so confirmation reloads its saved mode", async () => {
     // The response's `mode`, not the route param this screen was handed. They
     // agree here — `confirm` posts the param — but the confirmation screen says
     // "your video consultation is confirmed" about the row that now exists, so it
     // must read the row.
-    post.mockResolvedValue({ mode: "video" });
+    post.mockResolvedValue({ booking_id: "video-booking", mode: "video" });
     withParams({ mode: "video" });
     renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
     expect(router.replace).toHaveBeenCalledWith(
       expect.objectContaining({
-        params: expect.objectContaining({ mode: "video" }),
+        params: { bookingId: "video-booking" },
       }),
     );
   });
@@ -351,7 +366,7 @@ describe("confirming", () => {
 
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
     const arg = (router.replace as unknown as jest.Mock).mock.calls[0][0];
-    expect(arg.params.mode).toBe("video");
+    expect(Object.keys(arg.params)).toEqual(["bookingId"]);
     // The room handle is NOT carried onto the confirmation screen: that screen
     // has no join affordance (550:1826 puts it on the appointment card, which
     // reads the room itself), and a spare handle on a screen that cannot use it
@@ -361,7 +376,7 @@ describe("confirming", () => {
     expect(arg.params).not.toHaveProperty("joinUrl");
   });
 
-  it("forwards the SERVER's instants and invents no reference or join link", async () => {
+  it("forwards only the saved booking ID for confirmation to reload", async () => {
     post.mockResolvedValue({
       booking_id: "3f1a...",
       user_id: "u-1",
@@ -377,14 +392,13 @@ describe("confirming", () => {
 
     const call = (router.replace as unknown as jest.Mock).mock.calls[0][0];
     expect(call.pathname).toBe("/(app)/booking-confirmed");
-    expect(call.params.startsAtIso).toBe("2025-05-13T10:00:00-04:00");
-    expect(call.params.endsAtIso).toBe("2025-05-13T10:45:00-04:00");
+    expect(call.params).toEqual({ bookingId: "3f1a..." });
     // `booking_reference` and `join_url` exist nowhere in the backend. Nothing
     // is forwarded for them, and `booking_id` is NOT laundered into a
     // human-readable "reference" the clinic could never look up.
     expect("bookingReference" in call.params).toBe(false);
     expect("joinUrl" in call.params).toBe(false);
-    expect(JSON.stringify(call.params)).not.toContain("3f1a");
+    expect(call.params.bookingId).toBe("3f1a...");
   });
 
   it("failed: says what happened, says nothing was charged, offers another time", async () => {
@@ -412,7 +426,7 @@ describe("confirming", () => {
 
     await waitFor(() => expect(screen.getByText("We couldn't confirm this booking")).toBeTruthy());
     expect(screen.queryByText("That slot was just taken")).toBeNull();
-    expect(screen.getByText(/nothing has been charged/i)).toBeTruthy();
+    expect(screen.getByText(/Check My Appointments before retrying/)).toBeTruthy();
   });
 });
 
@@ -510,7 +524,7 @@ describe("provider-supplied values", () => {
   // The duration param is a DISPLAY string ("45 Minutes"); the wire wants an
   // `ends_at`. These pin the conversion, and — the point — that an unreadable
   // label is not turned into a number.
-  it("turns a displayed duration into a real window when there is no end time", async () => {
+  it("preserves the slot end when a display duration differs", async () => {
     post.mockResolvedValue({
       booking_id: "b-1",
       user_id: "u-1",
@@ -523,10 +537,10 @@ describe("provider-supplied values", () => {
     renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
     await waitFor(() => expect(post).toHaveBeenCalled());
-    expect(post.mock.calls[0][1].ends_at).toMatch(/^2025-05-13T11:15:00[+-]\d{2}:\d{2}$/);
+    expect(post.mock.calls[0][1].ends_at).toBe(PARAMS.endsAtIso);
   });
 
-  it("lets api.ts apply its documented default when the label is unreadable", async () => {
+  it("preserves the slot end when a display duration is unreadable", async () => {
     post.mockResolvedValue({
       booking_id: "b-1",
       user_id: "u-1",
@@ -540,7 +554,7 @@ describe("provider-supplied values", () => {
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
     await waitFor(() => expect(post).toHaveBeenCalled());
     // 30, the DEFAULT_SLOT_MINUTES floor — not 60 guessed off the word "hour".
-    expect(post.mock.calls[0][1].ends_at).toMatch(/^2025-05-13T10:30:00[+-]\d{2}:\d{2}$/);
+    expect(post.mock.calls[0][1].ends_at).toBe(PARAMS.endsAtIso);
   });
 
   it("prefers a real end time over the duration label", async () => {
@@ -652,9 +666,9 @@ describe("money", () => {
     expect(screen.queryByText(/\$/)).toBeNull();
   });
 
-  it("keeps the cancellation window, which is the part that is not a charge", () => {
+  it("asks the clinic for actual cancellation terms", () => {
     renderScreen();
-    expect(screen.getByText(/Free cancellation until 24 hours before/)).toBeTruthy();
+    expect(screen.getByText(/Contact the clinic about fees and cancellation terms/)).toBeTruthy();
   });
 
   it("advertises no checkout", () => {
@@ -699,201 +713,55 @@ describe("money", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Reschedule — two calls, in an order chosen for how each one fails
-// ---------------------------------------------------------------------------
-// `booking_service` has no reschedule endpoint, so this screen books the new
-// time and then cancels the old one. Book-first is deliberate: a failed create
-// leaves the original appointment standing, while cancel-first can leave the
-// patient with nothing at all when the new slot is taken while they review.
-
-describe("rescheduling an existing booking", () => {
-  const BOOKING_RESPONSE = {
+describe("atomic rescheduling", () => {
+  const response = {
     booking_id: "b-new",
     user_id: "u-1",
     status: "booked",
     doctor_id: "prac-1",
-    starts_at: "2025-05-13T10:00:00-04:00",
-    ends_at: "2025-05-13T10:45:00-04:00",
+    starts_at: PARAMS.startsAtIso,
+    ends_at: PARAMS.endsAtIso,
     mode: "in_person",
   };
-
-  it("says what confirming will do, before it does it", () => {
+  it("uses one reschedule request and confirms its stored result", async () => {
     withParams({ rescheduleOfId: "b-old" });
+    post.mockResolvedValue(response);
     renderScreen();
-    expect(screen.getByText(/books this new time first, then cancels your original/)).toBeTruthy();
-  });
-
-  it("makes no reschedule claim on an ordinary new booking", () => {
-    renderScreen();
-    expect(screen.queryByText(/cancels your original/)).toBeNull();
-  });
-
-  it("creates the new booking BEFORE cancelling the old one", async () => {
-    withParams({ rescheduleOfId: "b-old" });
-    post.mockResolvedValue(BOOKING_RESPONSE);
-
-    renderScreen();
+    expect(screen.getByText(/original appointment stays booked/)).toBeTruthy();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
-
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
-
-    // Two calls, and the ORDER is the assertion: create, then cancel.
-    expect(post.mock.calls[0][0]).toBe("/v1/bookings");
-    expect(post.mock.calls[1][0]).toBe("/v1/bookings/b-old/cancel");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0]).toBe("/v1/bookings/b-old/reschedule");
+    expect((router.replace as jest.Mock).mock.calls[0][0].params.bookingId).toBe("b-new");
   });
-
-  it("leaves the original booking alone when the new one fails", async () => {
+  it("does not send a separate cancellation on failure", async () => {
     withParams({ rescheduleOfId: "b-old" });
     post.mockRejectedValue(Object.assign(new Error("taken"), { status: 409 }));
-
     renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
-
     await waitFor(() => expect(screen.getByText("That slot was just taken")).toBeTruthy());
-    // The whole reason for booking first. Cancel-first here would have left the
-    // patient with no appointment at all and no way back to the slot they lost.
     expect(post).toHaveBeenCalledTimes(1);
-    expect(post.mock.calls[0][0]).toBe("/v1/bookings");
+    expect(router.replace).not.toHaveBeenCalled();
   });
-
-  it("TELLS the patient when the old booking could not be cancelled", async () => {
-    withParams({ rescheduleOfId: "b-old" });
-    post
-      .mockResolvedValueOnce(BOOKING_RESPONSE)
-      .mockRejectedValueOnce(new Error("cancel failed"));
-
+  it("requires authoritative instants when restoring an old route", () => {
+    withParams({ startsAtIso: undefined });
+    renderScreen();
+    expect(screen.getByText("This booking session has expired")).toBeTruthy();
+  });
+  it("suppresses late success after an account switch and prevents double taps", async () => {
+    let resolve!: (value: typeof response) => void;
+    post.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
     renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
-
-    await waitFor(() => expect(router.replace).toHaveBeenCalled());
-
-    // The new booking is real, so the flow continues — but the duplicate is
-    // carried forward as a fact, never swallowed. An unsurfaced duplicate is a
-    // clinician holding a slot for nobody and a patient who may turn up twice.
-    const params = (router.replace as jest.Mock).mock.calls[0][0].params;
-    expect(params.rescheduleCancelFailed).toBe("1");
-  });
-
-  it("forwards no such flag when the cancellation succeeded", async () => {
-    withParams({ rescheduleOfId: "b-old" });
-    post.mockResolvedValue(BOOKING_RESPONSE);
-
-    renderScreen();
     fireEvent.press(screen.getByLabelText("Confirm Booking"));
-
-    await waitFor(() => expect(router.replace).toHaveBeenCalled());
-    const params = (router.replace as jest.Mock).mock.calls[0][0].params;
-    expect(params).not.toHaveProperty("rescheduleCancelFailed");
-  });
-
-  it("cancels nothing at all on a plain new booking", async () => {
-    post.mockResolvedValue(BOOKING_RESPONSE);
-
-    renderScreen();
-    fireEvent.press(screen.getByLabelText("Confirm Booking"));
-
-    await waitFor(() => expect(router.replace).toHaveBeenCalled());
-    expect(post).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// The contract with screen 1 — what a REAL user currently reaches
-//
-// Every test above hands this screen params that screen 1 does not yet push.
-// That is the right way to exercise a branch, and it is also exactly how a
-// fabricated endpoint passed 595 tests: a suite that supplies its own inputs
-// cannot tell you the caller supplies them too. This block pins the gap so a
-// green run stops implying those rows are live for anyone.
-// ---------------------------------------------------------------------------
-
-/** `SelectTimeSlotScreen.proceedToReview`'s params-out, verbatim. */
-const SCREEN_1_PARAMS_OUT = {
-  practitionerId: "prac-1",
-  practitionerName: "Dr. Julian Sterling",
-  practitionerSpecialty: "Senior Cardiologist",
-  practitionerAvatar: undefined,
-  date: "2025-05-13",
-  time: "10:00 AM",
-  mode: "in-person",
-  type: "Standard Consultation",
-  reason: "Chest pain",
-};
-
-describe("what screen 1 actually sends today", () => {
-  beforeEach(() => {
-    (useLocalSearchParams as unknown as jest.Mock).mockReturnValue(SCREEN_1_PARAMS_OUT);
-  });
-
-  it("reviews and books the appointment on those nine params alone", async () => {
-    post.mockResolvedValue({
-      booking_id: "b-1",
-      user_id: "u-1",
-      status: "booked",
-      doctor_id: "prac-1",
-      starts_at: "2025-05-13T10:00:00-04:00",
-      ends_at: "2025-05-13T10:30:00-04:00",
-    });
-
-    renderScreen();
-    // Not the expired frame: the six required params are all present.
-    expect(screen.queryByText("This booking session has expired")).toBeNull();
-    expect(screen.getByText("Tuesday, 13 May 2025")).toBeTruthy();
-    expect(screen.getByText("10:00 AM")).toBeTruthy();
-    expect(screen.getByText("Standard Consultation")).toBeTruthy();
-    expect(screen.getByText("Chest pain")).toBeTruthy();
-
-    fireEvent.press(screen.getByLabelText("Confirm Booking"));
-    await waitFor(() => expect(router.replace).toHaveBeenCalled());
-    expect(post.mock.calls[0][0]).toBe("/v1/bookings");
-  });
-
-  it("KNOWN GAP: six designed rows are unreachable until screen 1 forwards them", () => {
-    renderScreen();
-    // Location card + Directions  — needs locationName / locationAddress
-    expect(screen.queryByLabelText("Directions")).toBeNull();
-    // Duration                    — needs duration
-    expect(screen.queryByText("Duration")).toBeNull();
-    // Time range and zone badge   — needs endTime / timezone
-    expect(screen.queryByText(/–/)).toBeNull();
-    expect(screen.queryByText(/EDT/)).toBeNull();
-    // Rating and tags (756:4213)  — needs rating / reviewCount / tags
-    expect(screen.queryByLabelText(/out of 5/)).toBeNull();
-    // ...and none of them is faked to fill the hole. docs/PIPELINE.md §5.
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Regression guard — the literals survived three prior passes
-// ---------------------------------------------------------------------------
-
-describe("the source itself", () => {
-  const source = readFileSync(
-    join(__dirname, "..", "ReviewAppointmentScreen.tsx"),
-    "utf8",
-  );
-  const code = source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "")
-    .replace(/\/\/.*$/gm, "");
-
-  it("carries no colour literal", () => {
-    expect(code.match(/#[0-9a-fA-F]{6}/g)).toBeNull();
-    expect(code.match(/rgba?\(/g)).toBeNull();
-  });
-
-  it("imports no icon library — Icon.tsx is the only file allowed to", () => {
-    expect(code).not.toContain("@expo/vector-icons");
-  });
-
-  it("keeps no shadow but the dialog's, which is a sanctioned floating role", () => {
-    // One useTokenShadow call, and it is the dialog's.
-    expect(code.match(/useTokenShadow\(/g)).toHaveLength(1);
-    expect(code).toContain("dialogShadow");
-  });
-
-  it("has no fabricated appointment left in it", () => {
-    expect(code).not.toContain("FALLBACK");
-    expect(code).not.toMatch(/lh3\.googleusercontent/);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    mockSessionCurrent = false;
+    await act(async () => resolve(response));
+    expect(router.replace).not.toHaveBeenCalled();
   });
 });

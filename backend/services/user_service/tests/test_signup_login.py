@@ -50,13 +50,15 @@ async def test_signup_refuses_to_grant_a_clinician_role(client):
     assert "authenticated provisioning" in r.text
 
 
-async def test_signup_starts_kyc_pending(client):
-    # kyc_status is still "pending" on a fresh account - that is what a KYC
-    # applicant's starting state looks like, and the field is unrelated to the
-    # role the caller may request.
+async def test_patient_signup_does_not_create_a_kyc_submission(client, db):
+    from app.models import KycSubmission
+    from sqlalchemy import select
+
+    # Patient access does not require professional credential verification.
     r = await _signup(client, email="pending@b.com")
     assert r.status_code == 201
-    assert r.json()["kyc_status"] == "pending"
+    assert r.json()["kyc_status"] == "not_required"
+    assert await db.scalar(select(KycSubmission)) is None
 
 
 async def test_signup_rejects_invalid_role(client):

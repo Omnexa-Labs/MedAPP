@@ -19,12 +19,11 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from shared.auth import Principal
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.auth import Principal
-
-from ..models import PharmacyProfile
+from ..models import ActivationReceipt, PharmacyProfile
 from ..schemas.pharmacy import PharmacyCreate, PharmacyUpdate
 
 
@@ -42,8 +41,14 @@ def _ensure_mutation_access(
 ) -> None:
     if principal.role not in {"pharmacy", "admin"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "pharmacy access required")
-    if profile is not None and principal.role != "admin" and profile.user_id != UUID(principal.subject):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "you can only manage your own pharmacy profile")
+    if (
+        profile is not None
+        and principal.role != "admin"
+        and profile.user_id != UUID(principal.subject)
+    ):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "you can only manage your own pharmacy profile"
+        )
 
 
 async def create_pharmacy_profile(
@@ -63,7 +68,9 @@ async def create_pharmacy_profile(
     if existing:
         raise PharmacyError("pharmacy profile already exists for this user")
 
-    slug_taken = await db.scalar(select(PharmacyProfile).where(PharmacyProfile.slug == payload.slug))
+    slug_taken = await db.scalar(
+        select(PharmacyProfile).where(PharmacyProfile.slug == payload.slug)
+    )
     if slug_taken:
         raise PharmacyError("pharmacy slug already in use")
 
@@ -85,8 +92,6 @@ async def create_pharmacy_profile(
         insurance_accepted=_normalize_strings(payload.insurance_accepted),
         operating_hours=payload.operating_hours,
         photo_url=payload.photo_url,
-        pms_base_url=payload.pms_base_url,
-        pms_partner_secret_id=payload.pms_partner_secret_id,
         is_listable=payload.is_listable,
     )
     db.add(profile)
@@ -112,9 +117,11 @@ async def list_pharmacy_profiles(
     second round-trip. Pagination cap of 200 is enforced at the
     router layer (Query(le=200)).
     """
-    base = select(PharmacyProfile).where(PharmacyProfile.is_active.is_(True))
-    if only_listable:
-        base = base.where(PharmacyProfile.is_listable.is_(True))
+    # A public query cannot opt into private applications, even with the old
+    # only_listable=false parameter retained for client compatibility.
+    base = select(PharmacyProfile).where(
+        PharmacyProfile.is_active.is_(True), PharmacyProfile.is_listable.is_(True)
+    )
     if city:
         base = base.where(PharmacyProfile.city.ilike(f"%{city}%"))
     if insurance:
@@ -140,18 +147,16 @@ async def list_pharmacy_profiles(
     # subquery is the idiomatic pattern.
     total = await db.scalar(select(func.count()).select_from(base.subquery())) or 0
 
-    page = (
-        base.order_by(PharmacyProfile.name.asc())
-        .limit(limit)
-        .offset(offset)
-    )
+    page = base.order_by(PharmacyProfile.name.asc()).limit(limit).offset(offset)
     result = await db.scalars(page)
     return list(result.all()), int(total)
 
 
-async def get_pharmacy_profile(db: AsyncSession, pharmacy_id: UUID) -> PharmacyProfile:
+async def get_pharmacy_profile(
+    db: AsyncSession, pharmacy_id: UUID, *, public: bool = True
+) -> PharmacyProfile:
     profile = await db.get(PharmacyProfile, pharmacy_id)
-    if not profile or not profile.is_active:
+    if not profile or not profile.is_active or (public and not profile.is_listable):
         raise PharmacyError("pharmacy not found")
     return profile
 
@@ -162,8 +167,9 @@ async def update_pharmacy_profile(
     pharmacy_id: UUID,
     payload: PharmacyUpdate,
 ) -> PharmacyProfile:
-    profile = await get_pharmacy_profile(db, pharmacy_id)
+    profile = await get_pharmacy_profile(db, pharmacy_id, public=False)
     _ensure_mutation_access(principal, profile)
+    await _require_legacy_profile(db, profile)
 
     updates = payload.model_dump(exclude_unset=True)
     if "license_categories" in updates and updates["license_categories"] is not None:
@@ -189,7 +195,18 @@ async def delete_pharmacy_profile(
     principal: Principal,
     pharmacy_id: UUID,
 ) -> None:
-    profile = await get_pharmacy_profile(db, pharmacy_id)
+    profile = await get_pharmacy_profile(db, pharmacy_id, public=False)
     _ensure_mutation_access(principal, profile)
+    await _require_legacy_profile(db, profile)
     await db.delete(profile)
     await db.flush()
+
+
+async def _require_legacy_profile(db, profile):
+    receipt = await db.scalar(
+        select(ActivationReceipt.id).where(ActivationReceipt.resource_id == profile.id)
+    )
+    if receipt:
+        raise HTTPException(
+            409, "approved pharmacies must be managed through their pharmacy workspace"
+        )

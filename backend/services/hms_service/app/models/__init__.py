@@ -1,31 +1,35 @@
 from shared.db import Base
+from shared.onboarding.receipts import ActivationReceipt  # noqa: F401
 
+from .appointment import Appointment, QueueEntry
+from .billing import Invoice, InvoiceLineItem, Payment
+from .department import Department, DepartmentMembership
 from .mgmt import HmsStaffRole, TenantRegistry
 from .patient import Patient, Visit
+from .pharmacy import Dispensing, Drug, DrugBatch, Prescription, PrescriptionItem
 from .staff import StaffMember, StaffSchedule
-from .department import Department, DepartmentMembership
-from .appointment import Appointment, QueueEntry
-from .pharmacy import Drug, DrugBatch, Prescription, PrescriptionItem, Dispensing
-from .billing import Invoice, InvoiceLineItem, Payment
+from .staff_invitation import StaffAccessEvent, StaffInvitation
 
 __all__ = [
+    "Appointment",
     "Base",
-    "TenantRegistry",
-    "HmsStaffRole",
-    "Patient",
-    "Visit",
-    "StaffMember",
-    "StaffSchedule",
     "Department",
     "DepartmentMembership",
-    "Appointment",
-    "QueueEntry",
+    "Dispensing",
     "Drug",
     "DrugBatch",
-    "Prescription",
-    "PrescriptionItem",
-    "Dispensing",
+    "HmsStaffRole",
     "Invoice",
     "InvoiceLineItem",
+    "Patient",
     "Payment",
+    "Prescription",
+    "PrescriptionItem",
+    "QueueEntry",
+    "StaffMember",
+    "StaffAccessEvent",
+    "StaffInvitation",
+    "StaffSchedule",
+    "TenantRegistry",
+    "Visit",
 ]

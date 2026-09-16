@@ -141,7 +141,7 @@ def doctor_service_calls(monkeypatch, doctor_profiles) -> list[httpx.Request]:
     def handler(request: httpx.Request) -> httpx.Response:
         calls.append(request)
         profile_id = request.url.path.rsplit("/", 1)[-1]
-        user_id = doctor_profiles.get(profile_id)
+        user_id = doctor_profiles.get(profile_id, DOCTOR_USER_ID)
         if user_id is None:
             return httpx.Response(404, json={"detail": "doctor profile not found"})
         return httpx.Response(
@@ -277,3 +277,20 @@ def booking_window() -> tuple[datetime, datetime]:
     start = datetime.now(timezone.utc) + timedelta(days=1)
     start = start.replace(minute=0, second=0, microsecond=0)
     return start, start + timedelta(minutes=30)
+
+
+@pytest.fixture(autouse=True)
+def offered_calendar(monkeypatch):
+    """A synthetic clinician offers half-hour slots; never call a real service."""
+    from app.services import availability
+    def handler(request):
+        doctor_id = request.url.path.split("/")[-2]
+        start = datetime.fromisoformat(request.url.params["from_date"]).replace(tzinfo=timezone.utc)
+        stop = datetime.fromisoformat(request.url.params["to_date"]).replace(tzinfo=timezone.utc) + timedelta(days=1)
+        slots = []
+        while start < stop:
+            end = start + timedelta(minutes=30)
+            slots.append({"doctor_id": doctor_id, "starts_at": start.isoformat(), "ends_at": end.isoformat(), "timezone": "UTC"})
+            start = end
+        return httpx.Response(200, json={"items": slots})
+    monkeypatch.setattr(availability, "_build_client", lambda: httpx.AsyncClient(base_url="http://doctor.test", transport=httpx.MockTransport(handler)))

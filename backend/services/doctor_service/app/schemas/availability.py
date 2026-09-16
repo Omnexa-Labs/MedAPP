@@ -1,7 +1,8 @@
 from datetime import date, datetime, time
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class AvailabilityRuleBase(BaseModel):
@@ -9,6 +10,22 @@ class AvailabilityRuleBase(BaseModel):
     start_time: time
     end_time: time
     timezone: str = "UTC"
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError("timezone must be a valid IANA timezone") from exc
+        return value
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def local_clock(cls, value: time) -> time:
+        if value.tzinfo is not None:
+            raise ValueError("use local clock times and the timezone field")
+        return value
 
 
 class AvailabilityRuleCreate(AvailabilityRuleBase):

@@ -24,7 +24,7 @@
 // every row needs hydrating from doctor_service. See `hydrate` below for why
 // that is a fan-out of `getDoctor` rather than one list call.
 
-import { client } from "@/lib/api/client";
+import { client, type RequestOptions } from "@/lib/api/client";
 import { careApi, type DoctorSummary } from "@/features/care/api";
 
 // ---- Wire ----------------------------------------------------------------
@@ -65,20 +65,8 @@ interface BookingListWire {
 
 // ---- App-facing ----------------------------------------------------------
 
-/**
- * What the card can honestly say.
- *
- * `booked` and `cancelled` are the only values `BookingStatus` has. The design
- * shows three pills — Confirmed, In Review, Completed — and **"In Review" has
- * no backend counterpart at all**; nothing in booking_service can produce a
- * pending state. It is therefore absent here rather than faked onto some
- * proxy, and the gap is logged in docs/PIPELINE.md §5 for the backend to
- * resolve. "Completed" is derived, not stored: a booking whose end time has
- * passed and which was never cancelled. That is an inference the client is
- * entitled to make from the clock, unlike a review state, which is a fact
- * about a workflow only the server knows.
- */
-export type AppointmentStatus = "confirmed" | "completed" | "cancelled";
+// The clock establishes that a scheduled time passed, not that a visit occurred.
+export type AppointmentStatus = "confirmed" | "past" | "cancelled";
 
 /**
  * How the consultation happens. Hyphenated to match the union the booking flow
@@ -130,7 +118,7 @@ export const BOOKINGS_PATH = "/v1/bookings";
  */
 function resolveStatus(w: BookingOutWire, now: number): AppointmentStatus {
   if (w.status === "cancelled") return "cancelled";
-  return Date.parse(w.ends_at) <= now ? "completed" : "confirmed";
+  return Date.parse(w.ends_at) <= now ? "past" : "confirmed";
 }
 
 /**
@@ -181,12 +169,12 @@ function adapt(w: BookingOutWire, now: number): Appointment {
  * One unreachable doctor_service profile should cost that row its name, not
  * cost the patient sight of every appointment they have.
  */
-async function hydrate(rows: Appointment[]): Promise<Appointment[]> {
+async function hydrate(rows: Appointment[], options?: RequestOptions): Promise<Appointment[]> {
   const ids = [...new Set(rows.map((r) => r.doctorId))];
   const entries = await Promise.all(
     ids.map(async (id): Promise<[string, DoctorSummary | null]> => {
       try {
-        return [id, await careApi.getDoctor(id)];
+        return [id, await careApi.getDoctor(id, options)];
       } catch {
         return [id, null];
       }
@@ -206,10 +194,13 @@ export const appointmentsApi = {
    * Upcoming is ordered soonest-first (the next appointment is the one you
    * came to check); past is most-recent-first.
    */
-  async listAppointments(): Promise<AppointmentBuckets> {
-    const wire = await client.get<BookingListWire>(BOOKINGS_PATH);
+  async listAppointments(options?: RequestOptions): Promise<AppointmentBuckets> {
+    const wire = await client.get<BookingListWire>(BOOKINGS_PATH, options);
     const now = Date.now();
-    const rows = await hydrate((wire.items ?? []).map((w) => adapt(w, now)));
+    const rows = await hydrate(
+      (wire.items ?? []).map((w) => adapt(w, now)),
+      options,
+    );
 
     const upcoming = rows
       .filter((r) => r.status === "confirmed")
@@ -222,8 +213,16 @@ export const appointmentsApi = {
   },
 
   /** `POST /v1/bookings/{id}/cancel`. */
-  async cancelAppointment(id: string, cancellationReason?: string): Promise<void> {
-    await client.post(`${BOOKINGS_PATH}/${id}/cancel`, { cancellation_reason: cancellationReason });
+  async cancelAppointment(
+    id: string,
+    cancellationReason?: string,
+    options?: RequestOptions,
+  ): Promise<void> {
+    await client.post(
+      `${BOOKINGS_PATH}/${id}/cancel`,
+      { cancellation_reason: cancellationReason },
+      options,
+    );
   },
 };
 

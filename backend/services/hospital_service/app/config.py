@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
+    onboarding_activation_secret: SecretStr = SecretStr("")
+    hms_directory_secret: SecretStr = SecretStr("")
 
 
 settings = Settings()

@@ -13,12 +13,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
+from shared.auth import Principal
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from shared.auth import Principal, get_current_principal
-
-from ..deps import DbSession
+from ..deps import CurrentPrincipal, DbSession
 from ..schemas.pharmacy import (
     PharmacyCreate,
     PharmacyList,
@@ -40,10 +39,17 @@ from ..services import (
 router = APIRouter(prefix="/v1/pharmacies", tags=["Pharmacy"])
 
 
+@router.get("/{pharmacy_id}/photos/{photo_id}")
+async def photo(pharmacy_id: UUID, photo_id: UUID, db: AsyncSession = DbSession):
+    from ..services.photos import read_photo
+
+    return await read_photo(db, pharmacy_id, photo_id)
+
+
 @router.post("", response_model=PharmacyOut, status_code=status.HTTP_201_CREATED)
 async def create(
     payload: PharmacyCreate,
-    principal: Principal = Depends(get_current_principal),
+    principal: Principal = CurrentPrincipal,
     db: AsyncSession = DbSession,
 ) -> PharmacyOut:
     try:
@@ -93,7 +99,7 @@ async def read(pharmacy_id: UUID, db: AsyncSession = DbSession) -> PharmacyOut:
 async def update(
     pharmacy_id: UUID,
     payload: PharmacyUpdate,
-    principal: Principal = Depends(get_current_principal),
+    principal: Principal = CurrentPrincipal,
     db: AsyncSession = DbSession,
 ) -> PharmacyOut:
     try:
@@ -106,7 +112,7 @@ async def update(
 @router.delete("/{pharmacy_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete(
     pharmacy_id: UUID,
-    principal: Principal = Depends(get_current_principal),
+    principal: Principal = CurrentPrincipal,
     db: AsyncSession = DbSession,
 ) -> None:
     try:
@@ -133,6 +139,6 @@ async def stock(
     except PharmacyError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     try:
-        return await check_drug_at_pharmacy(profile, drug_name)
+        return await check_drug_at_pharmacy(profile, drug_name, db)
     except StockLookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc

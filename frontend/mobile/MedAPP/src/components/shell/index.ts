@@ -60,6 +60,9 @@ export {
   type PractitionerTab,
 } from "./PractitionerBottomNav";
 export { PractitionerShell } from "./PractitionerShell";
+// The web width ceiling. Exported for screens that render their OWN full-bleed
+// chrome outside a shell and need to line up with the column.
+export { WebColumn, WEB_COLUMN_MAX_WIDTH } from "./WebColumn";
 // Re-exported so a patient screen can type its `activeTab` without reaching into
 // the features tree. The bar itself stays in features/home for now — 12 screens
 // import it from there and moving it is a separate, mechanical change.

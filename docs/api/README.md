@@ -13,6 +13,28 @@ Standing rules this register exists to serve:
 
 ## Status
 
+2026-09-15 pharmacy update: [directory and PMS activation contract](pharmacy_service.md)
+documents approved ownership, operator deployment assignment, private directory
+reads, MedApp-to-PMS session exchange and trusted stock routing. Per-pharmacy PMS
+deployments are independent. Admin assignment and the portal's MedApp/local staff
+session flow are implemented, including the verified PMS identity context.
+The mobile pharmacy workspace list and deployment-bound handoff/return are
+implemented. Versioned owner profile drafts, publication/withdrawal and history
+are now implemented, with published services and pharmacist details wired into
+the patient screen. Managed photo uploads now save private drafts, normalize images
+and serve them publicly only while published. Apply pharmacy migration 20260915_0004
+and set the public API origin. Operational and rendered/device acceptance remain pending. Older route/wiring notes below
+describe the starting state.
+
+The [PMS operations contract](pms_service.md) now documents live dashboard data,
+catalog edits, batch receipts/adjustments, movement history, role permissions,
+revision conflicts and request replay. Apply PMS migration `0003_inventory_revisions`
+before deploying that API and portal. Purchasing adds migration `0004_partial_receiving`:
+versioned drafts, partial deliveries, cancellation of outstanding quantities and
+administrator review of earlier batch allocations. Use the current operations
+contract for the required request keys and received-date shape. Full B08/B11
+workflows remain open.
+
 | Service | Routes | Contract doc | App wiring |
 | --- | ---: | --- | --- |
 | `inbox_service` | 11 | ✅ [inbox_service.md](inbox_service.md) | Inbox + chat thread wired; practitioner room + AI handoff seeded; **attachment upload live on the backend, client not yet wired** |
@@ -333,9 +355,9 @@ endpoint — none of which exist. Its one reusable asset, the shared `VitalStatC
 
 Wired instead of cut, using endpoints that were already live and already adapted:
 
-- **Upcoming appointment** — `GET /v1/bookings` via `appointmentsApi.listAppointments()`, sharing
-  the `["appointments"]` query key with `appointment-management` so the two cannot disagree about
-  "next". This replaces the invented clinician, the literal `"Tomorrow, 10:30 AM"` (which never
+- **Upcoming appointment** — `GET /v1/bookings` via `appointmentsApi.listAppointments()`. Home now
+  scopes its query by user and session revision; the `appointments` invalidation prefix still
+  refreshes it after booking changes. This replaces the invented clinician, the literal `"Tomorrow, 10:30 AM"` (which never
   became yesterday) and a fixed "Virtual" badge that told every patient their clinic visit was a
   video call. Join Call now carries the **room** id as `sessionId` — it previously sent the
   appointment id under that name, which the waiting room resolves to no room.
@@ -343,11 +365,12 @@ Wired instead of cut, using endpoints that were already live and already adapted
   screen inherits the PO's cumulative-latest-per-device rule rather than re-deriving it. A figure
   with no reading for today is **not rendered**; a zero would claim the patient did not move.
 
-Four Quick Service tiles (**Pharmacy, Labs, Vitals, Records**) have no destination and are now
-non-interactive: still visible and still readable, but no `Pressable`, no `accessibilityRole`,
-no press animation. `pharmacy-detail` needs a pharmacy id and is not a directory; there is no labs
-or vitals screen; `patient-record` is blocked as recorded above. They become buttons when their
-screens ship.
+As of 2026-09-13, Home separates appointment/wellness loading, retry and empty states; it refreshes
+on focus, resume and pull-to-refresh. **Labs, Vitals and Records** now open the existing lab list,
+the new patient vitals timeline and a medical-records navigation hub. The timeline preserves
+recorded values/units/notes and uses consent-enforced cursor paging. **Pharmacy** remains a
+non-interactive tile while directory/partner work is pending B11. Documents, uploads and full
+medical history remain B07; no specialist screen is accepted by these patient changes.
 
 ### What the overview / profile / scripts / lifestyle fabrication cut removed (2026-08-08)
 
@@ -381,9 +404,9 @@ still asserts the product can do the thing and is merely busy.
 | `MED_DOSES` (Lisinopril 10mg taken / Atorvastatin 20mg not taken), `MILESTONES` ("BP stabilized to 120/80 within 7 days"), `DEVICES` (Apple Watch Ultra "synced 2m ago"), `SCRIPTS` (two active prescriptions) and the "Health Insight" card ("sleep quality improved by 12%") | `OverviewScreen` | all module constants, and the first three were **written into the exported health report** — a fabricated medical record in a file the patient can forward to a clinician | `pms_service` for medications and scripts (namespaced at `/v1/pms/*`, and 401s for a MedApp token — see above); `wearable_sync_service` for devices; nothing exists for milestones or insights |
 | `PROFILE_PHOTO_URI` | `OverviewScreen` | a remote photograph of a stranger rendered as **every** signed-in user's avatar | nothing — the shell resolves photo → initials → silhouette from the auth store |
 | "Export" quick action | `OverviewScreen` | no `onPress`, ever. Wiring it to the same summary would have made two buttons producing identical files under different promises | an EHR export route |
-| Patient ID MED-208471, a fictional verified email, phone, Austin TX address, DOB, sex, **blood type O+**, age, weight, PCP "Dr. Sarah Chen", emergency contact "Maria Davis" and its `tel:` link | `PatientProfileOverviewScreen` | there is **no profile/demographics endpoint anywhere in the product** — `/v1/me` carries id, email, display name and avatar, and `PatientOut` has no demographics either. Blood type has transfusion consequences and this one was picked by a designer | demographics on `user_service` or `ehr_service`, and an emergency-contact field with its own edit flow |
+| Patient ID MED-208471, a fictional verified email, phone, Austin TX address, DOB, sex, **blood type O+**, age, weight, PCP "Dr. Sarah Chen", emergency contact "Maria Davis" and its `tel:` link | `PatientProfileOverviewScreen` | These were fictional values displayed beside a real account; the invented blood type and emergency number were especially unsafe. As of 2026-09-13, `/v1/me` restores saved DOB, gender, self-reported blood type and primary health goal, which the profile displays and its editor can update. Missing values remain explicit. | Real address/weight/provider data and an emergency-contact field with its own edit flow; no fabricated fallback values |
 | Steps / Heart Rate dual-line chart and "15% more active this week" | `PatientProfileOverviewScreen` | normalised 0–1 constants with no unit and no source | a vitals or wearables series with real units |
-| "Share Records", "Edit Profile", the camera "Change profile photo" FAB | `PatientProfileOverviewScreen` | all three no-ops, sitting above a record that was not the user's to edit | a share destination and a profile-edit flow (`PATCH /v1/me` exists for display name and avatar) |
+| "Share Records", "Edit Profile", the camera "Change profile photo" FAB | `PatientProfileOverviewScreen` | These controls were removed as no-ops. As of 2026-09-13, Edit profile opens a real patient editor using `PATCH /v1/me` for name parts and optional personal details, with confirmed save/readback. | A share destination and a separately implemented avatar upload/storage flow; `/v1/me` does not support avatar updates |
 | `SEED_MEDS` — "Lisinopril 10mg, 8:00 AM, Taken" with a "2 of 3 taken" counter and a working "Mark Taken" | `LifestyleHubScreen` | a **named prescription list** with an adherence state, which a patient could read as their own regimen. Adherence is exactly what a clinician asks about | `pms_service`, as above |
 | `NUTRIENTS` (1,850 kcal / 85g protein / 1.1mg B2), the `MOOD` series, `WATER` ("Today: 2.1L"), the 150/200-minute activity ring, and the Day/Week/Month control whose `range` nothing read | `LifestyleHubScreen` | constants no action could change — logging 3.4L of water on the Manage screen left the Hub reading 2.1L | a lifestyle-log service; none exists |
 | The sticky "Save & Close" FAB | `LifestyleManageScreen` | `onPress={() => router.back()}`. Sleep, water, workout, mood and stress lived in `useState` and were discarded on dismiss. A control shaped, labelled and tick-glyphed like a save **is** a claim the data was recorded | a lifestyle-log write endpoint |
@@ -491,10 +514,10 @@ Removed, all user-visible, with what each would cost to restore:
 | `SEED_CLOSED_STRIP_INDEX = 3` | `use-booking-availability` | closed the 4th day of every strip for every clinician — an invented day off | `GET /v1/slots` |
 | "From provider" provenance badge on Duration | `ReviewAppointmentScreen` | the value is derived from `SEED_SLOTS`, a bundle constant; the badge certified a provider that had said nothing | `GET /v1/slots`, at which point the badge is true |
 | "See Calendar" (header) and "See calendar" (no-slots) | `SelectTimeSlotScreen` | `openCalendar` was `() => {}`; the second was the **only** escape the empty state offered | a full-month picker frame and route (neither exists) |
-| "Try again" on the provider profile | `PractitionerTelehealthProfileScreen` | called `setState("default")` on a screen that issues no request — it manufactured the appearance of a recovery | the screen fetching `GET /v1/doctors/{id}` itself |
+| "Try again" on the provider profile | `PractitionerTelehealthProfileScreen` | called `setState("default")` on a screen that issues no request — it manufactured the appearance of a recovery | Implemented 2026-09-13: real doctor/nurse/pharmacist single-resource profile queries, retry and refresh. Route display values are ignored. |
 | `DEFAULT_PROVIDER` — "Dr. Julian Sterling, Cardiologist" | `PractitionerTelehealthProfileScreen` | a **named fictional clinician, bookable**: any param-less arrival rendered him under a live dock that pushed `julian-sterling` into a real `POST /v1/bookings` | nothing — it must not return; the screen now renders a no-data state |
 | "Available Now" and "Nearest" facets | `FindCareScreen` | matched badge substrings no adapter emits, so either one emptied the directory into "No matches" and blamed the user's filters | a presence signal / a distance field |
-| "Specialty" picker trigger (and its `PickerTrigger` component) | `FindCareScreen` | a chevron promising a menu, empty `onPress` | `GET /v1/doctors/specialties` |
+| "Specialty" picker trigger (and its `PickerTrigger` component) | `FindCareScreen` | a chevron promising a menu, empty `onPress` | Implemented 2026-09-13: specialty text filters use the existing doctor/nurse/hospital query contract; no fabricated specialty catalogue is required. |
 | Message button on every provider card | `FindCareScreen` | empty `onPress`; also not a small job — `inbox_service` keys threads on a **user** id and a directory entry carries a **profile** id, with no resolution between them | a profile-id → user-id lookup, then thread creation |
 | Presence dot + `"<name> is online"` label, and `AvailabilityTone` | `FindCareScreen` / `care/types.ts` | every adapter hardcoded `availability: "online"`; the `busy`/`away` branches were unreachable by construction | any presence source at all — there is none |
 | `PLACEHOLDER_AVATAR` | `care/api.ts` | a photograph of a real stranger substituted for every null `photo_url`, repeated down the directory over other people's names | nothing — `AvatarWithFallback` draws initials, which is what BRAND §App shell already required |
@@ -605,3 +628,36 @@ What the retro-documentation pass turned up that was not written down anywhere b
 Still genuinely undocumented, because the app does not call them yet: social, telemedicine, lab,
 notification, payment, wearable-sync, onboarding, analytics, pms, hms. Write the contract as part of
 wiring each, not after.
+
+
+### Directory and saved appointment follow-up — 2026-09-13
+
+Find Care's All view now queries all five directory categories. Pharmacy and
+pharmacist pages use server offsets and expose Load more results; failed categories
+remain visible as errors beside successful results. Pharmacy cards use the actual
+`pharmacy_id`, and recorded hours no longer claim the store is currently open.
+Home Service uses a nurse's recorded home-visit fee, including zero, rather than
+matching badge text. Specialty filters are available for doctors, nurses and hospitals.
+
+Public clinician profiles load their saved identity and biography from the matching
+single-resource route. Confirmation and both appointment-list detail actions load
+`GET /v1/bookings/{id}`. A saved ID is now the only value Review forwards to
+confirmation. The display derives local dates, clocks and offsets from the stored
+instants and shows cancellation/past states explicitly. A past scheduled time is
+not evidence of a completed consultation. The summary-shaped history button now
+opens saved appointment details; clinical visit summaries remain separate unfinished work.
+
+B02 is still in progress: public social/review profile variants, exact reference
+acceptance, currencies/fees, live PostgreSQL contention and native/device checks
+remain open. See the current completion baseline for validation evidence.
+
+
+### B03 professional identity follow-up — 2026-09-14
+
+Authenticated doctor/nurse self-profile reads and partial updates are implemented;
+the mobile doctor lookup no longer scans the full directory. The professional
+editor saves basic public identity and listing fields, with draft preview and
+session guards. Patient Profile now links to actual application status and
+activated professional entry. See [doctor](doctor_service.md),
+[nurse](nurse_service.md), and [onboarding](onboarding_service.md) contracts.
+Approval-to-account/profile provisioning and the web handoff remain absent.

@@ -94,11 +94,7 @@ describe("api client 401 handling", () => {
       refreshed ? jsonResponse(200, { ok: true }) : jsonResponse(401),
     );
 
-    const inflight = Promise.all([
-      client.get("/v1/a"),
-      client.get("/v1/b"),
-      client.get("/v1/c"),
-    ]);
+    const inflight = Promise.all([client.get("/v1/a"), client.get("/v1/b"), client.get("/v1/c")]);
 
     // All three have 401'd and are queued on the shared refresh by now.
     await flush();
@@ -198,6 +194,45 @@ describe("api client 401 handling", () => {
 
     await expect(client.get("/v1/me")).rejects.toMatchObject({ status: 401 });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start an account action after its identity changed", async () => {
+    await expect(
+      client.post(
+        "/v1/me/two-factor/setup",
+        { current_password: "old" },
+        { isSessionCurrent: () => false },
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh a newer account on behalf of an old failed action", async () => {
+    let current = true;
+    const refresher = jest.fn(async () => true);
+    registerSessionRefresher(refresher);
+    fetchMock.mockImplementation(async () => {
+      current = false;
+      return jsonResponse(401);
+    });
+    await expect(
+      client.post("/v1/me/two-factor/disable", {}, { isSessionCurrent: () => current }),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(refresher).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not replay a sensitive action if identity changes during refresh", async () => {
+    let current = true;
+    registerSessionRefresher(async () => {
+      current = false;
+      return true;
+    });
+    fetchMock.mockResolvedValue(jsonResponse(401));
+    await expect(
+      client.post("/v1/me/two-factor/disable", {}, { isSessionCurrent: () => current }),
+    ).rejects.toMatchObject({ status: 409 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -3,16 +3,46 @@
 All stock changes MUST go through `record_movement()` so the
 stock_movements ledger stays the source of truth.
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, timedelta
-from typing import Iterable
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from fastapi import HTTPException
+from sqlalchemy import BigInteger, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.core import Drug, DrugBatch, StockMovement
+from ..models.core import Drug, DrugBatch, PharmacyProfile, StockMovement
+
+
+async def pharmacy_currency(db):
+    return await db.scalar(select(PharmacyProfile.currency).limit(1)) or "GHS"
+
+
+async def lock_drugs(db, ids):
+    """All stock writers take parent drug locks in a stable order first."""
+    rows = (
+        await db.scalars(
+            select(Drug)
+            .where(Drug.id.in_(set(ids)))
+            .order_by(Drug.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    return {drug.id: drug for drug in rows}
+
+
+def change_quantity(batch, delta):
+    value = batch.quantity_on_hand + delta
+    if not 0 <= value <= 2_147_483_647:
+        raise HTTPException(
+            409, "Stock changed or the adjustment exceeds available units. Reload the batch."
+        )
+    batch.quantity_on_hand = value
+    batch.version += 1
 
 
 async def current_stock(drug_id: UUID, db: AsyncSession) -> int:
@@ -119,7 +149,7 @@ async def fifo_batches(drug_id: UUID, db: AsyncSession) -> list[DrugBatch]:
             DrugBatch.expiry_date >= today,
             DrugBatch.quantity_on_hand > 0,
         )
-        .order_by(DrugBatch.expiry_date.asc(), DrugBatch.received_at.asc())
+        .order_by(DrugBatch.expiry_date.asc(), DrugBatch.received_at.asc(), DrugBatch.id)
     )
     return list((await db.execute(stmt)).scalars().all())
 
@@ -154,10 +184,15 @@ async def stock_valuation(db: AsyncSession) -> dict:
     """Total at-cost and at-sell value of non-expired stock."""
     today = date.today()
     stmt = select(
-        func.coalesce(func.sum(DrugBatch.quantity_on_hand * DrugBatch.unit_cost_cents), 0),
-        func.coalesce(func.sum(DrugBatch.quantity_on_hand * DrugBatch.selling_price_cents), 0),
+        func.coalesce(
+            func.sum(cast(DrugBatch.quantity_on_hand, BigInteger) * DrugBatch.unit_cost_cents), 0
+        ),
+        func.coalesce(
+            func.sum(cast(DrugBatch.quantity_on_hand, BigInteger) * DrugBatch.selling_price_cents),
+            0,
+        ),
         func.coalesce(func.sum(DrugBatch.quantity_on_hand), 0),
-    ).where(DrugBatch.expiry_date >= today)
+    ).where(DrugBatch.expiry_date >= today, DrugBatch.currency == await pharmacy_currency(db))
     cost, sell, units = (await db.execute(stmt)).one()
     return {
         "cost_value_cents": int(cost),

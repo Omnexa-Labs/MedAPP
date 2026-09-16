@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { authApi, type LoginPayload } from "@/features/auth/api";
-import { useAuthStore } from "@/store/auth-store";
+import { AuthSessionChanged, useAuthStore } from "@/store/auth-store";
 
 // useMutation wrapping the login endpoint.
 // On success: persists token via authStore.signIn (which writes SecureStore
@@ -9,9 +9,20 @@ import { useAuthStore } from "@/store/auth-store";
 export function useLogin() {
   const signIn = useAuthStore((s) => s.signIn);
   return useMutation({
-    mutationFn: (payload: LoginPayload) => authApi.login(payload),
-    onSuccess: async ({ accessToken, refreshToken, user }) => {
+    gcTime: 0,
+    mutationFn: async (payload: LoginPayload) => {
+      const revision = useAuthStore.getState().revision;
+      let response;
+      try {
+        response = await authApi.login(payload);
+      } catch (error) {
+        if (useAuthStore.getState().revision !== revision) throw new AuthSessionChanged();
+        throw error;
+      }
+      if (useAuthStore.getState().revision !== revision) throw new AuthSessionChanged();
+      const { accessToken, refreshToken, user } = response;
       await signIn(accessToken, user, refreshToken);
+      return response;
     },
   });
 }

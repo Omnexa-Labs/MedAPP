@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from pathlib import Path
 
 from agents.shared import (
     AgentRequest,
     AgentResponse,
     BaseAgent,
     LLMChatTurn,
+    load_prompt,
     make_memory_service_from_env,
     make_provider,
 )
@@ -31,7 +31,7 @@ from .tools import TOOLS, make_executor
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = (Path(__file__).resolve().parents[3] / "prompts" / "medical_chat.md").read_text()
+_SYSTEM_PROMPT = load_prompt("medical_chat.md")
 
 
 class MedicalChatAgent(BaseAgent):

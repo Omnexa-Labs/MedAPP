@@ -1,30 +1,44 @@
-import axios from "axios";
-
+import axios, { CanceledError } from "axios";
+import { useAuthStore } from "@/lib/stores/auth.store";
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_HMS_API_URL || "http://localhost:8020",
-  timeout: 15000,
+  timeout: 25000,
   headers: { "Content-Type": "application/json" },
 });
-
 apiClient.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("hms_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
+  const { scope, identity } = useAuthStore.getState();
+  if (!scope || !identity?.workspace)
+    throw new CanceledError("Choose a hospital workspace.");
+  if (!config.url?.startsWith("/v1/"))
+    throw new Error("Unknown hospital API route.");
+  config.url = "/api/hms/" + config.url.slice("/v1/".length);
+  config.baseURL = "";
+  config.headers.delete("Authorization");
+  config.headers.set("X-Session-Scope", scope);
   return config;
 });
-
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (
+      response.config.headers.get("X-Session-Scope") !==
+      useAuthStore.getState().scope
+    )
+      throw new CanceledError("Hospital changed.");
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("hms_token");
-      window.location.href = "/login";
+    const sentScope = error.config?.headers?.get?.("X-Session-Scope");
+    if (sentScope && sentScope === useAuthStore.getState().scope) {
+      if (
+        error.response?.status === 401 ||
+        ["session_changed", "workspace_required"].includes(
+          error.response?.data?.code,
+        )
+      )
+        void useAuthStore.getState().invalidate();
+      else if (error.response?.status === 403)
+        void useAuthStore.getState().hydrate();
     }
     return Promise.reject(error);
-  }
+  },
 );
-
 export default apiClient;

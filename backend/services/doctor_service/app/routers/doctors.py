@@ -23,6 +23,8 @@ from ..services import (
     update_doctor_profile,
 )
 
+from ..services.self_profile import get_self_profile
+
 router = APIRouter(prefix="/v1/doctors", tags=["Doctor"])
 
 
@@ -61,6 +63,30 @@ async def index(
         db, q=q, specialty=specialty, only_listable=only_listable,
     )
     return DoctorList(items=[DoctorProfileOut.model_validate(profile) for profile in profiles])
+
+
+@router.get("/me", response_model=DoctorProfileOut)
+async def read_self(
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    return DoctorProfileOut.model_validate(await get_self_profile(db, principal))
+
+
+@router.patch("/me", response_model=DoctorProfileOut)
+async def update_self(
+    payload: DoctorUpdate,
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    profile = await get_self_profile(db, principal)
+    if not profile.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "professional profile is inactive")
+    try:
+        profile = await update_doctor_profile(db, principal, profile.id, payload)
+    except DoctorProfileError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return DoctorProfileOut.model_validate(profile)
 
 
 @router.get("/{doctor_id}", response_model=DoctorProfileOut)

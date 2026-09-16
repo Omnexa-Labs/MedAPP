@@ -4,15 +4,8 @@ import { z } from "zod";
 // inferred types feed react-hook-form's generics.
 
 export const LoginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required")
-    .email("Enter a valid email"),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "At least 8 characters"),
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(1, "Password is required").min(8, "At least 8 characters"),
   // Note: no .default(false) here — that desyncs the resolver's input vs
   // output types and trips RHF's generics. defaultValues are supplied at
   // useForm() instead.
@@ -20,6 +13,31 @@ export const LoginSchema = z.object({
 });
 
 export type LoginFormValues = z.infer<typeof LoginSchema>;
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+});
+
+export const ResetPasswordSchema = z
+  .object({
+    token: z
+      .string()
+      .trim()
+      .min(1, "Enter the reset code from your email")
+      .max(256, "Check the reset code"),
+    newPassword: z
+      .string()
+      .min(8, "Use at least 8 characters")
+      .max(128, "Use no more than 128 characters"),
+    confirmPassword: z.string().min(1, "Confirm your new password"),
+  })
+  .refine((values) => values.newPassword === values.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
+
+export type ForgotPasswordValues = z.infer<typeof ForgotPasswordSchema>;
+export type ResetPasswordValues = z.infer<typeof ResetPasswordSchema>;
 
 // Sign-up is a 3-step flow:
 //   1. Create account  — name + email + password (this schema)
@@ -108,14 +126,13 @@ export type BloodType = (typeof BloodTypes)[number];
 export type Gender = (typeof Genders)[number];
 export type HealthGoal = (typeof HealthGoals)[number];
 
-// Step 3 — "Secure your account". All three are user preferences; none are
-// required to create the account. Defaults mirror the Stitch HTML (biometric
-// + data-sharing pre-checked, 2FA opt-in).
+// Signup has no enrollment/consent flow for these options yet. They remain
+// off; completing or skipping this step cannot activate security or sharing.
 
 export const SignUpStep3Schema = z.object({
-  enableBiometric: z.boolean(),
-  enableTwoFactor: z.boolean(),
-  shareAnonymousData: z.boolean(),
+  enableBiometric: z.literal(false),
+  enableTwoFactor: z.literal(false),
+  shareWithCareTeam: z.literal(false),
 });
 
 export type SignUpStep3Values = z.infer<typeof SignUpStep3Schema>;

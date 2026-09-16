@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC
 from uuid import uuid4
 
+import app.models
 import pytest
+from app.config import settings
+from app.deps import HmsPrincipal, get_hms_principal, get_mgmt_db, get_tenant_db
+from app.main import create_app
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from shared.db import Base
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from shared.db import Base
-
-import app.models  # noqa: F401 — register all models with SQLAlchemy metadata
-from app.config import settings
-from app.deps import get_mgmt_db, get_tenant_db, get_hms_principal, HmsPrincipal
-from app.main import create_app
-
 TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def test_identity_settings(monkeypatch):
+    from pydantic import SecretStr
+    monkeypatch.setattr(settings, "jwt_secret", "hms-test-platform-signing-secret-2026")
+    monkeypatch.setattr(settings, "workspace_session_secret", SecretStr("hms-test-workspace-signing-secret-2026"))
 
 
 @pytest.fixture()
@@ -52,18 +58,22 @@ def hospital_id() -> str:
 
 @pytest.fixture()
 def admin_token(admin_user_id, hospital_id) -> str:
-    import jwt as pyjwt
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
-    now = datetime.now(tz=timezone.utc)
+    import jwt as pyjwt
+
+    now = datetime.now(tz=UTC)
     payload = {
         "sub": admin_user_id,
-        "role": "admin",
+        "role": "hms_staff",
+        "typ": "access",
+        "aud": settings.workspace_session_audience,
+        "iss": settings.workspace_session_issuer,
         "hospital_id": hospital_id,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(hours=1)).timestamp()),
     }
-    return pyjwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+    return pyjwt.encode(payload, settings.workspace_session_secret.get_secret_value(), algorithm="HS256")
 
 
 @pytest.fixture()
@@ -77,7 +87,7 @@ def admin_principal(admin_user_id, hospital_id) -> HmsPrincipal:
 
 
 @pytest.fixture()
-async def app(test_session_factory, admin_principal) -> FastAPI:
+async def app(test_session_factory, admin_principal, monkeypatch) -> FastAPI:
     application = create_app()
 
     async def _override_mgmt_db() -> AsyncIterator[AsyncSession]:
@@ -100,6 +110,16 @@ async def app(test_session_factory, admin_principal) -> FastAPI:
 
     async def _override_principal() -> HmsPrincipal:
         return admin_principal
+
+    async def _test_membership(user_id: str, tenant_id: str) -> str | None:
+        # Operational unit tests already inject this principal and tenant DB.
+        # Keep the middleware lookup in that same fixture boundary, rather than
+        # connecting to the deployment's management database during a unit test.
+        if user_id == admin_principal.subject and tenant_id == admin_principal.hospital_id:
+            return admin_principal.hms_role
+        return None
+
+    monkeypatch.setattr("app.deps._resolve_hms_role", _test_membership)
 
     application.dependency_overrides[get_mgmt_db] = _override_mgmt_db
     application.dependency_overrides[get_tenant_db] = _override_tenant_db

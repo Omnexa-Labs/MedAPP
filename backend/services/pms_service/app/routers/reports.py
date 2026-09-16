@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -23,6 +24,15 @@ router = APIRouter(prefix="/v1/reports", tags=["reports"])
 
 ALL = ("pharmacy_admin", "pharmacist", "cashier")
 ADMIN = ("pharmacy_admin", "pharmacist")
+
+
+@router.get("/dashboard")
+async def dashboard(
+    period: Literal["today", "week"] = "today", db=DbSession, _=Depends(require_roles(*ALL))
+):
+    from ..services.dashboard import dashboard as load_dashboard
+
+    return await load_dashboard(db, period)
 
 
 @router.get("/sales-summary", response_model=SalesSummary)

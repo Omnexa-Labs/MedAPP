@@ -40,7 +40,7 @@ async def test_patient_summary_returns_bounded_clinical_snapshot(patient_client,
 
     await patient_client.post(
         f"/v1/patients/{principal_patient.subject}/consents",
-        json={"doctor_user_id": principal_doctor.subject, "scope": "records", "reason": "summary review"},
+        json={"doctor_user_id": principal_doctor.subject, "scope": "records_and_vitals", "reason": "summary review"},
     )
 
     for offset, value in enumerate(("36.9", "37.1", "37.4"), start=1):
@@ -74,7 +74,7 @@ async def test_vitals_timeline_is_monotonic(patient_client, doctor_client, princ
 
     await patient_client.post(
         f"/v1/patients/{principal_patient.subject}/consents",
-        json={"doctor_user_id": principal_doctor.subject, "scope": "records", "reason": "review"},
+        json={"doctor_user_id": principal_doctor.subject, "scope": "records_and_vitals", "reason": "review"},
     )
 
     first = datetime.now(UTC) - timedelta(hours=1)

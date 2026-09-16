@@ -1,10 +1,12 @@
 # API contract — `ehr_service`
 
 **Base prefix:** `/v1/patients` · **Source of truth:** `backend/services/ehr_service/app/schemas/record.py`
-· **Client:** `frontend/mobile/MedAPP/src/features/overview/api.ts`
+· **Clients:** `frontend/mobile/MedAPP/src/features/overview/api.ts` and
+`frontend/mobile/MedAPP/src/features/settings/care-team-api.ts`, plus
+`frontend/mobile/MedAPP/src/features/records/vital-timeline-api.ts` for the paged patient timeline.
 
-> **No new endpoints were created.** Per the CTO's rule, every route below already existed. Two
-> *bugs* were fixed so they could answer at all — see "Two stacked bugs" below.
+Updated 2026-09-13: patient-controlled care-team sharing now includes a bounded consent list,
+verified clinician identity, explicit read/write scopes, expiry, revocation and retained history.
 
 ---
 
@@ -17,6 +19,7 @@
 | `GET` | `/v1/patients/{patient_id}/vitals` | — | `VitalTimelineOut` |
 | `POST` | `/v1/patients/{patient_id}/vitals` | `VitalCreate` | `VitalOut` (201) |
 | `POST` | `/v1/patients/{patient_id}/consents` | `ConsentCreate` | `ConsentOut` (201) |
+| `GET` | `/v1/patients/{patient_id}/consents` | Query parameters below | `ConsentPage` |
 | `DELETE` | `/v1/patients/{patient_id}/consents/{consent_id}` | — | `ConsentOut` |
 
 **`GET /v1/patients` (the list) 404s through the gateway.** Verified 2026-08-07.
@@ -38,10 +41,81 @@ value** from the one in the path. Do not feed the response's `patientId` back in
 - `kind` is **free text** (`max_length=64`), *not* an enum. Do not `switch` on it exhaustively.
 - `value` is a **string** ("122/80"). Never parse it as a number.
 
+**`ConsentCreate`** — `doctor_user_id` (identity UUID, including for a nurse),
+`scope` (`records` or `records_and_vitals`, default `records`), `expires_in_days`
+(`7`, `30`, or `90`, default `30`), and optional `reason` (at most 255 characters).
+Other fields are rejected; clients cannot supply a recipient name/role or arbitrary expiry.
+
 **`ConsentOut`** — `consent_id`, `patient_id`, `doctor_user_id`, `scope`, `granted_by_user_id`,
-`granted_at`.
+`granted_at`, nullable `revoked_at`, `revoked_by_user_id`, `expires_at`,
+`clinician_display_name`, `clinician_role`, and `reason`; computed `status` is
+`active`, `revoked`, or `expired`. The stored clinician name/role describes the recipient
+at grant time. Legacy grants may have no name, role, or expiry.
+
+**`ConsentPage`** — `{ items, limit, offset, next_offset }`. Only the patient or an administrator
+can list/manage their grants. The list defaults to active permissions; `include_inactive=true`
+includes history. `limit` defaults to 25 and is bounded to 1–100, `offset` defaults to 0,
+and optional `clinician_user_id` filters the list when reconciling an uncertain mutation.
+Results sort by grant time and ID, newest first. List/grant responses use `Cache-Control: no-store`.
 
 **Envelopes differ:** `summary` and `records` return bare objects; `vitals` returns `{ items }`.
+
+### Paged patient vitals
+
+`GET /v1/patients/{user_id}/vitals?limit=25` returns `{ items, next_cursor }`, newest first,
+ordered by recorded time and UUID. `limit` is bounded to 1–100. Pass the returned opaque cursor
+unchanged with the same filters to retrieve the next page; `null` means the end. This uses a
+keyset comparison, so a newly inserted reading ahead of the cursor does not shift subsequent
+pages. Refresh to see newer entries. A cursor is not an authorization credential.
+
+Optional `from_date` and `to_date` are inclusive timestamps; invalid ranges return 422. Optional
+`kind` matches part of the recorded measurement type, ignoring case and treating underscores
+as spaces, so `blood pressure` matches `blood_pressure`. Wildcard characters are escaped.
+Kind/cursor parameters require a limit; malformed/oversized cursors and invalid limits return
+422. Omit the limit for the existing complete, ascending timeline contract used by Overview;
+that response has `next_cursor: null` and remains compatible with existing `{ items }` consumers.
+
+Every page checks the existing patient/clinician/admin authorization, consent scope and expiry,
+records a `vitals_read` audit, and returns `Cache-Control: no-store`. Values, units, dates and
+notes are returned as recorded. Pagination supplies no clinical classifications or reference ranges.
+Migration `20260913_0004` adds `(patient_id, recorded_at, id)` for the timeline. Its downgrade
+drops only that index; reading data and consent history are retained.
+
+## Care-team permission contract
+
+| Permission | EHR bundle, summary and vitals reads | Add a new vital |
+| --- | --- | --- |
+| `records` | Allowed for the named doctor/nurse | Denied |
+| `records_and_vitals` | Allowed for the named doctor/nurse | Allowed |
+| Revoked, expired, missing or unsupported scope | Denied for other clinicians | Denied |
+
+Patients retain access to their own record. Patient accounts cannot create clinical vitals.
+The existing administrator override remains and is tagged `[admin_override]` in access audits,
+including vital writes. These grants do not govern uploaded files, labs, prescriptions,
+messages, research data, HMS or PMS. Those cross-service contracts remain scheduled work.
+
+The server resolves the recipient through the internal user-service `GET /users/{user_id}`,
+forwarding the authenticated caller's bearer token. It must resolve an active doctor or nurse.
+Inactive/missing recipients or non-clinical roles return 400; unavailable/malformed upstream
+responses return 503; invalid caller authentication returns 401. No grant is saved on a lookup
+failure. Configure `EHR_USER_SERVICE_URL` for the deployment; its Compose-network default is
+`http://user_service:8001`. The internal lookup is not exposed through a new gateway route.
+
+One supported active permission is allowed per patient/recipient. Duplicate grants and attempts
+to upgrade an active scope return 409. To change permission, revoke and grant again with explicit
+confirmation. Deletion revokes rather than removes a row; repeated revocation returns the same
+revocation instant. Expired grants can be renewed without losing their historical status.
+Other clinicians see only their own grants in bundle/summary responses, not the rest of the care team.
+
+Patient-row locks serialize consent changes and clinical authorization. A request authorized
+before a revocation can finish; later requests are denied. Revocation cannot retract information
+already received or remove recorded vitals. Vital events publish after database commit.
+
+Migration `20260913_0003` preserves existing scopes and data and replaces the historical unique
+constraint with a partial index over unrevoked grants. Existing indefinite read grants remain
+read-only. Rollback is refused once time-limited grants or duplicate historical tuples exist,
+because the old schema cannot retain that information. Do not discard consent history to force
+a rollback; prepare a reviewed recovery/migration approach for the actual deployment data.
 
 ---
 
@@ -75,33 +149,22 @@ published 8010. `ehr_service` now maps to 8020.
 | Screen | State |
 | --- | --- |
 | `OverviewScreen` | **Wired** — `GET /{userId}/summary`, mapping `latestVitals` onto the trend cards. |
-| `PatientRecordScreen` | **Not wired.** See below — this is a decision, not an omission. |
+| `CareTeamSharingScreen` | **Wired** — patient selects an active directory doctor/nurse, confirms read or add-vitals access for 7/30/90 days, and can view history or confirm revocation. Component/API and backend validation do not establish rendered/device acceptance. |
+| `VitalsTimelineScreen` | **Wired** — own-user EHR readings, date/type filters, cursor paging, retry and care-team navigation. Exact reference/native acceptance remains pending. |
+| `MedicalRecordsScreen` | **Navigation hub** — links to the available patient vitals, overview, labs and consent screens. Documents and complete medical history remain B07. |
+| `PatientRecordScreen` | **Specialist reuse candidate** — reconcile the roster/record journey in B05; this patient work does not count as specialist implementation or acceptance. |
 
-### Why `OverviewScreen` still keeps placeholder readings
-`ehr_service` has no seeded content, so a live-but-empty account would render an Overview with no
-numbers at all — which reads as *"your readings are gone"* rather than *"nothing recorded yet"*.
-The design's placeholders are used **only when the service returns zero vitals**, and they are
-FLAGGED to be removed the moment the seeder covers this service: placeholder numbers on a health
-screen are indistinguishable from real ones.
+### Remaining record work
 
-Sparkline `bars` are **not** derived from live data. They are static design heights with no dates or
-units; synthesising a trend from a single latest value would draw a line that was never measured.
-Charting the real timeline needs `GET /{id}/vitals` plus a real chart component.
+Earlier prose in this contract described Overview's placeholder readings and static charts.
+That is superseded by the current source: it separates loading/error/empty states, uses the
+bounded latest-reading summary, and derives numeric sparklines from the unpaged vital timeline.
+It still needs reference/device acceptance and full B07 review; the summary returns the five
+latest readings, not a guaranteed latest entry for every measurement type.
 
-### Why `PatientRecordScreen` was NOT wired
-It is a **practitioner** screen viewing *someone else's* record, and three things block a
-straight swap:
+The specialist roster and record workflow must use real patient identity UUIDs and handle denied,
+expired and revoked access. Completing the patient timeline does not complete that professional
+journey, encounters, notes, documents, prescribing, HMS or PMS integration.
 
-1. **It is keyed by slug, not UUID.** `mock-data.ts` uses ids like `amina-mensah`; these routes take
-   user UUIDs. There is no mapping, and the roster it is reached from is itself mock data.
-2. **Clinician access is consent-gated.** `_authorize_patient_access` admits a clinician only via
-   the consents table. With no seeded consents, a doctor gets 403 — so wiring it without also
-   building consent-granting produces a screen that always fails.
-3. **It is a preview harness.** The screen is driven by `PREVIEW_STATES`
-   (`loading`/`offline`/`not-found`/`vitals-unavailable`/`discharge-saved`) selected by a query
-   param, for design QA. Live data and a state-picker are two different screens wearing one name;
-   untangling that is a design decision.
-
-**Consent create/delete are deliberately not wrapped in the client either.** Granting a doctor
-access to a medical record carries legal weight (Ghana DPA 2012 §20, GDPR Art. 9). It needs a
-designed confirmation flow, not a client method sitting ready for someone to bind to a button.
+Consent controls now have a dedicated patient confirmation flow. Signup remains off and does not
+create consent. No specialist reference is marked implemented by this patient settings work.

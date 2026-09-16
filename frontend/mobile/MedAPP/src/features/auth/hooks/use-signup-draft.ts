@@ -25,6 +25,8 @@ export interface SignUpVerification {
 }
 
 interface SignUpDraftState {
+  provider: { ticket: string; email: string; fullName: string; expiresAt: number } | null;
+  setProvider: (provider: SignUpDraftState["provider"]) => void;
   step1: SignUpStep1Values | null;
   step2: SignUpStep2Values | null;
   verification: SignUpVerification | null;
@@ -35,11 +37,18 @@ interface SignUpDraftState {
 }
 
 export const useSignUpDraft = create<SignUpDraftState>((set) => ({
+  provider: null,
+  setProvider: (provider) => set({ provider }),
   step1: null,
   step2: null,
   verification: null,
-  setStep1: (values) => set({ step1: values }),
+  setStep1: (values) =>
+    set((state) => ({
+      step1: values,
+      provider:
+        state.provider?.email.toLowerCase() === values.email.toLowerCase() ? state.provider : null,
+    })),
   setStep2: (values) => set({ step2: values }),
   setVerification: (verification) => set({ verification }),
-  reset: () => set({ step1: null, step2: null, verification: null }),
+  reset: () => set({ step1: null, step2: null, verification: null, provider: null }),
 }));

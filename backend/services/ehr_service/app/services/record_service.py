@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.auth import Principal
 
 from ..models.record import AccessAudit, Consent, PatientRecord, VitalReading
-from ..schemas.record import ConsentCreate, ConsentOut, PatientBundleOut, PatientOut, PatientSummaryOut, VitalCreate, VitalOut
+from ..schemas.record import ConsentCreate, ConsentOut, ConsentPage, PatientBundleOut, PatientOut, PatientSummaryOut, VitalCreate, VitalOut
+from .clinician_identity import ClinicianLookup
 
 
 class EHRAccessError(RuntimeError):
@@ -33,7 +35,7 @@ def _is_clinician(principal: Principal) -> bool:
 
 
 async def _authorize_patient_access(
-    session: AsyncSession, principal: Principal, patient: PatientRecord
+    session: AsyncSession, principal: Principal, patient: PatientRecord, *, write_vitals: bool = False
 ) -> tuple[UUID, str]:
     """Return (requester_id, mode).
 
@@ -53,7 +55,7 @@ async def _authorize_patient_access(
         return requester_id, "admin_override"
     if not _is_clinician(principal):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
-    if not await _has_active_consent(session, patient.id, requester_id):
+    if not await _has_active_consent(session, patient.id, requester_id, write_vitals=write_vitals):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "forbidden")
     return requester_id, "consent"
 
@@ -63,8 +65,15 @@ async def create_patient_if_missing(session: AsyncSession, patient_user_id: UUID
     if patient is not None:
         return patient
     patient = PatientRecord(user_id=patient_user_id, display_name=display_name)
-    session.add(patient)
-    await session.flush()
+    # First access can overlap on multiple workers. Preserve the outer transaction.
+    try:
+        async with session.begin_nested():
+            session.add(patient)
+            await session.flush()
+    except IntegrityError:
+        patient = await session.scalar(select(PatientRecord).where(PatientRecord.user_id == patient_user_id))
+        if patient is None:
+            raise
     return patient
 
 
@@ -72,16 +81,20 @@ async def _load_patient(session: AsyncSession, patient_user_id: UUID) -> Patient
     patient = await session.scalar(select(PatientRecord).where(PatientRecord.user_id == patient_user_id))
     if patient is None:
         patient = await create_patient_if_missing(session, patient_user_id)
-    return patient
+    # Grants, revocations and clinical reads/writes share this lock. A request
+    # authorized before revocation can finish; later requests see the revocation.
+    return await session.scalar(select(PatientRecord).where(PatientRecord.id == patient.id)
+                                .with_for_update().execution_options(populate_existing=True))
 
 
-async def _has_active_consent(session: AsyncSession, patient_id: UUID, doctor_user_id: UUID) -> bool:
+async def _has_active_consent(session: AsyncSession, patient_id: UUID, doctor_user_id: UUID, *, write_vitals: bool = False) -> bool:
     consent = await session.scalar(
         select(Consent).where(
             Consent.patient_id == patient_id,
             Consent.doctor_user_id == doctor_user_id,
-            Consent.scope == "records",
+            Consent.scope.in_(["records_and_vitals"] if write_vitals else ["records", "records_and_vitals"]),
             Consent.revoked_at.is_(None),
+            or_(Consent.expires_at.is_(None), Consent.expires_at > datetime.now(UTC)),
         )
     )
     return consent is not None
@@ -127,7 +140,9 @@ async def get_patient_bundle(session: AsyncSession, principal: Principal, patien
     consents = list(
         (
             await session.scalars(
-                select(Consent).where(Consent.patient_id == patient.id).order_by(Consent.granted_at.desc())
+                select(Consent).where(Consent.patient_id == patient.id,
+                    True if mode in {"self", "admin_override"} else Consent.doctor_user_id == requester_id
+                ).order_by(Consent.granted_at.desc())
             )
         ).all()
     )
@@ -159,7 +174,9 @@ async def get_patient_summary(
         (
             await session.scalars(
                 select(Consent)
-                .where(Consent.patient_id == patient.id, Consent.revoked_at.is_(None))
+                .where(Consent.patient_id == patient.id, Consent.revoked_at.is_(None),
+                       or_(Consent.expires_at.is_(None), Consent.expires_at > datetime.now(UTC)),
+                       True if mode in {"self", "admin_override"} else Consent.doctor_user_id == requester_id)
                 .order_by(Consent.granted_at.desc())
             )
         ).all()
@@ -177,6 +194,7 @@ async def record_vital(session: AsyncSession, principal: Principal, patient_user
     if not _is_clinician(principal):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "clinician access required")
     patient = await _load_patient(session, patient_user_id)
+    requester_id, mode = await _authorize_patient_access(session, principal, patient, write_vitals=True)
     vital = VitalReading(
         patient_id=patient.id,
         recorded_by_user_id=_principal_uuid(principal),
@@ -188,7 +206,7 @@ async def record_vital(session: AsyncSession, principal: Principal, patient_user
     )
     session.add(vital)
     await session.flush()
-    await record_access(session, _principal_uuid(principal), patient.id, "vital_write", payload.kind)
+    await record_access(session, requester_id, patient.id, "vital_write", payload.kind, mode=mode)
     return vital
 
 
@@ -225,31 +243,48 @@ async def list_vitals(
     return vitals
 
 
-async def create_consent(session: AsyncSession, principal: Principal, patient_user_id: UUID, payload: ConsentCreate) -> Consent:
+async def create_consent(session: AsyncSession, principal: Principal, patient_user_id: UUID, payload: ConsentCreate, *, lookup: ClinicianLookup) -> Consent:
     requester_id = _principal_uuid(principal)
     if requester_id != patient_user_id and principal.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "patients can only manage their own consents")
+    if patient_user_id == payload.doctor_user_id:
+        raise HTTPException(400, "you already have access to your own records")
+    clinician = await lookup(payload.doctor_user_id)
     patient = await _load_patient(session, patient_user_id)
-    existing = await session.scalar(
+    existing = list((await session.scalars(
         select(Consent).where(
             Consent.patient_id == patient.id,
             Consent.doctor_user_id == payload.doctor_user_id,
-            Consent.scope == payload.scope,
             Consent.revoked_at.is_(None),
         )
-    )
-    if existing is not None:
-        raise EHRConflictError("active consent already exists")
+    )).all())
+    now = datetime.now(UTC)
+    for previous in existing:
+        expiry = previous.expires_at
+        if expiry and not expiry.tzinfo:
+            expiry = expiry.replace(tzinfo=UTC)
+        if expiry and expiry <= now:
+            previous.revoked_at = expiry
+            previous.revoked_by_user_id = None
+        elif previous.scope in {"records", "records_and_vitals"} or previous.scope == payload.scope:
+            raise HTTPException(409, "active sharing already exists; revoke it before changing permissions")
+    await session.flush()
     consent = Consent(
         patient_id=patient.id,
         doctor_user_id=payload.doctor_user_id,
         scope=payload.scope,
         granted_by_user_id=requester_id,
-        granted_at=datetime.now(tz=UTC),
+        granted_at=now,
+        expires_at=now + timedelta(days=payload.expires_in_days),
+        clinician_display_name=clinician.display_name,
+        clinician_role=clinician.role,
+        reason=payload.reason,
     )
     session.add(consent)
     await session.flush()
-    await record_access(session, requester_id, patient.id, "consent_write", payload.reason)
+    await record_access(session, requester_id, patient.id, "consent_write",
+                        f"{consent.id}; {payload.scope}; {payload.expires_in_days} days",
+                        mode="self" if requester_id == patient_user_id else "admin_override")
     return consent
 
 
@@ -258,11 +293,36 @@ async def delete_consent(session: AsyncSession, principal: Principal, patient_us
     if requester_id != patient_user_id and principal.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "patients can only manage their own consents")
     patient = await _load_patient(session, patient_user_id)
-    consent = await session.get(Consent, consent_id)
+    consent = await session.scalar(select(Consent).where(Consent.id == consent_id)
+                                    .execution_options(populate_existing=True))
     if consent is None or consent.patient_id != patient.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "consent not found")
+    if consent.revoked_at is not None:
+        return consent
     consent.revoked_at = datetime.now(tz=UTC)
     consent.revoked_by_user_id = requester_id
     await session.flush()
-    await record_access(session, requester_id, patient.id, "consent_revoke", "patient revocation")
+    await record_access(session, requester_id, patient.id, "consent_revoke", str(consent.id),
+                        mode="self" if requester_id == patient_user_id else "admin_override")
     return consent
+
+
+async def list_consents(session: AsyncSession, principal: Principal, patient_user_id: UUID,
+                        *, include_inactive: bool = False, limit: int = 25, offset: int = 0,
+                        clinician_user_id: UUID | None = None) -> ConsentPage:
+    requester_id = _principal_uuid(principal)
+    if requester_id != patient_user_id and principal.role != "admin":
+        raise HTTPException(403, "patients can only manage their own consents")
+    patient = await _load_patient(session, patient_user_id)
+    statement = select(Consent).where(Consent.patient_id == patient.id)
+    if clinician_user_id:
+        statement = statement.where(Consent.doctor_user_id == clinician_user_id)
+    if not include_inactive:
+        statement = statement.where(Consent.revoked_at.is_(None),
+            or_(Consent.expires_at.is_(None), Consent.expires_at > datetime.now(UTC)))
+    rows = list((await session.scalars(statement.order_by(Consent.granted_at.desc(), Consent.id.desc())
+                                      .offset(offset).limit(limit + 1))).all())
+    await record_access(session, requester_id, patient.id, "consent_list", "sharing settings",
+                        mode="self" if requester_id == patient_user_id else "admin_override")
+    return ConsentPage(items=[ConsentOut.model_validate(row) for row in rows[:limit]],
+                       offset=offset, limit=limit, next_offset=offset + limit if len(rows) > limit else None)
