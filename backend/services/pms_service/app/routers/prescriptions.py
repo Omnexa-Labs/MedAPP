@@ -17,7 +17,7 @@ from ..schemas.transactions import CancelTransaction, TransactionQuote
 from ..services import (
     dispensing_service,
     inventory_service,
-    medapp_integration,
+    medapp_delivery,
     transaction_pricing,
 )
 from ..services import inventory_requests as requests
@@ -166,7 +166,7 @@ async def dispense(
     )
     if previous is not None:
         return previous
-    data, outbound = await dispensing_service.dispense(rx_id, body, actor, db)
+    data = await dispensing_service.dispense(rx_id, body, actor, db)
     result = DispenseResult(**data)
     db.add(
         AuditLog(
@@ -178,8 +178,6 @@ async def dispense(
         )
     )
     await requests.finish_request(db, idempotency_key, result)
-    if outbound:
-        await medapp_integration.confirm_dispense(outbound)
     return result
 
 
@@ -212,6 +210,7 @@ async def cancel_prescription(
     rx.version += 1
     rx.cancellation_reason = body.reason
     await db.flush()
+    await medapp_delivery.enqueue(db, rx, "cancelled")
     result = (await serialize([rx], db))[0]
     db.add(
         AuditLog(

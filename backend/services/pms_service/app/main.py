@@ -13,6 +13,7 @@ from .routers import (
     dev_auth,
     drugs,
     integrations,
+    medapp_deliveries,
     medapp_sessions,
     prescriptions,
     purchase_orders,
@@ -75,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(customers.router)
     app.include_router(reports.router)
     app.include_router(integrations.router)
+    app.include_router(medapp_deliveries.router)
 
     if settings.dev_mode:
         app.include_router(dev_auth.router)

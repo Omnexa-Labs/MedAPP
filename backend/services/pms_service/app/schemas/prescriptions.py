@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -44,6 +44,7 @@ class PrescriptionOut(BaseModel):
     rx_number: str
     version: int
     cancellation_reason: str | None
+    valid_until: date | None = None
     source: str
     external_ref: str | None
     customer_id: UUID | None

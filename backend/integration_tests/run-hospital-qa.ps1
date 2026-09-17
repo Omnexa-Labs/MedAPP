@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $taskBackend = Split-Path $PSScriptRoot -Parent
-$taskImage = 'medapp-hospital-qa:corrections-20260916'
+$taskImage = 'medapp-hospital-qa:reminders-20260917'
 $taskReportName = if ($Suite -eq 'tenant') { 'hms-tenant-postgres.xml' } else { 'hospital-http-postgres.xml' }
 if ($Suite -eq 'pharmacy') { $taskReportName = 'pharmacy-http-postgres.xml' }
 if (-not $SkipBuild) {

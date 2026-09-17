@@ -1,5 +1,8 @@
-from pydantic import SecretStr
+from urllib.parse import urlsplit
+
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from shared.pharmacy_sync import SYNC_PATH
 
 
 class Settings(BaseSettings):
@@ -37,8 +40,26 @@ class Settings(BaseSettings):
     pharmacy_country: str = "GH"
 
     medapp_webhook_secret: str = ""
-    medapp_dispense_webhook_url: str | None = None
+    medapp_sync_url: str | None = None
     medapp_partner_id: str | None = None
+
+    @field_validator("medapp_sync_url")
+    @classmethod
+    def sync_endpoint(cls, value):
+        if not value:
+            return None
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.path != SYNC_PATH
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("MedApp sync URL must be an HTTP(S) /v1/pharmacy-sync/events endpoint")
+        return value
 
     cors_allow_origins: str = "http://localhost:3002,http://127.0.0.1:3002"
 

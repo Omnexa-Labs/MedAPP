@@ -22,6 +22,7 @@ import {
   useRefreshTransactions,
 } from "./shared";
 import { SalesList } from "./transaction-lists";
+import { MedAppDeliveries } from "./medapp-deliveries";
 
 function DispenseForm({
   rx,
@@ -175,6 +176,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
           {rx.external_ref && ` · ${rx.external_ref}`}
         </p>
         {rx.notes && <p>Notes: {rx.notes}</p>}
+        {rx.valid_until && <p>Valid for dispensing through {rx.valid_until} (UTC).{rx.valid_until < new Date().toISOString().slice(0, 10) ? " Expired — dispensing is unavailable." : ""}</p>}
         {rx.cancellation_reason && (
           <p>Cancellation reason: {rx.cancellation_reason}</p>
         )}
@@ -250,7 +252,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
         ) : (
           ["pending", "partially_dispensed"].includes(rx.status) && (
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => setMode({ action: "dispense", rx })}>
+              <Button disabled={!!rx.valid_until && rx.valid_until < new Date().toISOString().slice(0, 10)} onClick={() => setMode({ action: "dispense", rx })}>
                 Prepare dispense
               </Button>
               <Button
@@ -266,6 +268,7 @@ export function PrescriptionDetail({ id }: { id: string }) {
         <h2 className="text-xl font-semibold">Dispense receipts</h2>
         <SalesList prescriptionId={id} />
       </section>
+      {rx.source === "medapp" && <MedAppDeliveries rxId={rx.id} />}
     </div>
   );
 }

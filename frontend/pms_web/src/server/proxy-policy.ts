@@ -5,6 +5,7 @@ export function proxyPolicy(parts: string[], method: string) {
   const path = parts.join("/");
   const rules: Record<string, RegExp[]> = {
     GET: [
+      new RegExp(`^prescriptions/${uuid}/medapp-deliveries$`),
       new RegExp(`^sales/${uuid}/(corrections|refunds)$`),
       /^pharmacy-profile(\/history)?$/,
       new RegExp(`^pharmacy-profile/photos/${uuid}$`),
@@ -18,6 +19,7 @@ export function proxyPolicy(parts: string[], method: string) {
       /^reports\/(sales-summary|sales-daily|top-drugs|dispensing|movements|stock-valuation|overview|dashboard)$/,
     ],
     POST: [
+      new RegExp(`^prescriptions/${uuid}/medapp-deliveries/${uuid}/retry$`),
       new RegExp(
         `^sales/${uuid}/(corrections|refunds|reconcile-prescription)$`,
       ),

@@ -1,302 +1,197 @@
-// Active medications — the patient's list.
-//
-// ===========================================================================
-// SAMPLE DATA. THERE IS NO MEDICATION ENDPOINT.
-// ===========================================================================
-// This screen renders `./sample-data.ts` and issues no network request. The
-// evidence for "no endpoint" is in the header of MedicationDetailsScreen.tsx
-// and it is thorough; the short version is that `ehr_service` has no medication
-// or prescription table, and the two `/v1/prescriptions` implementations that
-// exist belong to a pharmacy and a hospital system, are staff-role-gated, and
-// reject a MedApp token.
-//
-// The three medications are therefore LABELLED, not dressed up. Every surface
-// that can carry the statement carries it: a callout above the list, a chip on
-// every card, the detail screen's provenance line, and the first line of the
-// shared export. A patient must not be able to reach any of them and conclude
-// these are their prescriptions.
-//
-// ===========================================================================
-// WHAT WAS REMOVED, AND WHY EACH ONE HAD TO GO
-// ===========================================================================
-//   * "Request refill" — added an id to a `useState` Set and rendered "Request
-//     sent · Pending review · We'll notify you once it's ready." No request was
-//     made, nothing was persisted, no notification would ever arrive, and
-//     navigating away erased it. Removed with the two fields that fed it.
-//   * "Add a medication" (twice: the footer and the empty state) — an
-//     `Alert.alert` saying entry would arrive with the records connection. A
-//     control whose entire behaviour is an apology.
-//   * "Last filled 12 Jul · 14 days left" — a JSX literal rendered identically
-//     under all three medications, backed by no field on the type. Two fabricated
-//     clinical facts per card.
-//   * "Offline · Updated 12 Jul at 09:42" — a fixed date that would still have
-//     said 12 Jul in 2027.
-//   * Both "Try again" buttons — they flipped a local enum. Nothing refetched,
-//     because there was nothing to fetch. The shared ErrorPanel now makes that
-//     shape a type error: its `retry` must return the promise of the request it
-//     re-issues, so a callback that only sets state cannot compile.
-//   * The `?state=` hatch — five async states on a screen that makes no request,
-//     every one of them reachable only by URL, including states that render
-//     clinical data. See ./state.ts.
-//
-// The share action stays: sharing is a CLIENT capability and works. It carries
-// the sample-data statement into the file it writes — see ./list-export.ts.
-//
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
-
-import { useCallback } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { FlatList, ScrollView, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { DetailShell } from "@/components/shell";
-import { Card, EmptyState, Icon, InfoCallout } from "@/components/ui";
-import { shareTextFile } from "@/lib/share";
-import { useTokenColor } from "@/lib/tokens";
-import { buildMedicationListText } from "./list-export";
-import { SAMPLE_MEDICATIONS, SAMPLE_NOTICE } from "./sample-data";
-import { medicationsOf, type MedicationsState } from "./state";
-import type { ActiveMedication } from "./types";
+import { Button, Card, ErrorPanel, SkeletonCard } from "@/components/ui";
+import { useSessionScope } from "@/hooks/use-session-scope";
+import { describeSaveResult, saveTextDocument } from "@/lib/documents";
+import { medicationApi, courseLabel, statusLabel } from "./medication-api";
+import { Paging, text, useMedicationQuery, type Scope } from "./MedicationComponents";
 
-export function ActiveMedicationsScreen() {
-  // The seam. When a patient-scoped medication endpoint ships this becomes
-  //     deriveMedicationsState(useQuery({ queryKey: […], queryFn: … }))
-  // and nothing below changes: the render switches on `kind`, and no branch
-  // tests a list length. Read ./state.ts before making that edit — the empty
-  // state MUST NOT be reachable from a failed fetch.
-  return <MedicationsList state={{ kind: "sample", medications: SAMPLE_MEDICATIONS }} />;
-}
-
-/**
- * The list, as a function of the state and nothing else.
- *
- * Split out from the screen so every branch is reachable in a test without a
- * fake network and without a URL parameter — which is what the deleted
- * `?state=` hatch was standing in for. The screen owns where the state comes
- * from; this owns what each state looks like.
- */
-export function MedicationsList({ state }: { state: MedicationsState }) {
-  const medications = medicationsOf(state);
-  const isSample = state.kind === "sample";
-
-  /**
-   * "Share medication list" — a FILE (`@/lib/share` → expo-sharing), not a text
-   * message. This is the one share in the app whose recipient wants to KEEP
-   * what they are given: a pharmacist or a locum reads a medication list,
-   * prints it, attaches it to a referral. `shareTextFile` degrades to the text
-   * sheet on its own where file sharing is unavailable.
-   *
-   * A list with nothing in it opens no sheet: `buildMedicationListText` would
-   * return a header and a disclaimer with nothing between them, and that is a
-   * document asserting "these are your medications" over a blank list.
-   *
-   * `sample` travels into the body builder. A document listing three drugs the
-   * reader does not take is the one artefact from this screen that outlives the
-   * screen, so the statement has to be inside the file, not beside it.
-   */
-  const shareMedicationList = useCallback(() => {
-    if (medications.length === 0) return;
-    void shareTextFile({
-      filename: "medapp-medications.txt",
-      body: buildMedicationListText({ medications, at: new Date(), sample: isSample }),
-      dialogTitle: "Share medication list",
-      subject: "MedApp — medication list",
-    });
-  }, [isSample, medications]);
-
-  return (
-    <DetailShell
-      title="Active medications"
-      onBack={() => {
-        if (router.canGoBack()) router.back();
-        else router.replace("/(app)/overview" as Href);
-      }}
-      actions={
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Share medication list"
-          onPress={shareMedicationList}
-          className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-        >
-          <Icon chrome="share" size={24} />
-        </Pressable>
-      }
-    >
-      <FlatList
-        data={medications}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: 24,
-          paddingBottom: 32,
-          flexGrow: 1,
-        }}
-        showsVerticalScrollIndicator={false}
-        accessibilityLabel="Active medications list"
-        ListHeaderComponent={
-          <View>
-            {/* First thing on the screen, above the title. `tone="error"`
-                structurally renders a glyph beside the words, so the statement
-                is never colour-only. */}
-            {isSample ? (
-              <View className="mb-4">
-                <InfoCallout tone="error" testID="medications-sample-notice">
-                  {`${SAMPLE_NOTICE} They are the same three entries for every account, and no medication record has been loaded.`}
-                </InfoCallout>
-              </View>
-            ) : null}
-            <Text className="font-headline-xl text-headline-xl text-on-surface">
-              Your current medications
-            </Text>
-            <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
-              Keep this list up to date for safer care.
-            </Text>
-            {state.kind === "error" ? (
-              <View className="mt-4">
-                <ErrorNotice offline={state.offline} />
-              </View>
-            ) : null}
-            {state.kind === "loading" ? <MedicationSkeleton /> : null}
-          </View>
-        }
-        renderItem={({ item }) => <ActiveMedicationCard medication={item} sample={isSample} />}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        // Keyed on the STATE, never on `medications.length`. This is the line
-        // the whole of ./state.ts exists to protect: a failed fetch reaches the
-        // error branch above, and can never arrive here.
-        ListEmptyComponent={state.kind === "empty" ? <EmptyMedications /> : null}
-      />
-    </DetailShell>
+function List({ scope }: { scope: Scope }) {
+  const [status, setStatus] = useState("all"),
+    [offset, setOffset] = useState(0);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null),
+    [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const query = useMedicationQuery(scope, ["list", status, offset], (options) =>
+    medicationApi.list(scope.owner!, status, offset, options),
   );
-}
-
-export function ActiveMedicationCard({
-  medication,
-  sample,
-}: {
-  medication: ActiveMedication;
-  sample: boolean;
-}) {
-  const primary = useTokenColor("primary");
-
+  async function save() {
+    if (!scope.owner || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveMessage(null);
+    try {
+      const fresh = await medicationApi.list(scope.owner, status, offset, {
+        isSessionCurrent: scope.isCurrent,
+      });
+      if (!scope.isCurrent()) return;
+      const result = await saveTextDocument({
+        fileName: "MedApp-medication-tracking.txt",
+        dialogTitle: "Save medication tracking page",
+        body: [
+          "MedApp medication tracking — patient report",
+          "Filter: " +
+            status +
+            "; page " +
+            (offset / 25 + 1) +
+            (fresh.next_offset !== null ? " (more records on later pages)" : ""),
+          "Retrieved: " + new Date().toISOString(),
+          "Tracking states and dose reports are patient-reported, not a prescription or proof of treatment completion.",
+          "",
+          ...fresh.items.map((c) =>
+            [
+              c.medicine.drug_name + " " + c.medicine.strength + " " + c.medicine.form,
+              c.medicine.dose + "; " + c.medicine.route + "; " + c.medicine.frequency,
+              c.source === "prescribed"
+                ? "Prescriber: " + c.prescriber_name + "; prescription " + c.prescription_id
+                : "Self-reported",
+              "Tracking: " +
+                courseLabel(c) +
+                "; " +
+                c.start_date +
+                " to " +
+                (c.end_date ?? "no planned end"),
+              (c.daily_times.join(", ") || "Manual entries") + " (" + c.timezone + ")",
+              "",
+            ].join("\n"),
+          ),
+        ].join("\n"),
+      });
+      if (scope.isCurrent()) setSaveMessage(describeSaveResult(result).message);
+    } catch {
+      if (scope.isCurrent()) setSaveMessage("Could not refresh and save this medication page.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
   return (
-    <Card
-      className="mt-3 p-4"
-      accessibilityLabel={
-        sample
-          ? `Sample medication. ${medication.name}, ${medication.formAndStrength}`
-          : `${medication.name}, ${medication.formAndStrength}`
-      }
-    >
-      <View className="flex-row items-start gap-3">
-        <View className="h-12 w-12 items-center justify-center rounded-md bg-primary-tint">
-          <Icon name="medication" size={24} color={primary} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="font-headline-md text-headline-md text-on-surface" numberOfLines={2}>
-            {medication.name}
+    <FlatList
+      data={query.error ? [] : (query.data?.items ?? [])}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 40 }}
+      refreshing={query.isFetching && !query.isPending}
+      onRefresh={() => void query.refetch()}
+      ListHeaderComponent={
+        <View className="gap-md">
+          <Text className="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">
+            Your medications
           </Text>
-          <Text className="mt-1 font-label-md text-label-md text-on-surface-variant" numberOfLines={2}>
-            {medication.formAndStrength}
+          <Text className={text}>
+            Keep a record of your medication use. Tracking status is separate from prescribing and
+            pharmacy dispensing.
           </Text>
-          {/* Was a green `success-container` pill reading "Refill available".
-              The chip slot now carries provenance instead of an availability
-              claim, and the tint is the error container so it reads as a
-              qualification rather than as a reassurance. */}
-          {sample ? (
-            <View className="mt-2 self-start rounded-full bg-error-container px-3 py-1">
-              <Text className="font-label-sm text-label-sm text-on-error-container">Sample</Text>
-            </View>
+          <Button
+            label="Add a medication"
+            onPress={() => router.push("/(app)/add-medication" as Href)}
+          />
+          <Button
+            label="Open dose tracker"
+            variant="outline"
+            onPress={() => router.push("/(app)/medication-tracker" as Href)}
+          />
+          <Button
+            label="Choose from prescriptions"
+            variant="outline"
+            onPress={() => router.push("/(app)/prescription-history" as Href)}
+          />
+          <ScrollView horizontal contentContainerStyle={{ gap: 8 }}>
+            {["all", "active", "paused", "stopped", "completed"].map((value) => (
+              <Button
+                key={value}
+                label={
+                  value === "all" ? "All courses" : statusLabel[value as keyof typeof statusLabel]
+                }
+                accessibilityState={{ selected: value === status }}
+                variant={value === status ? "primary" : "outline"}
+                onPress={() => {
+                  setOffset(0);
+                  setStatus(value);
+                  setSaveMessage(null);
+                }}
+              />
+            ))}
+          </ScrollView>
+          {!!query.data?.items.length && !query.error ? (
+            <Button
+              label={saving ? "Preparing copy…" : "Save this page (.txt)"}
+              variant="outline"
+              disabled={saving}
+              onPress={() => void save()}
+            />
+          ) : null}
+          {saveMessage ? (
+            <Text accessibilityLiveRegion="polite" className={text}>
+              {saveMessage}
+            </Text>
           ) : null}
         </View>
-      </View>
-
-      <Text className="mt-4 font-body-md text-body-md text-on-surface">
-        {medication.instructions}
-      </Text>
-      <View className="mt-4 h-px bg-outline-variant" />
-      <View testID={`medication-actions-${medication.id}`} className="mt-4 flex-row gap-3">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`View details for ${medication.name}`}
-          onPress={() =>
-            router.push({
-              pathname: "/(app)/medication-details",
-              params: { id: medication.id },
-            } as Href)
-          }
-          className="min-h-11 flex-1 items-center justify-center rounded-md bg-primary px-3 active:opacity-70"
-        >
-          <Text className="font-label-md text-label-md text-on-primary">View details</Text>
-        </Pressable>
-      </View>
-    </Card>
-  );
-}
-
-/**
- * Reachable only from `{ kind: "empty" }` — a service that answered and said
- * this patient has no medications. It is NOT reachable from a failure, which is
- * the whole point; the copy asks the patient to act, and asking a patient to
- * chase their clinician because a server returned 500 is the harm.
- *
- * Its "Add a medication" button is gone: it opened an Alert saying medication
- * entry was not available — which is why no `action` is passed to the shared
- * EmptyState, whose Action=No case is the ABSENCE of the prop.
- *
- * The `flex-1 items-center justify-center py-12` wrapper stays: this is the
- * FlatList's `ListEmptyComponent` and it centres against the content container's
- * `flexGrow: 1`. EmptyState sets no outer flex, so dropping the wrapper would
- * pin the panel to the top of the list.
- */
-function EmptyMedications() {
-  return (
-    <View className="flex-1 items-center justify-center py-12">
-      <EmptyState
-        testID="medications-empty"
-        icon="medication"
-        title="No active medications"
-        body="Ask your clinician to share a prescription."
-      />
-    </View>
-  );
-}
-
-/**
- * A failure says a list could not be loaded. It never says the list is empty,
- * and it shows no medications beneath itself — there is no local cache, so
- * "showing your last saved list" (which this screen used to claim, under a
- * fixed "Updated 12 Jul at 09:42") was describing a fixture.
- */
-function ErrorNotice({ offline }: { offline: boolean }) {
-  return (
-    <View
-      accessibilityRole="alert"
-      testID="medications-error"
-      className="rounded-md bg-error-container p-4"
-    >
-      <Text className="font-label-md text-label-md text-on-error-container">
-        {offline ? "You’re offline" : "Couldn’t load your medications"}
-      </Text>
-      <Text className="mt-1 font-body-md text-body-md text-on-error-container">
-        Your medication list could not be loaded, so none is shown. This is not an empty list.
-      </Text>
-    </View>
-  );
-}
-
-function MedicationSkeleton() {
-  return (
-    <View
-      className="mt-6 gap-3"
-      accessibilityRole="progressbar"
-      accessibilityLabel="Loading medications"
-    >
-      {[0, 1, 2].map((item) => (
-        <Card key={item} className="p-4">
-          <View className="h-5 w-2/3 rounded-md bg-surface-container-high" />
-          <View className="mt-3 h-4 w-1/2 rounded-md bg-surface-container-high" />
-          <View className="mt-4 h-16 rounded-md bg-surface-container-high" />
+      }
+      ListEmptyComponent={
+        !scope.owner ? (
+          <Text className={text}>Sign in to view medications.</Text>
+        ) : query.isPending ? (
+          <SkeletonCard shape="provider-card" count={2} />
+        ) : query.error ? (
+          <ErrorPanel
+            title="Could not load medications"
+            body="Your saved records could not be checked."
+            retry={() => query.refetch()}
+          />
+        ) : (
+          <Text className={text}>No medication courses in this view.</Text>
+        )
+      }
+      renderItem={({ item }) => (
+        <Card className="gap-sm">
+          <Text className="font-headline-md text-headline-md text-on-surface">
+            {item.medicine.drug_name}
+          </Text>
+          <Text className={text}>
+            {item.medicine.strength} · {item.medicine.form}
+          </Text>
+          <Text className={text}>
+            {item.medicine.dose} · {item.medicine.frequency}
+          </Text>
+          <Text className={text}>
+            {courseLabel(item)} ·{" "}
+            {item.source === "prescribed" ? "From prescription" : "Self-reported"}
+          </Text>
+          <Button
+            label="View medication"
+            accessibilityLabel={"View medication " + item.medicine.drug_name}
+            onPress={() =>
+              router.push({
+                pathname: "/(app)/medication-details",
+                params: { id: item.id },
+              } as Href)
+            }
+          />
         </Card>
-      ))}
-    </View>
+      )}
+      ListFooterComponent={
+        <Paging
+          offset={offset}
+          next={query.error ? null : query.data?.next_offset}
+          onPage={setOffset}
+          disabled={query.isFetching}
+        />
+      }
+    />
+  );
+}
+export function ActiveMedicationsScreen() {
+  const scope = useSessionScope();
+  return (
+    <DetailShell
+      title="Medications"
+      onBack={() =>
+        router.canGoBack() ? router.back() : router.replace("/(app)/overview" as Href)
+      }
+    >
+      <List key={scope.owner + ":" + scope.revision} scope={scope} />
+    </DetailShell>
   );
 }

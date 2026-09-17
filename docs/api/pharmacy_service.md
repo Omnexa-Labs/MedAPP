@@ -5,6 +5,19 @@ as a separate deployment/database, normally on port 8030. Approval creates a
 private directory identity and reserves the owner's access in the assigned PMS.
 It does not change the applicant's global MedApp role or publish the pharmacy.
 
+The service also stores patient-owned pharmacy dispensing reports. Apply migration
+`20260916_0005` for the signed `/v1/pharmacy-sync/events` receiver and authenticated
+`/v1/me/pharmacy-prescriptions` list/detail. See [pharmacy synchronization](../PHARMACY_SYNC.md)
+for the shared snapshot contract, deployment keys, patient linkage and worker rollout.
+
+The private `POST /internal/clinical-prescriptions` relay accepts EHR's durable
+send/withdrawal commands using `X-Clinical-Handoff-Secret`. Configure
+`PHARMACY_CLINICAL_HANDOFF_SECRET` with the same distinct, 32-character minimum
+secret as EHR. This route is not exposed by the gateway. It selects the active
+pharmacy's confirmed, configured PMS deployment, signs the upstream request and
+requires a matching acknowledgement. See [clinical prescribing](../PRESCRIBING.md)
+for the contract, migration dependencies and separate EHR delivery worker.
+
 ## Activation and deployment configuration
 
 Apply directory migrations through `20260915_0004` and PMS migration

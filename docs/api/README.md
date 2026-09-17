@@ -13,6 +13,14 @@ Standing rules this register exists to serve:
 
 ## Status
 
+2026-09-16 clinical update: EHR owns [verified-doctor prescribing](../PRESCRIBING.md)
+and [patient medication tracking](../MEDICATION_TRACKING.md). Patient medications
+and adherence use `/v1/patients/{patient_user_id}/medications`; they do not use
+PMS staff credentials. Earlier gap entries below describe historical audits.
+Clinical issuing, patient history, pharmacy handoff and saved dose reports now
+have implementation/test evidence. Scanning, interaction providers, reminders
+and rendered/reference acceptance remain open.
+
 2026-09-15 pharmacy update: [directory and PMS activation contract](pharmacy_service.md)
 documents approved ownership, operator deployment assignment, private directory
 reads, MedApp-to-PMS session exchange and trusted stock routing. Per-pharmacy PMS

@@ -1,40 +1,19 @@
-// Prescriptions — the full history, in three tabs.
-//
-// Frame: UI_screens/Patient_facing_screens/full_prescription_history.
-//
-// ===========================================================================
-// SAMPLE DATA. NO PATIENT-FACING PRESCRIPTION ENDPOINT EXISTS.
-// ===========================================================================
-// See ./prescriptions-sample-data.ts for the evidence and for why the frame's
-// drugs and prescribers were replaced with the ones the rest of the app already
-// uses. The shared `SAMPLE_NOTICE` is rendered above the tabs.
-//
-// ===========================================================================
-// TWO CONTROLS FROM THE FRAME ARE NOT BUILT
-// ===========================================================================
-//   * The SEARCH icon in the app bar. A search field over four sample scripts is
-//     a control whose only honest result is the list it already shows. It goes in
-//     when there is a list long enough to need it, which means when there is an
-//     endpoint.
-//   * The BOTTOM TAB BAR the frame draws (with Overview active). This is a pushed
-//     detail screen: it has a back arrow in the same frame. components/shell's
-//     README is explicit — "never a tab set at all on a detail screen" — so this
-//     uses DetailShell, exactly as ActiveMedicationsScreen does when reached the
-//     same way.
-//
-// "View details" routes to ActiveScriptViewScreen, which is the existing digital
-// prescription surface. It is passed only the fields this list actually holds;
-// that screen had its thirteen `params.X ?? "<clinical constant>"` fallbacks
-// deleted, so an absent param renders as an absent row rather than as an invented
-// patient name, clinic or licence number.
-//
-// Read https://docs.expo.dev/versions/v55.0.0/ before adding any expo-* API.
+// The production route uses saved pharmacy reports. The legacy presentation below
+// remains a design fixture for medicine-course tabs, whose clinical API is still pending.
 
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { router, type Href } from "expo-router";
 import { DetailShell } from "@/components/shell";
-import { Badge, Card, ChoiceChip, ChoiceChipRow, EmptyState, Icon, InfoCallout } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  ChoiceChip,
+  ChoiceChipRow,
+  EmptyState,
+  Icon,
+  InfoCallout,
+} from "@/components/ui";
 import { useTokenColor } from "@/lib/tokens";
 import {
   formatIssuedDate,
@@ -43,10 +22,8 @@ import {
   type Prescription,
   type PrescriptionStatus,
 } from "./prescriptions";
-import {
-  buildSamplePrescriptions,
-  PRESCRIPTIONS_SAMPLE_NOTICE,
-} from "./prescriptions-sample-data";
+import { PRESCRIPTIONS_SAMPLE_NOTICE } from "./prescriptions-sample-data";
+import { ClinicalPrescriptionHistory } from "./ClinicalPrescriptionScreens";
 
 const TABS: readonly { status: PrescriptionStatus; label: string }[] = [
   { status: "active", label: "Active" },
@@ -55,13 +32,7 @@ const TABS: readonly { status: PrescriptionStatus; label: string }[] = [
 ];
 
 export function PrescriptionHistoryScreen() {
-  // One clock read at mount, for the same reason MedicationTrackerScreen does it
-  // this way: a module-level `new Date()` is evaluated at import and pins every
-  // issued date to whenever the bundle first loaded.
-  const today = useMemo(() => new Date(), []);
-  const prescriptions = useMemo(() => buildSamplePrescriptions(today), [today]);
-
-  return <PrescriptionHistory prescriptions={prescriptions} sample />;
+  return <ClinicalPrescriptionHistory />;
 }
 
 export type PrescriptionHistoryProps = {
@@ -78,7 +49,10 @@ export type PrescriptionHistoryProps = {
 export function PrescriptionHistory({ prescriptions, sample }: PrescriptionHistoryProps) {
   const [status, setStatus] = useState<PrescriptionStatus>("active");
   const counts = useMemo(() => statusCounts(prescriptions), [prescriptions]);
-  const visible = useMemo(() => prescriptionsWithStatus(prescriptions, status), [prescriptions, status]);
+  const visible = useMemo(
+    () => prescriptionsWithStatus(prescriptions, status),
+    [prescriptions, status],
+  );
 
   return (
     <DetailShell
@@ -135,7 +109,10 @@ export function PrescriptionHistory({ prescriptions, sample }: PrescriptionHisto
  * "New" on a tab but a badge saying "NEW" on a card next to a date from
  * yesterday is clearer as "Just issued".
  */
-const STATUS_BADGE: Record<PrescriptionStatus, { label: string; tone: "success" | "primary" | "neutral" }> = {
+const STATUS_BADGE: Record<
+  PrescriptionStatus,
+  { label: string; tone: "success" | "primary" | "neutral" }
+> = {
   active: { label: "Active", tone: "success" },
   new: { label: "Just issued", tone: "primary" },
   past: { label: "Completed", tone: "neutral" },
@@ -211,29 +188,29 @@ export function PrescriptionCard({ prescription }: { prescription: Prescription 
           <Text className="font-label-md text-label-md text-on-primary">Open prescription</Text>
         </Pressable>
       ) : (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`View details for ${prescription.drugName}`}
-        onPress={() =>
-          router.push({
-            pathname: "/(app)/active-script-view",
-            // Only what this list holds. ActiveScriptViewScreen renders an absent
-            // param as an absent row by design — its clinical-constant fallbacks
-            // were deleted — so passing nothing for patient/dob/clinic/licence is
-            // correct, not a gap.
-            params: {
-              drug: `${prescription.drugName} ${prescription.strengthAndForm}`,
-              prescriber: prescription.prescriberName,
-              issuedDate: formatIssuedDate(prescription.issuedDate),
-              rxNumber: prescription.rxNumber,
-              scriptId: prescription.id,
-            },
-          } as Href)
-        }
-        className="mt-4 min-h-11 items-center justify-center rounded-md bg-primary px-3 active:opacity-70"
-      >
-        <Text className="font-label-md text-label-md text-on-primary">View details</Text>
-      </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View details for ${prescription.drugName}`}
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/active-script-view",
+              // Only what this list holds. ActiveScriptViewScreen renders an absent
+              // param as an absent row by design — its clinical-constant fallbacks
+              // were deleted — so passing nothing for patient/dob/clinic/licence is
+              // correct, not a gap.
+              params: {
+                drug: `${prescription.drugName} ${prescription.strengthAndForm}`,
+                prescriber: prescription.prescriberName,
+                issuedDate: formatIssuedDate(prescription.issuedDate),
+                rxNumber: prescription.rxNumber,
+                scriptId: prescription.id,
+              },
+            } as Href)
+          }
+          className="mt-4 min-h-11 items-center justify-center rounded-md bg-primary px-3 active:opacity-70"
+        >
+          <Text className="font-label-md text-label-md text-on-primary">View details</Text>
+        </Pressable>
       )}
     </Card>
   );

@@ -17,9 +17,11 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -198,7 +200,22 @@ class Customer(Base, TimestampMixin):
 
 class Prescription(Base, TimestampMixin):
     __tablename__ = "prescriptions"
+    __table_args__ = (
+        Index(
+            "uq_prescriptions_medapp_external",
+            "external_ref",
+            unique=True,
+            postgresql_where=text("source = 'medapp' AND external_ref IS NOT NULL"),
+            sqlite_where=text("source = 'medapp' AND external_ref IS NOT NULL"),
+        ),
+    )
 
+    medapp_patient_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
+    sync_sequence: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    ingest_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
     cancellation_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
 

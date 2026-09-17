@@ -73,3 +73,8 @@ test("history and outcome checks preserve paging and clinician filters", async (
     isSessionCurrent: current,
   });
 });
+
+test("prescribing requires an explicit permission choice", async () => {
+  await api.grant("patient", "doctor", false, 30, true);
+  expect(client.post).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ scope: "records_and_prescriptions" }), expect.any(Object));
+});

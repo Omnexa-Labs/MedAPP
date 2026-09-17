@@ -60,6 +60,7 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
   const query = useDebouncedValue(search.trim());
   const [choice, setChoice] = useState<Choice | null>(null);
   const [allowVitals, setAllowVitals] = useState(false);
+  const [allowPrescriptions, setAllowPrescriptions] = useState(false);
   const [duration, setDuration] = useState<ConsentDuration>(30);
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
@@ -90,6 +91,7 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
   function select(next: Choice) {
     setChoice(next);
     setAllowVitals(false);
+    setAllowPrescriptions(false);
     setDuration(30);
     setError(null);
     setNotice(null);
@@ -117,7 +119,7 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
     setError(null);
     try {
       if (choice.kind === "grant") {
-        await api.grant(owner, choice.clinician.userId, allowVitals, duration);
+        await api.grant(owner, choice.clinician.userId, allowVitals, duration, allowPrescriptions);
         await finish("Sharing permission saved.");
       } else {
         await api.revoke(owner, choice.consent.consent_id);
@@ -151,8 +153,8 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
       if (!isCurrent()) return;
       if (
         choice.kind === "grant" &&
-        page.items.some(
-          (entry) => entry.scope === "records" || entry.scope === "records_and_vitals",
+        page.items.some((entry) =>
+          ["records", "records_and_vitals", "records_and_prescriptions"].includes(entry.scope),
         )
       )
         await finish(
@@ -201,11 +203,13 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
             </Text>
             <Text className="font-body-md text-body-md text-on-surface-variant">
               Share your EHR summary and recorded vitals with a named doctor or nurse. You can also
-              allow them to add vitals, choose an expiry, and revoke access here.
+              allow them to add vitals, or allow a verified doctor to prescribe. Choose an expiry
+              and revoke access here.
             </Text>
             <InfoCallout>
-              This permission covers the EHR summary and vitals only. It does not share uploaded
-              files, lab results, prescriptions, messages or research data.
+              Basic sharing covers your EHR summary and vitals. Prescription access requires the
+              separate prescribing choice. Uploaded files, lab results, messages and research data
+              are not shared here.
             </InfoCallout>
             {notice ? (
               <View accessibilityLiveRegion="polite">
@@ -367,13 +371,32 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
                     <ConsentRow
                       checked={allowVitals}
                       onChange={(value) => {
-                        if (!busy && !uncertain) setAllowVitals(value);
+                        if (!busy && !uncertain) {
+                          setAllowVitals(value);
+                          if (value) setAllowPrescriptions(false);
+                        }
                       }}
                       accessibilityLabel="Also allow this clinician to add vitals"
                       labelPressable
                     >
                       Also allow this clinician to add vitals
                     </ConsentRow>
+                    {choice.clinician.role === "doctor" ? (
+                      <ConsentRow
+                        checked={allowPrescriptions}
+                        onChange={(value) => {
+                          if (!busy && !uncertain) {
+                            setAllowPrescriptions(value);
+                            if (value) setAllowVitals(false);
+                          }
+                        }}
+                        accessibilityLabel="Allow this verified doctor to view and manage prescriptions"
+                        labelPressable
+                      >
+                        Allow this verified doctor to view my prescriptions and issue, send, correct
+                        or cancel prescriptions they author.
+                      </ConsentRow>
+                    ) : null}
                     <Text className="font-label-md text-label-md text-on-surface">Share for</Text>
                     <View className="flex-row gap-2">
                       {([7, 30, 90] as const).map((days) => (
@@ -388,9 +411,11 @@ function SharingContent({ owner, revision }: { owner: string; revision: number }
                       ))}
                     </View>
                     <InfoCallout>
-                      {allowVitals
-                        ? "They can view your EHR and add new vitals. This does not allow changes to existing entries."
-                        : "They can view your EHR and vitals. They cannot add vitals with this permission."}{" "}
+                      {allowPrescriptions
+                        ? "They can view your EHR and prescription history and manage prescriptions they author. Medicines already supplied remain in your pharmacy history."
+                        : allowVitals
+                          ? "They can view your EHR and add new vitals. This does not allow changes to existing entries."
+                          : "They can view your EHR and vitals. They cannot add vitals with this permission."}{" "}
                       You can revoke this access at any time.
                     </InfoCallout>
                   </>

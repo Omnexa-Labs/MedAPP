@@ -47,7 +47,18 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
+.env.*
+!.env.example
 .env*.local
+
+# Local Firebase client configuration and private signing/provider files.
+# Cloud builds receive the client config through an EAS file environment variable.
+/credentials/
+google-services*.json
+*service-account*.json
+*firebase-adminsdk*.json
+credentials.json
 
 # typescript
 *.tsbuildinfo

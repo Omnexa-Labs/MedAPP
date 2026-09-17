@@ -6,7 +6,7 @@ from shared.observability import configure_logging, instrument_app
 
 from . import events
 from .config import settings
-from .routers import records, root
+from .routers import medication_reminders, medications, prescriptions, records, root
 
 
 @asynccontextmanager
@@ -28,6 +28,9 @@ def create_app() -> FastAPI:
     instrument_app(app, service_name=settings.service_name, otlp_endpoint=settings.otlp_endpoint)
     app.include_router(root.router)
     app.include_router(records.router)
+    app.include_router(prescriptions.router)
+    app.include_router(medication_reminders.router)
+    app.include_router(medications.router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

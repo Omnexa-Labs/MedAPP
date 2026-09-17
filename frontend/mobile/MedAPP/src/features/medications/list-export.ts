@@ -1,47 +1,5 @@
-// The plain-text body behind "Share medication list".
-//
-// A PURE function of the data plus the export instant, deliberately separate
-// from the screen: what goes into a shared medication record is the part worth
-// asserting on in a test, and it must not need a rendered FlatList to check.
-//
-// ---------------------------------------------------------------------------
-// WHAT IS IN IT, AND WHAT IS DELIBERATELY NOT
-// ---------------------------------------------------------------------------
-//
-// IN — every field `ActiveMedication` actually carries: name, form/strength,
-// instructions, and (where the record has them) prescriber and refills left.
-// `prescriberName` and `refillsRemaining` are NOT drawn on the list screen —
-// only on MedicationDetailsScreen — but they are real fields on the same local
-// record, and a medication list handed to a pharmacist without the prescriber
-// is the one thing they will ask for next. Omitting them would be the "silently
-// dropped information" failure, not caution.
-//
-// OUT — "Last filled 12 Jul · 14 days left". That line is hardcoded in the card
-// JSX, identical for all three medications, and corresponds to no field on the
-// type. It is placeholder chrome. Putting it in an export would turn a layout
-// stub into a clinical claim about a specific drug, in a document someone else
-// reads. When the record API supplies real fill dates this is where they go.
-//
-// OUT — `refillLabel` ("Refill available in 6 days", "Added by you"). It was the
-// list card's own display copy keyed to a UI state, `refillsRemaining` is the
-// underlying fact, and the field has since been deleted from the type along
-// with the refill control it fed. `source` is stated instead, in words, because
-// "who says you take this" is the part that changes how a clinician reads the
-// line.
-//
-// OUT — any invented total, adherence figure, or "as of" clinical status. There
-// is no medication endpoint (see ./sample-data.ts); nothing here may read as a
-// record that arrived from a provider.
-//
-// ---------------------------------------------------------------------------
-// THE SAMPLE-DATA STATEMENT GOES IN THE FILE, NOT BESIDE IT
-// ---------------------------------------------------------------------------
-// The screen's callout stays on the screen. This document is the one artefact
-// that LEAVES the app — it is written to disk, handed to a share sheet, and may
-// be printed or attached to a referral by somebody who never saw the screen. So
-// `sample` puts the statement on the FIRST line, before any drug name, and
-// repeats it in the footer. A reader who sees only the top of the file, and a
-// reader who reads only the end, both get it.
+// Reference display helpers retained for regression tests. Production medication data comes from medication-api.ts.
+// The tracker uses server-generated slots; it does not use the sample adherence calculation.
 
 import type { ActiveMedication } from "./types";
 

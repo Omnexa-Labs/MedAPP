@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-09-16",
+  "updated": "2026-09-17",
   "scope": "Complete the existing patient-facing and specialist-facing screen sets.",
   "planning_authority": "Product owner: patient UI largely implemented; specialist-facing screen set not implemented.",
   "counts": {
@@ -11,7 +11,7 @@
     "animation_html": 1,
     "png_files": 126,
     "reclassified_specialist_references": 17,
-    "route_entries": 63,
+    "route_entries": 65,
     "layouts": 3
   },
   "status_rules": {
@@ -1052,13 +1052,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/active_medications/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-medications.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1072,13 +1075,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/screen.png"
       ],
-      "ui_status": "existing_code_to_verify",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/add-medication.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1092,13 +1098,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1112,13 +1121,15 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/digital_prescription_view/screen.png"
       ],
-      "ui_status": "existing_code_to_verify",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-script-view.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1132,13 +1143,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/full_prescription_history/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/prescription-history.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 pharmacy synchronization: transactional full snapshots for ingestion, dispensing, corrections, cancellation and receipt reconciliation; leased worker retries and authenticated deduplicated acknowledgements; patient identity frozen from signed ingestion; pharmacy status/retry controls and account-scoped live patient history with quantities, returns and report times. See PHARMACY_SYNC.md and COMPLETION_BASELINE.md for rollout, validation and limits. Specialist issuing, medicine-course states, refill/order/delivery and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1172,13 +1186,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/medication_detail/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-details.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1212,13 +1229,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/medication_tracker_1/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1232,13 +1252,16 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/medication_tracker_2/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 medication tracking: EHR-owned prescription-linked/self-reported courses, explicit patient status transitions, scheduled/manual taken/skipped entries, retained corrections, account isolation and fresh export are connected. See MEDICATION_TRACKING.md and COMPLETION_BASELINE.md for 153 distinct passing tests and limits. Scanning, plan revision, notifications, interaction providers and rendered/device/reference acceptance remain open. No reference accepted.",
+        "2026-09-17: future schedule revisions preserve historical dose attribution; saved reminder opt-in, native device registration, generic Expo dispatch and attempt history implemented. 208 unit/component tests pass; new PostgreSQL migration/concurrency and real provider/device checks are pending. Docker repair and preview startup were blocked by automatic approval review. See MEDICATION_REMINDERS.md and COMPLETION_BASELINE.md. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1252,13 +1275,15 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/new_prescription_received/screen.png"
       ],
-      "ui_status": "partial_sample_data",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/new-prescription.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -1272,13 +1297,15 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/prescription_sharing_hub/screen.png"
       ],
-      "ui_status": "existing_code_to_verify",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
       "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/active-script-share.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -2289,13 +2316,15 @@
       "preview_paths": [
         "UI_screens/Specialist_facing_screens/issue_prescription/screen.png"
       ],
-      "ui_status": "not_implemented",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
-      "reuse_route": null,
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/issue-prescription.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": false,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -2309,13 +2338,15 @@
       "preview_paths": [
         "UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/screen.png"
       ],
-      "ui_status": "not_implemented",
-      "api_status": "not_verified",
-      "qa_status": "not_verified",
-      "reuse_route": null,
+      "ui_status": "in_progress",
+      "api_status": "partially_verified",
+      "qa_status": "partially_verified",
+      "reuse_route": "frontend/mobile/MedAPP/src/app/(app)/issue-prescription.tsx",
       "next_batch": "B08",
       "accepted": false,
-      "acceptance_evidence": [],
+      "acceptance_evidence": [
+        "2026-09-16 clinical prescribing: verified-doctor approval and explicit patient consent; private drafts, reviewed issuing, immutable replacement/cancellation, durable pharmacy handoff/withdrawal and patient-owned clinical history/details/text copy. HTTP/PostgreSQL and component evidence is recorded in PRESCRIBING.md and COMPLETION_BASELINE.md. Medication/adherence, interaction providers, signature requirements and rendered/device/reference acceptance remain open. No reference accepted."
+      ],
       "source_folder_differs_from_group": true,
       "disposition": "pending_reference_review",
       "covered_by_id": null
@@ -2459,7 +2490,8 @@
         "2026-09-15 pharmacy inventory: live dashboard with prescription/stock queues and today/week sales, searchable paged catalog with revisioned edits/archiving, batch receipts/adjustments/expiry filters and staff-attributed movement history. PostgreSQL HTTP checks exercise duplicate receipts, competing adjustments, overselling, duplicate voids/dispensing/PO receipts and balance-to-ledger reconciliation. See COMPLETION_BASELINE.md and api/pms_service.md for final automated results and limits. Scanning, refills/orders/delivery, clinical interaction alerts, partial receipts and prescription corrections/refunds remain in scope. Rendered/theme/device and full reference acceptance remain pending; not accepted.",
         "2026-09-15 purchasing: versioned purchase drafts, tracking externally placed orders, partial/split batch deliveries, outstanding/cancelled quantities, delivery records and before/after history are implemented. Request replay keys and PostgreSQL row locks protect retries and receipt/cancellation races. Administrators can reconcile recorded historical batches without altering stock; missing evidence stays flagged. The latest completion baseline records 228 passing checks, the production build and validation limits. Patient refills/fulfillment/delivery, clinical alerts, returns/refunds, browser-restart recovery and full rendered/device/theme/reference acceptance remain open; not accepted.",
         "2026-09-15 POS/prescription recovery: batch-price review, saved receipts, paged ledgers, prescription entry, partial dispensing, reasoned cancellation and walk-in sale voids are implemented. Atomic request receipts protect retries while forms remain mounted and saved revisions protect competing changes. 263 automated checks plus TypeScript/lint and the production build pass; see the latest baseline for evidence and limits. Prescription corrections/refunds, durable MedApp confirmation, refill fulfillment/delivery, browser-restart recovery and rendered/device/theme/reference acceptance remain open. No reference accepted.",
-        "2026-09-16 corrections/refund records: partial credits preserve original receipts and capture reason, staff and disposition. Only never-collected units restore original batches and reduce verified prescription counts; customer returns stay outside usable stock and preserve clinical history. External completed refunds have credit limits, replay protection and administrator correction of mistaken entries. Explicit legacy line reconciliation handles repeated medicines; reports separate credit from settlement. See COMPLETION_BASELINE.md for passing checks and limits and apply PMS migration 0006_sale_corrections. Durable MedApp synchronization, provider refunds, supplier credits, fulfillment/delivery, clinical alerts, restart recovery and rendered/device/theme/reference acceptance remain open. No reference accepted."
+        "2026-09-16 corrections/refund records: partial credits preserve original receipts and capture reason, staff and disposition. Only never-collected units restore original batches and reduce verified prescription counts; customer returns stay outside usable stock and preserve clinical history. External completed refunds have credit limits, replay protection and administrator correction of mistaken entries. Explicit legacy line reconciliation handles repeated medicines; reports separate credit from settlement. See COMPLETION_BASELINE.md for passing checks and limits and apply PMS migration 0006_sale_corrections. Durable MedApp synchronization, provider refunds, supplier credits, fulfillment/delivery, clinical alerts, restart recovery and rendered/device/theme/reference acceptance remain open. No reference accepted.",
+        "2026-09-16 pharmacy synchronization: transactional full snapshots for ingestion, dispensing, corrections, cancellation and receipt reconciliation; leased worker retries and authenticated deduplicated acknowledgements; patient identity frozen from signed ingestion; pharmacy status/retry controls and account-scoped live patient history with quantities, returns and report times. See PHARMACY_SYNC.md and COMPLETION_BASELINE.md for rollout, validation and limits. Specialist issuing, medicine-course states, refill/order/delivery and rendered/device/reference acceptance remain open. No reference accepted."
       ],
       "source_folder_differs_from_group": true,
       "disposition": "pending_reference_review",
@@ -2487,6 +2519,18 @@
     }
   ],
   "application_only_routes": [
+    {
+      "group": "patient",
+      "path": "frontend/mobile/MedAPP/src/app/(app)/pharmacy-prescription-history.tsx",
+      "module": "P06",
+      "next_batch": "B08",
+      "note": "Patient-owned dispensing reports reached from clinical prescription history. Dispensing quantities and returns remain separate from medication-course completion.",
+      "qa_status": "partially_verified",
+      "accepted": false,
+      "acceptance_evidence": [
+        "2026-09-16: Pharmacy report API/component coverage and the clinical prescribing HTTP/PostgreSQL journey pass. See COMPLETION_BASELINE.md. Rendered/device/reference acceptance remains pending."
+      ]
+    },
     {
       "group": "specialist",
       "path": "frontend/mobile/MedAPP/src/app/(app)/pharmacy-workspaces.tsx",

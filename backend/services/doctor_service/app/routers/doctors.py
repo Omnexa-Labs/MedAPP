@@ -73,6 +73,27 @@ async def read_self(
     return DoctorProfileOut.model_validate(await get_self_profile(db, principal))
 
 
+@router.get("/me/prescribing-eligibility")
+async def prescribing_eligibility(
+    db: AsyncSession = DbSession,
+    principal: Principal = Depends(get_current_principal),
+):
+    from shared.onboarding.receipts import ActivationReceipt
+    from sqlalchemy import select
+
+    if principal.role != "doctor":
+        raise HTTPException(403, "verified doctor access required")
+    profile = await get_self_profile(db, principal)
+    receipt = await db.scalar(select(ActivationReceipt).where(
+        ActivationReceipt.applicant_id == profile.user_id,
+        ActivationReceipt.resource_id == profile.id,
+        ActivationReceipt.role == "doctor",
+    ).order_by(ActivationReceipt.created_at.desc(), ActivationReceipt.id.desc()).limit(1))
+    if not profile.is_active or receipt is None:
+        raise HTTPException(403, "an active, approved doctor profile is required to prescribe")
+    return {"user_id": profile.user_id, "profile_id": profile.id, "approval_id": receipt.id}
+
+
 @router.patch("/me", response_model=DoctorProfileOut)
 async def update_self(
     payload: DoctorUpdate,

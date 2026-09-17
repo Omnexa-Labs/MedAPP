@@ -92,7 +92,7 @@ async def _has_active_consent(session: AsyncSession, patient_id: UUID, doctor_us
         select(Consent).where(
             Consent.patient_id == patient_id,
             Consent.doctor_user_id == doctor_user_id,
-            Consent.scope.in_(["records_and_vitals"] if write_vitals else ["records", "records_and_vitals"]),
+            Consent.scope.in_(["records_and_vitals"] if write_vitals else ["records", "records_and_vitals", "records_and_prescriptions"]),
             Consent.revoked_at.is_(None),
             or_(Consent.expires_at.is_(None), Consent.expires_at > datetime.now(UTC)),
         )
@@ -250,6 +250,8 @@ async def create_consent(session: AsyncSession, principal: Principal, patient_us
     if patient_user_id == payload.doctor_user_id:
         raise HTTPException(400, "you already have access to your own records")
     clinician = await lookup(payload.doctor_user_id)
+    if payload.scope == "records_and_prescriptions" and clinician.role != "doctor":
+        raise HTTPException(400, "prescribing permission can only be granted to a doctor")
     patient = await _load_patient(session, patient_user_id)
     existing = list((await session.scalars(
         select(Consent).where(
@@ -266,7 +268,7 @@ async def create_consent(session: AsyncSession, principal: Principal, patient_us
         if expiry and expiry <= now:
             previous.revoked_at = expiry
             previous.revoked_by_user_id = None
-        elif previous.scope in {"records", "records_and_vitals"} or previous.scope == payload.scope:
+        elif previous.scope in {"records", "records_and_vitals", "records_and_prescriptions"} or previous.scope == payload.scope:
             raise HTTPException(409, "active sharing already exists; revoke it before changing permissions")
     await session.flush()
     consent = Consent(

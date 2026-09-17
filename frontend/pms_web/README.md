@@ -12,7 +12,7 @@ screens now use live PMS data. Cashiers have read-only inventory access.
 Full operational and reference-screen acceptance remain in the
 [completion guide](../../docs/COMPLETION_GUIDE.md).
 
-Apply PMS migrations through `0006_sale_corrections` before using the updated inventory
+Apply PMS migrations through `0007_medapp_delivery` before using the updated inventory
 screens. Deploy the portal and PMS API together: creates/receipts/adjustments now
 require a UUID request key, and edits/adjustments require the saved revision.
 
@@ -24,8 +24,12 @@ walk-in medicines; pharmacists/admins dispense and correct. Payment entries reco
 the pharmacy's external payment process and do not charge or refund instruments.
 See the [transaction contract](../../docs/api/pms_service.md#pos-and-prescription-transaction-recovery).
 Keep an uncertain form open and use **Retry same request**. Recovery after leaving
-the page or restarting the browser is still pending. MedApp dispense confirmation
-remains best-effort; refill fulfillment and payment-provider refunds remain open.
+the page or restarting the browser is still pending. MedApp reports now use a
+durable outbox and matching receiver acknowledgements. The prescription detail
+shows queued, sending, received, retry and attention states; pharmacists/admins
+can queue a versioned retry. Apply the directory migration and start the separate
+worker using the [sync setup](../../docs/PHARMACY_SYNC.md). Refill fulfillment,
+specialist issuing and payment-provider refunds remain open.
 Receipt corrections distinguish medicines never collected from customer returns.
 Only never-collected units return to original stock batches and reduce the linked
 prescription's dispensed quantity; a cancelled prescription stays cancelled.

@@ -1,44 +1,8 @@
+// Reference fixtures only. Production medication screens load patient-owned EHR records.
 import type { ActiveMedication } from "./types";
 
-/**
- * The one statement, in one place, so the surfaces that make it — the list
- * callout, the detail screen's provenance line, the shared export — cannot
- * drift into making it differently. It lives beside the data it describes, so
- * deleting `SAMPLE_MEDICATIONS` deletes the notice with it.
- */
 export const SAMPLE_NOTICE = "Sample data — these are not your medications.";
 
-/**
- * SAMPLE MEDICATIONS. NOT ANY PATIENT'S RECORD.
- *
- * Renamed from `ACTIVE_MEDICATIONS` in `mock-data.ts`, because the old name is
- * what the screen read and "active medications" is a clinical claim. Nothing
- * imports a constant called `SAMPLE_MEDICATIONS` by accident.
- *
- * These three entries are module-level and therefore identical for every
- * account, on every device, in every session — the same Amlodipine 5 mg for a
- * patient who takes none. Both screens that render them now say so on screen,
- * unmissably and in words, and `buildMedicationListText` stamps the same
- * statement onto anything shared out of the app. That labelling is the reason
- * this file is allowed to exist at all.
- *
- * There is no medication endpoint to replace it with — the routing evidence is
- * in the header of MedicationDetailsScreen.tsx, and the gap is recorded in
- * docs/api/README.md. When one ships, delete this file: the screen's `sample`
- * branch goes with it and `deriveMedicationsState` (./state.ts) is already the
- * seam the query plugs into.
- *
- * `prescriberName` / `refillsRemaining` are read only by the detail screen.
- * Vitamin D3 leaves both unset on purpose: it is `self-reported`, so there is no
- * clinician and no prescription behind it, and the detail screen renders that as
- * two absent rows rather than as a blank value or an invented one.
- *
- * Every `prescriberName` here must be a clinician that scripts/seed_dev_data.py
- * actually creates, because those are the doctors a tester sees in Find Care —
- * anyone else reads as a bug. The two prescribers are picked to match the seeded
- * specialties: Amlodipine (antihypertensive) sits with the cardiologist, and
- * Metformin sits with the GP whose seed bio covers chronic disease reviews.
- */
 export const SAMPLE_MEDICATIONS: readonly ActiveMedication[] = [
   {
     id: "amlodipine-5",

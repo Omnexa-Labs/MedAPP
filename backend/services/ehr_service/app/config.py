@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,8 +11,13 @@ class Settings(BaseSettings):
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     user_service_url: str = "http://user_service:8001"
+    doctor_service_url: str = "http://doctor_service:8002"
+    pharmacy_service_url: str = "http://pharmacy_service:8015"
+    clinical_handoff_secret: SecretStr = SecretStr("")
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
+    medication_push_enabled: bool = False
+    expo_access_token: SecretStr = SecretStr("")
 
     # ── Domain events ───────────────────────────────────────────────────────
     # ehr_service publishes `ehr.vital.recorded` after a successful

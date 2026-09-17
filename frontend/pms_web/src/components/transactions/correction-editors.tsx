@@ -219,9 +219,8 @@ export function CorrectionEditor({
       </label>
       {rx?.source === "medapp" && (
         <p className="text-sm">
-          This prescription originated in MedApp. Coordinate the correction with
-          the originating service; automatic correction synchronization is not
-          yet connected.
+          A MedApp report is saved with this correction. Check MedApp delivery
+          on the prescription to confirm receipt or resolve a delivery problem.
         </p>
       )}
       {error && (

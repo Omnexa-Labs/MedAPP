@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 
 from app.models.core import AuditLog, DrugBatch, InventoryRequest, Prescription, Sale
-from app.services import inventory_requests, medapp_integration
+from app.services import inventory_requests
 
 from . import test_inventory
 
@@ -213,7 +213,9 @@ async def test_receipt_failure_rolls_back_entire_dispense_and_can_retry(setup, m
     ).status_code == 200
 
 
-async def test_outbound_runs_after_commit_and_is_not_repeated_by_replay(setup, monkeypatch):
+async def test_delivery_is_committed_once_with_dispense_and_legacy_identity_is_not_guessed(setup):
+    from app.models.delivery import MedAppDelivery
+
     client, factory, _ = setup
     item, _ = await stocked(client)
     rx = await make_rx(client, item)
@@ -221,30 +223,18 @@ async def test_outbound_runs_after_commit_and_is_not_repeated_by_replay(setup, m
         stored = await db.get(Prescription, UUID(rx["id"]))
         stored.source, stored.external_ref = "medapp", "external-qa"
     key = uuid4()
-    called = []
-
-    async def outbound(payload):
-        async with factory() as db:
-            assert (await db.get(InventoryRequest, key)).result["sale_number"] == payload[
-                "sale_number"
-            ]
-        called.append(payload)
-
-    monkeypatch.setattr(medapp_integration, "confirm_dispense", outbound)
     for _ in range(2):
         assert (
             await post(client, f"/v1/prescriptions/{rx['id']}/dispense", dispense_body(rx), key)
         ).status_code == 200
-    assert len(called) == 1
-    assert set(called[0]) == {
-        "external_ref",
-        "rx_number",
-        "status",
-        "sale_number",
-        "sale_total_cents",
-        "currency",
-        "lines",
-    }
+    async with factory() as db:
+        events = list(await db.scalars(select(MedAppDelivery)))
+        assert len(events) == 1
+        assert events[0].last_error == "patient_link_missing"
+        assert events[0].state == "attention_required"
+        assert events[0].payload["patient_id"] is None
+        assert (await db.get(InventoryRequest, key)).result is not None
+        assert events[0].payload["snapshot"]["items"][0]["quantity_dispensed"] == 2
 
 
 @pytest.mark.parametrize(

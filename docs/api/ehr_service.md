@@ -1,5 +1,22 @@
 # API contract — `ehr_service`
 
+Clinical prescribing now also belongs to this service. See [PRESCRIBING.md](../PRESCRIBING.md)
+for `/v1/patients/{patient_user_id}/prescriptions`, doctor approval checks, explicit
+`records_and_prescriptions` consent, immutable issued records, versioned commands,
+patient reads, and durable pharmacy handoff. Existing read/vital grants do not
+automatically grant access to clinical prescriptions.
+
+Patient medication courses and dose reports also belong to EHR. See
+[MEDICATION_TRACKING.md](../MEDICATION_TRACKING.md) for
+`/v1/patients/{patient_user_id}/medications`, patient-only ownership, prescription
+linkage, tracking states, retained dose corrections and migration `20260916_0006`.
+Record and prescribing consent do not grant access to these patient reports.
+
+Future tracking plans and opt-in reminder delivery are specified in
+[MEDICATION_REMINDERS.md](../MEDICATION_REMINDERS.md), including EHR migration
+`20260917_0007`, native device registration and the dedicated reminder worker.
+New PostgreSQL/device verification remains pending; check the completion baseline.
+
 **Base prefix:** `/v1/patients` · **Source of truth:** `backend/services/ehr_service/app/schemas/record.py`
 · **Clients:** `frontend/mobile/MedAPP/src/features/overview/api.ts` and
 `frontend/mobile/MedAPP/src/features/settings/care-team-api.ts`, plus
@@ -42,7 +59,7 @@ value** from the one in the path. Do not feed the response's `patientId` back in
 - `value` is a **string** ("122/80"). Never parse it as a number.
 
 **`ConsentCreate`** — `doctor_user_id` (identity UUID, including for a nurse),
-`scope` (`records` or `records_and_vitals`, default `records`), `expires_in_days`
+`scope` (`records`, `records_and_vitals`, or doctor-only `records_and_prescriptions`; default `records`), `expires_in_days`
 (`7`, `30`, or `90`, default `30`), and optional `reason` (at most 255 characters).
 Other fields are rejected; clients cannot supply a recipient name/role or arbitrary expiry.
 
@@ -87,11 +104,13 @@ drops only that index; reading data and consent history are retained.
 | --- | --- | --- |
 | `records` | Allowed for the named doctor/nurse | Denied |
 | `records_and_vitals` | Allowed for the named doctor/nurse | Allowed |
+| `records_and_prescriptions` | Allowed for the named doctor | Denied; permits clinical prescribing under additional approval/author checks |
 | Revoked, expired, missing or unsupported scope | Denied for other clinicians | Denied |
 
 Patients retain access to their own record. Patient accounts cannot create clinical vitals.
 The existing administrator override remains and is tagged `[admin_override]` in access audits,
-including vital writes. These grants do not govern uploaded files, labs, prescriptions,
+including vital writes. This override does not grant clinical prescribing access.
+Only the explicit prescribing scope grants clinical prescription access. These grants do not govern uploaded files, labs,
 messages, research data, HMS or PMS. Those cross-service contracts remain scheduled work.
 
 The server resolves the recipient through the internal user-service `GET /users/{user_id}`,

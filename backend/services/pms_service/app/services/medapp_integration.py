@@ -1,23 +1,29 @@
-"""MedApp integration: HMAC verification, inbound prescription ingest,
-outbound dispense confirmation (best-effort, no-op when URL unset).
-"""
+"""Signed MedApp prescription ingestion and stock request authentication."""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
-import logging
-from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4, uuid5
 
-import httpx
-from sqlalchemy import func, or_, select
+from fastapi import HTTPException
+from shared.pharmacy_sync import encode
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..models.core import Customer, Drug, Prescription, PrescriptionItem
+from ..schemas.integrations import MedAppWebhookAck
+from . import inventory_requests
+from .medapp_delivery import enqueue
 
-logger = logging.getLogger(__name__)
+INGEST_NAMESPACE = UUID("b852ba09-bf5a-42a9-81bf-f8f6f96af454")
+
+
+async def external_lock(db, reference):
+    if db.bind.dialect.name == "postgresql":
+        key = int.from_bytes(hashlib.sha256(f"clinical:{reference}".encode()).digest()[:8], "big", signed=True)
+        await db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
 
 
 def verify_signature(body: bytes, signature_header: str | None) -> bool:
@@ -56,110 +62,99 @@ def verify_partner_signature(
     return hmac.compare_digest(expected, provided)
 
 
-async def _resolve_drug(name: str, hint: UUID | None, db: AsyncSession) -> Drug | None:
+async def _resolve_drug(name: str, hint: UUID | None, db: AsyncSession, *, strength=None, form=None) -> Drug:
+    filters = [Drug.is_active.is_(True)]
+    if strength is not None:
+        filters.append(func.lower(Drug.strength) == strength.lower())
+    if form is not None:
+        filters.append(func.lower(Drug.form) == form.lower())
     if hint is not None:
-        drug = (
-            await db.execute(select(Drug).where(Drug.id == hint, Drug.is_active.is_(True)))
-        ).scalar_one_or_none()
-        if drug:
-            return drug
-    # Case-insensitive match against name or brand_name.
-    stmt = select(Drug).where(
-        Drug.is_active.is_(True),
-        or_(
-            func.lower(Drug.name) == name.lower(),
-            func.lower(Drug.brand_name) == name.lower(),
-        ),
-    )
-    return (await db.execute(stmt)).scalars().first()
-
-
-async def _upsert_customer(
-    db: AsyncSession,
-    *,
-    medapp_user_id: str | None,
-    full_name: str | None,
-    phone: str | None,
-) -> Customer | None:
-    if medapp_user_id:
-        existing = (
-            await db.execute(select(Customer).where(Customer.medapp_user_id == medapp_user_id))
-        ).scalar_one_or_none()
-        if existing:
-            return existing
-    if not (medapp_user_id or full_name):
-        return None
-    c = Customer(
-        full_name=full_name or "MedApp Customer",
-        phone=phone,
-        medapp_user_id=medapp_user_id,
-    )
-    db.add(c)
-    await db.flush()
-    return c
-
-
-async def _next_rx_number(db: AsyncSession) -> str:
-    n = (await db.execute(select(func.count(Prescription.id)))).scalar_one()
-    return f"RX-{int(n) + 1:06d}"
-
-
-async def ingest_prescription(payload, db: AsyncSession) -> dict:
-    """Create a Prescription from a MedApp webhook payload.
-
-    Idempotency: if a prescription with the same external_ref already exists,
-    return it instead of creating a duplicate.
-    """
-    existing = (
-        await db.execute(
-            select(Prescription).where(
-                Prescription.source == "medapp",
-                Prescription.external_ref == payload.external_ref,
+        matches = list(
+            await db.scalars(select(Drug).where(Drug.id == hint, *filters))
+        )
+    else:
+        matches = list(
+            await db.scalars(
+                select(Drug)
+                .where(
+                    *filters,
+                    or_(
+                        func.lower(Drug.name) == name.lower(),
+                        func.lower(Drug.brand_name) == name.lower(),
+                    ),
+                )
+                .limit(2)
             )
         )
-    ).scalar_one_or_none()
-    if existing:
-        item_count = (
-            await db.execute(
-                select(func.count(PrescriptionItem.id)).where(
-                    PrescriptionItem.prescription_id == existing.id
-                )
-            )
-        ).scalar_one()
-        return {
-            "prescription_id": existing.id,
-            "rx_number": existing.rx_number,
-            "accepted_item_count": int(item_count),
-            "unresolved_drugs": [],
-        }
+    if len(matches) != 1:
+        raise HTTPException(
+            422,
+            "Every item must resolve to exactly one active drug. Supply valid drug IDs for ambiguous names.",
+        )
+    return matches[0]
 
-    customer = await _upsert_customer(
-        db,
-        medapp_user_id=payload.customer_medapp_user_id,
-        full_name=payload.customer_full_name,
-        phone=payload.customer_phone,
+
+async def ingest_prescription(payload, db: AsyncSession, *, commit=True) -> dict:
+    from ..models.clinical_handoff import ClinicalHandoffReceipt
+    await external_lock(db, payload.external_ref)
+    try:
+        clinical_id = UUID(payload.external_ref)
+    except ValueError:
+        clinical_id = None
+    receipt = await db.get(ClinicalHandoffReceipt, clinical_id) if clinical_id else None
+    if receipt and receipt.cancel_ack:
+        raise HTTPException(409, "this prescription has been withdrawn")
+    normalized = payload.model_dump(mode="json")
+    if payload.valid_until is None:
+        normalized.pop("valid_until", None)  # Preserve pre-expiry ingestion receipts.
+    for item in normalized["items"]:
+        for field in ("strength", "form"):
+            if item[field] is None:
+                item.pop(field)
+    request_id = uuid5(INGEST_NAMESPACE, payload.external_ref)
+    previous = await inventory_requests.begin_request(
+        db, request_id, INGEST_NAMESPACE, "medapp.ingest", normalized
     )
-
+    if previous is not None:
+        return previous
+    digest = hashlib.sha256(encode(normalized)).hexdigest()
+    existing = await db.scalar(
+        select(Prescription).where(
+            Prescription.source == "medapp", Prescription.external_ref == payload.external_ref
+        )
+    )
+    if existing:
+        # Legacy ingestion may have silently omitted drugs or used an editable
+        # customer link. Never reinterpret or reassign that historical record.
+        raise HTTPException(409, "This external reference needs explicit record reconciliation.")
+    drugs = [await _resolve_drug(item.drug_name, item.drug_id_hint, db, strength=item.strength, form=item.form) for item in payload.items]
+    customer = None
+    if payload.customer_full_name or payload.customer_medapp_user_id:
+        customer = Customer(
+            full_name=payload.customer_full_name or "MedApp Customer",
+            phone=payload.customer_phone,
+            medapp_user_id=str(payload.customer_medapp_user_id)
+            if payload.customer_medapp_user_id
+            else None,
+        )
+        db.add(customer)
+        await db.flush()
     rx = Prescription(
-        rx_number=await _next_rx_number(db),
+        rx_number="RX-" + uuid4().hex[:24],
         source="medapp",
         external_ref=payload.external_ref,
+        medapp_patient_id=payload.customer_medapp_user_id,
+        ingest_hash=digest,
         customer_id=customer.id if customer else None,
         prescriber_name=payload.prescriber_name,
         prescriber_license=payload.prescriber_license,
         status="pending",
         notes=payload.notes,
+        valid_until=payload.valid_until,
     )
     db.add(rx)
     await db.flush()
-
-    unresolved: list[str] = []
-    accepted = 0
-    for item in payload.items:
-        drug = await _resolve_drug(item.drug_name, item.drug_id_hint, db)
-        if drug is None:
-            unresolved.append(item.drug_name)
-            continue
+    for item, drug in zip(payload.items, drugs, strict=True):
         db.add(
             PrescriptionItem(
                 prescription_id=rx.id,
@@ -169,37 +164,13 @@ async def ingest_prescription(payload, db: AsyncSession) -> dict:
                 dosage_instructions=item.dosage_instructions,
             )
         )
-        accepted += 1
-
     await db.flush()
-    return {
-        "prescription_id": rx.id,
-        "rx_number": rx.rx_number,
-        "accepted_item_count": accepted,
-        "unresolved_drugs": unresolved,
-    }
-
-
-async def confirm_dispense(payload: dict[str, Any]) -> None:
-    """Best-effort outbound POST to MedApp. No-op if URL not configured."""
-    url = settings.medapp_dispense_webhook_url
-    if not url:
-        logger.debug("medapp_dispense_webhook_url unset; skipping outbound confirm")
-        return
-    secret = settings.medapp_webhook_secret.encode("utf-8")
-    import json as _json
-
-    raw = _json.dumps(payload, default=str).encode("utf-8")
-    signature = "sha256=" + hmac.new(secret, raw, hashlib.sha256).hexdigest()
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(
-                url,
-                content=raw,
-                headers={
-                    "content-type": "application/json",
-                    "x-medapp-signature": signature,
-                },
-            )
-    except Exception as exc:  # pragma: no cover — fire-and-forget
-        logger.warning("medapp dispense confirm failed: %s", exc)
+    await enqueue(db, rx, "received")
+    result = MedAppWebhookAck(
+        prescription_id=rx.id,
+        rx_number=rx.rx_number,
+        accepted_item_count=len(drugs),
+        unresolved_drugs=[],
+    )
+    await inventory_requests.finish_request(db, request_id, result, commit=commit)
+    return result.model_dump(mode="json")

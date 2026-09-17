@@ -87,6 +87,9 @@ def _rewrite_path(path: str, upstream: str) -> str:
 
 
 def _route_allows_public_access(path: str, method: str = "GET") -> bool:
+    # This exact POST uses deployment HMAC authentication in pharmacy_service.
+    if method == "POST" and path == "/v1/pharmacy-sync/events":
+        return True
     uuid = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
     return path.startswith(PUBLIC_ROUTE_PREFIXES) or (
         method == "GET"

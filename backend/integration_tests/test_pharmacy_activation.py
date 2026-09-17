@@ -19,6 +19,8 @@ from pharmacy_inventory_journey import inventory_journey
 from pharmacy_purchasing_journey import purchasing_journey
 from pharmacy_transactions_journey import transactions_journey
 from pharmacy_corrections_journey import corrections_journey
+from pharmacy_sync_journey import sync_journey
+from prescribing_journey import prescribing_journey
 from psycopg import sql
 from sqlalchemy.engine import make_url
 from test_hospital_activation import (  # noqa: F401
@@ -43,7 +45,7 @@ postgres = hospital_postgres
 @pytest.fixture(scope="module")
 def services(postgres, tmp_path_factory):
     directory = tmp_path_factory.mktemp("pharmacy-http-postgres")
-    names = ("user", "pharmacy", "pms", "onboarding", "api_gateway")
+    names = ("user", "doctor", "ehr", "pharmacy", "pms", "onboarding", "api_gateway")
     ports = {name: free_port() for name in names}
     urls = {name: f"http://127.0.0.1:{ports[name]}" for name in names}
     parsed = make_url(postgres)
@@ -52,6 +54,12 @@ def services(postgres, tmp_path_factory):
         "PYTHONUTF8": "1",
         "MEDAPP_TEST_MIGRATED": "1",
         "USER_PUBLISH_EVENTS": "false",
+        "EHR_PUBLISH_EVENTS": "false",
+        "EHR_USER_SERVICE_URL": urls["user"],
+        "EHR_DOCTOR_SERVICE_URL": urls["doctor"],
+        "EHR_PHARMACY_SERVICE_URL": urls["pharmacy"],
+        "EHR_CLINICAL_HANDOFF_SECRET": "qa-clinical-handoff-separate-secret-2026",
+        "PHARMACY_CLINICAL_HANDOFF_SECRET": "qa-clinical-handoff-separate-secret-2026",
         "USER_JWT_ISSUER": "medapp",
         "ONBOARDING_ACTIVATION_ENABLED": "true",
         "ONBOARDING_ACTIVATION_POLL_SECONDS": "1",
@@ -86,6 +94,8 @@ def services(postgres, tmp_path_factory):
         "PHARMACY_PUBLIC_API_ORIGIN": urls["api_gateway"],
         "GW_JWT_SECRET": JWT_SECRET,
         "GW_USER_SERVICE_URL": urls["user"],
+        "GW_DOCTOR_SERVICE_URL": urls["doctor"],
+        "GW_EHR_SERVICE_URL": urls["ehr"],
         "GW_PHARMACY_SERVICE_URL": urls["pharmacy"],
         "GW_ONBOARDING_SERVICE_URL": urls["onboarding"],
         "MEDAPP_DEFAULT_JWT_SECRET": JWT_SECRET,
@@ -108,7 +118,7 @@ def services(postgres, tmp_path_factory):
                 drivername="postgresql+psycopg", database=database
             ).render_as_string(hide_password=False)
         env[name.upper() + "_LOG_LEVEL"] = "WARNING"
-        if name in {"user", "pharmacy"}:
+        if name in {"user", "pharmacy", "doctor"}:
             secret = f"pharmacy-qa-{name}-approval-secret-2026"
             env[name.upper() + "_ONBOARDING_ACTIVATION_SECRET"] = secret
             env["ONBOARDING_ACTIVATION_" + name.upper() + "_SECRET"] = secret
@@ -437,6 +447,8 @@ def test_approved_pharmacy_uses_assigned_deployment_and_real_medapp_identity(ser
     purchasing_journey(client, urls, databases, staff_headers)
     transactions_journey(client, urls, databases, staff_headers)
     corrections_journey(client, urls, databases, staff_headers)
+    sync_journey(client, urls, databases, staff_headers, owner, env, STOCK_SECRET)
+    prescribing_journey(client, urls, databases, staff_headers, env, pharmacy_id)
     with psycopg.connect(databases["pms"]) as db:
         db.execute("UPDATE medapp_memberships SET is_active=false")
     assert client.get(urls["pms"] + "/v1/auth/me", headers=staff_headers).status_code == 401
@@ -516,6 +528,8 @@ def test_empty_migration_roundtrip_preserves_legacy_rows(postgres, name, base):
             0,
         )
         if name == "pms":
+            assert db.execute("SELECT medapp_patient_id,ingest_hash,sync_sequence FROM prescriptions WHERE id=%s", (legacy_rx_id,)).fetchone() == (None, None, 0)
+            assert db.execute("SELECT count(*) FROM medapp_deliveries").fetchone() == (0,)
             assert db.execute("SELECT prescription_item_id,quantity,line_total_cents FROM sale_items WHERE id=%s", (legacy_sale_line_id,)).fetchone() == (None, 5, 1250)
             assert db.execute("SELECT quantity_prescribed,quantity_dispensed FROM prescription_items WHERE id=%s", (legacy_rx_line_id,)).fetchone() == (10, 5)
             assert db.execute("SELECT version,status,notes,cancellation_reason FROM prescriptions WHERE id=%s", (legacy_rx_id,)).fetchone() == (1, "partially_dispensed", "Original instructions", None)
@@ -525,3 +539,63 @@ def test_empty_migration_roundtrip_preserves_legacy_rows(postgres, name, base):
             assert db.execute("SELECT version FROM drugs WHERE id=%s", (legacy_drug_id,)).fetchone() == (1,)
             assert db.execute("SELECT version,quantity_received,quantity_on_hand FROM drug_batches WHERE id=%s",
                 (legacy_batch_id,)).fetchone() == (1, 17, 12)
+
+
+def test_medication_migration_preserves_prescriptions_and_protects_tracking(postgres):
+    parsed = make_url(postgres)
+    database = "qa_medications_migration_" + uuid4().hex
+    with psycopg.connect(postgres, autocommit=True) as db:
+        db.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database)))
+    url = parsed.set(database=database).render_as_string(hide_password=False)
+    env = {**os.environ, "EHR_PUBLISH_EVENTS": "false",
+           "EHR_DATABASE_URL": parsed.set(drivername="postgresql+asyncpg", database=database).render_as_string(hide_password=False)}
+    baseline = migrate("ehr", env, "upgrade", "20260916_0005")
+    assert baseline.returncode == 0, baseline.stderr
+    patient, prescription = uuid4(), uuid4()
+    with psycopg.connect(url) as db:
+        db.execute("INSERT INTO patients(id,user_id) VALUES(%s,%s)", (patient, uuid4()))
+        db.execute(
+            "INSERT INTO clinical_prescriptions(id,patient_id,author_id,approval_id,prescriber_name,version,status,items,clinical_goal,valid_until,issued_at) "
+            "VALUES(%s,%s,%s,%s,'Legacy prescriber',2,'issued','[]','Retained goal','2026-12-01',now())",
+            (prescription, patient, uuid4(), uuid4()),
+        )
+    for direction, target in [("upgrade", "head"), ("downgrade", "20260916_0005"), ("upgrade", "head")]:
+        completed = migrate("ehr", env, direction, target)
+        assert completed.returncode == 0, completed.stderr
+    with psycopg.connect(url) as db:
+        assert db.execute("SELECT status,clinical_goal FROM clinical_prescriptions WHERE id=%s", (prescription,)).fetchone() == ("issued", "Retained goal")
+        assert db.execute("SELECT count(*) FROM medication_courses").fetchone() == (0,)
+        db.execute("INSERT INTO medication_courses(id,patient_id,medicine,source,status,version,start_date,timezone,daily_times) "
+                   "VALUES(%s,%s,'{}','self_reported','active',1,'2026-09-16','Africa/Accra','[]')",
+                   (uuid4(), patient))
+    assert migrate("ehr", env, "downgrade", "20260916_0005").returncode != 0
+    with psycopg.connect(url) as db:
+        assert db.execute("SELECT count(*) FROM medication_courses").fetchone() == (1,)
+
+
+def test_reminder_migration_and_concurrent_workers(postgres):
+    parsed = make_url(postgres)
+    database = "qa_reminders_" + uuid4().hex
+    with psycopg.connect(postgres, autocommit=True) as db:
+        db.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database)))
+    url = parsed.set(database=database).render_as_string(hide_password=False)
+    env = {**os.environ, "EHR_PUBLISH_EVENTS": "false",
+           "PYTHONPATH": str(BACKEND / "services/ehr_service") + os.pathsep + str(BACKEND / "shared"),
+           "EHR_DATABASE_URL": parsed.set(drivername="postgresql+asyncpg", database=database).render_as_string(hide_password=False)}
+    assert migrate("ehr", env, "upgrade", "20260916_0006").returncode == 0
+    patient, course = uuid4(), uuid4()
+    with psycopg.connect(url) as db:
+        db.execute("INSERT INTO patients(id,user_id) VALUES(%s,%s)", (patient, uuid4()))
+        db.execute("INSERT INTO medication_courses(id,patient_id,medicine,source,status,version,start_date,timezone,daily_times) "
+                   "VALUES(%s,%s,'{}','self_reported','active',1,'2026-09-16','Africa/Accra','[\"08:00\"]')", (course, patient))
+    for direction, target in [("upgrade", "head"), ("downgrade", "20260916_0006"), ("upgrade", "head")]:
+        migration = migrate("ehr", env, direction, target)
+        assert migration.returncode == 0, migration.stderr
+    with psycopg.connect(url) as db:
+        assert db.execute("SELECT daily_times,schedule_changes,reminders_enabled FROM medication_courses WHERE id=%s", (course,)).fetchone() == (["08:00"], [], False)
+    checked = subprocess.run([sys.executable, str(BACKEND / "integration_tests/reminder_worker_check.py")],
+                             env=env, cwd=BACKEND / "services/ehr_service", capture_output=True, text=True, timeout=45)
+    assert checked.returncode == 0, checked.stdout + checked.stderr
+    assert migrate("ehr", env, "downgrade", "20260916_0006").returncode != 0
+    with psycopg.connect(url) as db:
+        assert db.execute("SELECT count(*) FROM medication_reminder_attempts").fetchone() == (1,)

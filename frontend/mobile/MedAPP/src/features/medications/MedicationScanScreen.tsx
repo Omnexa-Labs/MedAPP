@@ -103,8 +103,8 @@ function PermissionPrompt({ onAllow, pending }: { onAllow: () => void; pending: 
         Photograph the label
       </Text>
       <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
-        The photo is attached to the medication you add, so you can check the packaging later. You
-        will still type the name and dose yourself — nothing is read off the photo.
+        Use the photo as a temporary reference while entering your medicine. It is not uploaded or
+        saved with the medication. You will type the details yourself; nothing is extracted.
       </Text>
       <View className="mt-5">
         <Button
@@ -219,21 +219,18 @@ function Viewfinder({ onCaptured }: { onCaptured: (captured: CapturedLabel) => v
  * It says the opposite, because the opposite is true — and it says it in the
  * error tone, not as a friendly aside, so it is not mistaken for a progress note.
  */
-function CapturedReview({
-  captured,
-  onRetake,
-}: {
-  captured: CapturedLabel;
-  onRetake: () => void;
-}) {
+function CapturedReview({ captured, onRetake }: { captured: CapturedLabel; onRetake: () => void }) {
   return (
     <View className="flex-1">
       <InfoCallout tone="error" testID="scan-no-extraction-notice">
-        Nothing is read from this photo. It is attached as a reference only — you enter the name and
-        dose yourself on the next step.
+        Nothing is extracted from this photo. Use it as a temporary reference while entering the
+        medicine on the next step. The photo will not be saved with the record.
       </InfoCallout>
 
-      <View className="mt-4 overflow-hidden rounded-md bg-surface-container-high" style={{ flex: 1 }}>
+      <View
+        className="mt-4 overflow-hidden rounded-md bg-surface-container-high"
+        style={{ flex: 1 }}
+      >
         <Image
           source={{ uri: captured.uri }}
           // `contain`, not `cover`: cropping a photo of a label can cut the dose

@@ -93,6 +93,8 @@ ROUTES: dict[str, str] = {
     "/v1/onboarding": settings.onboarding_service_url,
     "/v1/pharmacies": settings.pharmacy_service_url,
     "/v1/pharmacy-workspaces": settings.pharmacy_service_url,
+    "/v1/pharmacy-sync": settings.pharmacy_service_url,
+    "/v1/me/pharmacy-prescriptions": settings.pharmacy_service_url,
     "/v1/pharmacists": settings.pharmacist_service_url,
     # MESSAGING. Absent until 2026-08-06, which meant every /v1/threads call the
     # mobile app made returned the gateway's {"error":"unknown route"} 404 — the

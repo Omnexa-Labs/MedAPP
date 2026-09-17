@@ -186,6 +186,13 @@ export function PatientRecordScreen() {
   const record = state.record;
 
   const handleAction = (action: ClinicalAction) => {
+    if (action === "prescription") {
+      router.push({
+        pathname: "/(app)/issue-prescription",
+        params: { patientId: record.id },
+      } as unknown as Href);
+      return;
+    }
     if (action === "video") {
       // The provider is WHOEVER IS SIGNED IN. This used to push
       // `providerName: "Dr. Julian Sterling"` — a fixed identity, on every call,
@@ -420,7 +427,10 @@ function ActionInfoSheet({ action, onClose }: { action: InfoAction | null; onClo
           "Follow-up planning",
           "No appointment has been booked. Review availability with the patient first.",
         ],
-        lab: ["Lab order", "No lab test has been ordered. The ordering workflow is not connected yet."],
+        lab: [
+          "Lab order",
+          "No lab test has been ordered. The ordering workflow is not connected yet.",
+        ],
         // Was a confirmation dialog that reported "Discharge saved — removed
         // from the active roster." Nothing was sent and nothing was removed.
         discharge: [
@@ -438,7 +448,9 @@ function ActionInfoSheet({ action, onClose }: { action: InfoAction | null; onClo
           className="rounded-t-card bg-card-surface p-5 pb-8"
         >
           <Text className="font-headline-md text-headline-md text-on-surface">{copy?.[0]}</Text>
-          <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">{copy?.[1]}</Text>
+          <Text className="mt-2 font-body-md text-body-md text-on-surface-variant">
+            {copy?.[1]}
+          </Text>
           <View className="mt-6">
             <Button label="Close" shadow={false} onPress={onClose} />
           </View>

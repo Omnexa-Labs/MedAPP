@@ -26,6 +26,7 @@ export interface Prescription {
   customer_id?: string | null;
   prescriber_name?: string | null;
   prescriber_license?: string | null;
+  valid_until?: string | null;
   status: "pending" | "partially_dispensed" | "dispensed" | "cancelled";
   notes?: string | null;
   created_at: string;

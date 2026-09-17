@@ -1,5 +1,5 @@
-import { NewPrescriptionScreen } from "@/features/scripts/NewPrescriptionScreen";
+import { ClinicalPrescriptionDetailScreen } from "@/features/scripts/ClinicalPrescriptionScreens";
 
 export default function NewPrescriptionRoute() {
-  return <NewPrescriptionScreen />;
+  return <ClinicalPrescriptionDetailScreen />;
 }

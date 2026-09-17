@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     otlp_endpoint: str | None = None
     log_level: str = "INFO"
     onboarding_activation_secret: SecretStr = SecretStr("")
+    clinical_handoff_secret: SecretStr = SecretStr("")
     pms_deployments: dict[str, PmsDeploymentConfig] = Field(default_factory=dict)
     public_api_origin: str = "http://localhost:8000"
 

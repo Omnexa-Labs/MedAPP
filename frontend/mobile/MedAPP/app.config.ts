@@ -9,7 +9,11 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
 
 type AppEnv = "dev" | "preview" | "prod";
 
-const APP_ENV = (process.env.APP_ENV ?? "dev") as AppEnv;
+const requestedEnv = process.env.APP_ENV ?? "dev";
+if (!["dev", "preview", "prod"].includes(requestedEnv)) {
+  throw new Error("APP_ENV must be dev, preview or prod.");
+}
+const APP_ENV = requestedEnv as AppEnv;
 
 const NAME_BY_ENV: Record<AppEnv, string> = {
   dev: "MedApp (Dev)",
@@ -68,6 +72,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     icon: "./assets/expo.icon",
   },
   android: {
+    ...(process.env.ANDROID_GOOGLE_SERVICES_FILE
+      ? { googleServicesFile: process.env.ANDROID_GOOGLE_SERVICES_FILE }
+      : {}),
     package: BUNDLE_BY_ENV[APP_ENV],
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
@@ -108,6 +115,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
+    "expo-notifications",
     "expo-router",
     ...(APPLE_SIGN_IN_ENABLED ? ["expo-apple-authentication"] : []),
     ...(GOOGLE_READY
@@ -210,6 +218,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     reactCompiler: true,
   },
   extra: {
+    ...(process.env.EAS_PROJECT_ID ? { eas: { projectId: process.env.EAS_PROJECT_ID } } : {}),
     googleWebClientId: GOOGLE_WEB_CLIENT_ID,
     googleIosClientId: GOOGLE_IOS_CLIENT_ID,
     appleSignInEnabled: APPLE_SIGN_IN_ENABLED,

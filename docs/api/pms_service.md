@@ -13,7 +13,7 @@ headers are discarded.
 
 ## Database rollout
 
-Apply PMS Alembic migrations through `0006_sale_corrections` before deploying the new
+Apply PMS Alembic migrations through `0008_clinical_handoff` before deploying the new
 API and portal together. Existing drugs and batches start at revision 1. The
 inventory migration adds `inventory_requests` for atomic mutation receipts. The
 purchasing migration adds order revisions, received quantities, saved drug/supplier
@@ -21,7 +21,18 @@ labels and explicit batch-to-order-item allocations. Earlier orders with receipt
 evidence or a received status are flagged for reconciliation. The transaction
 migration adds sale/prescription revisions, sale notes and cancellation reasons.
 The correction migration adds separate credit/refund records and exact prescription
-line links for new dispensing receipts; earlier links remain null. Downgrading
+line links for new dispensing receipts; earlier links remain null. The delivery
+migration adds the outbox, event sequences and frozen patient links. The clinical
+handoff migration adds durable send/withdrawal receipts and prescription expiry.
+The signed `POST /v1/integrations/medapp/clinical-prescriptions` endpoint accepts
+the verified-doctor prescription contract described in [PRESCRIBING.md](../PRESCRIBING.md).
+It requires a confirmed MedApp pharmacy workspace and the deployment partner
+signature, rather than a staff token. Cancellation markers prevent delayed sends
+from reopening withdrawn prescriptions; dispensing refuses expired prescriptions.
+Apply directory
+migration `20260916_0005` and configure the [MedApp worker](../PHARMACY_SYNC.md).
+Historical patient links remain unknown; duplicate MedApp external references
+require reconciliation before upgrade. Downgrading
 refuses to discard receipts or changed revisions; retain database backups and
 use a forward migration for a populated deployment. Use UTC for the PMS process
 and database session timezone so inventory dates and sales periods align.
@@ -107,7 +118,8 @@ implemented below; actual payment-provider refunds and supplier credits remain o
 Prescription-linked sales use the correction workflow and cannot be voided.
 POS/dispensing retries now use atomic
 request receipts as described below. Recovery after leaving the form or restarting
-the browser remains open, along with reliable MedApp fulfillment synchronization.
+the browser remains open, along with patient refill/order/fulfillment contracts.
+Pharmacy dispensing and correction reports now use [durable MedApp delivery](../PHARMACY_SYNC.md).
 
 Verification and local report paths are recorded in
 [COMPLETION_BASELINE.md](../COMPLETION_BASELINE.md).
@@ -228,11 +240,11 @@ after route departure or browser restart; check saved receipts before starting
 another transaction after losing a form. No clinical drafts are persisted in
 browser local storage by this workflow.
 
-The existing MedApp dispense confirmation runs only after the transaction commits
-and is not resent on receipt replay. Its original payload shape is preserved.
-It remains best-effort: no durable delivery queue or receiver acknowledgment is
-implemented here. Patient refill fulfillment/delivery, durable correction delivery,
-supplier credits and payment-provider refunds remain open.
+MedApp dispensing reports now commit to an outbox with the transaction. A separate
+worker sends versioned full snapshots and requires a matching persisted MedApp
+acknowledgement. The former callback URL/payload is retired; use the
+[delivery contract and setup](../PHARMACY_SYNC.md). Patient refill fulfillment/delivery,
+specialist issuing, supplier credits and payment-provider refunds remain open.
 
 ## Receipt corrections and completed refund records
 
@@ -288,8 +300,10 @@ Every link must belong to the same prescription and drug; linked sale quantities
 across receipts, less never-collected corrections, cannot exceed the recorded
 dispensed balance. Reconciliation changes links and revisions only. Unknown or
 inconsistent legacy status, balances or missing evidence require further records
-review and remain in scope. Automatic MedApp correction synchronization is not
-connected; the portal tells staff to coordinate with the originating service.
+review and remain in scope. MedApp-origin corrections and line reconciliation
+save a delivery event atomically. Staff check its receipt or attention state in
+the prescription's **MedApp delivery** section. Unknown patient identities require
+explicit records review and are never inferred from mutable customer records.
 
 ### Sales and credit reports
 

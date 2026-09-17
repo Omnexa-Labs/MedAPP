@@ -1,38 +1,5 @@
-// The dose schedule behind MedicationTrackerScreen, and the adherence figure
-// derived from it.
-//
-// ===========================================================================
-// ADHERENCE IS COMPUTED, NEVER WRITTEN DOWN
-// ===========================================================================
-// The frame (UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker)
-// shows "Great job! You've completed 66% of your daily medication schedule."
-// above a grid of dose markers. The obvious build is a `66` in the JSX beside a
-// hand-placed set of ticks — and then the headline and the grid are two
-// independent assertions about the same day, free to disagree the moment either
-// is edited. On a medication screen that disagreement is the bug: a patient
-// reads "66%" over a grid showing four of four taken and cannot tell which is
-// lying.
-//
-// So `adherenceOf` is the ONLY source of the number, and it reads the same dose
-// list the grid renders. There is no literal percentage anywhere in this feature.
-//
-// ===========================================================================
-// WHY `undefined` IS A RESULT, AND 0 IS NOT ITS STAND-IN
-// ===========================================================================
-// Before the first dose of the day falls due there is nothing to be adherent
-// TO. Returning 0 there would render "You've completed 0% of your daily
-// medication schedule" at 6am to a patient who has missed nothing — a reproach
-// for a failure that has not happened. `adherenceOf` returns `undefined` for
-// that day and the screen renders the absence as absence (no percentage line),
-// which is the same stance MedicationDetailsScreen takes on a missing
-// prescriber: a plausible invented value is worse than a missing row.
-//
-// ===========================================================================
-// UPCOMING DOSES ARE NOT MISSES
-// ===========================================================================
-// The denominator is `taken + missed`, not `doses.length`. A 19:00 dose is not a
-// failure at 13:00, and counting it as one would make adherence climb through
-// the day from an opening figure that defames the patient.
+// Reference display helpers retained for regression tests. Production medication data comes from medication-api.ts.
+// The tracker uses server-generated slots; it does not use the sample adherence calculation.
 
 import type { ActiveMedication } from "./types";
 

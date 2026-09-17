@@ -11,9 +11,9 @@ gateway/PMS origins and exact deployment key. MedApp workspace selection and
 handoff/return are implemented; configure the per-deployment handoff credential
 and return allowlists before use. The owner profile editor, explicit publication/
 withdrawal, history and managed photo uploads are implemented; apply directory
-migration 20260915_0004 and set PHARMACY_PUBLIC_API_ORIGIN to the patient gateway.
+migration 20260916_0005 and set PHARMACY_PUBLIC_API_ORIGIN to the patient gateway.
 Dashboard, catalog editing and batch receipt/adjustment/history are implemented.
-Apply PMS migrations through `0006_sale_corrections` with the updated portal/API and
+Apply PMS migrations through `0007_medapp_delivery` with the updated portal/API and
 follow the [inventory contract](api/pms_service.md) for versioned edits, request
 keys and stock concurrency. Purchasing now supports draft edits, partial deliveries,
 multiple batches, cancellation of unreceived stock and administrator reconciliation
@@ -25,7 +25,9 @@ never-collected units from customer returns. Only never-collected units restore
 stock and reduce verified prescription quantities. External refunds can be recorded
 against credits, with separate history and corrected-entry evidence. Older dispense
 links require administrator review. See the [correction contract](api/pms_service.md#receipt-corrections-and-completed-refund-records).
-Missing legacy evidence, durable MedApp synchronization, actual payment-provider
+Dispensing/correction reports now use a transactional queue and a separate worker;
+follow [MedApp synchronization setup](PHARMACY_SYNC.md) and check the latest delivery
+status on the prescription. Missing legacy evidence, specialist issuing, actual payment-provider
 refunds, full operational and rendered/device acceptance remain pending.
 The standalone instructions below do not activate MedApp ownership. Existing PMS
 sessions must sign in again for the new token issuer/audience and pharmacy scope.
@@ -140,7 +142,8 @@ Only relevant if this pharmacy is a MedApp partner. Set these env vars on
 | Variable | Purpose |
 |---|---|
 | `PMS_MEDAPP_WEBHOOK_SECRET` | Shared secret. MedApp signs inbound prescription webhooks with HMAC-SHA256; we verify using this. |
-| `PMS_MEDAPP_DISPENSE_WEBHOOK_URL` | If set, dispenses against `source=medapp` prescriptions POST a signed confirmation here. |
+| `PMS_MEDAPP_SYNC_URL` | Exact `/v1/pharmacy-sync/events` receiver URL used by the separate durable delivery worker. The old dispense callback setting is retired. |
+| `PMS_MEDAPP_DEPLOYMENT_KEY` | Permanent deployment assignment, shared with the directory and worker. |
 
 Endpoints exposed:
 
@@ -150,8 +153,11 @@ Endpoints exposed:
   current stock so MedApp can route to the nearest in-stock pharmacy.
   Requires Bearer auth.
 
-If both variables are empty, the PMS runs **fully standalone** with no MedApp
-calls.
+Standalone walk-in/internal prescriptions do not enter the delivery queue. A
+MedApp-origin prescription without verified patient/workspace identity remains
+flagged for records review. See [the worker rollout and recovery guide](PHARMACY_SYNC.md)
+before enabling delivery; this also requires the confirmed MedApp deployment and
+the directory's matching per-deployment credential.
 
 ---
 

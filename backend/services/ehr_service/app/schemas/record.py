@@ -50,7 +50,7 @@ class PatientSummaryOut(BaseModel):
 class ConsentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     doctor_user_id: UUID
-    scope: Literal["records", "records_and_vitals"] = "records"
+    scope: Literal["records", "records_and_vitals", "records_and_prescriptions"] = "records"
     expires_in_days: Literal[7, 30, 90] = 30
     reason: str = Field(default="patient consent", max_length=255)
 

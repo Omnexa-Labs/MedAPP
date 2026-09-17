@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from shared.observability import configure_logging, instrument_app
 
 from .config import settings
-from .routers import activation, deployments, directory, pharmacies, root
+from .routers import activation, clinical_handoff, deployments, directory, dispensing, pharmacies, root
 
 
 @asynccontextmanager
@@ -25,6 +25,8 @@ def create_app() -> FastAPI:
     app.include_router(activation.router)
     app.include_router(deployments.router)
     app.include_router(directory.router)
+    app.include_router(dispensing.router)
+    app.include_router(clinical_handoff.router)
 
     @app.get("/healthz", tags=["meta"])
     async def healthz() -> dict[str, str]:

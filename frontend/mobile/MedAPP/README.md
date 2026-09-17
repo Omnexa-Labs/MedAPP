@@ -10,6 +10,25 @@ For Google and Apple sign-in, follow the [provider setup guide](../../../docs/PR
 It lists the required accounts, public client IDs, backend settings, native builds and live checks.
 Providers stay unavailable until configured; email authentication remains available.
 
+**Prescriptions** shows the current account's issued clinical records, linked to
+separate pharmacy dispensing reports. Verified doctors can compose and issue
+with explicit patient consent; see [prescribing](../../../docs/PRESCRIBING.md) and
+the [pharmacy receiver/worker](../../../docs/PHARMACY_SYNC.md).
+
+**Medications** and the dose tracker now use patient-owned EHR records. Patients
+can track an issued medicine or add a self report, record taken/skipped doses,
+correct an entry and retain course history across sessions. Follow the
+[tracking contract](../../../docs/MEDICATION_TRACKING.md) for migration and rollout.
+Dispensing never automatically completes a course. Future schedule edits and opt-in
+reminders are implemented; follow the [reminder setup guide](../../../docs/MEDICATION_REMINDERS.md)
+for the new migration, Expo project credentials, native rebuild and worker.
+Scanning and PostgreSQL/provider/device/reference acceptance remain open.
+
+Android build profiles, credential placement, the configuration preflight and
+the physical-phone reminder checklist are in [mobile build setup](../../../docs/MOBILE_BUILD_SETUP.md).
+Run `npm.cmd run check:native-build -- --profile development --platform android`
+before requesting a native build. This checks configuration only and never launches a preview.
+
 ## Install
 
 Run commands from this directory. Use a Node version supported by
@@ -55,6 +74,13 @@ uses a local test inbox and isolated database; it does not validate deployed ema
 or other service-backed journeys.
 
 ## Check
+
+Clinical prescribing: `issue-prescription` is reached from an authorized patient record.
+Only verified doctors with the patient's explicit prescribing permission can save, review,
+issue, correct, cancel and route prescriptions. Patient history/details/new/share routes
+read saved EHR records by ID; text copies refresh the record before export. Pharmacy
+reports have their own route. See [PRESCRIBING.md](../../../docs/PRESCRIBING.md) for contracts,
+workers and remaining medication/reference acceptance.
 
 ```powershell
 npx.cmd expo install --check

@@ -1,6 +1,6 @@
 # MedApp screen inventory
 
-Updated: 2026-09-16. Execution order and acceptance criteria: [COMPLETION_GUIDE.md](COMPLETION_GUIDE.md). Structured tracking: [SCREEN_INVENTORY.json](SCREEN_INVENTORY.json).
+Updated: 2026-09-17. Execution order and acceptance criteria: [COMPLETION_GUIDE.md](COMPLETION_GUIDE.md). Structured tracking: [SCREEN_INVENTORY.json](SCREEN_INVENTORY.json).
 
 ## Reading the register
 
@@ -93,18 +93,18 @@ Replace samples with patient-owned medication/prescription/adherence data; finis
 
 | ID | Reference | UI baseline | Existing code to inspect | Batch |
 | --- | --- | --- | --- | --- |
-| P-039 | [active_medications](<../UI_screens/Patient_facing_screens/active_medications/code.html>) · [image](<../UI_screens/Patient_facing_screens/active_medications/screen.png>) | Partial — sample data | [(app)/active-medications.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-medications.tsx>) | B08 |
-| P-040 | [add_medication_smart_scan_flow](<../UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/code.html>) · [image](<../UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/screen.png>) | Existing code — verify | [(app)/add-medication.tsx](<../frontend/mobile/MedAPP/src/app/(app)/add-medication.tsx>) | B08 |
-| P-041 | [advanced_medication_timeline_tracker](<../UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/code.html>) · [image](<../UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/screen.png>) | Partial — sample data | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
-| P-042 | [digital_prescription_view](<../UI_screens/Patient_facing_screens/digital_prescription_view/code.html>) · [image](<../UI_screens/Patient_facing_screens/digital_prescription_view/screen.png>) | Existing code — verify | [(app)/active-script-view.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-script-view.tsx>) | B08 |
-| P-043 | [full_prescription_history](<../UI_screens/Patient_facing_screens/full_prescription_history/code.html>) · [image](<../UI_screens/Patient_facing_screens/full_prescription_history/screen.png>) | Partial — sample data | [(app)/prescription-history.tsx](<../frontend/mobile/MedAPP/src/app/(app)/prescription-history.tsx>) | B08 |
+| P-039 | [active_medications](<../UI_screens/Patient_facing_screens/active_medications/code.html>) · [image](<../UI_screens/Patient_facing_screens/active_medications/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/active-medications.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-medications.tsx>) | B08 |
+| P-040 | [add_medication_smart_scan_flow](<../UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/code.html>) · [image](<../UI_screens/Patient_facing_screens/add_medication_smart_scan_flow/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/add-medication.tsx](<../frontend/mobile/MedAPP/src/app/(app)/add-medication.tsx>) | B08 |
+| P-041 | [advanced_medication_timeline_tracker](<../UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/code.html>) · [image](<../UI_screens/Patient_facing_screens/advanced_medication_timeline_tracker/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
+| P-042 | [digital_prescription_view](<../UI_screens/Patient_facing_screens/digital_prescription_view/code.html>) · [image](<../UI_screens/Patient_facing_screens/digital_prescription_view/screen.png>) | In progress — clinical prescribing connected; reference acceptance pending | [(app)/active-script-view.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-script-view.tsx>) | B08 |
+| P-043 | [full_prescription_history](<../UI_screens/Patient_facing_screens/full_prescription_history/code.html>) · [image](<../UI_screens/Patient_facing_screens/full_prescription_history/screen.png>) | In progress — clinical prescribing connected; reference acceptance pending | [(app)/prescription-history.tsx](<../frontend/mobile/MedAPP/src/app/(app)/prescription-history.tsx>) | B08 |
 | P-044 | [health_command_center_with_integrated_prescriptions](<../UI_screens/Patient_facing_screens/health_command_center_with_integrated_prescriptions/code.html>) · [image](<../UI_screens/Patient_facing_screens/health_command_center_with_integrated_prescriptions/screen.png>) | Existing code — verify | [(app)/overview.tsx](<../frontend/mobile/MedAPP/src/app/(app)/overview.tsx>) | B08 |
-| P-045 | [medication_detail](<../UI_screens/Patient_facing_screens/medication_detail/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_detail/screen.png>) | Partial — sample data | [(app)/medication-details.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-details.tsx>) | B08 |
+| P-045 | [medication_detail](<../UI_screens/Patient_facing_screens/medication_detail/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_detail/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/medication-details.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-details.tsx>) | B08 |
 | P-046 | [medication_interaction_checker](<../UI_screens/Patient_facing_screens/medication_interaction_checker/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_interaction_checker/screen.png>) | Reference — reconcile | No direct mobile route mapped | B08 |
-| P-047 | [medication_tracker_1](<../UI_screens/Patient_facing_screens/medication_tracker_1/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_tracker_1/screen.png>) | Partial — sample data | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
-| P-048 | [medication_tracker_2](<../UI_screens/Patient_facing_screens/medication_tracker_2/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_tracker_2/screen.png>) | Partial — sample data | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
-| P-049 | [new_prescription_received](<../UI_screens/Patient_facing_screens/new_prescription_received/code.html>) · [image](<../UI_screens/Patient_facing_screens/new_prescription_received/screen.png>) | Partial — sample data | [(app)/new-prescription.tsx](<../frontend/mobile/MedAPP/src/app/(app)/new-prescription.tsx>) | B08 |
-| P-050 | [prescription_sharing_hub](<../UI_screens/Patient_facing_screens/prescription_sharing_hub/code.html>) · [image](<../UI_screens/Patient_facing_screens/prescription_sharing_hub/screen.png>) | Existing code — verify | [(app)/active-script-share.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-script-share.tsx>) | B08 |
+| P-047 | [medication_tracker_1](<../UI_screens/Patient_facing_screens/medication_tracker_1/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_tracker_1/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
+| P-048 | [medication_tracker_2](<../UI_screens/Patient_facing_screens/medication_tracker_2/code.html>) · [image](<../UI_screens/Patient_facing_screens/medication_tracker_2/screen.png>) | In progress — saved medication tracking; reference acceptance pending | [(app)/medication-tracker.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-tracker.tsx>) | B08 |
+| P-049 | [new_prescription_received](<../UI_screens/Patient_facing_screens/new_prescription_received/code.html>) · [image](<../UI_screens/Patient_facing_screens/new_prescription_received/screen.png>) | In progress — clinical prescribing connected; reference acceptance pending | [(app)/new-prescription.tsx](<../frontend/mobile/MedAPP/src/app/(app)/new-prescription.tsx>) | B08 |
+| P-050 | [prescription_sharing_hub](<../UI_screens/Patient_facing_screens/prescription_sharing_hub/code.html>) · [image](<../UI_screens/Patient_facing_screens/prescription_sharing_hub/screen.png>) | In progress — clinical prescribing connected; reference acceptance pending | [(app)/active-script-share.tsx](<../frontend/mobile/MedAPP/src/app/(app)/active-script-share.tsx>) | B08 |
 | P-051 | [smart_scan_preview_verification](<../UI_screens/Patient_facing_screens/smart_scan_preview_verification/code.html>) · [image](<../UI_screens/Patient_facing_screens/smart_scan_preview_verification/screen.png>) | Existing code — verify | [(app)/medication-scan.tsx](<../frontend/mobile/MedAPP/src/app/(app)/medication-scan.tsx>) | B08 |
 
 ### P07 — Lifestyle (3)
@@ -283,8 +283,8 @@ Implement prescription composition, review, issue, cancellation/correction, and 
 
 | ID | Reference | UI baseline | Existing code to inspect | Batch |
 | --- | --- | --- | --- | --- |
-| S-023 | [issue_prescription](<../UI_screens/Specialist_facing_screens/issue_prescription/code.html>) · [image](<../UI_screens/Specialist_facing_screens/issue_prescription/screen.png>) | Not implemented | No direct mobile route mapped | B08 |
-| S-024 | [issue_prescription_advanced_clinical_flow](<../UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/code.html>) · [image](<../UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/screen.png>) † | Not implemented | No direct mobile route mapped | B08 |
+| S-023 | [issue_prescription](<../UI_screens/Specialist_facing_screens/issue_prescription/code.html>) · [image](<../UI_screens/Specialist_facing_screens/issue_prescription/screen.png>) | In progress — clinical prescribing connected; reference acceptance pending | [(app)/issue-prescription.tsx](<../frontend/mobile/MedAPP/src/app/(app)/issue-prescription.tsx>) | B08 |
+| S-024 | [issue_prescription_advanced_clinical_flow](<../UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/code.html>) · [image](<../UI_screens/Patient_facing_screens/issue_prescription_advanced_clinical_flow/screen.png>) † | In progress — clinical prescribing connected; reference acceptance pending | [(app)/issue-prescription.tsx](<../frontend/mobile/MedAPP/src/app/(app)/issue-prescription.tsx>) | B08 |
 
 ### S07 — Publishing and community management (4)
 
@@ -530,3 +530,52 @@ This is supporting work for S-031, which remains in progress and unaccepted.
 Durable MedApp synchronization, actual provider refunds, supplier credits, patient
 refill fulfillment/delivery, clinical alerts, restart recovery and rendered/device/
 theme/reference acceptance remain open. All 108 references remain in scope.
+
+### Pharmacy reports and patient history — 2026-09-16
+
+P-043 now reads the signed-in patient's saved pharmacy reports with dispensing
+quantities, later returns, report time, loading/empty/error/retry and paging.
+Session changes cancel requests and remove the previous account's records.
+Dispensing status is explicitly separate from medication-course completion.
+S-031 gains delivery state and versioned retry controls. A transactional outbox,
+leased worker and authenticated receiver preserve reports through outages,
+duplicate requests, lost acknowledgements and out-of-order arrival. Original
+patient identity is frozen; historical unknown links require records review.
+See the [rollout contract](PHARMACY_SYNC.md) and [validation baseline](COMPLETION_BASELINE.md).
+Both references remain in progress and unaccepted. Specialist issuing, clinical
+new/active/past states, refill/order/delivery and rendered/device/theme/reference
+acceptance remain pending. Counts remain 108: 76 patient and 32 specialist.
+
+### Verified-doctor prescribing — 2026-09-16
+
+S-023/S-024 now use the specialist issue-prescription route for author-owned drafts,
+clinical review, issuing, cancellation, linked replacement and pharmacy handoff.
+Fresh account/profile approval and explicit patient prescribing consent gate
+access. P-042/P-043/P-049/P-050 use saved clinical records for history, detail and
+fresh text-copy export. These six references remain in progress and unaccepted.
+
+The application-only
+[pharmacy prescription history](<../frontend/mobile/MedAPP/src/app/(app)/pharmacy-prescription-history.tsx>)
+route preserves separate patient-owned dispensing reports. The current register
+has 65 mobile routes and three layouts, with the original 108 references (76
+patient, 32 specialist), **0 accepted**. Medication-course/adherence, scanning,
+interaction providers and rendered/device/reference acceptance remain open. See
+[PRESCRIBING.md](PRESCRIBING.md) and the [validation baseline](COMPLETION_BASELINE.md)
+for contracts, deployment requirements and test evidence.
+
+### Saved medication tracking — 2026-09-16
+
+P-039/P-040/P-041/P-045/P-047/P-048 now connect patient-owned medication courses,
+prescription import, self reports, daily/manual dose logs, retained corrections
+and explicit course states. The server checks patient identity, versions,
+duplicate reports, withdrawal cutoffs, paused periods and timezone/DST rules.
+See [MEDICATION_TRACKING.md](MEDICATION_TRACKING.md) and the
+[validation baseline](COMPLETION_BASELINE.md) for evidence and deployment.
+These six references remain in progress and unaccepted. Plan revision, scanning,
+reminders, interaction providers and rendered/device/reference acceptance remain
+open. Counts stay at 108 references: 76 patient, 32 specialist, 0 accepted, with
+65 mobile routes and three layouts.
+
+## Schedule and reminder evidence, 2026-09-17
+
+P-039/P-040/P-041/P-045/P-047/P-048 have additional implementation evidence for retained future schedules and opt-in reminders. See [the reminder contract](MEDICATION_REMINDERS.md) and [208-test validation record](COMPLETION_BASELINE.md). PostgreSQL/provider/device acceptance remains pending. All 108 references remain in scope, grouped as 76 patient and 32 specialist; none is accepted.

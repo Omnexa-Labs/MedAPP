@@ -412,7 +412,43 @@ services:
     environment:
       <<: *svc-env
       EHR_USER_SERVICE_URL: ${EHR_USER_SERVICE_URL:-http://user_service:8001}
+      EHR_DOCTOR_SERVICE_URL: ${EHR_DOCTOR_SERVICE_URL:-http://doctor_service:8002}
+      EHR_PHARMACY_SERVICE_URL: ${EHR_PHARMACY_SERVICE_URL:-http://pharmacy_service:8015}
+      EHR_CLINICAL_HANDOFF_SECRET: ${CLINICAL_HANDOFF_SECRET:-}
+      EHR_MEDICATION_PUSH_ENABLED: ${EHR_MEDICATION_PUSH_ENABLED:-false}
     ports: ["8010:8010"]
+
+  ehr_prescription_delivery:
+    build:
+      <<: *py-build
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: ehr_service
+        SERVICE_PORT: 8010
+    depends_on: { postgres: { condition: service_healthy } }
+    command: ["python", "-m", "app.workers.prescriptions"]
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    environment:
+      EHR_PHARMACY_SERVICE_URL: ${EHR_PHARMACY_SERVICE_URL:-http://pharmacy_service:8015}
+      EHR_CLINICAL_HANDOFF_SECRET: ${CLINICAL_HANDOFF_SECRET:-}
+
+  ehr_medication_reminders:
+    build:
+      <<: *py-build
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: ehr_service
+        SERVICE_PORT: 8010
+    depends_on: { postgres: { condition: service_healthy } }
+    command: ["python", "-m", "app.workers.medication_reminders"]
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    environment:
+      EHR_MEDICATION_PUSH_ENABLED: ${EHR_MEDICATION_PUSH_ENABLED:-false}
+      EHR_EXPO_ACCESS_TOKEN: ${EHR_EXPO_ACCESS_TOKEN:-}
 
   wearable_sync_service:
     build:
@@ -497,8 +533,26 @@ services:
       PMS_ONBOARDING_ACTIVATION_SECRET: ${PMS_ONBOARDING_ACTIVATION_SECRET:-}
       # Match this deployment's stock_secret in PHARMACY_PMS_DEPLOYMENTS.
       PMS_MEDAPP_WEBHOOK_SECRET: ${PMS_MEDAPP_WEBHOOK_SECRET:-}
-      PMS_MEDAPP_DISPENSE_WEBHOOK_URL: ${PMS_MEDAPP_DISPENSE_WEBHOOK_URL:-}
+      PMS_MEDAPP_SYNC_URL: ${PMS_MEDAPP_SYNC_URL:-http://pharmacy_service:8015/v1/pharmacy-sync/events}
     ports: ["8030:8030"]
+
+  pms_medapp_sync:
+    build:
+      <<: *py-build
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: pms_service
+        SERVICE_PORT: 8030
+    depends_on: { postgres: { condition: service_healthy } }
+    command: ["python", "-m", "app.workers.medapp_sync"]
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    environment:
+      PMS_DATABASE_URL: postgresql+asyncpg://medapp:medapp@postgres/medapp_pms
+      PMS_MEDAPP_DEPLOYMENT_KEY: ${PMS_MEDAPP_DEPLOYMENT_KEY:-}
+      PMS_MEDAPP_WEBHOOK_SECRET: ${PMS_MEDAPP_WEBHOOK_SECRET:-}
+      PMS_MEDAPP_SYNC_URL: ${PMS_MEDAPP_SYNC_URL:-http://pharmacy_service:8015/v1/pharmacy-sync/events}
 
   pharmacy_service:
     build:
@@ -514,6 +568,7 @@ services:
       PHARMACY_ONBOARDING_ACTIVATION_SECRET: ${PHARMACY_ONBOARDING_ACTIVATION_SECRET:-}
       PHARMACY_PMS_DEPLOYMENTS: ${PHARMACY_PMS_DEPLOYMENTS:-{}}
       PHARMACY_PUBLIC_API_ORIGIN: ${PHARMACY_PUBLIC_API_ORIGIN:-http://localhost:8000}
+      PHARMACY_CLINICAL_HANDOFF_SECRET: ${CLINICAL_HANDOFF_SECRET:-}
     ports: ["8015:8015"]
 
   pharmacist_service:

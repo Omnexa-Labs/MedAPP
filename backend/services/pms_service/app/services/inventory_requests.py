@@ -39,10 +39,11 @@ async def begin_request(db, request_id: UUID, actor_id: UUID, operation: str, pa
     return record.result
 
 
-async def finish_request(db, request_id, result):
+async def finish_request(db, request_id, result, *, commit=True):
     payload = result.model_dump(mode="json")
     await db.execute(
         update(InventoryRequest).where(InventoryRequest.id == request_id).values(result=payload)
     )
-    await db.commit()
+    if commit:
+        await db.commit()
     return result

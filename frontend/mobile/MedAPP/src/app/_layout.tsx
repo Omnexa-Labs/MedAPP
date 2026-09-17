@@ -12,11 +12,7 @@ import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { QueryClientProvider } from "@tanstack/react-query";
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-} from "@expo-google-fonts/inter";
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from "@expo-google-fonts/inter";
 import {
   Manrope_400Regular,
   Manrope_600SemiBold,
@@ -28,6 +24,7 @@ import { queryClient } from "@/lib/api/query-client";
 import { useAppearanceSync, useResolvedScheme } from "@/lib/theme";
 import { useAuthStore } from "@/store/auth-store";
 import { useWelcomeStore } from "@/store/welcome-store";
+import { ReminderDeviceBridge } from "@/features/medications/ReminderDeviceBridge";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -99,6 +96,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <ReminderDeviceBridge />
       {/* Resolved scheme, not the raw OS one — so an explicit Light/Dark
           override also themes the navigation chrome, not just our own views. */}
       <ThemeProvider value={scheme === "dark" ? DarkTheme : DefaultTheme}>

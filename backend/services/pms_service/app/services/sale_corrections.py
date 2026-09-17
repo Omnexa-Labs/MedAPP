@@ -253,6 +253,9 @@ async def correct(sale_id, body, actor, db):
         rx.version += 1
     sale.version += 1
     await db.flush()
+    from .medapp_delivery import enqueue
+
+    await enqueue(db, rx, "corrected", disposition=body.kind)
     return correction
 
 
@@ -410,4 +413,7 @@ async def reconcile(sale_id, body, db):
     sale.version += 1
     rx.version += 1
     await db.flush()
+    from .medapp_delivery import enqueue
+
+    await enqueue(db, rx, "reconciled")
     return sale

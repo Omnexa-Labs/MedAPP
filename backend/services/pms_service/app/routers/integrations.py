@@ -61,6 +61,26 @@ router = APIRouter(prefix="/v1/integrations", tags=["integrations"])
 PartnerOrStaff = Depends(_require_partner_or_staff)
 
 
+@router.post("/medapp/clinical-prescriptions")
+async def clinical_prescription_handoff(request: Request,
+    x_medapp_signature: str | None = Header(default=None), db: AsyncSession = DbSession):
+    from shared.clinical_handoff import ClinicalHandoff
+    from ..services.clinical_handoff import receive
+    chunks = bytearray()
+    async for chunk in request.stream():
+        chunks.extend(chunk)
+        if len(chunks) > 64_000:
+            raise HTTPException(413, "prescription payload is too large")
+    raw = bytes(chunks)
+    if not medapp_integration.verify_partner_signature("POST", request.url.path, raw, x_medapp_signature):
+        raise HTTPException(401, "invalid partner signature")
+    try:
+        command = ClinicalHandoff.model_validate_json(raw)
+    except ValueError as exc:
+        raise HTTPException(422, "invalid clinical prescription payload") from exc
+    return await receive(db, command)
+
+
 @router.post(
     "/medapp/prescriptions",
     response_model=MedAppWebhookAck,
@@ -71,13 +91,18 @@ async def medapp_prescription_webhook(
     x_medapp_signature: str | None = Header(default=None),
     db: AsyncSession = DbSession,
 ):
-    raw = await request.body()
+    chunks = bytearray()
+    async for chunk in request.stream():
+        chunks.extend(chunk)
+        if len(chunks) > 256_000:
+            raise HTTPException(413, "Prescription payload is too large.")
+    raw = bytes(chunks)
     if not medapp_integration.verify_signature(raw, x_medapp_signature):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid signature")
     try:
         payload = MedAppPrescriptionWebhook.model_validate_json(raw)
     except Exception as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid payload: {exc}") from exc
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid prescription payload.") from exc
     result = await medapp_integration.ingest_prescription(payload, db)
     return MedAppWebhookAck(**result)
 

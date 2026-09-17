@@ -306,6 +306,12 @@ it("dispenses selected quantities with the saved revision and shows the sale lin
     expected_total_cents: 250,
   });
 });
+it("shows the dispensing expiry and prevents starting an expired prescription", async () => {
+  vi.mocked(prescriptionsRepo.get).mockResolvedValue({ ...rx, valid_until: "2020-01-01" });
+  mount(<PrescriptionDetail id="rx1" />);
+  expect(await screen.findByRole("button", { name: "Prepare dispense" })).toBeDisabled();
+  expect(screen.getByText(/Expired — dispensing is unavailable/)).toBeInTheDocument();
+});
 it("cancels remaining units with a reason and retains its request on network failure", async () => {
   vi.mocked(prescriptionsRepo.cancel)
     .mockRejectedValueOnce(new Error("Offline"))

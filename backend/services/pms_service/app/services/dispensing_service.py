@@ -9,6 +9,7 @@ from sqlalchemy import select
 from ..models.core import Prescription, PrescriptionItem, Sale, SaleItem
 from . import inventory_service as inventory
 from . import transaction_pricing as pricing
+from .medapp_delivery import enqueue
 
 
 async def prepare(rx_id, body, db):
@@ -19,6 +20,8 @@ async def prepare(rx_id, body, db):
         raise HTTPException(409, "This prescription changed. Reload before dispensing.")
     if rx.status not in ("pending", "partially_dispensed"):
         raise HTTPException(400, f"Prescription is {rx.status}.")
+    if rx.valid_until and rx.valid_until < datetime.now(UTC).date():
+        raise HTTPException(409, "This prescription has expired; request a new prescription.")
     items = {
         item.id: item
         for item in await db.scalars(
@@ -112,17 +115,5 @@ async def dispense(rx_id, body, actor_id, db):
         "currency": sale.currency,
         "lines": result_lines,
     }
-    # The router commits stock, sale, audit and replay receipt together, then
-    # performs the existing best-effort integration without holding row locks.
-    outbound = None
-    if rx.source == "medapp" and rx.external_ref:
-        outbound = {
-            "external_ref": rx.external_ref,
-            "rx_number": rx.rx_number,
-            "status": rx.status,
-            "sale_number": sale.sale_number,
-            "sale_total_cents": sale.total_cents,
-            "currency": sale.currency,
-            "lines": result_lines,
-        }
-    return result, outbound
+    await enqueue(db, rx, "dispensed")
+    return result

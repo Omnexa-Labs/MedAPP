@@ -1,6 +1,6 @@
 # MedApp project completion guide
 
-Updated: 2026-09-16.
+Updated: 2026-09-17.
 
 This is the working guide for completing MedApp. It covers the full reference inventory in two screen groups: **patient-facing** and **specialist-facing**.
 
@@ -22,7 +22,7 @@ Seventeen specialist references are physically stored under `Patient_facing_scre
 
 The specialist group includes doctor, nurse, and hospital/pharmacy partner workflows as subgroups. Their permissions remain separate. This organizational grouping does not give every specialist access to every professional action.
 
-The mobile source currently has 63 non-test route entries and 3 layouts, including active sessions, two-factor setup, care-team sharing, the patient vitals timeline, medical-records hub, hospital workspaces and pharmacy workspaces (recounted from source). A route may contain several states or reference variants. Route count is not a completion measure. Reference variants remain individually tracked until their behavior and appearance are accounted for in an accepted implementation.
+The mobile source currently has 65 non-test route entries and 3 layouts, including active sessions, two-factor setup, care-team sharing, the patient vitals timeline, medical-records hub, hospital/pharmacy workspaces, specialist prescribing and pharmacy reports (recounted from source). A route may contain several states or reference variants. Route count is not a completion measure. Reference variants remain individually tracked until their behavior and appearance are accounted for in an accepted implementation.
 
 Previously deferred features such as community groups and order/delivery references remain in this guide. Where an older document excludes them, record the scope conflict and settle the implementation contract in the assigned batch; do not silently remove the reference from the checklist.
 
@@ -216,6 +216,40 @@ B03 specialist entry/onboarding; remaining account actions stay in B01.
 - [ ] Integrate partner dispensing without treating MedApp patient credentials as PMS staff credentials.
 
 **Exit:** a specialist issues a prescription; the correct patient sees it, tracks its medication, and can revisit the saved state. Changes and dispensing acknowledgments reconcile across the relevant systems.
+
+2026-09-16 partial integration: pharmacy dispensing/correction reports now reach
+patient-owned history through a durable queue and authenticated receiver. This
+supports P-043/S-031, but does not complete specialist issuing, medication-course
+states or the B08 exit. See [PHARMACY_SYNC.md](PHARMACY_SYNC.md).
+
+2026-09-16 prescribing milestone: EHR owns doctor-authored drafts, reviewed issuing,
+immutable corrections/cancellations and patient-scoped history. Verified doctors
+require explicit `records_and_prescriptions` consent. Durable pharmacy handoff and
+withdrawal reconcile with dispensing reports; replacement requires confirmed
+withdrawal of a routed original. Specialist compose/review and patient
+details/history/text-copy routes are connected. See [PRESCRIBING.md](PRESCRIBING.md).
+Medication tracking, adherence, scanning, interaction providers and rendered/device
+acceptance remain open. The B08 exit and all 108 reference acceptances remain incomplete.
+
+2026-09-16 medication milestone: patient-owned courses and dose reports now persist
+in EHR. Patients can track issued prescription items or add self reports, choose
+daily/manual tracking, report taken/skipped doses, correct entries with retained
+history, and pause/resume/stop/complete tracking with a reason. Prescription and
+pharmacy states remain separate. Lists, tracker, details, history and fresh text
+exports are connected. See [MEDICATION_TRACKING.md](MEDICATION_TRACKING.md) and
+[validation evidence](COMPLETION_BASELINE.md). This supports
+P-039/P-040/P-041/P-045/P-047/P-048 without accepting them. Scanning, interaction
+providers and rendered/device/reference QA remain open. The following update supersedes
+the plan-revision/reminder implementation gap.
+
+2026-09-17 schedule/reminder milestone: future daily-time/end-date changes retain
+historical plans and dose attribution. Reminder preferences, native registration,
+generic Expo push dispatch and attempt history are implemented. Worker suppression
+uses current course, prescription, device and dose state; uncertain sends are not
+resent. See [MEDICATION_REMINDERS.md](MEDICATION_REMINDERS.md). The 208 unit/component
+checks pass; new PostgreSQL migration/concurrency checks and real provider/device
+delivery remain pending. Docker repair and preview startup were blocked by automatic
+approval review. No reference is accepted and B08/B09 remain incomplete.
 
 ### B09 — Complete daily follow-up and clinical insights
 
@@ -498,15 +532,46 @@ review, including separate allocations when the same medicine appears twice.
 Apply `0006_sale_corrections` with the API and portal. See the
 [correction contract](api/pms_service.md#receipt-corrections-and-completed-refund-records)
 and [latest validation record](COMPLETION_BASELINE.md). S-031 remains unaccepted.
-This workflow does not initiate provider payments or synchronize corrections to
-the originating MedApp prescription automatically.
+This workflow does not initiate provider payments. The later synchronization
+update below adds automatic delivery of pharmacy correction reports.
 
-Next B03/B11 implementation steps:
+Pharmacy synchronization update, 2026-09-16: MedApp ingestion freezes the patient
+identity and rejects partial or ambiguous prescriptions. Dispensing, both receipt
+correction dispositions, cancellation and line reconciliation save full snapshots
+with the local transaction. A separate leased worker retries delivery; the receiver
+deduplicates event/sequence receipts and preserves newer patient state if reports
+arrive out of order. Staff have delivery status and versioned retry controls.
+The patient prescription-history route now uses account-scoped real reports with
+quantities, returns and report times, separate from medicine-course completion.
+Apply `0007_medapp_delivery` and `20260916_0005`; use the
+[rollout guide](PHARMACY_SYNC.md) and [validation record](COMPLETION_BASELINE.md).
+P-043 and S-031 remain in progress and unaccepted.
+
+Prescribing update, 2026-09-16: verified doctors with explicit patient consent can
+save drafts, review and issue, cancel and prepare linked replacements. Patients
+see saved clinical records and can export a freshly retrieved text copy. Pharmacy
+send/withdrawal commands use durable acknowledgements; a routed original requires
+confirmed withdrawal before replacement. This supports S-023/S-024 and
+P-042/P-043/P-049/P-050 without accepting a reference. See the
+[prescribing contract](PRESCRIBING.md) and [validation record](COMPLETION_BASELINE.md).
+
+Android build preparation, 2026-09-17: the product owner selected Android for the
+first live reminder test. EAS variant profiles and a configuration preflight are
+implemented, with 28 passing configuration tests. Follow [mobile build setup](MOBILE_BUILD_SETUP.md)
+for Expo/Firebase configuration and the phone acceptance record. The local check
+still needs the Expo project UUID, reachable gateway URL and matching Firebase
+client file. No phone is connected through ADB, no native build was produced,
+and the prior Docker repair/preview policy blocks remain unresolved. This adds
+no reference acceptance credit.
+
+Next B03/B08/B11 implementation steps:
 
 1. Complete deployed browser and native acceptance for hospital
    staff and profile publication using the recorded checks and required configuration.
-2. Continue the pharmacy operational/reference flows: implement durable MedApp
-   dispense/correction synchronization and real refill/order/delivery and clinical-alert contracts.
+2. Finish PostgreSQL migration/concurrency and real-device acceptance for the
+   implemented schedule revisions and reminders; complete scanning/verification and an appropriate
+   interaction-data integration. Continue real refill/order/delivery contracts
+   using the saved clinical prescriptions and pharmacy reports.
    The dashboard, catalog, purchasing/partial-delivery, POS/prescription and
    correction/refund-record workflows now support this work. Supplier returns/
    credits, provider payment/refund reconciliation and recovery after route departure

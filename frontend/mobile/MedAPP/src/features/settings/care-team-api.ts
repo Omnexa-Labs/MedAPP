@@ -82,12 +82,17 @@ export function careTeamApi(isSessionCurrent: () => boolean) {
       clinicianId: string,
       allowVitals: boolean,
       duration: ConsentDuration,
+      allowPrescriptions = false,
     ): Promise<CareConsent> {
       return client.post(
         path(userId),
         {
           doctor_user_id: clinicianId,
-          scope: allowVitals ? "records_and_vitals" : "records",
+          scope: allowPrescriptions
+            ? "records_and_prescriptions"
+            : allowVitals
+              ? "records_and_vitals"
+              : "records",
           expires_in_days: duration,
           reason: "Patient confirmation in care-team sharing settings",
         },
@@ -103,5 +108,7 @@ export function careTeamApi(isSessionCurrent: () => boolean) {
 export function permissionLabel(scope: string): string {
   if (scope === "records") return "View EHR summary and vitals";
   if (scope === "records_and_vitals") return "View EHR summary and add vitals";
+  if (scope === "records_and_prescriptions")
+    return "View EHR and prescriptions; issue and manage prescriptions";
   return "Legacy permission — access scope unavailable";
 }

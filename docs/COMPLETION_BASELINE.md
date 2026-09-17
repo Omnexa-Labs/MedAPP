@@ -6,7 +6,264 @@ Planning correction from the product owner: most patient-facing screens are impl
 
 This is an initial code and reference review to prepare for completing the existing product. It is not a release certification or an exhaustive defect list. Status below distinguishes implemented UI, API wiring visible in source, and runtime verification. Recheck each area before changing it: several older handbooks and handoff entries describe work that has since been completed.
 
-## Latest pharmacy operations update: corrections and refund records, 2026-09-16
+## Native build preparation, 2026-09-17
+
+The product owner selected Android for the first reminder test. Added development
+and preview APK profiles, a production AAB profile, explicit profile environments,
+and an EAS post-install configuration check. Unknown `APP_ENV` values now fail
+configuration resolution. Firebase client files/local credentials are ignored.
+The check validates the resolved variant, Expo project UUID, explicit physical-phone
+API URL, notifications plugin and Firebase client/package match without printing
+configured values or file errors. See [MOBILE_BUILD_SETUP.md](MOBILE_BUILD_SETUP.md).
+
+**28 configuration tests pass**, including resolution of the actual Expo config
+for all three variants using synthetic values; no provider is contacted. Report:
+`%LOCALAPPDATA%/MedApp/recovery-runtime/mobile/native-build-tests.tap`.
+Mobile TypeScript and Git whitespace checks pass. This is separate from the 208
+reminder implementation tests below. The actual local check exits 1 and lists
+`EAS_PROJECT_ID`, a reachable `API_BASE_URL`, and `ANDROID_GOOGLE_SERVICES_FILE`
+as missing; its redacted report is `mobile/native-build-preflight.json` in the same
+runtime. No EAS project/account or provider credentials
+have been verified. ADB reports zero connected devices. No native build, app
+launch or push delivery was performed. Docker's Linux-engine pipe is still
+unavailable; the earlier policy blocks on Docker repair and preview startup were
+not retried. PostgreSQL, provider/device and reference acceptance remain pending.
+
+## Latest medication update: future schedules and opt-in reminders, 2026-09-17
+
+Medication details now supports future daily-time/end-date revisions, a retained
+revision history, saved reminder preferences, native device registration and
+reminder attempt history. Original medicine directions, timezone and historical
+doses remain fixed. Tracker and retrospective reports resolve the plan for the
+requested day. Pending revisions can be replaced with retained audit evidence.
+
+The EHR worker selects newly due slots from authoritative records, suppresses
+inactive/withdrawn/expired/reported slots and persists one attempt per device/slot
+before calling Expo. Its message is generic and never logs a dose. Provider
+acceptance is explicitly distinct from phone arrival; ambiguous sends are not
+automatically replayed. Resume starts future reminders without catching up prompts
+from before the pause. Device registration requires explicit opt-in and OS
+permission, expires after seven days, renews on foreground, and is disabled on
+sign-out/lock where connectivity and the captured credential permit.
+
+See [MEDICATION_REMINDERS.md](MEDICATION_REMINDERS.md) for contracts, limits,
+credential/build setup and the pending release checks. Deploy requires EHR
+`20260917_0007`, the declared Expo notifications dependency, a configured native
+build, and the `ehr_medication_reminders` worker. Push defaults off. No retained
+database was migrated and no real push was sent.
+
+Executed reports under `%LOCALAPPDATA%/MedApp/recovery-runtime`:
+
+| Evidence | Result |
+| --- | --- |
+| `ehr-reminders-final.xml` | **128 passed**: full EHR suite, including 36 new schedule/reminder cases. Ownership, versions/replays, historical/manual plan resolution, saved-zone effective dates, preference/device lifecycle, suppression, no duplicate retry, DST and mocked Expo acknowledgements. SQLite/ASGI, not PostgreSQL. Two existing dependency deprecation warnings. |
+| `mobile/reminders-tests-final.json` | **77 passed** in 11 suites: medication screens/helpers, connected clinical prescriptions and auth deep links. Includes future-plan editing, payload/key reuse, pending-plan rendering, separate preference/device state, permission handling, identity switches, renewal/revocation and provider-acceptance wording. APIs and native modules are mocked. |
+| `mobile/reminders-bridge-final.json` | **2 passed**: app-level session/foreground lifecycle, rotated credentials, sign-out, account switching and listener cleanup. |
+| `mobile/reminders-ui-final.json` | **6 passed**: the five plan-control cases above rechecked, plus a regression for keeping a removed end date empty when reopening a pending plan. Only the new sixth case is additional to the 77. |
+| `mobile/reminders-native-final.json` | The same three native adapter cases rechecked after final user-facing copy cleanup; included in the 77. |
+
+Total: **208 distinct passing tests**. Mobile TypeScript and scoped Ruff pass.
+Seventeen mobile source/config/test files match the external runtime.
+The migration compiles to PostgreSQL SQL offline (`ehr-reminders-upgrade.sql`);
+this is not a database execution or rollback test. Mobile ESLint remains
+unavailable as previously recorded. A component test caught and fixed native
+text wrapping in the pending-plan callout; this is not rendered-device acceptance.
+
+The expanded HTTP/PostgreSQL suite and migration/worker concurrency check are
+prepared but **unexecuted**. Docker Desktop failed to initialize its stale
+`sailor-ingest.sock`; automatic approval review rejected the targeted Docker
+restart/socket cleanup as **blocked by policy**. Image
+`medapp-hospital-qa:reminders-20260917` was not built. Earlier PostgreSQL results
+below apply to earlier source, not this milestone. Automatic approval review had
+also blocked preview startup, so browser/device/theme/reference acceptance remains
+pending. Expo credentials/native build and real arrival checks remain outstanding.
+
+All **108 references (76 patient, 32 specialist) remain in scope; 0 accepted**.
+No route was added (65 routes, three layouts). Changes remain local on
+`project-completion`; the previous GitHub checkpoint is unchanged. Next: complete
+the pending database/provider/device verification, then scanning/verification,
+interaction providers, refill/order/delivery and the remaining specialist flows.
+
+## Earlier medication update: patient courses and dose tracking, 2026-09-16
+
+Patient medication screens now read EHR records instead of sample lists. Patients
+can track an item from their own issued prescription or add an explicitly
+self-reported medicine. Tracking records retain source directions, daily times
+or manual logging, an IANA timezone and planned dates. Active, paused, stopped
+and completed states are patient reports, with reasons and retained transitions.
+Dispensing, elapsed dates and dose counts do not automatically complete a course.
+
+Taken/skipped reports, removed entries and before/after corrections persist with
+atomic request receipts. Patient locks and unique scheduled slots prevent duplicate
+reports from concurrent requests. Future slots, paused periods, withdrawal cutoffs
+and daylight-saving gaps are checked on the server. Prescription replacement now
+preserves an earlier cancellation time, so it cannot reopen the withdrawn period
+for retrospective reporting. Existing doctor consent does not grant access to
+patient tracking. Lists/history fail closed on account changes and distinguish
+failed, empty and loading results. Exports refresh and label the selected page.
+
+Apply EHR `20260916_0006`, install the declared `tzdata` dependency and deploy the
+mobile client with the EHR API. No new service credential or worker is required.
+Only disposable QA databases were migrated. See [MEDICATION_TRACKING.md](MEDICATION_TRACKING.md)
+for contracts, state semantics and remaining work.
+
+Final reports under `%LOCALAPPDATA%/MedApp/recovery-runtime`:
+
+| Evidence | Result |
+| --- | --- |
+| `medications-verified/ehr_service.xml` | 92 passed: 66 prior EHR/prescribing cases and 26 medication cases. Covers ownership, authoritative prescription linkage, validation, duplicate/replayed requests, status transitions, scheduled/manual reports, corrections, withdrawal, pagination, planned end and DST. |
+| `medications-verified/ehr-medications-final.xml` | The same 26 medication cases passed again with the final test fixture (its prescribed-course clock now follows issuing time). Included in the 92, not counted twice. |
+| `medications-verified/pharmacy-http-postgres.xml` | Four real HTTP/PostgreSQL/migration cases passed. The extended journey concurrently creates tracking, reports and corrects doses, rejects competing writes, reads saved records through a fresh client, checks patient isolation and rejects reports after withdrawal. A new migration case preserves legacy prescriptions across upgrade/downgrade/upgrade and rejects populated tracking downgrade. |
+| `mobile/medications-tests.json` | 57 passed across medication screens/helpers and connected clinical-prescription screens. Covers real-data states with mocked APIs, confirmation, source-only import, exact retry payload/key, stale versions, corrections, account-switch reads/writes, reopening, export freshness, paging and saved-zone display. |
+| `mobile/medications-add-final.json` | The same six add-form cases passed again after retaining the temporary camera-reference entry point. Included in the 57, not counted twice. |
+
+Total: **153 distinct passing tests**, no failures or skips in these final reports.
+Mobile TypeScript, scoped Ruff and Git whitespace checks pass. Nineteen changed
+mobile source/test/fixture files match the external QA copies. Some React Native
+test runs emit existing asynchronous Icon/VirtualizedList `act` warnings; no test
+fails. Mobile ESLint remains unavailable as previously recorded. No native build,
+live notification provider or rendered browser/device acceptance is claimed.
+
+The backend image is `medapp-hospital-qa:medications-20260916`, manifest
+`sha256:8e6c61d46e3255fd4cd4929ba829601b384f8465bdee0a01c19e1e0d24e8d160`.
+The final targeted EHR run mounts only the updated test file read-only; application
+sources match the image used for the full EHR and HTTP/PostgreSQL runs. Integration
+services publish no host ports and their disposable containers are removed.
+
+P-039/P-040/P-041/P-045/P-047/P-048 are in progress and unaccepted. Counts remain
+**108 references: 76 patient, 32 specialist, 0 accepted**, and 65 mobile routes.
+Scanning/OCR, photo retention, plan revision, reminders, interaction providers
+and specialist access to these reports remain open. Unsaved form drafts and
+uncertain request keys do not survive leaving/restarting; saved records do, and
+the UI directs patients to check their history before entering another report.
+Automatic approval review previously rejected preview startup as **blocked by
+policy**, so browser/device/theme/reference acceptance remains pending. Changes
+remain local on `project-completion`, beyond the earlier GitHub checkpoint.
+
+## Previous prescribing update: verified doctors and pharmacy handoff, 2026-09-16
+
+Only verified doctors with an active account, active approved profile and explicit
+patient `records_and_prescriptions` consent can prescribe. EHR owns author-private
+drafts, reviewed issuing, immutable issued content, cancellation and linked
+replacement drafts. Existing sharing grants do not gain prescribing access.
+Patients see only their own issued records; cancelled, unissued drafts remain
+private. Writes use optimistic versions and atomic, actor-bound request receipts.
+The mobile client retrieves current detail after a command replay so an old issue
+receipt cannot display a subsequently cancelled prescription as issued.
+
+Specialists can compose, review, issue, withdraw and prepare replacements from
+the patient record. Patient history/detail/share routes read saved clinical data;
+text export refreshes the record and identifies the result as an unsigned patient
+copy. Clinical URL parameters and sample prescriptions cannot substitute for a
+saved record. Pharmacy reports remain separate from medication-course completion.
+
+A separate EHR worker delivers frozen send/withdrawal commands through the private
+pharmacy relay to the confirmed PMS deployment. Leases, bounded retries and exact
+acknowledgements preserve delivery through outages. PMS matches complete medicine
+lines by name, strength and form, enforces dispensing expiry and retains withdrawal
+markers to reject a delayed first send. Cancellation preserves supplied quantities,
+sales and stock. A routed original requires confirmed pharmacy withdrawal before
+the doctor prepares its replacement. See [PRESCRIBING.md](PRESCRIBING.md) for
+contracts, EHR `20260916_0005` / PMS `0008_clinical_handoff` migrations, credentials
+and the separate delivery worker. Retained application databases were not migrated.
+
+Final reports under `%LOCALAPPDATA%/MedApp/recovery-runtime`:
+
+| Evidence | Result |
+| --- | --- |
+| `prescribing-verified/ehr_service.xml` | 66 passed. Covers current verified-doctor access, explicit consent, draft privacy, version/replay handling, immutable issued content, correction/withdrawal and delivery recovery. |
+| `prescribing-verified/doctor_service.xml` | 40 passed. Includes approval-receipt eligibility and inactive/legacy profile rejection. |
+| `prescribing-verified/pms_service.xml` | 138 passed. Includes signed clinical handoff, exact catalog identity, cancellation-before-send, replay and expiry enforcement. |
+| `prescribing-verified/pharmacy_service.xml` | 105 passed. Directory, activated deployment routing and patient-owned dispensing report regression coverage. |
+| `prescribing-verified/api_gateway.xml` | 34 passed. Authenticated routing and the narrowly scoped signed-report exception. |
+| `prescribing-verified/pharmacy-http-postgres.xml` | Three real HTTP/PostgreSQL/migration cases passed. The journey exercises approved accounts, consent, concurrent duplicate creation/issuing, draft and patient isolation, outages and competing delivery workers, partial dispensing, confirmed withdrawal, replacement, revocation and stale-token rejection. Cancellation leaves stock and prior dispensing intact. |
+| `mobile/prescribing-tests.json` | 25 passed across clinical prescribing, pharmacy history and care-team contracts. Includes explicit review, same-request retries, current cancelled status after replay, fresh export and account-switch isolation. APIs are mocked. |
+| `pms-web/prescribing-portal.xml` | 188 passed, including four real Redis cases and the prescription-expiry interaction. UI cases use mocked repositories. |
+
+Total: **599 distinct passing tests**, no failures or skips in these final reports.
+Mobile and portal TypeScript, portal lint and the portal production build pass.
+Scoped Ruff, Compose configuration and Git whitespace checks pass. All 17 current
+frontend source/test files checked match the external QA copies. The final backend
+image is `medapp-hospital-qa:prescribing-20260916`, manifest
+`sha256:774db6a39a45c0da7a16809d571893868e209f4a0def0ca945ac4584d3dbafe8`.
+The final EHR and full HTTP/PostgreSQL runs use that image. Earlier service reports
+use the same service sources except for the final EHR-only privacy change, which
+the final EHR run covers. All database/service integration testing is disposable
+and publishes no host ports. Mobile ESLint remains unavailable as recorded below;
+it is not included in the passing checks.
+
+S-023/S-024 and P-042/P-043/P-049/P-050 have implementation evidence and remain
+unaccepted. The register retains **108 references: 76 patient and 32 specialist,
+0 accepted**, with 65 mobile routes and three layouts. Medication-course state,
+adherence, scanning, interaction providers, refill/order/delivery, notifications
+and production configuration remain open. Browser/device/theme/reference
+acceptance remains pending because automatic approval review previously rejected
+preview startup as **blocked by policy**. This milestone and the preceding sync
+work are local on `project-completion`, beyond the earlier GitHub checkpoint.
+
+## Previous pharmacy update: reliable MedApp reports and patient history, 2026-09-16
+
+MedApp-origin ingestion, dispensing, both correction dispositions, cancellation
+and receipt-line reconciliation now save immutable full snapshots in the same
+transaction as local pharmacy changes. A separate worker uses expiring claims,
+bounded automatic retries and matching persisted acknowledgements. Staff can
+view delivery history and request an audited, versioned retry without repeating
+stock or payment operations. Invalid/partial/ambiguous inbound prescriptions are
+rejected atomically, and concurrent exact requests share one ingestion receipt.
+
+The directory now receives signed reports from confirmed pharmacy deployments.
+Patient identity is frozen from authenticated ingestion and cannot follow edits
+to a customer record. Duplicate deliveries return their original acknowledgement;
+older snapshots cannot rewind newer patient state. The patient's prescription
+history now uses account-scoped saved reports with dispensing quantities, returns,
+report times, refresh, paging and explicit failed/empty states. Dispensing remains
+separate from medication-course completion. This does not implement the upstream
+specialist prescribing service or refill/order/delivery contracts.
+
+Apply PMS `0007_medapp_delivery` and directory `20260916_0005`, deploy the related
+services/clients, configure `PMS_MEDAPP_SYNC_URL` and run the separate worker.
+Legacy patient identities are not backfilled, and immutable delivery payloads
+cannot be edited through the retry API. Duplicate external references or missing
+historical evidence need explicit reconciliation. See [PHARMACY_SYNC.md](PHARMACY_SYNC.md)
+for deployment and recovery.
+
+Final evidence under `%LOCALAPPDATA%/MedApp/recovery-runtime`:
+
+| Evidence | Result |
+| --- | --- |
+| `pharmacy-sync-verified/pms-sync.xml` | 130 PMS tests passed. Includes atomic ingestion, frozen recipient, missing/ambiguous drug rejection, rollback with stock, correction/cancellation snapshots, response validation, transport/status failures, expired leases, manual retry authorization/replay and automatic retry limits. |
+| `pharmacy-sync-verified/pharmacy-sync.xml` | 105 directory tests passed. Includes deployment authentication/freshness, malformed signature headers, immutable identity/lines, duplicate event/sequence rejection, out-of-order receipt, patient ownership and payload limits. |
+| `pharmacy-sync-verified/gateway-sync.xml` | 34 gateway tests passed. Only the exact signed POST bypasses patient JWT checking; patient history routes to its own authenticated service. |
+| `pharmacy-sync-verified/pharmacy-http-postgres.xml` | Three complete HTTP/PostgreSQL/migration cases passed. The extended journey concurrently ingests, dispenses and corrects one prescription; exercises an unavailable receiver, committed receipt with lost acknowledgement, a worker process exiting after claim, lease expiry and competing worker processes; verifies patient isolation and newest-state preservation. Migration round trips retain legacy data with unknown patient links. |
+| `pms-web/pms-sync.xml` | 187 portal tests passed, including four real Redis cases and five new status/retry/access tests. Repositories are mocked in UI cases. |
+| `pms-web/pms-sync-final-focus.xml` | 19 existing cases passed again after correcting the repository's default API-client import; these are included in the 187, not counted twice. |
+| `mobile/pharmacy-sync-tests.json` | 24 mobile tests passed, including ten new report/UI/session/paging/validation cases and 14 existing prescription-domain cases. APIs are mocked. |
+
+Total: **483 distinct passing tests**, no failures or skips in the final reports.
+The portal production build, portal TypeScript/lint and mobile TypeScript pass.
+Scoped Ruff, Compose configuration and Git whitespace checks pass. All ten changed
+frontend source/test files match the external QA copies. The final backend image
+is `medapp-hospital-qa:sync-20260916`, manifest
+`sha256:cb5a8b7112dc1c39ff3e6ca921f7e8dedb87c0ba380ef967b9416544f1b2bfb0`.
+
+The initial mobile run exceeded the default five-second cold-render timeout; the
+final run passed with a 15-second per-test limit. Mobile ESLint did not run:
+`eslint` and `eslint-config-expo` are absent from its installed/declaration graph,
+and the attempted npx fallback failed with `ECONNRESET`. No mobile dependency
+manifest was changed; this remains an environment task, separate from passing
+mobile TypeScript/tests. The portal lint uses its installed dependency graph.
+
+P-043 and S-031 have partial implementation evidence and remain unaccepted. All
+108 references remain in scope: 76 patient and 32 specialist, **0 accepted**.
+Automatic approval review previously rejected preview startup as **blocked by
+policy**; browser/device/theme/reference acceptance remains pending. Production
+configuration and queue-age alerting, specialist issuing, clinical new/active/past
+states, refills/order/delivery, clinical alerts, supplier credits, provider refunds,
+legacy records without evidence and browser-restart transaction recovery remain open.
+These changes are local on `project-completion`; the earlier GitHub push is the
+previous checkpoint, not this milestone.
+
+## Previous pharmacy operations update: corrections and refund records, 2026-09-16
 
 Receipt corrections now preserve the original sale and append partial credits,
 reasons, staff attribution and physical disposition. Never-collected units restore

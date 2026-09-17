@@ -1,41 +1,5 @@
-// SAMPLE DOSE SCHEDULE. NOT ANY PATIENT'S RECORD.
-//
-// There is no medication endpoint and therefore no dose-history endpoint either
-// — the routing evidence is in the header of MedicationDetailsScreen.tsx. This
-// file is the tracker's equivalent of ./sample-data.ts and is labelled on screen
-// by the same `SAMPLE_NOTICE`.
-//
-// ===========================================================================
-// THE DRUGS ARE THE ONES ALREADY IN ./sample-data.ts, NOT THE FRAME'S
-// ===========================================================================
-// The frame draws Lisinopril 10mg, Multivitamin, Metformin 500mg and
-// Atorvastatin 20mg. Three of those four appear nowhere else in this app: the
-// shipped sample list is Amlodipine, Metformin and Vitamin D3. Building the
-// frame literally would put two different "your medications" lists one tap apart
-// — the list screen naming three drugs and the tracker naming four others — and
-// a patient reading both cannot reconcile them. Since both are sample data, the
-// one that has to give is the frame.
-//
-// So doses reference `SAMPLE_MEDICATIONS` BY ID. A medication removed from that
-// file takes its doses with it (`dosesByMedication` drops rows with no matching
-// medication), and no drug name is spelled twice.
-//
-// The dose TIMES are taken from each medication's own `instructions`, so the grid
-// agrees with the sig line the other two screens render:
-//
-//   Amlodipine  "once daily in the morning"          -> 08:00
-//   Metformin   "with breakfast and dinner"          -> 08:00 + 19:00
-//   Vitamin D3  "once daily with food"               -> 13:00
-//
-// ===========================================================================
-// NO HARDCODED DATE. THIS IS THE "12 JUL" RULE.
-// ===========================================================================
-// The frame's header reads "October 2023 / Tue 24". A literal date is exactly the
-// defect ActiveMedicationsScreen deleted when it removed "Offline · Updated 12
-// Jul at 09:42" — "a fixed date that would still have said 12 Jul in 2027". So
-// the schedule is BUILT FROM a date passed in rather than frozen into a
-// constant, and the screen passes today's. That also keeps the module free of a
-// clock read at import time, which is what makes it testable.
+// Reference display helpers retained for regression tests. Production medication data comes from medication-api.ts.
+// The tracker uses server-generated slots; it does not use the sample adherence calculation.
 
 import { SAMPLE_MEDICATIONS } from "./sample-data";
 import type { DaySchedule } from "./schedule";
